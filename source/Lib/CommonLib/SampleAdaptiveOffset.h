@@ -68,8 +68,7 @@ class SampleAdaptiveOffset
 public:
   SampleAdaptiveOffset();
   virtual ~SampleAdaptiveOffset();
-  void SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkParams
-                   );
+  void SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkParams );
   void create( int picWidth, int picHeight, ChromaFormat format, uint32_t maxCUWidth, uint32_t maxCUHeight, uint32_t maxCUDepth, uint32_t lumaBitShift, uint32_t chromaBitShift );
   void destroy();
   static int getMaxOffsetQVal(const int channelBitDepth) { return (1<<(std::min<int>(channelBitDepth,MAX_SAO_TRUNCATED_BITDEPTH)-5))-1; } //Table 9-32, inclusive
@@ -86,6 +85,15 @@ public:
   uint8_t* getCcSaoControlIdc(const ComponentID compID) { return m_ccSaoControl[compID]; }
   PelStorage& getCcSaoBuf() { return m_ccSaoBuf; }
   void jointClipSaoBifCcSao(CodingStructure& cs);
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+  static int getCcSaoClassNum(const int compIdx, const int setIdx, const CcSaoComParam& ccSaoParam);
+  inline int getCcSaoEdgeIdx(const Pel c, const Pel a, const int t, const int edgeIdc)
+  {
+    const int d = c - a;
+    if   (edgeIdc == 0) { return (d < 0 ? (d < -t ? 0 : 1) : (d < t ? 2 : 3)); }
+    else/*edgeIdc == 1*/{ return (                            d < t ? 0 : 1 ); }
+  }
+#endif
 #endif
 protected:
   void deriveLoopFilterBoundaryAvailibility(CodingStructure& cs, const Position &pos,
@@ -149,22 +157,30 @@ protected:
   }
   Reshape* m_pcReshape;
 #if JVET_W0066_CCSAO
-  void applyCcSao(CodingStructure &cs, const PreCalcValues& pcv, const CPelUnitBuf& srcYuv, PelUnitBuf& dstYuv);
+  void applyCcSao(CodingStructure& cs, const PreCalcValues& pcv, const CPelUnitBuf& srcYuv, PelUnitBuf& dstYuv);
+#if !JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
   void offsetCTUCcSao(CodingStructure& cs, const UnitArea& area, const CPelUnitBuf& srcYuv, PelUnitBuf& dstYuv, const int ctuRsAddr);
+#endif
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
-  void offsetBlockCcSaoNoClipEdge(const ComponentID compID, const ChromaFormat chromaFormat, const int bitDepth, const ClpRng &clpRng,
-                                  const uint16_t candPosY, const uint16_t bandNumY, const uint16_t bandNumU,
-                                  const uint16_t bandNumV, const short *offset, const Pel *srcY, const Pel *srcU,
-                                  const Pel *srcV, Pel *dst, const int srcStrideY, const int srcStrideU,
-                                  const int srcStrideV, const int dstStride, const int width, const int height,
-                                  bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail,
-                                  bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail
+  void offsetBlockCcSaoNoClipEdge(const ComponentID compID, const ChromaFormat chromaFormat, const int bitDepth, const ClpRng &clpRng
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+                                , const uint16_t edgeCmp
+                                , const uint16_t edgeDir, const uint16_t bandIdc, const uint16_t edgeThr, const uint16_t edgeIdc
+#else
+                                , const uint16_t candPosY, const uint16_t bandNumY, const uint16_t bandNumU, const uint16_t bandNumV
+#endif
+                                , const short *offset
+                                , const Pel *srcY, const Pel *srcU, const Pel *srcV, Pel *dst
+                                , const int srcStrideY, const int srcStrideU, const int srcStrideV, const int dstStride 
+                                , const int width, const int height
+                                , bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                                 , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
 #endif
                                   );
 #endif
   void offsetCTUCcSaoNoClip(CodingStructure& cs, const UnitArea& area, const CPelUnitBuf& srcYuv, PelUnitBuf& dstYuv, const int ctuRsAddr);
+#if !JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
   void offsetBlockCcSao(const ComponentID compID, const ChromaFormat chromaFormat, const int bitDepth, const ClpRng& clpRng
                       , const uint16_t candPosY
                       , const uint16_t bandNumY, const uint16_t bandNumU, const uint16_t bandNumV
@@ -177,11 +193,11 @@ protected:
                       , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
 #endif
                        );
+#endif
   void offsetBlockCcSaoNoClip(const ComponentID compID, const ChromaFormat chromaFormat, const int bitDepth, const ClpRng& clpRng
-                            , const uint16_t candPosY
-                            , const uint16_t bandNumY, const uint16_t bandNumU, const uint16_t bandNumV
+                            , const uint16_t candPosY, const uint16_t bandNumY, const uint16_t bandNumU, const uint16_t bandNumV
                             , const short* offset
-                            , const Pel* srcY, const Pel* srcU, const Pel* srcV, Pel* dst
+                            , const Pel* srcY, const Pel* srcU, const Pel* srcV, Pel *dst 
                             , const int srcStrideY, const int srcStrideU, const int srcStrideV, const int dstStride
                             , const int width, const int height
                             , bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail
@@ -215,6 +231,9 @@ private:
   bool m_picSAOEnabled[MAX_NUM_COMPONENT];
 };
 
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+extern std::vector<CcSaoPrvParam> g_ccSaoPrvParam[MAX_NUM_COMPONENT];
+#endif
 //! \}
 #endif
 

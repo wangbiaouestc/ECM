@@ -145,6 +145,14 @@ IntraPrediction::IntraPrediction()
 #else
   m_cccmLumaBuf = nullptr;
 #endif
+#if JVET_AE0100_BVGCCCM
+  for (int i = 0; i < NUM_BVG_CCCM_CANDS; i++)
+  {
+    m_bvgCccmLumaBuf[i] = nullptr;
+    m_bvgCccmChromaBuf[i][0] = nullptr;
+    m_bvgCccmChromaBuf[i][1] = nullptr;
+  }
+#endif
 #endif
 #if JVET_AD0086_ENHANCED_INTRA_TMP
   for (int j = 0; j < MTMP_NUM; j++)
@@ -265,6 +273,17 @@ void IntraPrediction::destroy()
 #else
   delete[] m_cccmLumaBuf;
   m_cccmLumaBuf = nullptr;
+#endif
+#if JVET_AE0100_BVGCCCM
+  for (int i = 0; i < NUM_BVG_CCCM_CANDS; i++)
+  {
+    delete[] m_bvgCccmLumaBuf[i];
+    m_bvgCccmLumaBuf[i] = nullptr;
+    delete[] m_bvgCccmChromaBuf[i][0];
+    m_bvgCccmChromaBuf[i][0] = nullptr;
+    delete[] m_bvgCccmChromaBuf[i][1];
+    m_bvgCccmChromaBuf[i][1] = nullptr;
+  }
 #endif
 #endif
 #if JVET_AD0086_ENHANCED_INTRA_TMP
@@ -481,6 +500,23 @@ void IntraPrediction::init(ChromaFormat chromaFormatIDC, const unsigned bitDepth
   if (m_cccmLumaBuf == nullptr)
   {
     m_cccmLumaBuf = new Pel[(2*MAX_CU_SIZE + CCCM_WINDOW_SIZE + 2*CCCM_FILTER_PADDING) * (2*MAX_CU_SIZE + CCCM_WINDOW_SIZE + 2*CCCM_FILTER_PADDING)];
+  }
+#endif
+#if JVET_AE0100_BVGCCCM
+  for (int i = 0; i < NUM_BVG_CCCM_CANDS; i++)
+  {
+    if( m_bvgCccmLumaBuf[i] == nullptr )
+    {
+      m_bvgCccmLumaBuf[i] = new Pel[(2 * MAX_CU_SIZE + CCCM_WINDOW_SIZE + 2 * CCCM_FILTER_PADDING) * (2 * MAX_CU_SIZE + CCCM_WINDOW_SIZE + 2 * CCCM_FILTER_PADDING)];
+    }
+    if (m_bvgCccmChromaBuf[i][0] == nullptr)
+    {
+      m_bvgCccmChromaBuf[i][0] = new Pel[(2 * MAX_CU_SIZE + CCCM_WINDOW_SIZE + 2 * CCCM_FILTER_PADDING) * (2 * MAX_CU_SIZE + CCCM_WINDOW_SIZE + 2 * CCCM_FILTER_PADDING)];
+    }
+    if (m_bvgCccmChromaBuf[i][1] == nullptr)
+    {
+      m_bvgCccmChromaBuf[i][1] = new Pel[(2 * MAX_CU_SIZE + CCCM_WINDOW_SIZE + 2 * CCCM_FILTER_PADDING) * (2 * MAX_CU_SIZE + CCCM_WINDOW_SIZE + 2 * CCCM_FILTER_PADDING)];
+    }
   }
 #endif
 #endif
@@ -1842,7 +1878,11 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
 #endif
     {
       xIntraPredPlanarDcPdpc(srcBuf2, m_tempBuffer[1].getBuf(localUnitArea.Y()).buf,
-                             m_tempBuffer[1].getBuf(localUnitArea.Y()).stride, iWidth, iHeight, pu.ciipPDPC);
+                             m_tempBuffer[1].getBuf(localUnitArea.Y()).stride, iWidth, iHeight
+#if CIIP_PDPC       
+           ,pu.ciipPDPC
+#endif   
+      );
     }
 #endif
     
@@ -2290,7 +2330,11 @@ void IntraPrediction::xUpdateCclmModel(int &a, int &b, int &iShift, int midLuma,
 }
 #endif
 
+#if JVET_AD0188_CCP_MERGE
+void IntraPrediction::predIntraChromaLM( const ComponentID compID, PelBuf &piPred, PredictionUnit &pu, const CompArea& chromaArea, int intraDir, bool createModel, CclmModel *cclmModelStored )
+#else
 void IntraPrediction::predIntraChromaLM(const ComponentID compID, PelBuf &piPred, const PredictionUnit &pu, const CompArea& chromaArea, int intraDir, bool createModel, CclmModel *cclmModelStored)
+#endif
 {
 #if JVET_AC0119_LM_CHROMA_FUSION
   if (pu.isChromaFusion > 1)
@@ -2327,9 +2371,9 @@ void IntraPrediction::predIntraChromaLM(const ComponentID compID, PelBuf &piPred
     xGlmApplyModel(pu, compID, chromaArea, glmModel, piPred);
 
  #if JVET_AD0188_CCP_MERGE
-    const_cast<PredictionUnit &>(pu).curCand.type   = CCP_TYPE_GLM4567;
-    const_cast<PredictionUnit &>(pu).curCand.glmIdc = pu.glmIdc.getIdc(compID, 0);
-    PU::glmModelToCcpParams(compID, const_cast<PredictionUnit&>(pu).curCand, glmModel 
+    pu.curCand.type   = CCP_TYPE_GLM4567;
+    pu.curCand.glmIdc = pu.glmIdc.getIdc(compID, 0);
+    PU::glmModelToCcpParams(compID, pu.curCand, glmModel 
 #if JVET_AB0174_CCCM_DIV_FREE
                             , m_glmLumaOffset
 #endif
@@ -2401,13 +2445,15 @@ void IntraPrediction::predIntraChromaLM(const ComponentID compID, PelBuf &piPred
 
 #if JVET_AD0188_CCP_MERGE
   int glmIdc = pu.glmIdc.getIdc(compID, 0);
-  const_cast<PredictionUnit&>(pu).curCand.type = (glmIdc > 0) ? CCP_TYPE_GLM0123 : CCP_TYPE_CCLM;
+  pu.curCand.type = (glmIdc > 0) ? CCP_TYPE_GLM0123 : CCP_TYPE_CCLM;
+
   if (PU::isMultiModeLM(pu.intraDir[1]))
   {
-    const_cast<PredictionUnit&>(pu).curCand.type |= CCP_TYPE_MMLM;
+    pu.curCand.type |= CCP_TYPE_MMLM;
   }
-  const_cast<PredictionUnit&>(pu).curCand.glmIdc = glmIdc;
-  PU::cclmModelToCcpParams(compID, const_cast<PredictionUnit&>(pu).curCand, cclmModel);
+
+  pu.curCand.glmIdc = glmIdc;
+  PU::cclmModelToCcpParams(compID, pu.curCand, cclmModel);
 #endif
 
   ////// final prediction
@@ -3362,7 +3408,11 @@ void IntraPrediction::xPredIntraAng( const CPelBuf &pSrc, PelBuf &pDst, const Ch
 }
 
 #if JVET_Z0050_DIMD_CHROMA_FUSION
+#if JVET_AD0188_CCP_MERGE
+void IntraPrediction::geneChromaFusionPred( const ComponentID compId, PelBuf &piPred, PredictionUnit &pu )
+#else
 void IntraPrediction::geneChromaFusionPred(const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu)
+#endif
 {
   int width = piPred.width;
   int height = piPred.height;
@@ -3463,13 +3513,13 @@ void IntraPrediction::geneChromaFusionPred(const ComponentID compId, PelBuf &piP
       if (cccmSAD < cclmSAD)
       {
 #if JVET_AC0054_GLCCCM
-        const_cast<PredictionUnit &>(pu).curCand.type = ((pu.glCccmFlag ? CCP_TYPE_GLCCCM : CCP_TYPE_CCCM) | CCP_TYPE_MMLM);
-        const_cast<PredictionUnit &>(pu).curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
-        const_cast<PredictionUnit &>(pu).curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
+        pu.curCand.type = ((pu.glCccmFlag ? CCP_TYPE_GLCCCM : CCP_TYPE_CCCM) | CCP_TYPE_MMLM);
+        pu.curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
+        pu.curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
 #else
-        const_cast<PredictionUnit &>(pu).curCand.type = (CCP_TYPE_CCCM | CCP_TYPE_MMLM);
+        pu.curCand.type = (CCP_TYPE_CCCM | CCP_TYPE_MMLM);
 #endif
-        PU::cccmModelToCcpParams(const_cast<PredictionUnit &>(pu).curCand, cccmModelCb, cccmModelCr, modelThr
+        PU::cccmModelToCcpParams(pu.curCand, cccmModelCb, cccmModelCr, modelThr
 #if JVET_AB0174_CCCM_DIV_FREE
                                  , m_cccmLumaOffset
 #endif
@@ -3477,9 +3527,9 @@ void IntraPrediction::geneChromaFusionPred(const ComponentID compId, PelBuf &piP
       }
       else
       {
-        const_cast<PredictionUnit &>(pu).curCand.type = (CCP_TYPE_CCLM | CCP_TYPE_MMLM);
-        PU::cclmModelToCcpParams(COMPONENT_Cb, const_cast<PredictionUnit &>(pu).curCand, cclmModelCb);
-        PU::cclmModelToCcpParams(COMPONENT_Cr, const_cast<PredictionUnit &>(pu).curCand, cclmModelCr);
+        pu.curCand.type = (CCP_TYPE_CCLM | CCP_TYPE_MMLM);
+        PU::cclmModelToCcpParams(COMPONENT_Cb, pu.curCand, cclmModelCb);
+        PU::cclmModelToCcpParams(COMPONENT_Cr, pu.curCand, cclmModelCr);
       }
     }
 #endif
@@ -3491,11 +3541,12 @@ void IntraPrediction::geneChromaFusionPred(const ComponentID compId, PelBuf &piP
     predIntraChromaLM(compId, predLmBuffer, pu2, area, pu2.intraDir[1]);
 
 #if JVET_AD0188_CCP_MERGE
-    const_cast<PredictionUnit &>(pu).curCand      = pu2.curCand;
-    const_cast<PredictionUnit &>(pu).curCand.type = CCP_TYPE_CCLM;
+    pu.curCand      = pu2.curCand;
+    pu.curCand.type = CCP_TYPE_CCLM;
+
     if (PU::isMultiModeLM(pu2.intraDir[1]))
     {
-      const_cast<PredictionUnit &>(pu).curCand.type |= CCP_TYPE_MMLM;
+      pu.curCand.type |= CCP_TYPE_MMLM;
     }
 #endif
 #if JVET_AD0120_LBCCP
@@ -8849,6 +8900,17 @@ void IntraPrediction::xGetLumaRecPixels(const PredictionUnit &pu, CompArea chrom
       , downsFilterIdx
 #endif
     );
+#if JVET_AE0100_BVGCCCM
+    if (pu.bvgCccmFlag)
+    {
+      CHECK(downsFilterIdx > 0, "downsFilterIdx in bvgCccm must be zero!");
+      xBvgCccmCreateLumaRef(pu, chromaArea
+#if JVET_AD0202_CCCM_MDF
+      , downsFilterIdx
+#endif
+                            );
+    }
+#endif
     return;
   }
 #endif
@@ -9457,16 +9519,12 @@ void IntraPrediction::xGetLMParameters(const PredictionUnit &pu, const Component
   if (avgCnt)
   {
     int x = floorLog2(avgCnt);
-    static const uint8_t DivSigTable[1 << 4] = {
-      // 4bit significands - 8 ( MSB is omitted )
-      0,  7,  6,  5,  5,  4,  4,  3,  3,  2,  2,  1,  1,  1,  1,  0
-    };
+    // 4bit significands - 8 ( MSB is omitted )
+    const uint8_t divSigTable[1 << 4] = { 0,  7,  6,  5,  5,  4,  4,  3,  3,  2,  2,  1,  1,  1,  1,  0 };
     int normDiff = (avgCnt << 4 >> x) & 15;
-    int v = DivSigTable[normDiff] | 8;
+    int v = divSigTable[normDiff] | 8;
     x += normDiff != 0;
-
     yAvg = (yAvg * v) >> (x + 3);
-
   }
   int cntMMLM[2] = { 0,0 };
 
@@ -9547,19 +9605,18 @@ void IntraPrediction::xGetLMParameters(const PredictionUnit &pu, const Component
         {
           int diffC = maxLuma2[i][1] - minLuma2[i][1];
           int x = floorLog2(diff);
-          static const uint8_t DivSigTable[1 << 4] = {
-            // 4bit significands - 8 ( MSB is omitted )
-            0,  7,  6,  5,  5,  4,  4,  3,  3,  2,  2,  1,  1,  1,  1,  0
-          };
+          // 4bit significands - 8 ( MSB is omitted )
+          const uint8_t divSigTable[1 << 4] = { 0,  7,  6,  5,  5,  4,  4,  3,  3,  2,  2,  1,  1,  1,  1,  0 };
           int normDiff = (diff << 4 >> x) & 15;
-          int v = DivSigTable[normDiff] | 8;
+          int v = divSigTable[normDiff] | 8;
           x += normDiff != 0;
 
           int y = floorLog2(abs(diffC)) + 1;
           int add = 1 << y >> 1;
           ax = (diffC * v + add) >> y;
           iShiftx = 3 + x - y;
-          if (iShiftx < 1) {
+          if (iShiftx < 1)
+          {
             iShiftx = 1;
             ax = ((ax == 0) ? 0 : (ax < 0) ? -15 : 15);   // a=Sign(a)*15
           }
@@ -9605,12 +9662,10 @@ void IntraPrediction::xGetLMParameters(const PredictionUnit &pu, const Component
     {
       int diffC = maxLuma[1] - minLuma[1];
       int x = floorLog2( diff );
-      static const uint8_t DivSigTable[1 << 4] = {
-        // 4bit significands - 8 ( MSB is omitted )
-        0,  7,  6,  5,  5,  4,  4,  3,  3,  2,  2,  1,  1,  1,  1,  0
-      };
+      // 4bit significands - 8 ( MSB is omitted )
+      const uint8_t divSigTable[1 << 4] = { 0,  7,  6,  5,  5,  4,  4,  3,  3,  2,  2,  1,  1,  1,  1,  0 };
       int normDiff = (diff << 4 >> x) & 15;
-      int v = DivSigTable[normDiff] | 8;
+      int v = divSigTable[normDiff] | 8;
       x += normDiff != 0;
 
       int y = floorLog2( abs( diffC ) ) + 1;
@@ -9971,7 +10026,7 @@ int IntraPrediction::xCalcLMParametersGeneralized(int x, int y, int xx, int xy, 
   return 0;
 }
 
-int IntraPrediction::xLMSampleClassifiedTraining(int count, int mean, int meanC, int LumaSamples[], int ChrmSamples[], int bitDepth, MMLM_parameter parameters[])
+int IntraPrediction::xLMSampleClassifiedTraining(int count, int mean, int meanC, int lumaSamples[], int chrmSamples[], int bitDepth, MMLMParameters parameters[])
 {
 
   //Initialize
@@ -9987,36 +10042,36 @@ int IntraPrediction::xLMSampleClassifiedTraining(int count, int mean, int meanC,
   {
     return -1;
   }
-  int GroupCount[2] = { 0, 0 };
+  int groupCount[2] = { 0, 0 };
 
   CHECK(count > 512, "");
 
   int meanDiff = meanC - mean;
   mean = std::max(1, mean);
 
-  int LumaPower2[2][128];
-  int ChromaPower2[2][128];
+  int lumaPower2[2][128];
+  int chromaPower2[2][128];
   //int GroupCount[2] = { 0, 0 };
   for (int i = 0; i < count; i++)
   {
-    if (LumaSamples[i] <= mean)
+    if (lumaSamples[i] <= mean)
     {
-      LumaPower2[0][GroupCount[0]] = LumaSamples[i];
-      ChromaPower2[0][GroupCount[0]] = ChrmSamples[i];
-      GroupCount[0]++;
+      lumaPower2[0][groupCount[0]] = lumaSamples[i];
+      chromaPower2[0][groupCount[0]] = chrmSamples[i];
+      groupCount[0]++;
     }
     else
     {
-      LumaPower2[1][GroupCount[1]] = LumaSamples[i];
-      ChromaPower2[1][GroupCount[1]] = ChrmSamples[i];
-      GroupCount[1]++;
+      lumaPower2[1][groupCount[1]] = lumaSamples[i];
+      chromaPower2[1][groupCount[1]] = chrmSamples[i];
+      groupCount[1]++;
     }
   }
 
   // Take power of two
   for (int group = 0; group < 2; group++)
   {
-    int existSampNum = GroupCount[group];
+    int existSampNum = groupCount[group];
     if (existSampNum < 2)
     {
       continue;
@@ -10028,12 +10083,12 @@ int IntraPrediction::xLMSampleClassifiedTraining(int count, int mean, int meanC,
     if (upperPower2 != lowerPower2)
     {
       int numPaddedSamples = std::min(existSampNum, upperPower2 - existSampNum);
-      GroupCount[group] = upperPower2;
+      groupCount[group] = upperPower2;
       int step = (int)(existSampNum / numPaddedSamples);
       for (int i = 0; i < numPaddedSamples; i++)
       {
-        LumaPower2[group][existSampNum + i] = LumaPower2[group][i * step];
-        ChromaPower2[group][existSampNum + i] = ChromaPower2[group][i * step];
+        lumaPower2[group][existSampNum + i] = lumaPower2[group][i * step];
+        chromaPower2[group][existSampNum + i] = chromaPower2[group][i * step];
 
       }
     }
@@ -10048,20 +10103,20 @@ int IntraPrediction::xLMSampleClassifiedTraining(int count, int mean, int meanC,
   for (int group = 0; group < 2; group++)
   {
 
-    for (int i = 0; i < GroupCount[group]; i++)
+    for (int i = 0; i < groupCount[group]; i++)
     {
-      x[group] += LumaPower2[group][i];
-      y[group] += ChromaPower2[group][i];
-      xx[group] += LumaPower2[group][i] * LumaPower2[group][i];
-      xy[group] += LumaPower2[group][i] * ChromaPower2[group][i];
+      x[group] += lumaPower2[group][i];
+      y[group] += chromaPower2[group][i];
+      xx[group] += lumaPower2[group][i] * lumaPower2[group][i];
+      xy[group] += lumaPower2[group][i] * chromaPower2[group][i];
     }
   }
   for (int group = 0; group < 2; group++)
   {
     int a, b, iShift;
-    if (GroupCount[group] > 1)
+    if (groupCount[group] > 1)
     {
-      xCalcLMParametersGeneralized(x[group], y[group], xx[group], xy[group], GroupCount[group], bitDepth, a, b, iShift);
+      xCalcLMParametersGeneralized(x[group], y[group], xx[group], xy[group], groupCount[group], bitDepth, a, b, iShift);
 
       parameters[group].a = a;
       parameters[group].b = b;
@@ -10349,7 +10404,7 @@ void IntraPrediction::xGetLMParametersLMS(const PredictionUnit &pu, const Compon
   if (PU::isMultiModeLM(pu.intraDir[1]))
   {
     // Classify and training
-    MMLM_parameter parameters[2];
+    MMLMParameters parameters[2];
     int lumaSamples[512];
     int chromaSamples[512];
     int meanC = 0; int mean = 0;
@@ -10366,12 +10421,10 @@ void IntraPrediction::xGetLMParametersLMS(const PredictionUnit &pu, const Compon
     if (avgCnt)
     {
        int x = floorLog2(avgCnt);
-       static const uint8_t DivSigTable[1 << 4] = {
-         // 4bit significands - 8 ( MSB is omitted )
-        0,  7,  6,  5,  5,  4,  4,  3,  3,  2,  2,  1,  1,  1,  1,  0
-       };
+       // 4bit significands - 8 ( MSB is omitted )
+       const uint8_t divSigTable[1 << 4] = { 0,  7,  6,  5,  5,  4,  4,  3,  3,  2,  2,  1,  1,  1,  1,  0 };
        int normDiff = (avgCnt << 4 >> x) & 15;
-       int v = DivSigTable[normDiff] | 8;
+       int v = divSigTable[normDiff] | 8;
        x += normDiff != 0;
 
        mean = (mean * v) >> (x + 3);
@@ -10531,12 +10584,11 @@ void IntraPrediction::xGetLMParametersLMS(const PredictionUnit &pu, const Compon
 #endif
 
 #if JVET_V0130_INTRA_TMP
-void insertNode( int diff, int& iXOffset, int& iYOffset, int& pDiff, int& pX, int& pY, short& pId, unsigned int& setId )
+void insertNode( int diff, int& iXOffset, int& iYOffset, int& pDiff, int& pX, int& pY )
 {
   pDiff = diff;
   pX = iXOffset;
   pY = iYOffset;
-  pId = setId;
 }
 
 void clipMvIntraConstraint( CodingUnit* pcCU, int regionId, int& iHorMin, int& iHorMax, int& iVerMin, int& iVerMax, unsigned int uiTemplateSize, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int iCurrY, int iCurrX, int offsetLCUY, int offsetLCUX, RefTemplateType tempType )
@@ -10552,177 +10604,109 @@ void clipMvIntraConstraint( CodingUnit* pcCU, int regionId, int& iHorMin, int& i
   int iTemplateSize = uiTemplateSize;
   int iBlkWidth = uiBlkWidth;
   int iBlkHeight = uiBlkHeight;
-  if( regionId == 0 ) //above outside LCU
+  int iCTUsize = pcCU->cs->sps->getCTUSize();
+
+  iHorMin = iVerMin = 0;
+  iHorMax = iVerMax = INT_MAX;
+
+  if (regionId == 0) // Above outside CTU
   {
-    iHorMax = std::min( (iCurrX + searchRangeWidth) << iMvShift, ( int ) ((pcCU->cs->pps->getPicWidthInLumaSamples() - iBlkWidth) << iMvShift) );
-    iHorMin = std::max( (tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrX - searchRangeWidth) << iMvShift );
-
-    iVerMax = (iCurrY - iBlkHeight - offsetLCUY) << iMvShift;
-    iVerMin = std::max( (tempType != LEFT_TEMPLATE) ? iTemplateSize << iMvShift : 0, ((iCurrY - searchRangeHeight) << iMvShift) );
-
-    iHorMin = iHorMin - iCurrX;
-    iHorMax = iHorMax - iCurrX;
-    iVerMax = iVerMax - iCurrY;
-    iVerMin = iVerMin - iCurrY;
+    iVerMax = (iCurrY - offsetLCUY - iBlkHeight) << iMvShift;
   }
-  else if( regionId == 1 ) //left outside LCU
+  else if (regionId == 1) // Left outside and top-left within CTU
   {
 #if JVET_AD0086_ENHANCED_INTRA_TMP
     iHorMax = (iCurrX - iBlkWidth) << iMvShift;
-    iHorMin = std::max( (tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrX - searchRangeWidth) << iMvShift );
-
-    iVerMin = std::max( (tempType != LEFT_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrY - iBlkHeight - offsetLCUY) << iMvShift );
+#if JVET_AE0077_EXT_INTRATMP
+    iVerMin = (iCurrY - offsetLCUY - iBlkHeight + 1) << iMvShift;
+#else
+    iVerMin = (iCurrY - offsetLCUY - iBlkHeight) << iMvShift;
+#endif
     iVerMax = (iCurrY) << iMvShift;
 #else
     iHorMax = (iCurrX - offsetLCUX - iBlkWidth) << iMvShift;
-    iHorMin = std::max( (tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrX - searchRangeWidth) << iMvShift );
-
-    iVerMin = std::max( (tempType != LEFT_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrY - iBlkHeight - offsetLCUY) << iMvShift );
+    iVerMin = (iCurrY - offsetLCUY - iBlkHeight) << iMvShift;
     iVerMax = (iCurrY) << iMvShift;
 #endif
-
-    iHorMin = iHorMin - iCurrX;
-    iHorMax = iHorMax - iCurrX;
-    iVerMax = iVerMax - iCurrY;
-    iVerMin = iVerMin - iCurrY;
   }
-  else if( regionId == 2 ) //left outside LCU (can reach the bottom row of LCU)
+  else if (regionId == 2) // Left-bottom outside CTU
   {
-    iHorMin = std::max( (tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrX - searchRangeWidth) << iMvShift );
     iHorMax = (iCurrX - offsetLCUX - iBlkWidth) << iMvShift;
     iVerMin = (iCurrY + 1) << iMvShift;
-    iVerMax = std::min( pcCU->cs->pps->getPicHeightInLumaSamples() - iBlkHeight, (iCurrY - offsetLCUY + pcCU->cs->sps->getCTUSize() - iBlkHeight) << iMvShift );
-
-    iHorMin = iHorMin - iCurrX;
-    iHorMax = iHorMax - iCurrX;
-    iVerMax = iVerMax - iCurrY;
-    iVerMin = iVerMin - iCurrY;
+    iVerMax = (iCurrY - offsetLCUY + iCTUsize - iBlkHeight) << iMvShift;
   }
-#if JVET_AD0086_ENHANCED_INTRA_TMP
-  else if (regionId == 3)   // within CTU
+  else if (regionId == 3)   // Top within CTU
   {
-    iVerMin = std::max( (tempType != LEFT_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrY - offsetLCUY - iBlkHeight + 1) << iMvShift );
+    iVerMin = (iCurrY - offsetLCUY - iBlkHeight + 1) << iMvShift;
     iVerMax = (iCurrY - iBlkHeight) << iMvShift;
-    iHorMin = std::max( (tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrX - iBlkWidth + 1) << iMvShift );
-    iHorMax = (iCurrX);
-
-    iHorMin = iHorMin - iCurrX;
-    iHorMax = iHorMax - iCurrX;
-    iVerMax = iVerMax - iCurrY;
-    iVerMin = iVerMin - iCurrY;
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+    iHorMin = (iCurrX - iBlkWidth + 1) << iMvShift;
+    iHorMax = (iCurrX) << iMvShift;
+#else
+    iHorMin = (iCurrX - offsetLCUX - iBlkWidth + 1) << iMvShift;
+    iHorMax = (iCurrX - iBlkWidth) << iMvShift;
+#endif
+  }
+#if JVET_AE0077_EXT_INTRATMP
+  else if (regionId == 4)   // Bottom-Left within CTU
+  {
+    iHorMin = (iCurrX - offsetLCUX - iBlkWidth + 1) << iMvShift;
+    iHorMax = (iCurrX - iBlkWidth) << iMvShift;
+    iVerMin = (iCurrY + 1) << iMvShift;
+    iVerMax = (iCurrY - offsetLCUY + iCTUsize - iBlkHeight) << iMvShift;
+  }
+  else if (regionId == 5)   // Top-right within CTU
+  {
+    iHorMin = (iCurrX + 1) << iMvShift;
+    iHorMax = (iCurrX - offsetLCUX + iCTUsize - iBlkWidth) << iMvShift;
+    iVerMin = (iCurrY - offsetLCUY - iBlkHeight + 1) << iMvShift;
+    iVerMax = (iCurrY - iBlkHeight) << iMvShift;
   }
 #endif
+
+  // Clipping by frame boundaries
+  iVerMin = std::max(iVerMin, (tempType != LEFT_TEMPLATE) ? iTemplateSize << iMvShift : 0);
+  iVerMax = std::min(iVerMax, ((int)pcCU->cs->pps->getPicHeightInLumaSamples() - iBlkHeight) << iMvShift);
+  iHorMin = std::max(iHorMin, (tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0);
+  iHorMax = std::min(iHorMax, ((int)pcCU->cs->pps->getPicWidthInLumaSamples() - iBlkWidth) << iMvShift);
+
+  // Clipping by search range
+#if !JVET_AE0077_EXT_INTRATMP
+  if (regionId == 0)
+  {
+#endif
+  iVerMin = std::max(iVerMin, (iCurrY - searchRangeHeight) << iMvShift);
+  iVerMax = std::min(iVerMax, (iCurrY + searchRangeHeight) << iMvShift);
+#if !JVET_AE0077_EXT_INTRATMP
+  }
+  if (regionId != 3)
+  {
+#endif
+  iHorMin = std::max(iHorMin, (iCurrX - searchRangeWidth) << iMvShift);
+  iHorMax = std::min(iHorMax, (iCurrX + searchRangeWidth) << iMvShift);
+#if !JVET_AE0077_EXT_INTRATMP
+  }
+#endif
+
+  iHorMin = iHorMin - iCurrX;
+  iHorMax = iHorMax - iCurrX;
+  iVerMax = iVerMax - iCurrY;
+  iVerMin = iVerMin - iCurrY;
 }
 
 #if JVET_AB0130_ITMP_SAMPLING
-void clipMvIntraConstraintRefine(CodingUnit* pcCU, int regionId, int& iHorMin, int& iHorMax, int& iVerMin, int& iVerMax, unsigned int uiTemplateSize, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int iCurrY, int iCurrX, int offsetLCUY, int offsetLCUX, int pX, int pY, int refinementRange, RefTemplateType tempType)
+void clipMvIntraConstraintRefine(int& iHorMin, int& iHorMax, int& iVerMin, int& iVerMax,int pX, int pY, int refinementRange)
 {
 #if JVET_AD0086_ENHANCED_INTRA_TMP
-  int searchRangeWidth  = std::max(TMP_SEARCH_RANGE_MULT_FACTOR * (int) uiBlkWidth, TMP_MINSR);
-  int searchRangeHeight = std::max(TMP_SEARCH_RANGE_MULT_FACTOR * (int) uiBlkHeight, TMP_MINSR);
-#else   
-  int searchRangeWidth = TMP_SEARCH_RANGE_MULT_FACTOR * uiBlkWidth;
-  int searchRangeHeight = TMP_SEARCH_RANGE_MULT_FACTOR * uiBlkHeight;
-#endif  
-  int iMvShift = 0;
-  int iTemplateSize = uiTemplateSize;
-  int iBlkWidth = uiBlkWidth;
-  int iBlkHeight = uiBlkHeight;
-  if (regionId == 0) //above outside LCU
-  {
-    iHorMax = std::min((iCurrX + searchRangeWidth) << iMvShift, (int)((pcCU->cs->pps->getPicWidthInLumaSamples() - iBlkWidth) << iMvShift));
-    iHorMin = std::max((tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrX - searchRangeWidth) << iMvShift);
-    iVerMax = (iCurrY - iBlkHeight - offsetLCUY) << iMvShift;
-    iVerMin = std::max((tempType != LEFT_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrY - searchRangeHeight) << iMvShift);
-#if !JVET_AD0086_ENHANCED_INTRA_TMP
-    int bestPosX = iCurrX + pX;
-    int bestPosY = iCurrY + pY;
-    iHorMin = std::max(iHorMin, bestPosX - refinementRange);
-    iHorMax = std::min(iHorMax, bestPosX + refinementRange);
-    iVerMin = std::max(iVerMin, bestPosY - refinementRange);
-    iVerMax = std::min(iVerMax, bestPosY + refinementRange);
-    iHorMin = iHorMin - iCurrX;
-    iHorMax = iHorMax - iCurrX;
-    iVerMax = iVerMax - iCurrY;
-    iVerMin = iVerMin - iCurrY;
-#endif
-  }
-  else if (regionId == 1) //left outside LCU
-  {
-#if JVET_AD0086_ENHANCED_INTRA_TMP
-    iHorMax = (iCurrX - iBlkWidth) << iMvShift;
-    iHorMin = std::max((tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrX - searchRangeWidth) << iMvShift);
-    iVerMin = std::max((tempType != LEFT_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrY - iBlkHeight - offsetLCUY) << iMvShift);
-    iVerMax = (iCurrY) << iMvShift;
+  iHorMin = std::max(iHorMin, pX - refinementRange + (TMP_SAMPLING % 2 ? 0 : 1));
+  iHorMax = std::min(iHorMax, pX + refinementRange);
+  iVerMin = std::max(iVerMin, pY - refinementRange + (TMP_SAMPLING % 2 ? 0 : 1));
+  iVerMax = std::min(iVerMax, pY + refinementRange);
 #else
-    iHorMax = (iCurrX - offsetLCUX - iBlkWidth) << iMvShift;
-    iHorMin = std::max((tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrX - searchRangeWidth) << iMvShift);
-    iVerMin = std::max((tempType != LEFT_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrY - iBlkHeight - offsetLCUY) << iMvShift);
-    iVerMax = (iCurrY) << iMvShift;
-    int bestPosX = iCurrX + pX;
-    int bestPosY = iCurrY + pY;
-    iHorMin = std::max(iHorMin, bestPosX - refinementRange);
-    iHorMax = std::min(iHorMax, bestPosX + refinementRange);
-    iVerMin = std::max(iVerMin, bestPosY - refinementRange);
-    iVerMax = std::min(iVerMax, bestPosY + refinementRange);
-    iHorMin = iHorMin - iCurrX;
-    iHorMax = iHorMax - iCurrX;
-    iVerMax = iVerMax - iCurrY;
-    iVerMin = iVerMin - iCurrY;
-#endif
-  }
-  else if (regionId == 2) //left outside LCU (can reach the bottom row of LCU)
-  {
-    iHorMin = std::max((tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrX - searchRangeWidth) << iMvShift);
-    iHorMax = (iCurrX - offsetLCUX - iBlkWidth) << iMvShift;
-    iVerMin = (iCurrY + 1) << iMvShift;
-    iVerMax = std::min(pcCU->cs->pps->getPicHeightInLumaSamples() - iBlkHeight, (iCurrY - offsetLCUY + pcCU->cs->sps->getCTUSize() - iBlkHeight) << iMvShift);
-#if !JVET_AD0086_ENHANCED_INTRA_TMP
-    int bestPosX = iCurrX + pX;
-    int bestPosY = iCurrY + pY;
-    iHorMin = std::max(iHorMin, bestPosX - refinementRange);
-    iHorMax = std::min(iHorMax, bestPosX + refinementRange);
-    iVerMin = std::max(iVerMin, bestPosY - refinementRange);
-    iVerMax = std::min(iVerMax, bestPosY + refinementRange);
-    iHorMin = iHorMin - iCurrX;
-    iHorMax = iHorMax - iCurrX;
-    iVerMax = iVerMax - iCurrY;
-    iVerMin = iVerMin - iCurrY;
-#endif
-  }
-  else if (regionId == 3) // within CTU
-  {
-    iVerMin = std::max((tempType != LEFT_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrY - offsetLCUY - iBlkHeight + 1) << iMvShift);
-    iVerMax = (iCurrY - iBlkHeight) << iMvShift;
-#if JVET_AD0086_ENHANCED_INTRA_TMP
-    iHorMin = std::max((tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrX - iBlkWidth + 1) << iMvShift);
-    iHorMax = (iCurrX) << iMvShift;
-#else
-    iHorMin = std::max((tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrX - offsetLCUX - iBlkWidth + 1) << iMvShift);
-    iHorMax = (iCurrX - iBlkWidth) << iMvShift;
-    int bestPosX = iCurrX + pX;
-    int bestPosY = iCurrY + pY;
-    iHorMin = std::max(iHorMin, bestPosX - refinementRange);
-    iHorMax = std::min(iHorMax, bestPosX + refinementRange);
-    iVerMin = std::max(iVerMin, bestPosY - refinementRange);
-    iVerMax = std::min(iVerMax, bestPosY + refinementRange);
-    iHorMin = iHorMin - iCurrX;
-    iHorMax = iHorMax - iCurrX;
-    iVerMin = iVerMin - iCurrY;
-    iVerMax = iVerMax - iCurrY;
-#endif
-  }
-#if JVET_AD0086_ENHANCED_INTRA_TMP
-  int bestPosX = iCurrX + pX;
-  int bestPosY = iCurrY + pY;
-  iHorMin      = std::max(iHorMin, bestPosX - refinementRange + (TMP_SAMPLING % 2 ? 0 : 1));
-  iHorMax      = std::min(iHorMax, bestPosX + refinementRange);
-  iVerMin      = std::max(iVerMin, bestPosY - refinementRange + (TMP_SAMPLING % 2 ? 0 : 1));
-  iVerMax      = std::min(iVerMax, bestPosY + refinementRange);
-  iHorMin      = iHorMin - iCurrX;
-  iHorMax      = iHorMax - iCurrX;
-  iVerMin      = iVerMin - iCurrY;
-  iVerMax      = iVerMax - iCurrY;
+  iHorMin = std::max(iHorMin, pX - refinementRange);
+  iHorMax = std::min(iHorMax, pX + refinementRange);
+  iVerMin = std::max(iVerMin, pY - refinementRange);
+  iVerMax = std::min(iVerMax, pY + refinementRange);
 #endif
 }
 #endif
@@ -10735,6 +10719,7 @@ TempLibFast::~TempLibFast()
 {
 }
 
+#if !JVET_AD0086_ENHANCED_INTRA_TMP
 void TempLibFast::initTemplateDiff( unsigned int uiPatchWidth, unsigned int uiPatchHeight, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int bitDepth )
 {
   int maxValue = ((1 << bitDepth) >> (INIT_THRESHOULD_SHIFTBITS)) * (uiPatchHeight * uiPatchWidth - uiBlkHeight * uiBlkWidth);
@@ -10743,6 +10728,7 @@ void TempLibFast::initTemplateDiff( unsigned int uiPatchWidth, unsigned int uiPa
     m_pDiff = maxValue;
   }
 }
+#endif
 
 #if JVET_W0069_TMP_BOUNDARY
 void IntraPrediction::getTargetTemplate( CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType )
@@ -10824,20 +10810,21 @@ void IntraPrediction::candidateSearchIntra( CodingUnit* pcCU, unsigned int uiBlk
 void IntraPrediction::candidateSearchIntra( CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight )
 #endif
 {
-  const ComponentID compID = COMPONENT_Y;
-  const int channelBitDepth = pcCU->cs->sps->getBitDepth( toChannelType( compID ) );
   unsigned int uiPatchWidth = uiBlkWidth + TMP_TEMPLATE_SIZE;
   unsigned int uiPatchHeight = uiBlkHeight + TMP_TEMPLATE_SIZE;
   unsigned int uiTarDepth = floorLog2( std::max( uiBlkWidth, uiBlkHeight ) ) - 2;
 
   Pel** tarPatch = getTargetPatch( uiTarDepth );
   //Initialize the library for saving the best candidates
+#if !JVET_AD0086_ENHANCED_INTRA_TMP
+  const ComponentID compID = COMPONENT_Y;
+  const int channelBitDepth = pcCU->cs->sps->getBitDepth(toChannelType(compID));
   m_tempLibFast.initTemplateDiff( uiPatchWidth, uiPatchHeight, uiBlkWidth, uiBlkHeight, channelBitDepth );
-  short setId = 0; //record the reference picture.
+#endif
 #if JVET_W0069_TMP_BOUNDARY
-  searchCandidateFromOnePicIntra( pcCU, tarPatch, uiPatchWidth, uiPatchHeight, setId, tempType );
+  searchCandidateFromOnePicIntra( pcCU, tarPatch, uiPatchWidth, uiPatchHeight, tempType );
 #else
-  searchCandidateFromOnePicIntra( pcCU, tarPatch, uiPatchWidth, uiPatchHeight, setId );
+  searchCandidateFromOnePicIntra( pcCU, tarPatch, uiPatchWidth, uiPatchHeight, );
 #endif
 #if !JVET_AD0086_ENHANCED_INTRA_TMP
   //count collected candidate number
@@ -10860,9 +10847,9 @@ void IntraPrediction::candidateSearchIntra( CodingUnit* pcCU, unsigned int uiBlk
 }
 
 #if JVET_W0069_TMP_BOUNDARY
-void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, unsigned int setId, RefTemplateType tempType )
+void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, RefTemplateType tempType )
 #else
-void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, unsigned int setId )
+void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, )
 #endif
 {
 #if JVET_AD0086_ENHANCED_INTRA_TMP
@@ -10881,7 +10868,6 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
   int      pX        = m_tempLibFast.getX();
   int      pY        = m_tempLibFast.getY();
   int      pDiff     = m_tempLibFast.getDiff();
-  short    pId       = m_tempLibFast.getId();
 #endif
   CompArea area      = pcCU->blocks[compID];
   int      refStride = pcCU->cs->picture->getRecoBuf(compID).stride;
@@ -10922,7 +10908,11 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
   Pel* refCurr;
 
 #if JVET_AD0086_ENHANCED_INTRA_TMP
+#if JVET_AE0077_EXT_INTRATMP
+  const int regionNum = 6;
+#else
   const int regionNum = 4;
+#endif
 #else
   const int regionNum = 3;
 #endif
@@ -10939,7 +10929,11 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
 #endif
   int regionId = 0;
 #if JVET_AB0130_ITMP_SAMPLING
+#if JVET_AE0077_EXT_INTRATMP
+  int bestRegionId = regionNum;
+#else
   int bestRegionId = 4;
+#endif
 #endif
 #if JVET_AD0086_ENHANCED_INTRA_TMP
   bool needTopLeft =
@@ -10952,9 +10946,10 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
     clipMvIntraConstraint(pcCU, regionId, mvXMins[regionId], mvXMaxs[regionId], mvYMins[regionId], mvYMaxs[regionId],
                           TMP_TEMPLATE_SIZE, uiBlkWidth, uiBlkHeight, iCurrY, iCurrX, offsetLCUY, offsetLCUX, tempType);
   }
+
   for (int checkIdx = 0; checkIdx < regionNum; checkIdx++)
   {
-    regionId = (checkIdx + 3) % regionNum;
+    regionId = (checkIdx + 3) % regionNum;   // 3->0->1->2
 
     int mvYMin = mvYMins[regionId];
     int mvYMax = mvYMaxs[regionId];
@@ -10969,6 +10964,16 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
     {
       for (iXOffset = mvXMax; iXOffset >= mvXMin; iXOffset -= TMP_SAMPLING)
       {
+#if JVET_AE0077_EXT_INTRATMP
+        if (regionId == 4 || regionId == 5)
+        {
+          Position bottomRight(iCurrX + iXOffset + uiBlkWidth - 1, iCurrY + iYOffset + uiBlkHeight - 1);
+          if (!pcCU->cs->isDecomp(bottomRight, CHANNEL_TYPE_LUMA))
+          {
+            continue;
+          }
+        }
+#endif
 #else
     for (iYOffset = mvYMax; iYOffset >= mvYMin; iYOffset--)
     {
@@ -10983,7 +10988,7 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
         {
           if (diff[temIdx] < pDiff[temIdx])
           {
-            updateCandList(TempLibFast(iXOffset, iYOffset, diff[temIdx], setId, regionId), diff[temIdx],
+            updateCandList(TempLibFast(iXOffset, iYOffset, regionId), diff[temIdx],
                            sparseMtmpCandList[temIdx], sparseMtmpCostList[temIdx], mtmpNumSparse[temIdx]);
             if (sparseMtmpCandList[temIdx].size() == mtmpNumSparse[temIdx])
             {
@@ -11000,22 +11005,13 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
   int iTemplateSize = TMP_TEMPLATE_SIZE;
   int iBlkWidth = uiBlkWidth;
   int iBlkHeight = uiBlkHeight;
-  regionId = 0;
-  int iMvShift = 0;
-
-  int iVerMin = std::max( (tempType != LEFT_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrY - offsetLCUY - iBlkHeight + 1) << iMvShift );
-  int iVerMax = (iCurrY - iBlkHeight) << iMvShift;
-  int iHorMin = std::max( (tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrX - offsetLCUX - iBlkWidth + 1) << iMvShift );
-  int iHorMax = (iCurrX - iBlkWidth) << iMvShift;
-
-  mvXMins[regionId] = iHorMin - iCurrX;
-  mvXMaxs[regionId] = iHorMax - iCurrX;
-  mvYMins[regionId] = iVerMin - iCurrY;
-  mvYMaxs[regionId] = iVerMax - iCurrY;
 
   //check within CTU pixels
-  for( regionId = 0; regionId < 1; regionId++ )
+  for( regionId = regionNum; regionId < regionNum+1; regionId++ )
   {
+    clipMvIntraConstraint(pcCU, regionId, mvXMins[regionId], mvXMaxs[regionId], mvYMins[regionId], mvYMaxs[regionId],
+      TMP_TEMPLATE_SIZE, uiBlkWidth, uiBlkHeight, iCurrY, iCurrX, offsetLCUY, offsetLCUX, tempType);
+
     int mvYMin = mvYMins[regionId];
     int mvYMax = mvYMaxs[regionId];
     int mvXMin = mvXMins[regionId];
@@ -11043,9 +11039,9 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
 #endif
         if( diff < (pDiff) )
         {
-          insertNode( diff, iXOffset, iYOffset, pDiff, pX, pY, pId, setId );
+          insertNode( diff, iXOffset, iYOffset, pDiff, pX, pY );
 #if JVET_AB0130_ITMP_SAMPLING
-          bestRegionId = 3;
+          bestRegionId = regionId;
 #endif
         }
         if( pDiff == 0 )
@@ -11094,7 +11090,7 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
 
         if( diff < (pDiff) )
         {
-          insertNode( diff, iXOffset, iYOffset, pDiff, pX, pY, pId, setId );
+          insertNode( diff, iXOffset, iYOffset, pDiff, pX, pY );
 #if JVET_AB0130_ITMP_SAMPLING
           bestRegionId = regionId;
 #endif
@@ -11144,14 +11140,11 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
       int iRefine      = 1;
       int iRefineRange = TMP_SAMPLING >> 1;
       bestRegionId     = sparseMtmpCandList[temIdx][candIdx].m_rId;
-      int mvYMin       = 0;
-      int mvYMax       = 0;
-      int mvXMin       = 0;
-      int mvXMax       = 0;
-      clipMvIntraConstraintRefine(pcCU, bestRegionId, mvXMin, mvXMax, mvYMin, mvYMax, TMP_TEMPLATE_SIZE, uiBlkWidth,
-                                   uiBlkHeight, iCurrY, iCurrX, offsetLCUY, offsetLCUX,
-                                   sparseMtmpCandList[temIdx][candIdx].m_pX, sparseMtmpCandList[temIdx][candIdx].m_pY,
-                                   iRefineRange, tempType);
+      int mvYMin       = mvYMins[bestRegionId];
+      int mvYMax       = mvYMaxs[bestRegionId];
+      int mvXMin       = mvXMins[bestRegionId];
+      int mvXMax       = mvXMaxs[bestRegionId];
+      clipMvIntraConstraintRefine(mvXMin, mvXMax, mvYMin, mvYMax, sparseMtmpCandList[temIdx][candIdx].m_pX, sparseMtmpCandList[temIdx][candIdx].m_pY, iRefineRange);
 
       if (!(mvYMax < mvYMin || mvXMax < mvXMin))
       {
@@ -11159,6 +11152,16 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
         {
           for (iXOffset = mvXMax; iXOffset >= mvXMin; iXOffset -= iRefine)
           {
+#if JVET_AE0077_EXT_INTRATMP
+            if (bestRegionId == 4 || bestRegionId == 5)
+            {
+              Position bottomRight(iCurrX + iXOffset + uiBlkWidth - 1, iCurrY + iYOffset + uiBlkHeight - 1);
+              if (!pcCU->cs->isDecomp(bottomRight, CHANNEL_TYPE_LUMA))
+              {
+                continue;
+              }
+            }
+#endif
             if (iXOffset == sparseMtmpCandList[temIdx][candIdx].m_pX
                 && iYOffset == sparseMtmpCandList[temIdx][candIdx].m_pY)
             {
@@ -11172,7 +11175,7 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
             }
             if (diff[temIdx] < pDiff[temIdx])
             {
-              updateCandList(TempLibFast(iXOffset, iYOffset, diff[temIdx], setId, bestRegionId), diff[temIdx],
+              updateCandList(TempLibFast(iXOffset, iYOffset, bestRegionId), diff[temIdx],
                              refineMtmpCandList[temIdx], refineMtmpCostList[temIdx], mtmpNumRefine[temIdx]);
               if (refineMtmpCandList[temIdx].size() == mtmpNumRefine[temIdx])
               {
@@ -11233,12 +11236,11 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
     {
       int iRefine = 1 << iRefineLog2;
       int tmpRefineRange = std::min(uiBlkHeight, uiBlkHeight) / 2;
-      clipMvIntraConstraintRefine(pcCU, bestRegionId, mvXMins[bestRegionId], mvXMaxs[bestRegionId], mvYMins[bestRegionId], mvYMaxs[bestRegionId], 
-                                   TMP_TEMPLATE_SIZE, uiBlkWidth, uiBlkHeight, iCurrY, iCurrX, offsetLCUY, offsetLCUX, pX, pY, iRefine* tmpRefineRange, tempType);
       int mvYMin = mvYMins[bestRegionId];
       int mvYMax = mvYMaxs[bestRegionId];
       int mvXMin = mvXMins[bestRegionId];
       int mvXMax = mvXMaxs[bestRegionId];
+      clipMvIntraConstraintRefine(mvXMin, mvXMax, mvYMin, mvYMax, pX, pY, iRefine* tmpRefineRange);
       if (!(mvYMax < mvYMin || mvXMax < mvXMin))
       {
         for (iYOffset = mvYMax; iYOffset >= mvYMin; iYOffset -= iRefine)
@@ -11253,7 +11255,7 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
 #endif
             if (diff < (pDiff))
             {
-              insertNode(diff, iXOffset, iYOffset, pDiff, pX, pY, pId, setId);
+              insertNode(diff, iXOffset, iYOffset, pDiff, pX, pY);
             }
           }
         }
@@ -11264,7 +11266,6 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
   m_tempLibFast.m_pX    = pX;
   m_tempLibFast.m_pY    = pY;
   m_tempLibFast.m_pDiff = pDiff;
-  m_tempLibFast.m_pId   = pId;
 #endif
 #if JVET_AD0086_ENHANCED_INTRA_TMP
   pcCU->tmpNumCand = (int) m_mtmpCandList.size();
@@ -11284,10 +11285,6 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
     pcCU->tmpXdisp[i] = pcCU->tmpXdisp[i - pcCU->tmpNumCand];
     pcCU->tmpYdisp[i] = pcCU->tmpYdisp[i - pcCU->tmpNumCand];
     m_mtmpCostList.push_back(m_mtmpCostList[i - pcCU->tmpNumCand]);
-  }
-  if (pcCU->tmpNumCand)
-  {
-    m_tempLibFast.m_pRegionId = m_mtmpCandList[0].m_rId;
   }
 #else 
 #if TMP_FAST_ENC
@@ -11655,13 +11652,6 @@ void IntraPrediction::xCalcTmpFlmRefArea(CodingUnit *cu, unsigned int uiBlkWidth
                                          RefTemplateType tempType, bool &leftPadding, bool &rightPadding,
                                          bool &abovePadding, bool &belowPadding)
 {
-  int searchRangeWidth  = std::max(TMP_SEARCH_RANGE_MULT_FACTOR * (int) uiBlkWidth, TMP_MINSR);
-  int searchRangeHeight = std::max(TMP_SEARCH_RANGE_MULT_FACTOR * (int) uiBlkHeight, TMP_MINSR);
-
-  int iMvShift      = 0;
-  int iTemplateSize = TMP_TEMPLATE_SIZE;
-  int iBlkWidth     = uiBlkWidth;
-  int iBlkHeight    = uiBlkHeight;
   int regionId      = m_mtmpCandList[cu->tmpIdx].m_rId;
 
   int      iHorMax = 0, iHorMin = 0, iVerMax = 0, iVerMin = 0;
@@ -11675,45 +11665,31 @@ void IntraPrediction::xCalcTmpFlmRefArea(CodingUnit *cu, unsigned int uiBlkWidth
   int pX = cu->tmpXdisp[cu->tmpIdx];
   int pY = cu->tmpYdisp[cu->tmpIdx];
 
+  CHECK(regionId < 0 || regionId > 5, "region Id error\n");
+  clipMvIntraConstraint(cu, regionId, iHorMin, iHorMax, iVerMin, iVerMax,
+    TMP_TEMPLATE_SIZE, uiBlkWidth, uiBlkHeight, iCurrY, iCurrX, offsetLCUY, offsetLCUX, tempType);
+
+  leftPadding  = !(pX > iHorMin);
+  rightPadding = !(pX < iHorMax);
+  abovePadding = !(pY > iVerMin);
+  belowPadding = !(pY < iVerMax);
+#if JVET_AE0077_EXT_INTRATMP
+  int iBlkWidth = uiBlkWidth;
+  int iBlkHeight = uiBlkHeight;
   int bestPosX = iCurrX + pX;
   int bestPosY = iCurrY + pY;
-  CHECK(regionId < 0 || regionId > 5, "region Id error\n");
-  if (regionId == 0)   // above outside LCU
+  if (regionId == 4 || regionId == 5)
   {
-    iHorMax = std::min((iCurrX + searchRangeWidth) << iMvShift,(int)((cu->cs->pps->getPicWidthInLumaSamples() - iBlkWidth) << iMvShift));
-    iHorMin = std::max((tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrX - searchRangeWidth) << iMvShift);
-
-    iVerMax = (iCurrY - iBlkHeight - offsetLCUY) << iMvShift;
-    iVerMin = std::max((tempType != LEFT_TEMPLATE) ? iTemplateSize << iMvShift : 0, ((iCurrY - searchRangeHeight) << iMvShift));
+    if (!cu->cs->isDecomp(Position(bestPosX + iBlkWidth - 1, bestPosY + iBlkHeight), CHANNEL_TYPE_LUMA))
+    {
+      belowPadding = true;
+    }
+    if (!cu->cs->isDecomp(Position(bestPosX + iBlkWidth, bestPosY + iBlkHeight - 1), CHANNEL_TYPE_LUMA))
+    {
+      rightPadding = true;
+    }
   }
-  else if (regionId == 1)   // left outside LCU
-  {
-    iHorMax = (iCurrX - iBlkWidth) << iMvShift;
-    iHorMin = std::max((tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrX - searchRangeWidth) << iMvShift);
-    iVerMin = std::max((tempType != LEFT_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrY - iBlkHeight - offsetLCUY) << iMvShift);
-    iVerMax = (iCurrY) << iMvShift;
-  }
-  else if (regionId == 2)   // left outside LCU (can reach the bottom row of LCU)
-  {
-    iHorMin = std::max((tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrX - searchRangeWidth) << iMvShift);
-    iHorMax = (iCurrX - offsetLCUX - iBlkWidth) << iMvShift;
-
-    iVerMin = (iCurrY + 1) << iMvShift;
-    iVerMax = std::min(cu->cs->pps->getPicHeightInLumaSamples() - iBlkHeight,
-                       (iCurrY - offsetLCUY + cu->cs->sps->getCTUSize() - iBlkHeight) << iMvShift);
-  }
-  else if (regionId == 3)   // within CTU
-  {
-    iVerMin = std::max((tempType != LEFT_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrY - offsetLCUY - iBlkHeight + 1) << iMvShift);
-    iVerMax = (iCurrY - iBlkHeight) << iMvShift;
-    iHorMin = std::max((tempType != ABOVE_TEMPLATE) ? iTemplateSize << iMvShift : 0, (iCurrX - iBlkWidth + 1) << iMvShift);
-    iHorMax = (iCurrX);
-  }
-
-  leftPadding  = !(bestPosX > iHorMin);
-  rightPadding = !(bestPosX < iHorMax);
-  abovePadding = !(bestPosY > iVerMin);
-  belowPadding = !(bestPosY < iVerMax);
+#endif
 }
 
 void IntraPrediction::xGetTmpFlmRefBuf(CodingUnit *cu, unsigned int uiBlkWidth, unsigned int uiBlkHeight,
@@ -13674,7 +13650,7 @@ void IntraPrediction::xCclmApplyModel(const PredictionUnit &pu, const ComponentI
   }
 }
 
-void IntraPrediction::reorderCCPCandidates(const PredictionUnit &pu, CCPModelCandidate candList[], int reorderlistSize)
+void IntraPrediction::reorderCCPCandidates(PredictionUnit &pu, CCPModelCandidate candList[], int reorderlistSize)
 {
   int candCost[MAX_CCP_CAND_LIST_SIZE];
   for (int i = 0; i < reorderlistSize; i++)
@@ -13704,7 +13680,7 @@ void IntraPrediction::reorderCCPCandidates(const PredictionUnit &pu, CCPModelCan
   }
 }
 
-int  IntraPrediction::xGetOneCCPCandCost(const PredictionUnit &pu, CCPModelCandidate &ccpCand)
+int IntraPrediction::xGetOneCCPCandCost( PredictionUnit &pu, CCPModelCandidate &ccpCand )
 {
   CompArea chromaArea = pu.Cb();
   int cost = 0;
@@ -13735,7 +13711,7 @@ int  IntraPrediction::xGetOneCCPCandCost(const PredictionUnit &pu, CCPModelCandi
 #if JVET_AD0202_CCCM_MDF
     else if (ccpCand.type & (CCP_TYPE_MDFCCCM))
     {
-      const_cast<PredictionUnit&>(pu).cccmMultiFilterIdx = ccpCand.cccmMultiFilterIdx;
+      pu.cccmMultiFilterIdx = ccpCand.cccmMultiFilterIdx;
 #if JVET_AB0174_CCCM_DIV_FREE
       int lumaOffset = m_cccmLumaOffset - ccpCand.lumaOffset;
 #else
@@ -13766,7 +13742,8 @@ int  IntraPrediction::xGetOneCCPCandCost(const PredictionUnit &pu, CCPModelCandi
         cost += xUpdateOffsetsAndGetCostCCCM<false>(pu, COMPONENT_Cb, pu.Cb(), cccmModelCb, ccpCand.yThres, lumaOffset, offsetCb, ccpCand.type, refSizeX, refSizeY, ccpCand.cccmMultiFilterIdx );
         cost += xUpdateOffsetsAndGetCostCCCM<false>(pu, COMPONENT_Cr, pu.Cr(), cccmModelCr, ccpCand.yThres, lumaOffset, offsetCr, ccpCand.type, refSizeX, refSizeY, ccpCand.cccmMultiFilterIdx );
       }
-      const_cast<PredictionUnit&>(pu).cccmMultiFilterIdx = 0;
+
+      pu.cccmMultiFilterIdx = 0;
     }
 #endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
@@ -13777,7 +13754,7 @@ int  IntraPrediction::xGetOneCCPCandCost(const PredictionUnit &pu, CCPModelCandi
 #else
       int lumaOffset = 0;
 #endif
-      const_cast<PredictionUnit &>(pu).cccmNoSubFlag = 1;
+      pu.cccmNoSubFlag = 1;
 
       CccmModel cccmModelCb[2] = { CccmModel( CCCM_NO_SUB_NUM_PARAMS, bitDepth ), CccmModel( CCCM_NO_SUB_NUM_PARAMS, bitDepth ) };
       CccmModel cccmModelCr[2] = { CccmModel( CCCM_NO_SUB_NUM_PARAMS, bitDepth ), CccmModel( CCCM_NO_SUB_NUM_PARAMS, bitDepth ) };
@@ -13787,7 +13764,7 @@ int  IntraPrediction::xGetOneCCPCandCost(const PredictionUnit &pu, CCPModelCandi
       cost += xUpdateOffsetsAndGetCostCCCM<false>(pu, COMPONENT_Cb, pu.Cb(), cccmModelCb, ccpCand.yThres, lumaOffset, offsetCb, ccpCand.type );
       cost += xUpdateOffsetsAndGetCostCCCM<false>(pu, COMPONENT_Cr, pu.Cr(), cccmModelCr, ccpCand.yThres, lumaOffset, offsetCr, ccpCand.type );
 
-      const_cast<PredictionUnit &>(pu).cccmNoSubFlag = 0;
+      pu.cccmNoSubFlag = 0;
     }
 #endif
     else if (ccpCand.type & (CCP_TYPE_CCLM | CCP_TYPE_GLM0123))
@@ -13836,7 +13813,7 @@ int  IntraPrediction::xGetOneCCPCandCost(const PredictionUnit &pu, CCPModelCandi
   return cost;
 }
 
-void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb, PelBuf &predCr)
+void IntraPrediction::predCCPCandidate(PredictionUnit &pu, PelBuf &predCb, PelBuf &predCr)
 {
   const int bitDepth = pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA);
 
@@ -13866,9 +13843,10 @@ void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb,
 
         if (!(pu.curCand.type & CCP_TYPE_MMLM))
         {
+#if !JVET_AE0097_RM_OFFSET_UPDATE_IN_CCP_MERGE
           xUpdateOffsetsAndGetCostCCCM<true>(pu, COMPONENT_Cb, pu.Cb(), cccmModelCb, 0, lumaOffset, offsetCb, pu.curCand.type, refSizeX, refSizeY);
           xUpdateOffsetsAndGetCostCCCM<true>(pu, COMPONENT_Cr, pu.Cr(), cccmModelCr, 0, lumaOffset, offsetCr, pu.curCand.type, refSizeX, refSizeY);
-
+#endif
           xCccmApplyModelOffset(pu, COMPONENT_Cb, cccmModelCb[0], 0, 0, predCb, lumaOffset, offsetCb, pu.curCand.type, refSizeX, refSizeY);
           xCccmApplyModelOffset(pu, COMPONENT_Cr, cccmModelCr[0], 0, 0, predCr, lumaOffset, offsetCr, pu.curCand.type, refSizeX, refSizeY);
         }
@@ -13876,10 +13854,10 @@ void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb,
         {
           // Multimode case
           int modelThr = pu.curCand.yThres;
-
+#if !JVET_AE0097_RM_OFFSET_UPDATE_IN_CCP_MERGE
           xUpdateOffsetsAndGetCostCCCM<true>(pu, COMPONENT_Cb, pu.Cb(), cccmModelCb, modelThr, lumaOffset, offsetCb, pu.curCand.type, refSizeX, refSizeY);
           xUpdateOffsetsAndGetCostCCCM<true>(pu, COMPONENT_Cr, pu.Cr(), cccmModelCr, modelThr, lumaOffset, offsetCr, pu.curCand.type, refSizeX, refSizeY);
-
+#endif
           xCccmApplyModelOffset(pu, COMPONENT_Cb, cccmModelCb[0], 1, modelThr, predCb, lumaOffset, offsetCb, pu.curCand.type, refSizeX, refSizeY);
           xCccmApplyModelOffset(pu, COMPONENT_Cr, cccmModelCr[0], 1, modelThr, predCr, lumaOffset, offsetCr, pu.curCand.type, refSizeX, refSizeY);
 
@@ -13897,7 +13875,7 @@ void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb,
 #else
         int lumaOffset = 0;
 #endif
-        const_cast<PredictionUnit &>(pu).cccmNoSubFlag = 1;
+        pu.cccmNoSubFlag = 1;
         int offsetCb[2] = { 0, 0 };
         int offsetCr[2] = { 0, 0 };
 
@@ -13905,9 +13883,10 @@ void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb,
 
         if (!(pu.curCand.type & CCP_TYPE_MMLM))
         {
+#if !JVET_AE0097_RM_OFFSET_UPDATE_IN_CCP_MERGE
           xUpdateOffsetsAndGetCostCCCM<true>(pu, COMPONENT_Cb, pu.Cb(), nscccmModelCb, 0, lumaOffset, offsetCb, pu.curCand.type );
           xUpdateOffsetsAndGetCostCCCM<true>(pu, COMPONENT_Cr, pu.Cr(), nscccmModelCr, 0, lumaOffset, offsetCr, pu.curCand.type );
-
+#endif
           xCccmApplyModelOffset(pu, COMPONENT_Cb, nscccmModelCb[0], 0, 0, predCb, lumaOffset, offsetCb, pu.curCand.type );
           xCccmApplyModelOffset(pu, COMPONENT_Cr, nscccmModelCr[0], 0, 0, predCr, lumaOffset, offsetCr, pu.curCand.type );
         }
@@ -13915,10 +13894,10 @@ void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb,
         {
           // Multimode case
           int modelThr = pu.curCand.yThres;
-
+#if !JVET_AE0097_RM_OFFSET_UPDATE_IN_CCP_MERGE
           xUpdateOffsetsAndGetCostCCCM<true>(pu, COMPONENT_Cb, pu.Cb(), nscccmModelCb, modelThr, lumaOffset, offsetCb, pu.curCand.type );
           xUpdateOffsetsAndGetCostCCCM<true>(pu, COMPONENT_Cr, pu.Cr(), nscccmModelCr, modelThr, lumaOffset, offsetCr, pu.curCand.type );
-
+#endif
           xCccmApplyModelOffset(pu, COMPONENT_Cb, nscccmModelCb[0], 1, modelThr, predCb, lumaOffset, offsetCb, pu.curCand.type );
           xCccmApplyModelOffset(pu, COMPONENT_Cr, nscccmModelCr[0], 1, modelThr, predCr, lumaOffset, offsetCr, pu.curCand.type );
 
@@ -13926,20 +13905,22 @@ void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb,
           xCccmApplyModelOffset(pu, COMPONENT_Cr, nscccmModelCr[1], 2, modelThr, predCr, lumaOffset, offsetCr, pu.curCand.type );
         }
 
-        const_cast<PredictionUnit &>(pu).cccmNoSubFlag = 0;
+        pu.cccmNoSubFlag = 0;
       }
 #endif
 #if JVET_AD0202_CCCM_MDF
       else if (pu.curCand.type & CCP_TYPE_MDFCCCM)
       {
-        const_cast<PredictionUnit&>(pu).cccmMultiFilterIdx = pu.curCand.cccmMultiFilterIdx;
+        pu.cccmMultiFilterIdx = pu.curCand.cccmMultiFilterIdx;
 #if JVET_AB0174_CCCM_DIV_FREE
         int lumaOffset = m_cccmLumaOffset - pu.curCand.lumaOffset;
 #else
         int lumaOffset = 0;
 #endif
+#if !JVET_AE0097_RM_OFFSET_UPDATE_IN_CCP_MERGE
         int refSizeX = pu.curCand.corOffX;
         int refSizeY = pu.curCand.corOffY;
+#endif
         int offsetCb[2] = { 0, 0 };
         int offsetCr[2] = { 0, 0 };
 
@@ -13952,9 +13933,10 @@ void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb,
 
           if (!(pu.curCand.type & CCP_TYPE_MMLM))
           {
+#if !JVET_AE0097_RM_OFFSET_UPDATE_IN_CCP_MERGE
             xUpdateOffsetsAndGetCostCCCM<true>(pu, COMPONENT_Cb, pu.Cb(), mfcccmModelCb, 0, lumaOffset, offsetCb, pu.curCand.type, refSizeX, refSizeY, pu.curCand.cccmMultiFilterIdx );
             xUpdateOffsetsAndGetCostCCCM<true>(pu, COMPONENT_Cr, pu.Cr(), mfcccmModelCr, 0, lumaOffset, offsetCr, pu.curCand.type, refSizeX, refSizeY, pu.curCand.cccmMultiFilterIdx );
-
+#endif
             xCccmApplyModelOffset(pu, COMPONENT_Cb, mfcccmModelCb[0], 0, 0, predCb, lumaOffset, offsetCb, pu.curCand.type, m_cccmBlkArea.x - m_cccmRefArea.x, m_cccmBlkArea.y - m_cccmRefArea.y );
             xCccmApplyModelOffset(pu, COMPONENT_Cr, mfcccmModelCr[0], 0, 0, predCr, lumaOffset, offsetCr, pu.curCand.type, m_cccmBlkArea.x - m_cccmRefArea.x, m_cccmBlkArea.y - m_cccmRefArea.y );
           }
@@ -13962,10 +13944,10 @@ void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb,
           {
             // Multimode case
             int modelThr = pu.curCand.yThres;
-
+#if !JVET_AE0097_RM_OFFSET_UPDATE_IN_CCP_MERGE
             xUpdateOffsetsAndGetCostCCCM<true>(pu, COMPONENT_Cb, pu.Cb(), mfcccmModelCb, modelThr, lumaOffset, offsetCb, pu.curCand.type, refSizeX, refSizeY, pu.curCand.cccmMultiFilterIdx );
             xUpdateOffsetsAndGetCostCCCM<true>(pu, COMPONENT_Cr, pu.Cr(), mfcccmModelCr, modelThr, lumaOffset, offsetCr, pu.curCand.type, refSizeX, refSizeY, pu.curCand.cccmMultiFilterIdx );
-
+#endif
             xCccmApplyModelOffset(pu, COMPONENT_Cb, mfcccmModelCb[0], 1, modelThr, predCb, lumaOffset, offsetCb, pu.curCand.type, m_cccmBlkArea.x - m_cccmRefArea.x, m_cccmBlkArea.y - m_cccmRefArea.y );
             xCccmApplyModelOffset(pu, COMPONENT_Cr, mfcccmModelCr[0], 1, modelThr, predCr, lumaOffset, offsetCr, pu.curCand.type, m_cccmBlkArea.x - m_cccmRefArea.x, m_cccmBlkArea.y - m_cccmRefArea.y );
 
@@ -13982,9 +13964,10 @@ void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb,
 
           if (!(pu.curCand.type & CCP_TYPE_MMLM))
           {
+#if !JVET_AE0097_RM_OFFSET_UPDATE_IN_CCP_MERGE
             xUpdateOffsetsAndGetCostCCCM<true>(pu, COMPONENT_Cb, pu.Cb(), mfcccmModelCb, 0, lumaOffset, offsetCb, pu.curCand.type, refSizeX, refSizeY, pu.curCand.cccmMultiFilterIdx );
             xUpdateOffsetsAndGetCostCCCM<true>(pu, COMPONENT_Cr, pu.Cr(), mfcccmModelCr, 0, lumaOffset, offsetCr, pu.curCand.type, refSizeX, refSizeY, pu.curCand.cccmMultiFilterIdx );
-
+#endif
             xCccmApplyModelOffset(pu, COMPONENT_Cb, mfcccmModelCb[0], 0, 0, predCb, lumaOffset, offsetCb, pu.curCand.type, m_cccmBlkArea.x - m_cccmRefArea.x, m_cccmBlkArea.y - m_cccmRefArea.y );
             xCccmApplyModelOffset(pu, COMPONENT_Cr, mfcccmModelCr[0], 0, 0, predCr, lumaOffset, offsetCr, pu.curCand.type, m_cccmBlkArea.x - m_cccmRefArea.x, m_cccmBlkArea.y - m_cccmRefArea.y );
           }
@@ -13992,10 +13975,10 @@ void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb,
           {
             // Multimode case
             int modelThr = pu.curCand.yThres;
-
+#if !JVET_AE0097_RM_OFFSET_UPDATE_IN_CCP_MERGE
             xUpdateOffsetsAndGetCostCCCM<true>(pu, COMPONENT_Cb, pu.Cb(), mfcccmModelCb, modelThr, lumaOffset, offsetCb, pu.curCand.type, refSizeX, refSizeY, pu.curCand.cccmMultiFilterIdx );
             xUpdateOffsetsAndGetCostCCCM<true>(pu, COMPONENT_Cr, pu.Cr(), mfcccmModelCr, modelThr, lumaOffset, offsetCr, pu.curCand.type, refSizeX, refSizeY, pu.curCand.cccmMultiFilterIdx );
-
+#endif
             xCccmApplyModelOffset(pu, COMPONENT_Cb, mfcccmModelCb[0], 1, modelThr, predCb, lumaOffset, offsetCb, pu.curCand.type, m_cccmBlkArea.x - m_cccmRefArea.x, m_cccmBlkArea.y - m_cccmRefArea.y );
             xCccmApplyModelOffset(pu, COMPONENT_Cr, mfcccmModelCr[0], 1, modelThr, predCr, lumaOffset, offsetCr, pu.curCand.type, m_cccmBlkArea.x - m_cccmRefArea.x, m_cccmBlkArea.y - m_cccmRefArea.y );
 
@@ -14004,7 +13987,7 @@ void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb,
           }
         }
 
-        const_cast<PredictionUnit&>(pu).cccmMultiFilterIdx = 0;
+        pu.cccmMultiFilterIdx = 0;
       }
 #endif
       else if (pu.curCand.type & (CCP_TYPE_CCLM | CCP_TYPE_GLM0123))
@@ -14030,9 +14013,10 @@ void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb,
 
         if (!(pu.curCand.type & CCP_TYPE_MMLM))
         {
+#if !JVET_AE0097_RM_OFFSET_UPDATE_IN_CCP_MERGE
           xUpdateOffsetsAndGetCostCCLM<true>(pu, COMPONENT_Cb, pu.Cb(), modelsCb, 1, pu.curCand.glmIdc);
           xUpdateOffsetsAndGetCostCCLM<true>(pu, COMPONENT_Cr, pu.Cr(), modelsCr, 1, pu.curCand.glmIdc);
-
+#endif
           predCb.copyFrom(temp);
           predCr.copyFrom(temp);
 
@@ -14041,9 +14025,10 @@ void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb,
         }
         else
         {
+#if !JVET_AE0097_RM_OFFSET_UPDATE_IN_CCP_MERGE
           xUpdateOffsetsAndGetCostCCLM<true>(pu, COMPONENT_Cb, pu.Cb(), modelsCb, 2, pu.curCand.glmIdc);
           xUpdateOffsetsAndGetCostCCLM<true>(pu, COMPONENT_Cr, pu.Cr(), modelsCr, 2, pu.curCand.glmIdc);
-
+#endif
           auto applyMMCM = [&](PelBuf &predBuf, const CclmModel &cclmModel)
           {
             Pel       *chromaPred   = predBuf.bufAt(0, 0);
@@ -14070,8 +14055,8 @@ void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb,
           applyMMCM(predCb, modelsCb);
           applyMMCM(predCr, modelsCr);
         }
-        PU::cclmModelToCcpParams(COMPONENT_Cb, const_cast<PredictionUnit&>(pu).curCand, modelsCb);
-        PU::cclmModelToCcpParams(COMPONENT_Cr, const_cast<PredictionUnit&>(pu).curCand, modelsCr);
+        PU::cclmModelToCcpParams(COMPONENT_Cb, pu.curCand, modelsCb);
+        PU::cclmModelToCcpParams(COMPONENT_Cr, pu.curCand, modelsCr);
       }
       else if (pu.curCand.type & CCP_TYPE_GLM4567)
       {
@@ -14085,11 +14070,15 @@ void IntraPrediction::predCCPCandidate(const PredictionUnit &pu, PelBuf &predCb,
         CccmModel glmModel( GLM_NUM_PARAMS, bitDepth);
 
         PU::ccpParamsToGlmModel(COMPONENT_Cb, pu.curCand, glmModel);
+#if !JVET_AE0097_RM_OFFSET_UPDATE_IN_CCP_MERGE
         xUpdateOffsetsAndGetCostGLM<true>(pu, COMPONENT_Cb, pu.Cb(), glmModel, glmIdc, lumaOffset, chromaOffset);
+#endif
         xGlmApplyModelOffset(pu, COMPONENT_Cb, pu.Cb(), glmModel, glmIdc, predCb, lumaOffset, chromaOffset);
 
         PU::ccpParamsToGlmModel(COMPONENT_Cr, pu.curCand, glmModel);
+#if !JVET_AE0097_RM_OFFSET_UPDATE_IN_CCP_MERGE
         xUpdateOffsetsAndGetCostGLM<true>(pu, COMPONENT_Cr, pu.Cr(), glmModel, glmIdc, lumaOffset, chromaOffset);
+#endif
         xGlmApplyModelOffset(pu, COMPONENT_Cr, pu.Cr(), glmModel, glmIdc, predCr, lumaOffset, chromaOffset);
       }
       else
@@ -14678,8 +14667,44 @@ Pel IntraPrediction::xCccmGetLumaVal(const PredictionUnit& pu, const CPelBuf pi,
 #endif
 
 #if JVET_AA0057_CCCM
+#if JVET_AD0188_CCP_MERGE
+void IntraPrediction::predIntraCCCM( PredictionUnit &pu, PelBuf &predCb, PelBuf &predCr, int intraDir )
+#else
 void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, PelBuf &predCr, int intraDir )
+#endif
 {
+#if JVET_AE0100_BVGCCCM
+  if (pu.bvgCccmFlag)
+  {
+    CccmModel cccmModelCb[2] = { CccmModel( BVG_CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)), CccmModel( CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)) };
+    CccmModel cccmModelCr[2] = { CccmModel( BVG_CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)), CccmModel( CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)) };
+    
+    if (intraDir == LM_CHROMA_IDX || intraDir == MDLM_L_IDX || intraDir == MDLM_T_IDX)
+    {
+      int minVal = 0, maxVal = 0;
+      xBvgCccmCalcBlkRange(pu, minVal, maxVal);
+      
+      xBvgCccmCalcModels(pu, cccmModelCb[0],  cccmModelCr[0], 0, 0, minVal, maxVal);
+      xBvgCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb[0], 0, 0, predCb);
+      xBvgCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr[0], 0, 0, predCr);
+    }
+    else
+    {
+      int modelThr = xBvgCccmCalcBlkAver(pu);
+      int minVal = 0, maxVal = 0;
+      xBvgCccmCalcBlkRange(pu, minVal, maxVal);
+      
+      xBvgCccmCalcModels(pu, cccmModelCb[0],  cccmModelCr[0], 1, modelThr, minVal, maxVal);
+      xBvgCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb[0], 1, modelThr, predCb);
+      xBvgCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr[0], 1, modelThr, predCr);
+      
+      xBvgCccmCalcModels(pu, cccmModelCb[1],  cccmModelCr[1], 2, modelThr, minVal, maxVal);
+      xBvgCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb[1], 2, modelThr, predCb);
+      xBvgCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr[1], 2, modelThr, predCr);
+    }
+    return;
+  }
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   if( pu.cccmNoSubFlag )
   {
@@ -14702,8 +14727,8 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
       xCccmApplyModel(pu, COMPONENT_Cb,   cccmModelCb[0], 0, 0, predCb);
       xCccmApplyModel(pu, COMPONENT_Cr,   cccmModelCr[0], 0, 0, predCr);
 
-      const_cast<PredictionUnit &>(pu).curCand.type = CCP_TYPE_NSCCCM;
-      PU::cccmModelToCcpParams(const_cast<PredictionUnit&>(pu).curCand, cccmModelCb, cccmModelCr, 0
+      pu.curCand.type = CCP_TYPE_NSCCCM;
+      PU::cccmModelToCcpParams(pu.curCand, cccmModelCb, cccmModelCr, 0
 #if JVET_AB0174_CCCM_DIV_FREE
                                , m_cccmLumaOffset
 #endif
@@ -14728,8 +14753,8 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
       xCccmApplyModel( pu, COMPONENT_Cb,   cccmModelCb[1], 2, modelThr, predCb );
       xCccmApplyModel( pu, COMPONENT_Cr,   cccmModelCr[1], 2, modelThr, predCr );
 
-      const_cast<PredictionUnit &>(pu).curCand.type = (CCP_TYPE_NSCCCM | CCP_TYPE_MMLM);
-      PU::cccmModelToCcpParams(const_cast<PredictionUnit&>(pu).curCand, cccmModelCb, cccmModelCr, modelThr
+      pu.curCand.type = (CCP_TYPE_NSCCCM | CCP_TYPE_MMLM);
+      PU::cccmModelToCcpParams(pu.curCand, cccmModelCb, cccmModelCr, modelThr
 #if JVET_AB0174_CCCM_DIV_FREE
                                , m_cccmLumaOffset
 #endif
@@ -14769,12 +14794,12 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
       xCccmApplyModel(pu, COMPONENT_Cb,   cccmModelCb[0], 0, 0, predCb);
       xCccmApplyModel(pu, COMPONENT_Cr,   cccmModelCr[0], 0, 0, predCr);
 
-      const_cast<PredictionUnit&>(pu).curCand.type = CCP_TYPE_MDFCCCM;
-      const_cast<PredictionUnit&>(pu).curCand.cccmMultiFilterIdx = pu.cccmMultiFilterIdx;
-      const_cast<PredictionUnit&>(pu).curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
-      const_cast<PredictionUnit&>(pu).curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
+      pu.curCand.type = CCP_TYPE_MDFCCCM;
+      pu.curCand.cccmMultiFilterIdx = pu.cccmMultiFilterIdx;
+      pu.curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
+      pu.curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
 
-      PU::cccmModelToCcpParams(const_cast<PredictionUnit&>(pu).curCand, cccmModelCb, cccmModelCr, 0
+      PU::cccmModelToCcpParams(pu.curCand, cccmModelCb, cccmModelCr, 0
 #if JVET_AB0174_CCCM_DIV_FREE
                                , m_cccmLumaOffset
 #endif
@@ -14799,12 +14824,12 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
       xCccmApplyModel(pu, COMPONENT_Cb,   cccmModelCb[1], 2, modelThr, predCb);
       xCccmApplyModel(pu, COMPONENT_Cr,   cccmModelCr[1], 2, modelThr, predCr);
 
-      const_cast<PredictionUnit&>(pu).curCand.type = CCP_TYPE_MDFCCCM | CCP_TYPE_MMLM;
-      const_cast<PredictionUnit&>(pu).curCand.cccmMultiFilterIdx = pu.cccmMultiFilterIdx;
-      const_cast<PredictionUnit&>(pu).curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
-      const_cast<PredictionUnit&>(pu).curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
+      pu.curCand.type = CCP_TYPE_MDFCCCM | CCP_TYPE_MMLM;
+      pu.curCand.cccmMultiFilterIdx = pu.cccmMultiFilterIdx;
+      pu.curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
+      pu.curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
 
-      PU::cccmModelToCcpParams(const_cast<PredictionUnit&>(pu).curCand, cccmModelCb, cccmModelCr, modelThr
+      PU::cccmModelToCcpParams(pu.curCand, cccmModelCb, cccmModelCr, modelThr
 #if JVET_AB0174_CCCM_DIV_FREE
                                , m_cccmLumaOffset
 #endif
@@ -14841,12 +14866,12 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
       xCccmApplyModel(pu, COMPONENT_Cb,   cccmModelCb[0], 0, 0, predCb);
       xCccmApplyModel(pu, COMPONENT_Cr,   cccmModelCr[0], 0, 0, predCr);
 
-      const_cast<PredictionUnit&>(pu).curCand.type = CCP_TYPE_MDFCCCM;
-      const_cast<PredictionUnit&>(pu).curCand.cccmMultiFilterIdx = pu.cccmMultiFilterIdx;
-      const_cast<PredictionUnit&>(pu).curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
-      const_cast<PredictionUnit&>(pu).curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
+      pu.curCand.type = CCP_TYPE_MDFCCCM;
+      pu.curCand.cccmMultiFilterIdx = pu.cccmMultiFilterIdx;
+      pu.curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
+      pu.curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
 
-      PU::cccmModelToCcpParams(const_cast<PredictionUnit&>(pu).curCand, cccmModelCb, cccmModelCr, 0
+      PU::cccmModelToCcpParams(pu.curCand, cccmModelCb, cccmModelCr, 0
 #if JVET_AB0174_CCCM_DIV_FREE
                                , m_cccmLumaOffset
 #endif
@@ -14871,12 +14896,12 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
       xCccmApplyModel(pu, COMPONENT_Cb,   cccmModelCb[1], 2, modelThr, predCb);
       xCccmApplyModel(pu, COMPONENT_Cr,   cccmModelCr[1], 2, modelThr, predCr);
 
-      const_cast<PredictionUnit&>(pu).curCand.type = CCP_TYPE_MDFCCCM | CCP_TYPE_MMLM;
-      const_cast<PredictionUnit&>(pu).curCand.cccmMultiFilterIdx = pu.cccmMultiFilterIdx;
-      const_cast<PredictionUnit&>(pu).curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
-      const_cast<PredictionUnit&>(pu).curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
+      pu.curCand.type = CCP_TYPE_MDFCCCM | CCP_TYPE_MMLM;
+      pu.curCand.cccmMultiFilterIdx = pu.cccmMultiFilterIdx;
+      pu.curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
+      pu.curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
 
-      PU::cccmModelToCcpParams(const_cast<PredictionUnit&>(pu).curCand, cccmModelCb, cccmModelCr, modelThr
+      PU::cccmModelToCcpParams(pu.curCand, cccmModelCb, cccmModelCr, modelThr
 #if JVET_AB0174_CCCM_DIV_FREE
                                , m_cccmLumaOffset
 #endif
@@ -14926,11 +14951,11 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
       cccmSADtmp += xCalculateCCCMcost(pu, COMPONENT_Cr, intraDir, pu.blocks[COMPONENT_Cr], &cccmModelCr[2], 0);
 #if JVET_AD0188_CCP_MERGE
 #if JVET_AC0054_GLCCCM
-      const_cast<PredictionUnit&>(pu).curCand.type = (pu.glCccmFlag ? CCP_TYPE_GLCCCM : CCP_TYPE_CCCM);
-      const_cast<PredictionUnit&>(pu).curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
-      const_cast<PredictionUnit&>(pu).curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
+      pu.curCand.type = (pu.glCccmFlag ? CCP_TYPE_GLCCCM : CCP_TYPE_CCCM);
+      pu.curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
+      pu.curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
 #else
-      const_cast<PredictionUnit&>(pu).curCand.type = CCP_TYPE_CCCM;
+      pu.curCand.type = CCP_TYPE_CCCM;
 #endif
 #endif
       if (cccmSADtmp < cccmSAD)
@@ -14938,7 +14963,7 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
         xCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb[2], 0, 0, predCb);
         xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr[2], 0, 0, predCr);
 #if JVET_AD0188_CCP_MERGE
-        PU::cccmModelToCcpParams(const_cast<PredictionUnit &>(pu).curCand, &cccmModelCb[2], &cccmModelCr[2], 0
+        PU::cccmModelToCcpParams(pu.curCand, &cccmModelCb[2], &cccmModelCr[2], 0
 #if JVET_AB0174_CCCM_DIV_FREE
                                  , m_cccmLumaOffset
 #endif
@@ -14950,7 +14975,7 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
         xCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb[0], 0, 0, predCb);
         xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr[0], 0, 0, predCr);
 #if JVET_AD0188_CCP_MERGE
-        PU::cccmModelToCcpParams(const_cast<PredictionUnit &>(pu).curCand, &cccmModelCb[0], &cccmModelCr[0], 0
+        PU::cccmModelToCcpParams(pu.curCand, &cccmModelCb[0], &cccmModelCr[0], 0
 #if JVET_AB0174_CCCM_DIV_FREE
                                  , m_cccmLumaOffset
 #endif
@@ -14977,11 +15002,11 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
       cccmSADtmp += xCalculateCCCMcost(pu, COMPONENT_Cr, pu.intraDir[1], pu.blocks[COMPONENT_Cr], &cccmModelCr[2], modelThrTmp);
 #if JVET_AD0188_CCP_MERGE
 #if JVET_AC0054_GLCCCM
-        const_cast<PredictionUnit &>(pu).curCand.type = ((pu.glCccmFlag ? CCP_TYPE_GLCCCM : CCP_TYPE_CCCM) | CCP_TYPE_MMLM);
-        const_cast<PredictionUnit &>(pu).curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
-        const_cast<PredictionUnit &>(pu).curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
+      pu.curCand.type = ((pu.glCccmFlag ? CCP_TYPE_GLCCCM : CCP_TYPE_CCCM) | CCP_TYPE_MMLM);
+      pu.curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
+      pu.curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
 #else
-        const_cast<PredictionUnit &>(pu).curCand.type = (CCP_TYPE_CCCM | CCP_TYPE_MMLM);
+      pu.curCand.type = (CCP_TYPE_CCCM | CCP_TYPE_MMLM);
 #endif
 #endif
       if (cccmSADtmp < cccmSAD)
@@ -14992,7 +15017,7 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
         xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr[2], 1, modelThrTmp, predCr);
         xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr[3], 2, modelThrTmp, predCr);
 #if JVET_AD0188_CCP_MERGE
-        PU::cccmModelToCcpParams(const_cast<PredictionUnit &>(pu).curCand, &cccmModelCb[2], &cccmModelCr[2], modelThrTmp
+        PU::cccmModelToCcpParams(pu.curCand, &cccmModelCb[2], &cccmModelCr[2], modelThrTmp
 #if JVET_AB0174_CCCM_DIV_FREE
                                  , m_cccmLumaOffset
 #endif
@@ -15007,7 +15032,7 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
         xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr[0], 1, modelThr, predCr);
         xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr[1], 2, modelThr, predCr);
 #if JVET_AD0188_CCP_MERGE
-        PU::cccmModelToCcpParams(const_cast<PredictionUnit &>(pu).curCand, &cccmModelCb[0], &cccmModelCr[0], modelThr
+        PU::cccmModelToCcpParams(pu.curCand, &cccmModelCb[0], &cccmModelCr[0], modelThr
 #if JVET_AB0174_CCCM_DIV_FREE
                                  , m_cccmLumaOffset
 #endif
@@ -15040,13 +15065,13 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
       xCccmApplyModel(pu, COMPONENT_Cr,   cccmModelCr[0], 0, 0, predCr);
 
 #if JVET_AC0054_GLCCCM
-      const_cast<PredictionUnit&>(pu).curCand.type = (pu.glCccmFlag ? CCP_TYPE_GLCCCM : CCP_TYPE_CCCM);
-      const_cast<PredictionUnit&>(pu).curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
-      const_cast<PredictionUnit&>(pu).curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
+      pu.curCand.type = (pu.glCccmFlag ? CCP_TYPE_GLCCCM : CCP_TYPE_CCCM);
+      pu.curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
+      pu.curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
 #else
-      const_cast<PredictionUnit&>(pu).curCand.type = CCP_TYPE_CCCM;
+      pu.curCand.type = CCP_TYPE_CCCM;
 #endif
-      PU::cccmModelToCcpParams(const_cast<PredictionUnit&>(pu).curCand, cccmModelCb, cccmModelCr, 0
+      PU::cccmModelToCcpParams(pu.curCand, cccmModelCb, cccmModelCr, 0
 #if JVET_AB0174_CCCM_DIV_FREE
                                , m_cccmLumaOffset
 #endif
@@ -15071,13 +15096,13 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
       xCccmApplyModel(pu, COMPONENT_Cr,   cccmModelCr[1], 2, modelThr, predCr);
 
 #if JVET_AC0054_GLCCCM
-      const_cast<PredictionUnit&>(pu).curCand.type = ((pu.glCccmFlag ? CCP_TYPE_GLCCCM : CCP_TYPE_CCCM) | CCP_TYPE_MMLM);
-      const_cast<PredictionUnit&>(pu).curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
-      const_cast<PredictionUnit&>(pu).curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
+      pu.curCand.type = ((pu.glCccmFlag ? CCP_TYPE_GLCCCM : CCP_TYPE_CCCM) | CCP_TYPE_MMLM);
+      pu.curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
+      pu.curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
 #else
-      const_cast<PredictionUnit&>(pu).curCand.type = (CCP_TYPE_CCCM | CCP_TYPE_MMLM);
+      pu.curCand.type = (CCP_TYPE_CCCM | CCP_TYPE_MMLM);
 #endif
-      PU::cccmModelToCcpParams(const_cast<PredictionUnit &>(pu).curCand, cccmModelCb, cccmModelCr, modelThr
+      PU::cccmModelToCcpParams(pu.curCand, cccmModelCb, cccmModelCr, modelThr
 #if JVET_AB0174_CCCM_DIV_FREE
                                , m_cccmLumaOffset
 #endif
@@ -15672,6 +15697,430 @@ void IntraPrediction::xCccmCreateLumaNoSubRef( const PredictionUnit& pu, CompAre
           refLuma.at( x, refSizeY + y ) = xCccmGetLumaVal( pu, recoLuma, chromaPosPicX, padPosPicY );
         }
       }
+    }
+  }
+}
+#endif
+#if JVET_AE0100_BVGCCCM
+void IntraPrediction::xBvgCccmCalcModels( const PredictionUnit& pu, CccmModel& cccmModelCb, CccmModel &cccmModelCr, int modelId, int modelThr, int minVal, int maxVal )
+{
+  const CPelBuf recoCb = pu.cs->picture->getRecoBuf( COMPONENT_Cb );
+  const CPelBuf recoCr = pu.cs->picture->getRecoBuf( COMPONENT_Cr );
+  int chromaOffsetCb = 1 << ( pu.cu->slice->getSPS()->getBitDepth( CHANNEL_TYPE_CHROMA ) - 1 );
+  int chromaOffsetCr = 1 << ( pu.cu->slice->getSPS()->getBitDepth( CHANNEL_TYPE_CHROMA ) - 1 );
+  
+  int refSizeX   = m_cccmBlkArea.x - m_cccmRefArea.x; // Reference lines available left and above
+  int refSizeY   = m_cccmBlkArea.y - m_cccmRefArea.y;
+  int refPosPicX = m_cccmRefArea.x;                   // Position of the reference area in picture coordinates
+  int refPosPicY = m_cccmRefArea.y;
+#if JVET_AB0174_CCCM_DIV_FREE
+  if ( refSizeX || refSizeY )
+  {
+    int refPosX = refSizeX > 0 ? refSizeX - 1 : 0;
+    int refPosY = refSizeY > 0 ? refSizeY - 1 : 0;
+    
+    chromaOffsetCb = recoCb.at(refPosPicX + refPosX, refPosPicY + refPosY);
+    chromaOffsetCr = recoCr.at(refPosPicX + refPosX, refPosPicY + refPosY);
+  }
+#endif
+  int sampleNum = 0;
+  int strX[NUM_BVG_CCCM_CANDS], endX[NUM_BVG_CCCM_CANDS], strY[NUM_BVG_CCCM_CANDS], endY[NUM_BVG_CCCM_CANDS];
+  for (int candIdx = 0; candIdx < pu.numBvgCands; candIdx++)
+  {
+    Mv chromaBv = pu.bvList[candIdx];
+    PelBuf refLuma = xBvgCccmGetLumaPuBuf(pu, candIdx);
+    int refPosPicX = pu.blocks[COMPONENT_Cb].x + chromaBv.hor;
+    int refPosPicY = pu.blocks[COMPONENT_Cb].y + chromaBv.ver;
+    strX[candIdx] = refPosPicX;
+    strY[candIdx] = refPosPicY;
+    endX[candIdx] = refPosPicX + refLuma.width;
+    endY[candIdx] = refPosPicY + refLuma.height;
+  }
+  
+  for (int candIdx = 0; candIdx < pu.numBvgCands; candIdx++)
+  {
+    PelBuf refLuma = xBvgCccmGetLumaPuBuf(pu, candIdx);
+    PelBuf refCb = xBvgCccmGetChromaPuBuf(pu, COMPONENT_Cb, candIdx);
+    PelBuf refCr = xBvgCccmGetChromaPuBuf(pu, COMPONENT_Cr, candIdx);
+      //-- collect data
+    for( int y = 0; y < refLuma.height; y++ )
+    {
+      for( int x = 0; x < refLuma.width; x++ )
+      {
+        if ( modelId == 1 && refLuma.at(x, y) > modelThr ) // Model 1: Include only samples below or equal to the threshold
+        {
+          continue;
+        }
+        if ( modelId == 2 && refLuma.at(x, y) <= modelThr) // Model 2: Include only samples above the threshold
+        {
+          continue;
+        }
+        if (refLuma.at(x, y) < minVal || refLuma.at(x, y) > maxVal)
+        {
+          continue;
+        }
+        bool exist = false;
+        if (candIdx > 0)
+        {
+          for (int i = 0; i < candIdx; i++)
+          {
+            int xx = strX[candIdx] + x;
+            int yy = strY[candIdx] + y;
+            if (xx >= strX[i] && xx < endX[i] && yy >= strY[i] && yy < endY[i])
+            {
+              exist = true;
+              break;
+            }
+          }
+        }
+        if (exist)
+        {
+          continue;
+        }
+        // 11-tap filter
+        m_a[0][sampleNum] = refLuma.at(x, y    ); // C
+        m_a[1][sampleNum] = refLuma.at(x, y - 1); // N
+        m_a[2][sampleNum] = refLuma.at(x, y + 1); // S
+        m_a[3][sampleNum] = refLuma.at(x - 1, y); // W
+        m_a[4][sampleNum] = refLuma.at(x + 1, y); // E
+        m_a[5][sampleNum] = cccmModelCb.nonlinear( refLuma.at(x, y) );     // nonlinear(C)
+        m_a[6][sampleNum] = cccmModelCb.nonlinear( refLuma.at(x, y - 1) ); // nonlinear(N)
+        m_a[7][sampleNum] = cccmModelCb.nonlinear( refLuma.at(x, y + 1) ); // nonlinear(S)
+        m_a[8][sampleNum] = cccmModelCb.nonlinear( refLuma.at(x - 1, y) ); // nonlinear(W)
+        m_a[9][sampleNum] = cccmModelCb.nonlinear( refLuma.at(x + 1, y) ); // nonlinear(E)
+        m_a[10][sampleNum] = cccmModelCb.bias();
+        
+        m_cb[sampleNum] = refCb.at( x, y );
+        m_cr[sampleNum++] = refCr.at( x, y );
+      }
+    }
+  }
+  
+  if( !sampleNum ) // Number of samples can go to zero in the multimode case
+  {
+    cccmModelCb.clearModel();
+    cccmModelCr.clearModel();
+  }
+  else
+  {
+#if JVET_AB0174_CCCM_DIV_FREE
+    m_cccmSolver.solve2( m_a, m_cb, m_cr, sampleNum, chromaOffsetCb, chromaOffsetCr, cccmModelCb, cccmModelCr );
+#else
+    m_cccmSolver.solve2( m_a, m_cb, m_cr, sampleNum, cccmModelCb, cccmModelCr );
+#endif
+  }
+  return;
+}
+void IntraPrediction::xBvgCccmApplyModel( const PredictionUnit& pu, const ComponentID compId, CccmModel &cccmModel, int modelId, int modelThr, PelBuf &piPred )
+{
+  const  ClpRng& clpRng(pu.cu->cs->slice->clpRng(compId));
+  Pel* samples = m_samples;
+  
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  CHECK( pu.cccmNoSubFlag, "cccmNoSubFlag shall be disabled" );
+#endif
+  CPelBuf refLumaBlk = xCccmGetLumaPuBuf(pu);
+  for (int y = 0; y < refLumaBlk.height; y++)
+  {
+    for (int x = 0; x < refLumaBlk.width; x++)
+    {
+      if ( modelId == 1 && refLumaBlk.at( x, y ) > modelThr ) // Model 1: Include only samples below or equal to the threshold
+      {
+        continue;
+      }
+      if ( modelId == 2 && refLumaBlk.at( x, y ) <= modelThr) // Model 2: Include only samples above the threshold
+      {
+        continue;
+      }
+      // 11-tap filter
+      samples[0] = refLumaBlk.at(x, y    ); // C
+      samples[1] = refLumaBlk.at(x, y - 1); // N
+      samples[2] = refLumaBlk.at(x, y + 1); // S
+      samples[3] = refLumaBlk.at(x - 1, y); // W
+      samples[4] = refLumaBlk.at(x + 1, y); // E
+      samples[5] = cccmModel.nonlinear( refLumaBlk.at(x, y) );     // nonlinear(C)
+      samples[6] = cccmModel.nonlinear( refLumaBlk.at(x, y - 1) ); // nonlinear(N)
+      samples[7] = cccmModel.nonlinear( refLumaBlk.at(x, y + 1) ); // nonlinear(S)
+      samples[8] = cccmModel.nonlinear( refLumaBlk.at(x - 1, y) ); // nonlinear(W)
+      samples[9] = cccmModel.nonlinear( refLumaBlk.at(x + 1, y) ); // nonlinear(E)
+      samples[10] = cccmModel.bias();
+      
+      piPred.at(x, y) = ClipPel<Pel>( cccmModel.convolve(samples), clpRng );
+    }
+  }
+}
+int IntraPrediction::xBvgCccmCalcBlkAver(const PredictionUnit& pu) const
+{
+  int numSamples = 0;
+  int sumSamples = 0;
+  CPelBuf refLumaBlk = xCccmGetLumaPuBuf( pu );
+  
+  for (int y = 0; y < refLumaBlk.height; y++)
+  {
+    for (int x = 0; x < refLumaBlk.width; x++)
+    {
+      sumSamples += refLumaBlk.at(x, y);
+      numSamples += 1;
+    }
+  }
+#if JVET_AB0174_CCCM_DIV_FREE
+  return numSamples == 0 ? 512 : xCccmDivideLowPrec(sumSamples, numSamples);
+#else
+  return numSamples == 0 ? 512 : ( sumSamples + numSamples/2) / numSamples;
+#endif
+}
+void IntraPrediction::xBvgCccmCalcBlkRange(const PredictionUnit& pu, int& minVal, int&maxVal) const
+{
+  minVal = MAX_INT, maxVal = -MAX_INT;
+  CPelBuf refLumaBlk = xCccmGetLumaPuBuf(pu);
+  for (int y = 0; y < refLumaBlk.height; y++)
+  {
+    for (int x = 0; x < refLumaBlk.width; x++)
+    {
+      if (refLumaBlk.at(x, y) < minVal)
+      {
+        minVal = refLumaBlk.at(x, y);
+      }
+      if (refLumaBlk.at(x, y) > maxVal)
+      {
+        maxVal = refLumaBlk.at(x, y);
+      }
+    }
+  }
+  int range = abs(maxVal - minVal) >> 4;
+  minVal -= range;
+  maxVal += range;
+}
+void IntraPrediction::xBvgCccmCalcRefArea(const PredictionUnit& pu, CompArea chromaArea)
+{
+  m_bvgCccmBlkArea = chromaArea;
+  m_bvgCccmRefArea = chromaArea;
+  int refWidth = chromaArea.width + 2 * CCCM_FILTER_PADDING;
+  int refHeight = chromaArea.height + 2 * CCCM_FILTER_PADDING;
+  m_bvgCccmRefArea = Area(chromaArea.x - CCCM_FILTER_PADDING, chromaArea.y - CCCM_FILTER_PADDING, refWidth, refHeight);
+}
+PelBuf IntraPrediction::xBvgCccmGetLumaPuBufFul(const PredictionUnit& pu, int candIdx) const
+{
+  int refStride = m_bvgCccmRefArea.width;
+  int tuWidth = m_bvgCccmRefArea.width;
+  int tuHeight = m_bvgCccmRefArea.height;
+  return PelBuf( m_bvgCccmLumaBuf[candIdx], refStride, tuWidth, tuHeight );  // Points to the top-left corner
+                                                                             //  return PelBuf( m_bvgCccmLumaBuf[0], refStride, tuWidth, tuHeight );  // Points to the top-left corner
+}
+PelBuf IntraPrediction::xBvgCccmGetLumaPuBuf(const PredictionUnit& pu, int candIdx) const
+{
+  int refSizeX  = 0;//m_bvgCccmBlkArea.x; // Reference lines available left and above
+  int refSizeY  = 0;//m_bvgCccmBlkArea.y;
+  int tuWidth   = m_bvgCccmBlkArea.width;
+  int tuHeight  = m_bvgCccmBlkArea.height;
+  int refStride = m_bvgCccmBlkArea.width + 2 * CCCM_FILTER_PADDING; // Including paddings required for the 2D filter
+  int refOrigin = refStride * (refSizeY + CCCM_FILTER_PADDING) + refSizeX + CCCM_FILTER_PADDING;
+  
+  return PelBuf( m_bvgCccmLumaBuf[candIdx] + refOrigin, refStride, tuWidth, tuHeight );  // Points to the top-left corner of the block
+                                                                                         //  return PelBuf( m_bvgCccmLumaBuf[0] + refOrigin, refStride, tuWidth, tuHeight );  // Points to the top-left corner of the block
+}
+PelBuf IntraPrediction::xBvgCccmGetChromaPuBuf(const PredictionUnit& pu, const ComponentID compID, int candIdx) const
+{
+  int refSizeX  = 0;//m_bvgCccmBlkArea.x; // Reference lines available left and above
+  int refSizeY  = 0;//m_bvgCccmBlkArea.y;
+  int tuWidth   = m_bvgCccmBlkArea.width;
+  int tuHeight  = m_bvgCccmBlkArea.height;
+  int refStride = m_bvgCccmBlkArea.width + 2 * CCCM_FILTER_PADDING; // Including paddings required for the 2D filter
+  int refOrigin = refStride * (refSizeY + CCCM_FILTER_PADDING) + refSizeX + CCCM_FILTER_PADDING;
+  if (compID == COMPONENT_Cb)
+  {
+    return PelBuf( m_bvgCccmChromaBuf[candIdx][0] + refOrigin, refStride, tuWidth, tuHeight );  // Points to the top-left corner of the block
+  }
+  else
+  {
+    return PelBuf( m_bvgCccmChromaBuf[candIdx][1] + refOrigin, refStride, tuWidth, tuHeight );  // Points to the top-left corner of the block
+  }
+}
+void IntraPrediction::xBvgCccmCreateLumaRef(const PredictionUnit& pu, CompArea chromaArea
+#if JVET_AD0202_CCCM_MDF
+                                            , int downsFilterIdx
+#endif
+                                            )
+{
+  const CPelBuf recoLuma = pu.cs->picture->getRecoBuf(COMPONENT_Y);
+  const CPelBuf recoCb = pu.cs->picture->getRecoBuf( COMPONENT_Cb );
+  const CPelBuf recoCr = pu.cs->picture->getRecoBuf( COMPONENT_Cr );
+  
+  const int  maxPosPicX  = pu.cs->picture->chromaSize().width  - 1;
+  const int  maxPosPicY  = pu.cs->picture->chromaSize().height - 1;
+  int ctuWidth  = pu.cs->sps->getMaxCUWidth()  >> getComponentScaleX(COMPONENT_Cb, pu.chromaFormat);
+  int ctuHeight = pu.cs->sps->getMaxCUHeight() >> getComponentScaleY(COMPONENT_Cb, pu.chromaFormat);
+  
+  for (int candIdx = 0; candIdx < pu.numBvgCands; candIdx++)
+  {
+    Mv chromaBv = pu.bvList[candIdx];
+    xBvgCccmCalcRefArea(pu, chromaArea); // Find the reference area
+    PelBuf refLuma = xBvgCccmGetLumaPuBuf(pu, candIdx);
+    PelBuf refCb = xBvgCccmGetChromaPuBuf(pu, COMPONENT_Cb, candIdx);
+    PelBuf refCr = xBvgCccmGetChromaPuBuf(pu, COMPONENT_Cr, candIdx);
+    
+#if JVET_AB0174_CCCM_DIV_FREE
+    xCccmSetLumaRefValue( pu );
+#endif
+    
+    int refPosPicX = pu.blocks[COMPONENT_Cb].x + chromaBv.hor;
+    int refPosPicY = pu.blocks[COMPONENT_Cb].y + chromaBv.ver;
+    int maxWidth = refLuma.width;
+    int maxHeight =  refLuma.height;
+    PU::checkIsChromaBvCandidateValid(pu, chromaBv, maxWidth, maxHeight);
+    // Generate down-sampled luma for the area covering both the PU and the top/left reference areas (+ top and left paddings)
+    for (int y = 0; y < refLuma.height; y++)
+    {
+      for (int x = 0; x < refLuma.width; x++)
+      {
+        int chromaPosPicX = refPosPicX + x;
+        int chromaPosPicY = refPosPicY + y;
+        
+        chromaPosPicX = chromaPosPicX < 0 ? 0 : chromaPosPicX > maxPosPicX ? maxPosPicX : chromaPosPicX;
+        chromaPosPicY = chromaPosPicY < 0 ? 0 : chromaPosPicY > maxPosPicY ? maxPosPicY : chromaPosPicY;
+        
+        refLuma.at( x, y ) = xCccmGetLumaVal(pu, recoLuma, chromaPosPicX, chromaPosPicY
+#if JVET_AD0202_CCCM_MDF
+                                             , downsFilterIdx
+#endif
+                                             );
+        refCb.at( x, y ) = recoCb.at( chromaPosPicX, chromaPosPicY );
+        refCr.at( x, y ) = recoCr.at( chromaPosPicX, chromaPosPicY );
+        // pad if not available
+        if ( x >= maxWidth )
+        {
+          refLuma.at( x, y ) = refLuma.at( x - 1, y );
+          refCb.at( x, y ) = refCb.at( x - 1, y );
+          refCr.at( x, y ) = refCr.at( x - 1, y );
+        }
+        else if (y >= maxHeight)
+        {
+          refLuma.at( x, y ) = refLuma.at( x, y - 1);
+          refCb.at( x, y ) = refCb.at( x, y - 1);
+          refCr.at( x, y ) = refCr.at( x, y - 1);
+        }
+      }
+    }
+    //-- Now fill the out of block samples (North)
+    for (int x = 0; x < refLuma.width; x++)
+    {
+      int y = -1;
+      int chromaPosPicX = refPosPicX + x;
+      int chromaPosPicY = refPosPicY + y;
+      
+      chromaPosPicX = chromaPosPicX < 0 ? 0 : chromaPosPicX > maxPosPicX ? maxPosPicX : chromaPosPicX;
+      chromaPosPicY = chromaPosPicY < 0 ? 0 : chromaPosPicY > maxPosPicY ? maxPosPicY : chromaPosPicY;
+      
+      refLuma.at( x, y ) = xCccmGetLumaVal(pu, recoLuma, chromaPosPicX, chromaPosPicY
+#if JVET_AD0202_CCCM_MDF
+                                           , downsFilterIdx
+#endif
+                                           );
+      if (chromaPosPicY < 0)
+      {
+        refLuma.at( x, y ) = refLuma.at( x, y + 1 );
+      }
+      if ( x >= maxWidth )
+      {
+        refLuma.at( x, y ) = refLuma.at( x - 1, y );
+      }
+    }
+    //-- Now fill the out of block samples (South)
+    for (int x = 0; x < refLuma.width; x++)
+    {
+      int y = refLuma.height;
+      int chromaPosPicX = refPosPicX + x;
+      int chromaPosPicY = refPosPicY + y;
+      
+      chromaPosPicX = chromaPosPicX < 0 ? 0 : chromaPosPicX > maxPosPicX ? maxPosPicX : chromaPosPicX;
+      chromaPosPicY = chromaPosPicY < 0 ? 0 : chromaPosPicY > maxPosPicY ? maxPosPicY : chromaPosPicY;
+      
+      refLuma.at( x, y ) = xCccmGetLumaVal(pu, recoLuma, chromaPosPicX, chromaPosPicY
+#if JVET_AD0202_CCCM_MDF
+                                           , downsFilterIdx
+#endif
+                                           );
+      if (chromaPosPicY >= maxPosPicY)
+      {
+        refLuma.at( x, y ) = refLuma.at( x, y - 1 );
+      }
+      if (!( chromaPosPicY <= maxPosPicY && (chromaPosPicY % ctuHeight) ))
+      {
+        refLuma.at( x, y ) = refLuma.at( x, y - 1 );
+      }
+      if (maxHeight < refLuma.height)
+      {
+        refLuma.at( x, y ) = refLuma.at( x, y - 1);
+      }
+      if ( x >= maxWidth )
+      {
+        refLuma.at( x, y ) = refLuma.at( x - 1, y );
+      }
+    }
+    //-- Now fill the out of block samples (West)
+    for (int y = 0; y < refLuma.height; y++)
+    {
+      int x = -1;
+      int chromaPosPicX = refPosPicX + x;
+      int chromaPosPicY = refPosPicY + y;
+      
+      chromaPosPicX = chromaPosPicX < 0 ? 0 : chromaPosPicX > maxPosPicX ? maxPosPicX : chromaPosPicX;
+      chromaPosPicY = chromaPosPicY < 0 ? 0 : chromaPosPicY > maxPosPicY ? maxPosPicY : chromaPosPicY;
+      
+      refLuma.at( x, y ) = xCccmGetLumaVal(pu, recoLuma, chromaPosPicX, chromaPosPicY
+#if JVET_AD0202_CCCM_MDF
+                                           , downsFilterIdx
+#endif
+                                           );
+      if (chromaPosPicX < 0)
+      {
+        refLuma.at( x, y ) = refLuma.at( x + 1, y );
+      }
+      if ( y >= maxHeight )
+      {
+        refLuma.at( x, y ) = refLuma.at( x, y - 1 );
+      }
+    }
+    //-- Now fill the out of block samples (East)
+    for (int y = 0; y < refLuma.height; y++)
+    {
+      int x = refLuma.width;
+      int chromaPosPicX = refPosPicX + x;
+      int chromaPosPicY = refPosPicY + y;
+      
+      chromaPosPicX = chromaPosPicX < 0 ? 0 : chromaPosPicX > maxPosPicX ? maxPosPicX : chromaPosPicX;
+      chromaPosPicY = chromaPosPicY < 0 ? 0 : chromaPosPicY > maxPosPicY ? maxPosPicY : chromaPosPicY;
+      
+      refLuma.at( x, y ) = xCccmGetLumaVal(pu, recoLuma, chromaPosPicX, chromaPosPicY
+#if JVET_AD0202_CCCM_MDF
+                                           , downsFilterIdx
+#endif
+                                           );
+      if (chromaPosPicX >= maxPosPicX)
+      {
+        refLuma.at( x, y ) = refLuma.at( x - 1, y );
+      }
+      if (!( chromaPosPicX <= maxPosPicX && (chromaPosPicX % ctuWidth) ))
+      {
+        refLuma.at( x, y ) = refLuma.at( x - 1, y );
+      }
+      if (maxWidth < refLuma.width)
+      {
+        refLuma.at( x, y ) = refLuma.at( x - 1, y );
+      }
+      if ( y >= maxHeight )
+      {
+        refLuma.at( x, y ) = refLuma.at( x, y - 1 );
+      }
+    }
+    
+    int rribcFlipType = pu.rrIbcList[candIdx];
+    if (rribcFlipType > 0)
+    {
+      PelBuf refLumaExt = xBvgCccmGetLumaPuBufFul(pu, candIdx);
+      refLumaExt.flipSignal(rribcFlipType == 1);
+      refCb.flipSignal(rribcFlipType == 1);
+      refCr.flipSignal(rribcFlipType == 1);
     }
   }
 }

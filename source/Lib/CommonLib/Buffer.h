@@ -72,6 +72,9 @@ struct PelBufferOps
   void ( *addAvg4 )       ( const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, int width, int height,            int shift, int offset, const ClpRng& clpRng );
   void ( *addAvg8 )       ( const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, int width, int height,            int shift, int offset, const ClpRng& clpRng );
 #endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  void ( *avg )        (const Pel* src1, int src1Stride, const Pel* src2, int src2Stride, Pel *dst, int dstStride, int width, int height);
+#endif
 #if JVET_AD0213_LIC_IMP
   void(*toLast2)       (Pel* src, int srcStride, int width, int height, int shiftNum, int offset, const ClpRng& clpRng);
   void(*toLast4)       (Pel* src, int srcStride, int width, int height, int shiftNum, int offset, const ClpRng& clpRng);
@@ -207,6 +210,9 @@ struct AreaBuf : public Size
 #else
   void addAvg               ( const AreaBuf<const T> &other1, const AreaBuf<const T> &other2, const ClpRng& clpRng );
 #endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  void avg                  (const AreaBuf<const T> &other1, const AreaBuf<const T> &other2);
+#endif
   void removeHighFreq       ( const AreaBuf<T>& other, const bool bClip, const ClpRng& clpRng);
   void updateHistogram      ( std::vector<int32_t>& hist ) const;
 #if INTER_LIC
@@ -216,6 +222,9 @@ struct AreaBuf : public Size
   T    meanDiff             ( const AreaBuf<const T> &other ) const;
   void subtract             ( const T val );
   void subtract             ( const AreaBuf<const T> &buffer1, const AreaBuf<const T> &buffer2 );
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  void linearTransforms     ( const int scale, const int shift, const int offset, const int scale2, const int shift2, const int offset2, const int yThres, bool bClip, const ClpRng& clpRng );
+#endif
   void linearTransform      ( const int scale, const int shift, const int offset, bool bClip, const ClpRng& clpRng );
 
   void transposedFrom       ( const AreaBuf<const T> &other );
@@ -272,6 +281,11 @@ typedef AreaBuf<const MotionInfo> CMotionBuf;
 #if JVET_W0123_TIMD_FUSION
 typedef AreaBuf<      uint8_t> IpmBuf;
 typedef AreaBuf<const uint8_t> CIpmBuf;
+#endif
+
+#if JVET_AE0043_CCP_MERGE_TEMPORAL
+typedef AreaBuf<      int>   CCPModelIdxBuf;
+typedef AreaBuf<const int>  CCCPModelIdxBuf;
 #endif
 
 typedef AreaBuf<      TCoeff>  PLTescapeBuf;

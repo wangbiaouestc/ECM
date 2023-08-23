@@ -69,6 +69,9 @@ Slice::Slice()
 #if JVET_S0193_NO_OUTPUT_PRIOR_PIC
 , m_noOutputOfPriorPicsFlag       ( 0 )
 #endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+, m_biPredictionIBCFlag           ( false )
+#endif
 , m_iSliceQp                      ( 0 )
 , m_ChromaQpAdjEnabled            ( false )
 , m_lmcsEnabledFlag               ( 0 )
@@ -199,6 +202,9 @@ void Slice::initSlice()
 
 #if JVET_S0193_NO_OUTPUT_PRIOR_PIC
   m_noOutputOfPriorPicsFlag = 0;
+#endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  m_biPredictionIBCFlag = false;
 #endif
 
   m_bCheckLDC = false;
@@ -1675,6 +1681,9 @@ void Slice::copySliceInfo(Slice *pSrc, bool cpyAlmostAll)
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   m_useIBC                        = pSrc->m_useIBC;
 #endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  m_biPredictionIBCFlag           = pSrc->m_biPredictionIBCFlag;
+#endif
 
   for ( uint32_t e=0 ; e<NUM_REF_PIC_LIST_01 ; e++ )
   {
@@ -2940,7 +2949,7 @@ const WPScalingParam *Slice::getWpScaling(const RefPicList refPicList, const int
 WPScalingParam *Slice::getWpScaling(const RefPicList refPicList, const int refIdx)
 {
   CHECK(refPicList >= NUM_REF_PIC_LIST_01, "Invalid picture reference list");
-  if (refIdx < 0)
+  if( refIdx < 0 || refIdx >= MAX_NUM_REF )
   {
     return nullptr;
   }
@@ -3622,6 +3631,9 @@ SPS::SPS()
 #endif
 #if JVET_AA0061_IBC_MBVD
   , m_ibcMbvd                 ( false )
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  , m_ibcMbvdAdSearch         ( false )
+#endif
 #endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   , m_rribc                   ( false )
@@ -3636,6 +3648,12 @@ SPS::SPS()
 #endif
 #if JVET_AC0112_IBC_LIC
   , m_ibcLic                  ( false )
+#endif
+#if JVET_AE0159_FIBC
+  , m_ibcFilter               ( false )
+#endif
+#if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
+  , m_ibcNonAdjCand           ( false )
 #endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
  , m_DMVDMode                 ( false )
@@ -5360,11 +5378,14 @@ void Slice::scaleRefPicList( Picture *scaledRefPic[ ], PicHeader *picHeader, APS
 
             scaledRefPic[j]->poc = NOT_VALID;
 
+
+            scaledRefPic[j]->create(
 #if JVET_Z0118_GDR
-            scaledRefPic[j]->create(sps->getGDREnabledFlag(), sps->getChromaFormatIdc(), Size(pps->getPicWidthInLumaSamples(), pps->getPicHeightInLumaSamples()), sps->getMaxCUWidth(), sps->getMaxCUWidth() + EXT_PICTURE_SIZE, isDecoder, layerId);
-#else
-            scaledRefPic[j]->create( sps->getChromaFormatIdc(), Size( pps->getPicWidthInLumaSamples(), pps->getPicHeightInLumaSamples() ), sps->getMaxCUWidth(), sps->getMaxCUWidth() + EXT_PICTURE_SIZE, isDecoder, layerId );
+              sps->getGDREnabledFlag(),
 #endif
+              sps->getWrapAroundEnabledFlag(), sps->getChromaFormatIdc(),
+              Size(pps->getPicWidthInLumaSamples(), pps->getPicHeightInLumaSamples()), sps->getMaxCUWidth(),
+              sps->getMaxCUWidth() + EXT_PICTURE_SIZE, isDecoder, layerId);
           }
 
           scaledRefPic[j]->poc = poc;

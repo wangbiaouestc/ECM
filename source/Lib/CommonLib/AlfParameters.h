@@ -744,12 +744,21 @@ struct CcAlfFilterParam
 struct CcSaoComParam
 {
   bool     enabled   [MAX_NUM_COMPONENT];
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+  bool     extChroma [MAX_NUM_COMPONENT];
+  bool     reusePrv  [MAX_NUM_COMPONENT];
+  int      reusePrvId[MAX_NUM_COMPONENT];
+#endif
   uint8_t  setNum    [MAX_NUM_COMPONENT];
   bool     setEnabled[MAX_NUM_COMPONENT][MAX_CCSAO_SET_NUM];
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
-  bool setType[MAX_NUM_COMPONENT][MAX_CCSAO_SET_NUM];
+  bool     setType   [MAX_NUM_COMPONENT][MAX_CCSAO_SET_NUM];
 #endif
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+  uint16_t candPos   [MAX_NUM_COMPONENT][MAX_CCSAO_SET_NUM][MAX_NUM_COMPONENT];  // BO 0: candPosY, EO 0: edgeDir, 1: edgeCmp, 2: dummy
+#else
   uint16_t candPos   [MAX_NUM_COMPONENT][MAX_CCSAO_SET_NUM][MAX_NUM_LUMA_COMP];
+#endif
   uint16_t bandNum   [MAX_NUM_COMPONENT][MAX_CCSAO_SET_NUM][MAX_NUM_COMPONENT];
   short    offset    [MAX_NUM_COMPONENT][MAX_CCSAO_SET_NUM][MAX_CCSAO_CLASS_NUM];
   CcSaoComParam()
@@ -759,10 +768,15 @@ struct CcSaoComParam
   void reset()
   {
     std::memset( enabled,    false, sizeof( enabled    ) );
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+    std::memset( extChroma,  false, sizeof( extChroma  ) );
+    std::memset( reusePrv,   false, sizeof( reusePrv   ) );
+    std::memset( reusePrvId,     0, sizeof( reusePrvId ) );
+#endif
     std::memset( setNum,         0, sizeof( setNum     ) );
     std::memset( setEnabled, false, sizeof( setEnabled ) );
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
-    std::memset(setType, 0, sizeof(setType));
+    std::memset( setType,        0, sizeof( setType    ) );
 #endif
     std::memset( candPos,        0, sizeof( candPos    ) );
     std::memset( bandNum,        0, sizeof( bandNum    ) );
@@ -770,11 +784,16 @@ struct CcSaoComParam
   }
   void reset(ComponentID compID)
   {
-    enabled[compID] = false;
-    setNum [compID] = 0;
+    enabled   [compID] = false;
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+    extChroma [compID] = false;
+    reusePrv  [compID] = false;
+    reusePrvId[compID] = 0;
+#endif
+    setNum    [compID] = 0;
     std::memset( setEnabled[compID], false, sizeof( setEnabled[compID]) );
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
-    std::memset(setType[compID], 0, sizeof(setType[compID]));
+    std::memset( setType   [compID],     0, sizeof( setType   [compID]) );
 #endif
     std::memset( candPos   [compID],     0, sizeof( candPos   [compID]) );
     std::memset( bandNum   [compID],     0, sizeof( bandNum   [compID]) );
@@ -783,10 +802,15 @@ struct CcSaoComParam
   const CcSaoComParam& operator = ( const CcSaoComParam& src )
   {
     std::memcpy( enabled,    src.enabled,    sizeof( enabled    ) );
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+    std::memcpy( extChroma,  src.extChroma,  sizeof( extChroma  ) );
+    std::memcpy( reusePrv,   src.reusePrv,   sizeof( reusePrv   ) );
+    std::memcpy( reusePrvId, src.reusePrvId, sizeof( reusePrvId ) );
+#endif
     std::memcpy( setNum,     src.setNum,     sizeof( setNum     ) );
     std::memcpy( setEnabled, src.setEnabled, sizeof( setEnabled ) );
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
-    std::memcpy(setType, src.setType, sizeof(setType));
+    std::memcpy( setType,    src.setType,    sizeof( setType    ) );
 #endif
     std::memcpy( candPos,    src.candPos,    sizeof( candPos    ) );
     std::memcpy( bandNum,    src.bandNum,    sizeof( bandNum    ) );
@@ -794,6 +818,56 @@ struct CcSaoComParam
     return *this;
   }
 };
+
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+struct CcSaoPrvParam
+{
+  bool     enabled;
+  bool     extChroma;
+  bool     reusePrv;
+  int      reusePrvId;
+  int      temporalId;
+  uint8_t  setNum;
+  bool     setEnabled[MAX_CCSAO_SET_NUM];
+  bool     setType   [MAX_CCSAO_SET_NUM];
+  uint16_t candPos   [MAX_CCSAO_SET_NUM][MAX_NUM_COMPONENT];
+  uint16_t bandNum   [MAX_CCSAO_SET_NUM][MAX_NUM_COMPONENT];  
+  short    offset    [MAX_CCSAO_SET_NUM][MAX_CCSAO_CLASS_NUM];
+  CcSaoPrvParam()
+  {
+    reset();
+  }
+  void reset()
+  {
+    enabled    = false;
+    extChroma  = false;
+    reusePrv   = false;
+    reusePrvId = 0;
+    temporalId = 0;
+    setNum = 0;
+    std::memset( setEnabled, false, sizeof( setEnabled ) );
+    std::memset( setType,        0, sizeof( setType    ) );
+    std::memset( candPos,        0, sizeof( candPos    ) );
+    std::memset( bandNum,        0, sizeof( bandNum    ) );
+    std::memset( offset,         0, sizeof( offset     ) );
+  }
+  const CcSaoPrvParam& operator = ( const CcSaoPrvParam& src )
+  {
+    enabled    = src.enabled;
+    extChroma  = src.extChroma;
+    reusePrv   = src.reusePrv;
+    reusePrvId = src.reusePrvId;
+    temporalId = src.temporalId;
+    setNum     = src.setNum;
+    std::memcpy( setEnabled, src.setEnabled, sizeof( setEnabled ) );
+    std::memcpy( setType,    src.setType,    sizeof( setType    ) );
+    std::memcpy( candPos,    src.candPos,    sizeof( candPos    ) );
+    std::memcpy( bandNum,    src.bandNum,    sizeof( bandNum    ) );
+    std::memcpy( offset,     src.offset,     sizeof( offset     ) );
+    return *this;
+  }
+};
+#endif
 #endif
 //! \}
 

@@ -240,6 +240,23 @@ void addAvgCore( const T* src1, int src1Stride, const T* src2, int src2Stride, T
 #undef ADD_AVG_CORE_INC
 }
 
+#if JVET_AE0169_BIPREDICTIVE_IBC
+template< typename T >
+void avgCore( const T* src1, int src1Stride, const T* src2, int src2Stride, T* dest, int dstStride, int width, int height )
+{
+#define ADD_AVG_CORE_OP( ADDR ) dest[ADDR] = ( ( src1[ADDR] + src2[ADDR] + 1 ) >> 1 )
+#define ADD_AVG_CORE_INC    \
+  src1 += src1Stride;       \
+  src2 += src2Stride;       \
+  dest +=  dstStride;       \
+
+  SIZE_AWARE_PER_EL_OP( ADD_AVG_CORE_OP, ADD_AVG_CORE_INC );
+
+#undef ADD_AVG_CORE_OP
+#undef ADD_AVG_CORE_INC
+}
+#endif
+
 #if JVET_AD0213_LIC_IMP
 template< typename T >
 void toLastCore(T* src, int srcStride, int width, int height, int shiftNum, int offset, const ClpRng& clpRng)
@@ -493,6 +510,11 @@ void calcBIOParamSum5Core(Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signG
       }
       sumDIX[sampleIdx] <<= 2;
       sumDIY[sampleIdx] <<= 2;
+#if JVET_AE0091_ITERATIVE_BDOF
+      int regVxVy = (1 << 8);
+      sumAbsGX[sampleIdx] += regVxVy;
+      sumAbsGY[sampleIdx] += regVxVy;
+#endif
       absGX += (1 - 5 * widthG);
       absGY += (1 - 5 * widthG);
       dIX += (1 - 5 * widthG);
@@ -1053,6 +1075,9 @@ PelBufferOps::PelBufferOps()
 #endif
   addAvg4 = addAvgCore<Pel>;
   addAvg8 = addAvgCore<Pel>;
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  avg = avgCore<Pel>;
+#endif
 #if JVET_AD0213_LIC_IMP
   toLast2 = toLastCore<Pel>;
   toLast4 = toLastCore<Pel>;
@@ -1596,6 +1621,40 @@ void AreaBuf<Pel>::addAvg( const AreaBuf<const Pel> &other1, const AreaBuf<const
 #endif
 }
 
+#if JVET_AE0169_BIPREDICTIVE_IBC
+template<>
+void AreaBuf<Pel>::avg(const AreaBuf<const Pel> &other1, const AreaBuf<const Pel> &other2)
+{
+  const Pel* src1 = other1.buf;
+  const Pel* src2 = other2.buf;
+        Pel* dest =        buf;
+
+  const unsigned src1Stride = other1.stride;
+  const unsigned src2Stride = other2.stride;
+  const unsigned destStride =        stride;
+
+#if ENABLE_SIMD_OPT_BUFFER && defined(TARGET_SIMD_X86)
+  if ((width & 3) == 0)
+  {
+    g_pelBufOP.avg(src1, src1Stride, src2, src2Stride, dest, destStride, width, height);
+  }
+  else
+#endif
+  {
+#define ADD_AVG_OP( ADDR ) dest[ADDR] = rightShift( ( src1[ADDR] + src2[ADDR] + 1 ), 1 )
+#define ADD_AVG_INC     \
+    src1 += src1Stride; \
+    src2 += src2Stride; \
+    dest += destStride; \
+
+    SIZE_AWARE_PER_EL_OP( ADD_AVG_OP, ADD_AVG_INC );
+
+#undef ADD_AVG_OP
+#undef ADD_AVG_INC
+  }
+}
+#endif
+
 template<>
 void AreaBuf<Pel>::toLast( const ClpRng& clpRng )
 {
@@ -1777,6 +1836,32 @@ void AreaBuf<Pel>::reconstruct( const AreaBuf<const Pel> &pred, const AreaBuf<co
 #undef RECO_INC
   }
 }
+
+#if JVET_AE0078_IBC_LIC_EXTENSION
+template<>
+void AreaBuf<Pel>::linearTransforms(const int scale, const int shift, const int offset, const int scale2, const int shift2, const int offset2, const int yThres, bool bClip, const ClpRng& clpRng)
+{
+  const Pel* src = buf;
+  Pel* dst = buf;
+
+  for (int i = 0; i < height; i++)
+  {
+    for (int j = 0; j < width; j++)
+    {
+      if (src[j] <= yThres)
+      {
+        dst[j] = (Pel)ClipPel(((scale * src[j]) >> shift) + offset, clpRng);
+      }
+      else
+      {
+        dst[j] = (Pel)ClipPel(((scale2 * src[j]) >> shift2) + offset2, clpRng);
+      }
+    }
+    src += stride;
+    dst += stride;
+  }
+}
+#endif
 
 template<>
 void AreaBuf<Pel>::linearTransform( const int scale, const int shift, const int offset, bool bClip, const ClpRng& clpRng )

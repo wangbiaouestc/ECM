@@ -409,6 +409,16 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #endif
 #if JVET_AC0112_IBC_LIC
   ibcLicFlag = other.ibcLicFlag;
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  ibcLicIdx = other.ibcLicIdx;
+#endif
+#endif
+#if JVET_AE0159_FIBC
+  ibcFilterFlag  = other.ibcFilterFlag;
+  if (slice->getSPS()->getUseIbcFilter())
+  {
+    memcpy(ibcFilterParams, other.ibcFilterParams, FIBC_PARAMS * sizeof(int64_t));
+  }
 #endif
 #if JVET_AA0070_RRIBC
   rribcFlipType = other.rribcFlipType;
@@ -616,6 +626,16 @@ void CodingUnit::initData()
 #endif
 #if JVET_AC0112_IBC_LIC
   ibcLicFlag = false;
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  ibcLicIdx = 0;
+#endif
+#endif
+#if JVET_AE0159_FIBC
+  for (int i = 0; i < FIBC_PARAMS; i++)
+  {
+    ibcFilterParams[i] = -1;
+  }
+  ibcFilterFlag = false;
 #endif
 #if JVET_AA0070_RRIBC
   rribcFlipType = 0;
@@ -887,6 +907,15 @@ void PredictionUnit::initData()
 #if JVET_AD0202_CCCM_MDF
   cccmMultiFilterIdx = 0;
 #endif
+#if JVET_AE0100_BVGCCCM
+  bvgCccmFlag = 0;
+  numBvgCands = 0;
+  for (int candIdx = 0; candIdx < NUM_BVG_CCCM_CANDS; candIdx++)
+  {
+    bvList[candIdx] = Mv(0, 0);
+    rrIbcList[candIdx] = 0;
+  }
+#endif
 #endif
 #if JVET_AD0188_CCP_MERGE
   idxNonLocalCCP = 0;
@@ -927,6 +956,9 @@ void PredictionUnit::initData()
 #endif
   mmvdMergeFlag = false;
   mmvdMergeIdx = MAX_UCHAR;
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  ibcMergeIdx1 = MAX_INT;
+#endif
 #if JVET_AA0061_IBC_MBVD
   ibcMbvdMergeFlag = false;
   ibcMbvdMergeIdx = MAX_INT;
@@ -1011,6 +1043,12 @@ void PredictionUnit::initData()
   addHypData.clear();
   numMergedAddHyps = 0;
 #endif
+
+#if JVET_AE0046_BI_GPM
+  gpmDirMode = 0;
+  gpmDmvrRefinePart0 = false;
+  gpmDmvrRefinePart1 = false;
+#endif
 }
 
 PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
@@ -1056,6 +1094,15 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
 #if JVET_AD0202_CCCM_MDF
   cccmMultiFilterIdx = predData.cccmMultiFilterIdx;
 #endif
+#if JVET_AE0100_BVGCCCM
+  bvgCccmFlag = predData.bvgCccmFlag;
+  numBvgCands = predData.numBvgCands;
+  for (int candIdx = 0; candIdx < NUM_BVG_CCCM_CANDS; candIdx++)
+  {
+    bvList[candIdx] = predData.bvList[candIdx];
+    rrIbcList[candIdx] = predData.rrIbcList[candIdx];
+  }
+#endif
 #endif
 #if JVET_AD0188_CCP_MERGE
   idxNonLocalCCP  = predData.idxNonLocalCCP;
@@ -1099,6 +1146,9 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
 #endif
   mmvdMergeFlag = predData.mmvdMergeFlag;
   mmvdMergeIdx = predData.mmvdMergeIdx;
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  ibcMergeIdx1 = predData.ibcMergeIdx1;
+#endif
 #if JVET_AA0061_IBC_MBVD
   ibcMbvdMergeFlag = predData.ibcMbvdMergeFlag;
   ibcMbvdMergeIdx = predData.ibcMbvdMergeIdx;
@@ -1188,6 +1238,11 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
   addHypData = predData.addHypData;
   numMergedAddHyps = predData.numMergedAddHyps;
 #endif
+#if JVET_AE0046_BI_GPM
+  gpmDirMode = predData.gpmDirMode;
+  gpmDmvrRefinePart0 = predData.gpmDmvrRefinePart0;
+  gpmDmvrRefinePart1 = predData.gpmDmvrRefinePart1;
+#endif
   return *this;
 }
 
@@ -1226,6 +1281,15 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 #endif
 #if JVET_AD0202_CCCM_MDF
   cccmMultiFilterIdx = other.cccmMultiFilterIdx;
+#endif
+#if JVET_AE0100_BVGCCCM
+  bvgCccmFlag = other.bvgCccmFlag;
+  numBvgCands = other.numBvgCands;
+  for (int candIdx = 0; candIdx < NUM_BVG_CCCM_CANDS; candIdx++)
+  {
+    bvList[candIdx] = other.bvList[candIdx];
+    rrIbcList[candIdx] = other.rrIbcList[candIdx];
+  }
 #endif
 #endif
 #if JVET_AD0188_CCP_MERGE
@@ -1273,6 +1337,9 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 #endif
   mmvdMergeFlag = other.mmvdMergeFlag;
   mmvdMergeIdx = other.mmvdMergeIdx;
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  ibcMergeIdx1 = other.ibcMergeIdx1;
+#endif
 #if JVET_AA0061_IBC_MBVD
   ibcMbvdMergeFlag = other.ibcMbvdMergeFlag;
   ibcMbvdMergeIdx = other.ibcMbvdMergeIdx;
@@ -1362,6 +1429,11 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 #if MULTI_HYP_PRED
   addHypData = other.addHypData;
   numMergedAddHyps = other.numMergedAddHyps;
+#endif
+#if JVET_AE0046_BI_GPM
+  gpmDirMode = other.gpmDirMode;
+  gpmDmvrRefinePart0 = other.gpmDmvrRefinePart0;
+  gpmDmvrRefinePart1 = other.gpmDmvrRefinePart1;
 #endif
   return *this;
 }

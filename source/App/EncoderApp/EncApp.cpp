@@ -954,6 +954,9 @@ void EncApp::xInitLibCfg()
 #endif
 #if JVET_AA0061_IBC_MBVD
   m_cEncLib.setIbcMbvd                                           ( m_ibcMbvd );
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  m_cEncLib.setIbcMbvdAdSearch                                   ( m_ibcMbvdAdSearch );
+#endif
 #endif
 #if JVET_AC0112_IBC_CIIP
   m_cEncLib.setIbcCiip                                           ( m_ibcCiip );
@@ -963,6 +966,15 @@ void EncApp::xInitLibCfg()
 #endif
 #if JVET_AC0112_IBC_LIC
   m_cEncLib.setIbcLic                                            ( m_ibcLic );
+#endif
+#if JVET_AE0159_FIBC
+  m_cEncLib.setIbcFilter                                         ( m_ibcFilter );
+#endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  m_cEncLib.setIbcBiPred                                         ( m_ibcBiPred );
+#endif
+#if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
+  m_cEncLib.setIbcNonAdjCand                                     ( m_ibcNonAdjCand);
 #endif
 
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
@@ -982,6 +994,9 @@ void EncApp::xInitLibCfg()
 #endif
 #if JVET_AC0071_DBV
   m_cEncLib.setUseIntraDBV(m_intraDBV);
+#endif
+#if JVET_AE0100_BVGCCCM
+  m_cEncLib.setUseBvgCccm(m_bvgCccm);
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   m_cEncLib.setUseBIF                                            ( m_BIF );
@@ -1060,7 +1075,9 @@ void EncApp::xInitLibCfg()
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   m_cEncLib.setTempCabacInitMode                                 ( m_tempCabacInitMode );
 #endif
-
+  #if JVET_AE0057_MTT_ET 
+  m_cEncLib.setUseMttSkip                                        (m_useMttSkip);
+#endif
   // set internal bit-depth and constants
   for (uint32_t channelType = 0; channelType < MAX_NUM_CHANNEL_TYPE; channelType++)
   {

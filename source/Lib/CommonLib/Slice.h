@@ -1539,6 +1539,9 @@ private:
 #endif
 #if JVET_AA0061_IBC_MBVD
   bool              m_ibcMbvd;
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  bool              m_ibcMbvdAdSearch;
+#endif
 #endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   bool              m_rribc;
@@ -1553,6 +1556,12 @@ private:
 #endif
 #if JVET_AC0112_IBC_LIC
   bool              m_ibcLic;
+#endif
+#if JVET_AE0159_FIBC
+  bool              m_ibcFilter;
+#endif
+#if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
+  bool              m_ibcNonAdjCand;
 #endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   bool              m_DMVDMode;
@@ -1772,6 +1781,9 @@ private:
 #endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   int               m_cccm;
+#endif
+#if JVET_AE0100_BVGCCCM
+  bool              m_bvgCccm;
 #endif
 #if JVET_AD0188_CCP_MERGE
   bool              m_ccpMerge;
@@ -2125,6 +2137,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if JVET_AA0061_IBC_MBVD
   void                    setUseIbcMbvd(bool b)                                                           { m_ibcMbvd = b; }
   bool                    getUseIbcMbvd() const                                                           { return m_ibcMbvd; }
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  void                    setUseIbcMbvdAdSearch(bool b)                                                   { m_ibcMbvdAdSearch = b; }
+  bool                    getUseIbcMbvdAdSearch() const                                                   { return m_ibcMbvdAdSearch; }
+#endif
 #endif
 
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
@@ -2150,6 +2166,15 @@ void                    setCCALFEnabledFlag( bool b )                           
   void                    setUseIbcLic(bool b)                                                            { m_ibcLic = b; }
   bool                    getUseIbcLic() const                                                            { return m_ibcLic; }
 #endif
+#if JVET_AE0159_FIBC
+  void                    setUseIbcFilter(bool b)                                                         { m_ibcFilter = b; }
+  bool                    getUseIbcFilter() const                                                         { return m_ibcFilter; }
+#endif
+#if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
+  void                    setUseIbcNonAdjCand(bool b)                                                     { m_ibcNonAdjCand = b; }
+  bool                    getUseIbcNonAdjCand() const                                                     { return m_ibcNonAdjCand; }
+#endif
+
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   void                    setUseDMVDMode(bool b)                                                          { m_DMVDMode = b; }
   bool                    getUseDMVDMode() const                                                          { return m_DMVDMode; }
@@ -2399,6 +2424,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   void      setUseCccm( int i )                                                  { m_cccm = i; }
   int       getUseCccm()                                               const     { return m_cccm; }
+#endif
+#if JVET_AE0100_BVGCCCM
+  void      setUseBvgCccm(bool b)                                                { m_bvgCccm = b; }
+  bool      getUseBvgCccm()                                            const     { return m_bvgCccm; }
 #endif
 #if JVET_AD0188_CCP_MERGE
   void      setUseCcpMerge     ( bool i )                                        { m_ccpMerge = i; }
@@ -3355,6 +3384,9 @@ private:
 #if JVET_S0193_NO_OUTPUT_PRIOR_PIC
   bool                       m_noOutputOfPriorPicsFlag;           //!< no output of prior pictures flag
 #endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  bool                       m_biPredictionIBCFlag;
+#endif
   int                        m_iSliceQp;
   int                        m_iSliceQpBase;
   bool                       m_ChromaQpAdjEnabled;
@@ -3563,6 +3595,10 @@ public:
   void                        setNoOutputOfPriorPicsFlag(bool b)                     { m_noOutputOfPriorPicsFlag = b;                                }
   bool                        getNoOutputOfPriorPicsFlag() const                     { return m_noOutputOfPriorPicsFlag;                             }
 #endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  void                        setBiPredictionIBCFlag(bool b)                         { m_biPredictionIBCFlag = b;                                }
+  bool                        getBiPredictionIBCFlag() const                         { return m_biPredictionIBCFlag;                             }
+#endif
   int                         getPOC() const                                         { return m_iPOC;                                                }
   int                         getSliceQp() const                                     { return m_iSliceQp;                                            }
   bool                        getUseWeightedPrediction() const                       { return( (m_eSliceType==P_SLICE && testWeightPred()) || (m_eSliceType==B_SLICE && testWeightBiPred()) ); }
@@ -3590,7 +3626,7 @@ public:
   int                         getNumRefIdx( RefPicList e ) const                     { return m_aiNumRefIdx[e];                                      }
   Picture*                    getPic()                                               { return m_pcPic;                                               }
   const Picture*              getPic() const                                         { return m_pcPic;                                               }
-        Picture*              getRefPic( RefPicList e, int iRefIdx) const            { return m_apcRefPicList[e][iRefIdx];                           }
+        Picture*              getRefPic( RefPicList e, int iRefIdx) const            { CHECK( iRefIdx < 0 || iRefIdx >= MAX_NUM_REF, "refIdx is out of range" ); return m_apcRefPicList[e][iRefIdx]; }
 #if JVET_Z0118_GDR
         Picture*              getReferencePicture(RefPicList e, int iRefIdx)         { return m_apcRefPicList[e][iRefIdx];                           }
 #endif

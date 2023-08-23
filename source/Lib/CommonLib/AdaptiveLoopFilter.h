@@ -610,7 +610,7 @@ protected:
   short                        m_chromaCoeffFinal[MAX_NUM_ALF_ALTERNATIVES_CHROMA][MAX_NUM_ALF_CHROMA_COEFF];
   AlfParam*                    m_alfParamChroma;
   Pel                          m_alfClippingValues[MAX_NUM_CHANNEL_TYPE][MaxAlfNumClippingValues];
-  std::vector<AlfFilterShape>  m_filterShapesCcAlf[2];
+  std::vector<AlfFilterShape>  m_filterShapesCcAlf;
   std::vector<AlfFilterShape>  m_filterShapes[MAX_NUM_CHANNEL_TYPE];
 #if ALF_IMPROVEMENT
   AlfFilterType                m_filterTypeApsLuma[ALF_CTB_MAX_NUM_APS];

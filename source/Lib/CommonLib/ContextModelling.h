@@ -110,7 +110,11 @@ public:
   TCoeff          maxCoeff()                                const { return m_maxCoeff; }
 #endif
 
-  unsigned sigCtxIdAbs( int scanPos, const TCoeff* coeff, const int state )
+#if JVET_AE0102_LFNST_CTX 
+  unsigned sigCtxIdAbs(int scanPos, const TCoeff* coeff, const int state, int lfnstIdx = -1)
+#else
+  unsigned sigCtxIdAbs(int scanPos, const TCoeff* coeff, const int state)
+#endif
   {
     const uint32_t posY      = m_scan[scanPos].y;
     const uint32_t posX      = m_scan[scanPos].x;
@@ -123,6 +127,10 @@ public:
 #else
     int           sumAbs    = 0;
 #define UPDATE(x) {int a=abs(x);sumAbs+=std::min(4+(a&1),a);numPos+=!!a;}
+#endif
+#if JVET_AE0102_LFNST_CTX
+    if (lfnstIdx == 0)
+    {
 #endif
     if( posX < m_width-1 )
     {
@@ -144,6 +152,16 @@ public:
         UPDATE( pData[m_width<<1] );
       }
     }
+#if JVET_AE0102_LFNST_CTX
+    }
+    else if (lfnstIdx > 0)
+    {
+      for (int k = 1; k <= std::min(5, scanPosLast() - scanPos); k++)
+      {
+        UPDATE( coeff[blockPos(scanPos + k)] );
+      }
+    }
+#endif
 #undef UPDATE
 
 
@@ -166,7 +184,6 @@ public:
     return m_sigFlagCtxSet[std::max( 0, state-1 )]( ctxOfs );
 #endif
   }
-
   uint8_t ctxOffsetAbs()
   {
     int offset = 0;
@@ -181,11 +198,25 @@ public:
     }
     return uint8_t(offset);
   }
-
-  unsigned parityCtxIdAbs   ( uint8_t offset )  const { return m_parFlagCtxSet   ( offset ); }
+  unsigned parityCtxIdAbs   ( uint8_t offset)  const { return m_parFlagCtxSet   ( offset ); }
   unsigned greater1CtxIdAbs ( uint8_t offset )  const { return m_gtxFlagCtxSet[1]( offset ); }
   unsigned greater2CtxIdAbs ( uint8_t offset )  const { return m_gtxFlagCtxSet[0]( offset ); }
-  unsigned templateAbsSum( int scanPos, const TCoeff* coeff, int baseLevel )
+#if JVET_AE0102_LFNST_CTX
+  void updateCtxSets()
+  {
+    m_sigFlagCtxSet[0] = Ctx::SigFlag[m_chType];
+    m_sigFlagCtxSet[1] = Ctx::SigFlag[m_chType + 2];
+    m_sigFlagCtxSet[2] = Ctx::SigFlag[m_chType];
+    m_sigFlagCtxSet[3] = Ctx::SigFlag[m_chType + 4];
+
+    m_parFlagCtxSet    = Ctx::ParFlag[m_chType];
+    m_gtxFlagCtxSet[0] = Ctx::GtxFlag[m_chType];
+    m_gtxFlagCtxSet[1] = Ctx::GtxFlag[m_chType + 2];
+  }
+  unsigned templateAbsSum(int scanPos, const TCoeff* coeff, int baseLevel, int lfnstIdx = 0)
+#else
+  unsigned templateAbsSum(int scanPos, const TCoeff* coeff, int baseLevel)
+#endif
   {
     const uint32_t  posY  = m_scan[scanPos].y;
     const uint32_t  posX  = m_scan[scanPos].x;
@@ -194,6 +225,10 @@ public:
     TCoeff          sum   = 0;
 #else
     int             sum   = 0;
+#endif
+#if JVET_AE0102_LFNST_CTX
+    if (lfnstIdx == 0 )
+    {
 #endif
     if (posX < m_width - 1)
     {
@@ -215,6 +250,16 @@ public:
         sum += abs(pData[m_width << 1]);
       }
     }
+#if JVET_AE0102_LFNST_CTX
+    }
+    else if (lfnstIdx > 0)
+    {
+      for (int k = 1; k <= std::min(5, scanPosLast() - scanPos); k++)
+      {
+        sum += abs(coeff[blockPos(scanPos + k)]);
+      }
+    }
+#endif
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT_VS
     return unsigned(std::max<TCoeff>(std::min<TCoeff>(sum - 5 * baseLevel, 31), 0));
 #else
@@ -488,7 +533,7 @@ private:
 #endif
   int                       m_tmplCpDiag;
 #if TCQ_8STATES
-	CtxSet                    m_sigFlagCtxSet[4];
+  CtxSet                    m_sigFlagCtxSet[4];
 #else
   CtxSet                    m_sigFlagCtxSet[3];
 #endif
@@ -563,6 +608,12 @@ public:
 #endif
 #if JVET_AC0112_IBC_LIC
   bool          ibcLicFlags[NUM_MERGE_CANDS];
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  int           ibcLicIndex[NUM_MERGE_CANDS];
+#endif
+#endif
+#if JVET_AE0159_FIBC
+  bool          ibcFilterFlags[NUM_MERGE_CANDS];
 #endif
 #if JVET_AA0070_RRIBC
   int           rribcFlipTypes[NUM_MERGE_CANDS];
@@ -583,6 +634,12 @@ public:
 #endif
 #if JVET_AC0112_IBC_LIC
   bool          ibcLicFlags       [ MRG_MAX_NUM_CANDS      ];
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  int           ibcLicIndex       [ MRG_MAX_NUM_CANDS      ];
+#endif
+#endif
+#if JVET_AE0159_FIBC
+  bool          ibcFilterFlags    [ MRG_MAX_NUM_CANDS      ];
 #endif
 #if JVET_AA0070_RRIBC
   int rribcFlipTypes[MRG_MAX_NUM_CANDS];
@@ -615,7 +672,14 @@ public:
 #endif
 #if JVET_AA0061_IBC_MBVD
   MvField ibcMbvdBaseBv[IBC_MBVD_BASE_NUM][2];
+#if JVET_AE0169_BIPREDICTIVE_IBC
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  MvField ibcMbvdBaseBvFrac[IBC_MBVD_BASE_NUM][2];
+#endif
+  bool setIbcMbvdMergeCandiInfo(PredictionUnit& pu, int candIdx, int candIdxMaped = -1, int candIdx1 = -1, int candIdxMaped1 = -1);
+#else
   bool setIbcMbvdMergeCandiInfo(PredictionUnit& pu, int candIdx, int candIdxMaped = -1);
+#endif
 #endif
   bool          mmvdUseAltHpelIf  [ MMVD_BASE_MV_NUM ];
 #if (JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM) || JVET_Z0075_IBC_HMVP_ENLARGE
@@ -627,7 +691,10 @@ public:
   void saveMergeInfo(PredictionUnit& puTmp, PredictionUnit pu);
 #endif
   void setMergeInfo( PredictionUnit& pu, int candIdx );
-#if NON_ADJACENT_MRG_CAND || TM_MRG || MULTI_PASS_DMVR || JVET_W0097_GPM_MMVD_TM || (JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM) || JVET_Y0058_IBC_LIST_MODIFY
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  void setIbcL1Info( PredictionUnit& pu, int candIdx );
+#endif
+#if NON_ADJACENT_MRG_CAND || TM_MRG || MULTI_PASS_DMVR || JVET_W0097_GPM_MMVD_TM || (JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM) || JVET_Y0058_IBC_LIST_MODIFY || JVET_AE0046_BI_GPM
 #if JVET_Z0075_IBC_HMVP_ENLARGE
   bool xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1, int compareNum = -1) const;
 #else
@@ -763,7 +830,9 @@ int ctxSmMvdBin(const int iPreviousBinIsCorrect2, const int iPreviousBinIsCorrec
 #if JVET_AC0104_IBC_BVD_PREDICTION
 int CtxSmBvdBin(const int iPreviousBinIsCorrect2, const int iPreviousBinIsCorrect, const int isHor, const int significance);
 #endif
-
+#if JVET_AE0159_FIBC
+unsigned ctxIbcFilterFlag(const CodingUnit& cu);
+#endif
 }
 
 #endif // __CONTEXTMODELLING__

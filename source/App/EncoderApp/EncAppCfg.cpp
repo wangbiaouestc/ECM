@@ -1202,11 +1202,18 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #endif
 #if JVET_AA0061_IBC_MBVD
   ("IBCMBVD",                                         m_ibcMbvd,                                         true, "IBC MMVD mode (0:off, 1:on)  [default: on]" )
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  ("IBCMBVDAdaptive",                                 m_ibcMbvdAdSearch,                                false, "IBC MBVD adaptive search (0:fixed, 1:adaptive)  [default: 0]" )
+#endif
 #endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   ("RRIBC",                                           m_rribc,                                          false, "RRIBC mode (0:off, 1:on)  [default: off]")
   ("TMIBC",                                           m_tmibc,                                          false, "TMIBC mode (0:off, 1:on)  [default: off]")
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  ("IBCMerge",                                        m_ibcMerge,                                        true, "Enable IBC merge")
+#else
   ("IBCMerge",                                        m_ibcMerge,                                       false, "Enable IBC merge")
+#endif
 #endif
 #if JVET_AC0112_IBC_CIIP
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
@@ -1216,10 +1223,23 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #endif
 #endif
 #if JVET_AC0112_IBC_GPM
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  ("IBCGPM",                                          m_ibcGpm,                                         false, "IBC GPM mode (0:off, 1:on)  [default: off]" )
+#else
   ("IBCGPM",                                          m_ibcGpm,                                          true, "IBC GPM mode (0:off, 1:on)  [default: on]" )
+#endif
 #endif
 #if JVET_AC0112_IBC_LIC
   ("IBCLIC",                                          m_ibcLic,                                          true, "IBC LIC mode (0:off, 1:on)  [default: on]" )
+#endif
+#if JVET_AE0159_FIBC
+  ("IBCFilter",                                       m_ibcFilter,                                      false, "Filtered IBC mode (0:off, 1:on)  [default: off]" )
+#endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  ("IBCBiPred",                                       m_ibcBiPred,                                       true, "IBC BiPred mode in I-Slice (0:off, 1:on)  [default: on]" )
+#endif
+#if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
+  ("IBCNonAdjCand",                                   m_ibcNonAdjCand,                                    false, "IBC with non-adjacent spatial candidates (0:off, 1:on)  [default: off]" )
 #endif
 
   ("WrapAround",                                      m_wrapAround,                                     false, "Enable horizontal wrap-around motion compensation for inter prediction (0:off, 1:on)  [default: off]")
@@ -1237,6 +1257,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_AB0130_ITMP_SAMPLING
   ("FastIntraTMP",                                    m_fastIntraTMP,                                   true,  "fast intra Template Matching (0: off, 1:on)  [default: off]")
 #endif
+#endif
+#if JVET_AE0100_BVGCCCM
+  ("BvgCccm",                                         m_bvgCccm,                                        true, "Block Vector Guided CCCM (0: off, 1:on)  [default: on]")
 #endif
 #if JVET_AC0071_DBV
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
@@ -1282,6 +1305,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("PBIntraFast",                                     m_usePbIntraFast,                                 false, "Fast assertion if the intra mode is probable")
   ("AMaxBT",                                          m_useAMaxBT,                                      false, "Adaptive maximal BT-size")
   ("E0023FastEnc",                                    m_e0023FastEnc,                                    true, "Fast encoding setting for QTBT (proposal E0023)")
+#if JVET_AE0057_MTT_ET
+  ("MTTSkipping",                                     m_useMttSkip,                                     false, "MTT split modes early termination")
+#endif 
   ("ContentBasedFastQtbt",                            m_contentBasedFastQtbt,                           false, "Signal based QTBT speed-up")
   ("UseNonLinearAlfLuma",                             m_useNonLinearAlfLuma,                             true, "Non-linear adaptive loop filters for Luma Channel")
   ("UseNonLinearAlfChroma",                           m_useNonLinearAlfChroma,                           true, "Non-linear adaptive loop filters for Chroma Channels")
@@ -4179,6 +4205,13 @@ bool EncAppCfg::xCheckParameter()
     msg( WARNING, "Max num of IBC merge candidates is set equal to IBC_MRG_MAX_NUM_CANDS since IBC merge is not used\n" );
 #endif
   }
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  if ( !m_ibcMbvd && m_ibcMbvdAdSearch )
+  {
+    msg(WARNING, "IBC MBVD Adaptive search is disabled since IBC MBVD is not used\n");
+    m_ibcMbvdAdSearch = false;
+  }
+#endif
 #endif
 
   xConfirmPara( m_MTS < 0 || m_MTS > 3, "MTS must be greater than 0 smaller than 4" );
@@ -5423,6 +5456,12 @@ void EncAppCfg::xPrintParameter()
     msg(VERBOSE, "IBC:%d ", m_IBCMode);
 #if JVET_AA0061_IBC_MBVD
     msg( VERBOSE, "IBCMBVD:%d ", m_ibcMbvd );
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+    if ( m_ibcMbvd )
+    {
+      msg(VERBOSE, "IBCMBVDAdaptive:%d ", m_ibcMbvdAdSearch);
+    }
+#endif
 #endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
     msg(VERBOSE, "IBCFrac:%d ",  m_IBCFracMode);
@@ -5446,6 +5485,15 @@ void EncAppCfg::xPrintParameter()
 #endif
 #if JVET_AC0112_IBC_LIC
   msg( VERBOSE, "IBCLIC:%d ", m_ibcLic );
+#endif
+#if JVET_AE0159_FIBC
+  msg( VERBOSE, "IBCFilter:%d ", m_ibcFilter );
+#endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  msg( VERBOSE, "IBCBiPred:%d ", m_ibcBiPred );
+#endif
+#if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
+  msg(VERBOSE, "IBCNonAdjCand:%d ", m_ibcNonAdjCand);
 #endif
   msg( VERBOSE, "HashME:%d ", m_HashME );
   msg( VERBOSE, "WrapAround:%d ", m_wrapAround);
@@ -5551,6 +5599,9 @@ void EncAppCfg::xPrintParameter()
 #endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   msg(VERBOSE, "CCCM:%d ", m_cccm);
+#endif
+#if JVET_AE0100_BVGCCCM
+  msg(VERBOSE, "BvgCCCM:%d ", m_bvgCccm);
 #endif
 #if JVET_V0130_INTRA_TMP && !JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
   msg( VERBOSE, "IntraTMP:%d ", m_intraTMP );

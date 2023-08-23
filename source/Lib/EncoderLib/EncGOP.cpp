@@ -2013,35 +2013,11 @@ public:
   BIFCabacEstImp(CABACWriter* _CABACEstimator) : CABACEstimator(_CABACEstimator) {};
   virtual ~BIFCabacEstImp() {};
 
-  virtual uint64_t getBits(const Slice& slice, const BifParams& htdfParams)
+  virtual uint64_t getBits(const ComponentID compID, const Slice& slice, const BifParams& htdfParams)
   {
     CABACEstimator->initCtxModels(slice);
     CABACEstimator->resetBits();
-    CABACEstimator->bif(slice, htdfParams);
-    return CABACEstimator->getEstFracBits();
-  }
-};
-#endif
-#if JVET_X0071_CHROMA_BILATERAL_FILTER
-class ChromaBIFCabacEstImp : public ChromaBIFCabacEst
-{
-  CABACWriter* CABACEstimator;
-public:
-  ChromaBIFCabacEstImp(CABACWriter* _CABACEstimator) : CABACEstimator(_CABACEstimator) {};
-  virtual ~ChromaBIFCabacEstImp() {};
-
-  virtual uint64_t getBitsCb(const Slice& slice, const ChromaBifParams& chromaBifParams)
-  {
-    CABACEstimator->initCtxModels(slice);
-    CABACEstimator->resetBits();
-    CABACEstimator->chromaBifCb(slice, chromaBifParams);
-    return CABACEstimator->getEstFracBits();
-  }
-  virtual uint64_t getBitsCr(const Slice& slice, const ChromaBifParams& chromaBifParams)
-  {
-    CABACEstimator->initCtxModels(slice);
-    CABACEstimator->resetBits();
-    CABACEstimator->chromaBifCr(slice, chromaBifParams);
+    CABACEstimator->bif( compID, slice, htdfParams);
     return CABACEstimator->getEstFracBits();
   }
 };
@@ -3577,6 +3553,13 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
       CS::setRefinedMotionField(cs);
 #endif
 
+#if JVET_AE0043_CCP_MERGE_TEMPORAL
+      if ((pcPic->temporalId == 0) || (pcPic->temporalId < pcSlice->getSPS()->getMaxTLayers() - 1))
+      {
+        CS::saveTemporalCcpModel(cs);
+      }
+#endif
+
 #if JVET_W0066_CCSAO
       if ( cs.sps->getCCSAOEnabledFlag() )
       {
@@ -3603,11 +3586,7 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
         m_pcSAO->initCABACEstimator( m_pcEncLib->getCABACEncoder(), m_pcEncLib->getCtxCache(), pcSlice );
 #if JVET_V0094_BILATERAL_FILTER
         BIFCabacEstImp est(m_pcEncLib->getCABACEncoder()->getCABACEstimator(cs.slice->getSPS()));
-#endif
-#if JVET_X0071_CHROMA_BILATERAL_FILTER
-        ChromaBIFCabacEstImp chromaBifEst(m_pcEncLib->getCABACEncoder()->getCABACEstimator(cs.slice->getSPS()));
-#endif
-        
+#endif      
         m_pcSAO->SAOProcess( cs, sliceEnabled, pcSlice->getLambdas(),
 #if ENABLE_QPA
                              (m_pcCfg->getUsePerceptQPA() && !m_pcCfg->getUseRateCtrl() && pcSlice->getPPS()->getUseDQP() ? m_pcEncLib->getRdCost (PARL_PARAM0 (0))->getChromaWeight() : 0.0),
@@ -3615,9 +3594,6 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
                              m_pcCfg->getTestSAODisableAtPictureLevel(), m_pcCfg->getSaoEncodingRate(), m_pcCfg->getSaoEncodingRateChroma(), m_pcCfg->getSaoCtuBoundary(), m_pcCfg->getSaoGreedyMergeEnc()
 #if JVET_V0094_BILATERAL_FILTER
                               , &est
-#endif
-#if JVET_X0071_CHROMA_BILATERAL_FILTER
-                              , &chromaBifEst
 #endif
                             );
         //assign SAO slice header
@@ -5137,6 +5113,7 @@ void EncGOP::xCalculateAddPSNR(Picture *pcPic, PelUnitBuf cPicD, const AccessUni
   double  MSEyuvframeWeighted[MAX_NUM_COMPONENT];
 #endif
   double  upscaledPSNR[MAX_NUM_COMPONENT];
+  double  upscaledMsssim[MAX_NUM_COMPONENT];
   for(int i=0; i<MAX_NUM_COMPONENT; i++)
   {
     dPSNR[i]=0.0;
@@ -5276,6 +5253,7 @@ void EncGOP::xCalculateAddPSNR(Picture *pcPic, PelUnitBuf cPicD, const AccessUni
 #endif
 
       upscaledPSNR[comp] = upscaledSSD ? 10.0 * log10( (double)maxval * maxval * upscaledWidth * upscaledHeight / (double)upscaledSSD ) : 999.99;
+      upscaledMsssim[comp] = xCalculateMSSSIM (upscaledOrgPB.bufAt(0, 0), upscaledOrgPB.stride, upscaledRecPB.bufAt(0, 0), upscaledRecPB.stride, upscaledWidth, upscaledHeight, bitDepth);
     }
   }
 
@@ -5327,6 +5305,7 @@ void EncGOP::xCalculateAddPSNR(Picture *pcPic, PelUnitBuf cPicD, const AccessUni
   m_gcAnalyzeAll.addResult(dPSNR, (double) uibits, MSEyuvframe, upscaledPSNR,
 #if MSSIM_UNIFORM_METRICS_LOG
                            msssim,
+                           upscaledMsssim, 
 #endif
                            isEncodeLtRef);
 #if EXTENSION_360_VIDEO
@@ -5343,6 +5322,7 @@ void EncGOP::xCalculateAddPSNR(Picture *pcPic, PelUnitBuf cPicD, const AccessUni
     m_gcAnalyzeI.addResult(dPSNR, (double) uibits, MSEyuvframe, upscaledPSNR,
 #if MSSIM_UNIFORM_METRICS_LOG
                            msssim,
+                           upscaledMsssim, 
 #endif
                            isEncodeLtRef);
     *PSNR_Y = dPSNR[COMPONENT_Y];
@@ -5361,6 +5341,7 @@ void EncGOP::xCalculateAddPSNR(Picture *pcPic, PelUnitBuf cPicD, const AccessUni
     m_gcAnalyzeP.addResult(dPSNR, (double) uibits, MSEyuvframe, upscaledPSNR,
 #if MSSIM_UNIFORM_METRICS_LOG
                            msssim,
+                           upscaledMsssim, 
 #endif
                            isEncodeLtRef);
     *PSNR_Y = dPSNR[COMPONENT_Y];
@@ -5379,6 +5360,7 @@ void EncGOP::xCalculateAddPSNR(Picture *pcPic, PelUnitBuf cPicD, const AccessUni
     m_gcAnalyzeB.addResult(dPSNR, (double) uibits, MSEyuvframe, upscaledPSNR,
 #if MSSIM_UNIFORM_METRICS_LOG
                            msssim,
+                           upscaledMsssim, 
 #endif
                            isEncodeLtRef);
     *PSNR_Y = dPSNR[COMPONENT_Y];
@@ -5398,6 +5380,7 @@ void EncGOP::xCalculateAddPSNR(Picture *pcPic, PelUnitBuf cPicD, const AccessUni
     m_gcAnalyzeWPSNR.addResult(dPSNRWeighted, (double) uibits, MSEyuvframeWeighted, upscaledPSNR,
 #if MSSIM_UNIFORM_METRICS_LOG
                                msssim,
+                               upscaledMsssim, 
 #endif
                                isEncodeLtRef);
   }
@@ -5552,8 +5535,10 @@ void EncGOP::xCalculateAddPSNR(Picture *pcPic, PelUnitBuf cPicD, const AccessUni
     {
 #if JVET_W0134_UNIFORM_METRICS_LOG
       msg( NOTICE, " [Y2 %6.4lf dB  U2 %6.4lf dB  V2 %6.4lf dB]", upscaledPSNR[COMPONENT_Y], upscaledPSNR[COMPONENT_Cb], upscaledPSNR[COMPONENT_Cr] );
+      msg( NOTICE, " MS-SSIM2: [Y %6.4lf  U %6.4lf  V %6.4lf ]", upscaledMsssim[COMPONENT_Y], upscaledMsssim[COMPONENT_Cb], upscaledMsssim[COMPONENT_Cr] );
 #else
       msg( NOTICE, "\nPSNR2: [Y %6.4lf dB    U %6.4lf dB    V %6.4lf dB]", upscaledPSNR[COMPONENT_Y], upscaledPSNR[COMPONENT_Cb], upscaledPSNR[COMPONENT_Cr] );
+      msg( NOTICE, "\nMS-SSIM2: [Y %6.4lf  U %6.4lf  V %6.4lf ]", upscaledMsssim[COMPONENT_Y], upscaledMsssim[COMPONENT_Cb], upscaledMsssim[COMPONENT_Cr] );
 #endif
     }
   }
@@ -5937,6 +5922,7 @@ void EncGOP::xCalculateInterlacedAddPSNR( Picture* pcPicOrgFirstField, Picture* 
   //===== add PSNR =====
   m_gcAnalyzeAll_in.addResult(dPSNR, (double) uibits, MSEyuvframe, MSEyuvframe,
 #if MSSIM_UNIFORM_METRICS_LOG
+                              msssim,
                               msssim,
 #endif
                               isEncodeLtRef);

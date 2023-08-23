@@ -84,12 +84,24 @@ CoeffCodingContext::CoeffCodingContext( const TransformUnit& tu, ComponentID com
   , m_tmplCpSum1                (-1)
   , m_tmplCpDiag                (-1)
 #if TCQ_8STATES
+#if JVET_AE0102_LFNST_CTX
+  , m_sigFlagCtxSet             { (tu.cu->lfnstIdx == 0) ? Ctx::SigFlag[m_chType]     : Ctx::SigFlagL[m_chType],
+                                  (tu.cu->lfnstIdx == 0) ? Ctx::SigFlag[m_chType + 2] : Ctx::SigFlagL[m_chType + 2],
+                                  (tu.cu->lfnstIdx == 0) ? Ctx::SigFlag[m_chType]     : Ctx::SigFlagL[m_chType],
+                                  (tu.cu->lfnstIdx == 0) ? Ctx::SigFlag[m_chType + 4] : Ctx::SigFlagL[m_chType + 4] }
+#else
   , m_sigFlagCtxSet             { Ctx::SigFlag[m_chType], Ctx::SigFlag[m_chType+2], Ctx::SigFlag[m_chType], Ctx::SigFlag[m_chType+4] }
+#endif
 #else
   , m_sigFlagCtxSet             { Ctx::SigFlag[m_chType], Ctx::SigFlag[m_chType+2], Ctx::SigFlag[m_chType+4] }
 #endif
+#if JVET_AE0102_LFNST_CTX
+  , m_parFlagCtxSet             { (tu.cu->lfnstIdx == 0) ? Ctx::ParFlag[m_chType] : Ctx::ParFlagL[m_chType] }
+  , m_gtxFlagCtxSet             { (tu.cu->lfnstIdx == 0) ? Ctx::GtxFlag[m_chType] : Ctx::GtxFlagL[m_chType] , (tu.cu->lfnstIdx == 0) ? Ctx::GtxFlag[m_chType + 2] : Ctx::GtxFlagL[m_chType + 2] }
+#else
   , m_parFlagCtxSet             ( Ctx::ParFlag[m_chType] )
   , m_gtxFlagCtxSet             { Ctx::GtxFlag[m_chType], Ctx::GtxFlag[m_chType+2] }
+#endif
   , m_sigGroupCtxIdTS           (-1)
   , m_tsSigFlagCtxSet           ( Ctx::TsSigFlag )
   , m_tsParFlagCtxSet           ( Ctx::TsParFlag )
@@ -619,6 +631,12 @@ void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
 #endif
 #if JVET_AC0112_IBC_LIC
     pu.cu->ibcLicFlag = ibcLicFlags[candIdx];
+#if JVET_AE0078_IBC_LIC_EXTENSION
+    pu.cu->ibcLicIdx = 0;
+#endif
+#endif
+#if JVET_AE0159_FIBC
+    pu.cu->ibcFilterFlag = ibcFilterFlags[candIdx];
 #endif
 #if JVET_AA0070_RRIBC
     pu.cu->rribcFlipType = rribcFlipTypes[candIdx];
@@ -674,6 +692,22 @@ void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
 #endif
 #endif
 }
+
+#if JVET_AE0169_BIPREDICTIVE_IBC
+void MergeCtx::setIbcL1Info( PredictionUnit& pu, int candIdx )
+{
+  pu.interDir = 3;
+  pu.ibcMergeIdx1 = candIdx;
+  pu.mv[REF_PIC_LIST_1] = mvFieldNeighbours[candIdx<<1].mv;
+  pu.refIdx[REF_PIC_LIST_1] = MAX_NUM_REF;
+  pu.cu->ibcLicFlag = 0;
+  pu.cu->rribcFlipType = 0;
+#if JVET_AE0159_FIBC
+  pu.cu->ibcFilterFlag = false;
+#endif
+}
+#endif
+
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION                                
 bool MergeCtx::xCheckSimilarMotionSubTMVP(int mergeCandIndex, uint32_t mvdSimilarityThresh) const
 {
@@ -701,7 +735,7 @@ bool MergeCtx::xCheckSimilarMotionSubTMVP(int mergeCandIndex, uint32_t mvdSimila
   return false;
 }
 #endif
-#if NON_ADJACENT_MRG_CAND || TM_MRG || MULTI_PASS_DMVR || JVET_W0097_GPM_MMVD_TM || (JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM) || JVET_Y0058_IBC_LIST_MODIFY
+#if NON_ADJACENT_MRG_CAND || TM_MRG || MULTI_PASS_DMVR || JVET_W0097_GPM_MMVD_TM || (JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM) || JVET_Y0058_IBC_LIST_MODIFY || JVET_AE0046_BI_GPM
 #if JVET_Z0075_IBC_HMVP_ENLARGE
 bool MergeCtx::xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh, int compareNum) const
 #else
@@ -817,6 +851,12 @@ void MergeCtx::initMrgCand(int cnt)
 #endif
 #if JVET_AC0112_IBC_LIC
   ibcLicFlags[cnt] = false;
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  ibcLicIndex[cnt] = 0;
+#endif
+#endif
+#if JVET_AE0159_FIBC
+  ibcFilterFlags[cnt] = false;
 #endif
 #if JVET_AA0070_RRIBC
   rribcFlipTypes[cnt] = 0;
@@ -980,7 +1020,20 @@ void MergeCtx::setGeoMmvdMergeInfo(PredictionUnit& pu, int mergeIdx, int mmvdIdx
     pu.regularMergeFlag = !(pu.ciipFlag || pu.cu->geoFlag);
   pu.mergeFlag = true;
   pu.mmvdMergeFlag = false;
+#if JVET_AE0046_BI_GPM
+  int desiredDir = interDirNeighbours[mergeIdx];
+
+  if (interDirNeighbours[mergeIdx] == 3)
+  {
+    if (!pu.cs->slice->getCheckLDC())
+    {
+      desiredDir = (mergeIdx % 2) + 1;
+    }
+  }
+  pu.interDir = desiredDir;
+#else
   pu.interDir = interDirNeighbours[mergeIdx];
+#endif
   pu.cu->imv = 0;
   pu.mergeIdx = mergeIdx;
   pu.mergeType = MRG_TYPE_DEFAULT_N;
@@ -1029,25 +1082,116 @@ void MergeCtx::setGeoMmvdMergeInfo(PredictionUnit& pu, int mergeIdx, int mmvdIdx
     mvOffset = Mv(-offset, -offset);
   }
 
-  pu.refIdx[REF_PIC_LIST_0] = mvFieldNeighbours[(mergeIdx << 1) + 0].refIdx;
-  pu.refIdx[REF_PIC_LIST_1] = mvFieldNeighbours[(mergeIdx << 1) + 1].refIdx;
-  if (pu.refIdx[REF_PIC_LIST_0] >= 0)
+#if JVET_AE0046_BI_GPM
+  if (desiredDir == 3)
   {
-    pu.mv[REF_PIC_LIST_0] = mvFieldNeighbours[(mergeIdx << 1) + 0].mv + mvOffset;
+    pu.refIdx[REF_PIC_LIST_0] = mvFieldNeighbours[(mergeIdx << 1) + 0].refIdx;
+    pu.refIdx[REF_PIC_LIST_1] = mvFieldNeighbours[(mergeIdx << 1) + 1].refIdx;
   }
   else
   {
-    pu.mv[REF_PIC_LIST_0] = Mv();
+    int listTarget = desiredDir - 1;
+    int listEmpty = 1 - listTarget;
+
+    pu.refIdx[ RefPicList(listTarget) ] = mvFieldNeighbours[(mergeIdx << 1) + listTarget].refIdx;
+    pu.refIdx[ RefPicList(listEmpty) ]  = -1;
   }
 
-  if (pu.refIdx[REF_PIC_LIST_1] >= 0)
+#else
+  pu.refIdx[REF_PIC_LIST_0] = mvFieldNeighbours[(mergeIdx << 1) + 0].refIdx;
+  pu.refIdx[REF_PIC_LIST_1] = mvFieldNeighbours[(mergeIdx << 1) + 1].refIdx;
+#endif
+
+#if JVET_AE0046_BI_GPM
+  if (pu.refIdx[REF_PIC_LIST_0] >= 0 && pu.refIdx[REF_PIC_LIST_1] >= 0)
   {
-    pu.mv[REF_PIC_LIST_1] = mvFieldNeighbours[(mergeIdx << 1) + 1].mv + mvOffset;
+    Mv tempMv[2];
+
+    const int refListIdx0 = pu.refIdx[REF_PIC_LIST_0];
+    const int refListIdx1 = pu.refIdx[REF_PIC_LIST_1];
+
+    const int poc0 = pu.cs->slice->getRefPOC(REF_PIC_LIST_0, refListIdx0);
+    const int poc1 = pu.cs->slice->getRefPOC(REF_PIC_LIST_1, refListIdx1);
+    const int currPoc = pu.cs->slice->getPOC();
+
+    tempMv[0] = mvOffset;
+
+    if ((poc0 - currPoc) == (poc1 - currPoc))
+    {
+      tempMv[1] = tempMv[0];
+    }
+    else if (abs(poc1 - currPoc) > abs(poc0 - currPoc))
+    {
+      const int scale = PU::getDistScaleFactor(currPoc, poc0, currPoc, poc1);
+      tempMv[1] = tempMv[0];
+
+      const bool isL0RefLongTerm = pu.cs->slice->getRefPic(REF_PIC_LIST_0, refListIdx0)->longTerm;
+      const bool isL1RefLongTerm = pu.cs->slice->getRefPic(REF_PIC_LIST_1, refListIdx1)->longTerm;
+
+      if (isL0RefLongTerm || isL1RefLongTerm)
+      {
+        if ((poc1 - currPoc) * (poc0 - currPoc) > 0)
+        {
+          tempMv[0] = tempMv[1];
+        }
+        else
+        {
+          tempMv[0].set(-1 * tempMv[1].getHor(), -1 * tempMv[1].getVer());
+        }
+      }
+      else
+      {
+        tempMv[0] = tempMv[1].scaleMv(scale);
+      }
+    }
+    else
+    {
+      const int scale = PU::getDistScaleFactor(currPoc, poc1, currPoc, poc0);
+      const bool isL0RefLongTerm = pu.cs->slice->getRefPic(REF_PIC_LIST_0, refListIdx0)->longTerm;
+      const bool isL1RefLongTerm = pu.cs->slice->getRefPic(REF_PIC_LIST_1, refListIdx1)->longTerm;
+      if (isL0RefLongTerm || isL1RefLongTerm)
+      {
+        if ((poc1 - currPoc) * (poc0 - currPoc) > 0)
+        {
+          tempMv[1] = tempMv[0];
+        }
+        else
+        {
+          tempMv[1].set(-1 * tempMv[0].getHor(), -1 * tempMv[0].getVer());
+        }
+      }
+      else
+      {
+        tempMv[1] = tempMv[0].scaleMv(scale);
+      }
+    }
+
+    pu.mv[REF_PIC_LIST_0] = mvFieldNeighbours[(mergeIdx << 1) + 0].mv + tempMv[0];
+    pu.mv[REF_PIC_LIST_1] = mvFieldNeighbours[(mergeIdx << 1) + 1].mv + tempMv[1];
   }
   else
   {
-    pu.mv[REF_PIC_LIST_1] = Mv();
+#endif
+    if (pu.refIdx[REF_PIC_LIST_0] >= 0)
+    {
+      pu.mv[REF_PIC_LIST_0] = mvFieldNeighbours[(mergeIdx << 1) + 0].mv + mvOffset;
+    }
+    else
+    {
+      pu.mv[REF_PIC_LIST_0] = Mv();
+    }
+
+    if (pu.refIdx[REF_PIC_LIST_1] >= 0)
+    {
+      pu.mv[REF_PIC_LIST_1] = mvFieldNeighbours[(mergeIdx << 1) + 1].mv + mvOffset;
+    }
+    else
+    {
+      pu.mv[REF_PIC_LIST_1] = Mv();
+    }
+#if JVET_AE0046_BI_GPM
   }
+#endif
   pu.mvd[REF_PIC_LIST_0] = Mv();
   pu.mvd[REF_PIC_LIST_1] = Mv();
   pu.mvpIdx[REF_PIC_LIST_0] = NOT_VALID;
@@ -1495,7 +1639,11 @@ bool AffineMergeCtx::xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilar
 }
 #endif
 #if JVET_AA0061_IBC_MBVD
+#if JVET_AE0169_BIPREDICTIVE_IBC
+bool MergeCtx::setIbcMbvdMergeCandiInfo(PredictionUnit& pu, int candIdx, int candIdxMaped, int candIdx1, int candIdxMaped1)
+#else
 bool MergeCtx::setIbcMbvdMergeCandiInfo(PredictionUnit& pu, int candIdx, int candIdxMaped)
+#endif
 {
   const int mvShift = MV_FRACTIONAL_BITS_DIFF + 2;
   const int refMvdCands[IBC_MBVD_STEP_NUM] = { 1 << mvShift , 2 << mvShift , 4 << mvShift , 8 << mvShift , 12 << mvShift , 16 << mvShift , 24 << mvShift , 32 << mvShift , 40 << mvShift , 48 << mvShift , 56 << mvShift ,
@@ -1513,13 +1661,31 @@ bool MergeCtx::setIbcMbvdMergeCandiInfo(PredictionUnit& pu, int candIdx, int can
   }
   tempIdx = candIdxMaped;
 
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  int offset = 0;
+  if (pu.cu->slice->getSPS()->getUseIbcMbvdAdSearch())
+  {
+    fPosBaseIdx = tempIdx / IBC_MBVD_AD_MAX_REFINE_NUM;
+    tempIdx = tempIdx - fPosBaseIdx * (IBC_MBVD_AD_MAX_REFINE_NUM);
+    fPosStep = tempIdx / IBC_MBVD_OFFSET_DIR;
+    fPosPosition = tempIdx - fPosStep * (IBC_MBVD_OFFSET_DIR);
+    offset = g_ibcMbvdCandOffsets[fPosStep];
+  }
+  else
+  {
+#endif
   fPosGroup = tempIdx / (IBC_MBVD_BASE_NUM * IBC_MBVD_MAX_REFINE_NUM);
   tempIdx = tempIdx - fPosGroup * (IBC_MBVD_BASE_NUM * IBC_MBVD_MAX_REFINE_NUM);
   fPosBaseIdx = tempIdx / IBC_MBVD_MAX_REFINE_NUM;
   tempIdx = tempIdx - fPosBaseIdx * (IBC_MBVD_MAX_REFINE_NUM);
   fPosStep = tempIdx / IBC_MBVD_OFFSET_DIR;
   fPosPosition = tempIdx - fPosStep * (IBC_MBVD_OFFSET_DIR);
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  offset = refMvdCands[fPosStep];
+  }
+#else
   int offset = refMvdCands[fPosStep];
+#endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   if (!pu.cu->slice->getPicHeader()->getDisFracMBVD() || !pu.cs->slice->getSPS()->getPLTMode())
   {
@@ -1557,6 +1723,94 @@ bool MergeCtx::setIbcMbvdMergeCandiInfo(PredictionUnit& pu, int candIdx, int can
   pu.mergeFlag = true;
   pu.mergeType = MRG_TYPE_IBC;
 
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  pu.ibcMergeIdx1 = MAX_INT;
+  if(candIdxMaped1 == -1)
+  {
+    candIdxMaped1 = candIdx1;
+  }
+  if (candIdxMaped1 != -1)
+  {
+    if (candIdx1 < IBC_MRG_MAX_NUM_CANDS)
+    {
+      fPosBaseIdx = candIdx1;
+      tempMv = Mv();
+#if JVET_AA0070_RRIBC
+      //check the BVD direction and base BV flip direction
+      if (rribcFlipTypes[fPosBaseIdx] == 1)
+      {
+        return true;
+      }
+      if (rribcFlipTypes[fPosBaseIdx] == 2)
+      {
+        return true;
+      }
+#endif
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+      pu.mv[REF_PIC_LIST_1] = pu.cu->slice->getSPS()->getUseIbcMbvdAdSearch() ? ibcMbvdBaseBvFrac[fPosBaseIdx][0].mv : ibcMbvdBaseBv[fPosBaseIdx][0].mv;
+#endif
+    }
+    else
+    {
+      tempIdx = candIdxMaped1;
+
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+      int offset = 0;
+      if (pu.cu->slice->getSPS()->getUseIbcMbvdAdSearch())
+      {
+        fPosBaseIdx = tempIdx / IBC_MBVD_AD_MAX_REFINE_NUM;
+        tempIdx = tempIdx - fPosBaseIdx * (IBC_MBVD_AD_MAX_REFINE_NUM);
+        fPosStep = tempIdx / IBC_MBVD_OFFSET_DIR;
+        fPosPosition = tempIdx - fPosStep * (IBC_MBVD_OFFSET_DIR);
+        offset = g_ibcMbvdCandOffsets[fPosStep];
+      }
+      else
+      {
+#endif
+      fPosGroup = tempIdx / (IBC_MBVD_BASE_NUM * IBC_MBVD_MAX_REFINE_NUM);
+      tempIdx = tempIdx - fPosGroup * (IBC_MBVD_BASE_NUM * IBC_MBVD_MAX_REFINE_NUM);
+      fPosBaseIdx = tempIdx / IBC_MBVD_MAX_REFINE_NUM;
+      tempIdx = tempIdx - fPosBaseIdx * (IBC_MBVD_MAX_REFINE_NUM);
+      fPosStep = tempIdx / IBC_MBVD_OFFSET_DIR;
+      fPosPosition = tempIdx - fPosStep * (IBC_MBVD_OFFSET_DIR);
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+      offset = refMvdCands[fPosStep];
+      }
+#else
+      int offset = refMvdCands[fPosStep];
+#endif
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+      if (!pu.cu->slice->getPicHeader()->getDisFracMBVD() || !pu.cs->slice->getSPS()->getPLTMode())
+      {
+        offset >>= 2;
+      }
+#endif
+
+      tempMv = Mv(xDir[fPosPosition] * offset, yDir[fPosPosition] * offset);
+#if JVET_AA0070_RRIBC
+      //check the BVD direction and base BV flip direction
+      if ((rribcFlipTypes[fPosBaseIdx] == 1) && (yDir[fPosPosition] != 0))
+      {
+        return true;
+      }
+      if ((rribcFlipTypes[fPosBaseIdx] == 2) && (xDir[fPosPosition] != 0))
+      {
+        return true;
+      }
+#endif
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+      pu.mv[REF_PIC_LIST_1] = ibcMbvdBaseBv[fPosBaseIdx][0].mv + tempMv;
+#endif
+    }
+    pu.interDir = 3;
+#if !JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+    pu.mv[REF_PIC_LIST_1] = ibcMbvdBaseBv[fPosBaseIdx][0].mv + tempMv;
+#endif
+    pu.refIdx[REF_PIC_LIST_1] = MAX_NUM_REF;
+    pu.ibcMergeIdx1 = candIdx1;
+  }
+#endif
+
   pu.mvd[REF_PIC_LIST_0] = Mv();
   pu.mvd[REF_PIC_LIST_1] = Mv();
   pu.mvpIdx[REF_PIC_LIST_0] = NOT_VALID;
@@ -1564,7 +1818,11 @@ bool MergeCtx::setIbcMbvdMergeCandiInfo(PredictionUnit& pu, int candIdx, int can
   pu.mvpNum[REF_PIC_LIST_0] = NOT_VALID;
   pu.mvpNum[REF_PIC_LIST_1] = NOT_VALID;
 
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  pu.cu->bcwIdx = BCW_DEFAULT;
+#else
   pu.cu->bcwIdx = (interDirNeighbours[fPosBaseIdx] == 3) ? bcwIdx[fPosBaseIdx] : BCW_DEFAULT;
+#endif
 
   for (int refList = 0; refList < 2; refList++)
   {
@@ -1583,11 +1841,32 @@ bool MergeCtx::setIbcMbvdMergeCandiInfo(PredictionUnit& pu, int candIdx, int can
   else
 #endif
   pu.cu->imv = pu.cu->imv == IMV_HPEL ? 0 : pu.cu->imv;
+#if JVET_AE0169_BIPREDICTIVE_IBC
+#if JVET_AC0112_IBC_LIC
+  pu.cu->ibcLicFlag = (pu.interDir == 3) ? false : ibcLicFlags[fPosBaseIdx];
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  pu.cu->ibcLicIdx = 0;
+#endif
+#endif
+#if JVET_AE0159_FIBC
+  pu.cu->ibcFilterFlag = (pu.interDir == 3) ? false : ibcFilterFlags[fPosBaseIdx];
+#endif
+#if JVET_AA0070_RRIBC
+  pu.cu->rribcFlipType = (pu.interDir == 3) ? 0 : rribcFlipTypes[fPosBaseIdx];
+#endif
+#else
 #if JVET_AC0112_IBC_LIC
   pu.cu->ibcLicFlag = ibcLicFlags[fPosBaseIdx];
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  pu.cu->ibcLicIdx = 0;
+#endif
+#endif
+#if JVET_AE0159_FIBC
+  pu.cu->ibcFilterFlag = ibcFilterFlags[fPosBaseIdx];
 #endif
 #if JVET_AA0070_RRIBC
   pu.cu->rribcFlipType = rribcFlipTypes[fPosBaseIdx];
+#endif
 #endif
 #if MULTI_HYP_PRED
   pu.addHypData.clear();
@@ -1659,3 +1938,18 @@ unsigned DeriveCtx::CtxPltCopyFlag( const unsigned prevRunType, const unsigned d
     return ucCtxLut[RUN_IDX_THRE];
   }
 }
+
+#if JVET_AE0159_FIBC 
+unsigned DeriveCtx::ctxIbcFilterFlag(const CodingUnit& cu)
+{
+  const CodingStructure *cs = cu.cs;
+  unsigned ctxId = 0;
+  const Position pos = cu.chType == CHANNEL_TYPE_CHROMA ? cu.chromaPos() : cu.lumaPos();
+  const CodingUnit *cuLeft = cs->getCURestricted(pos.offset(-1, 0), cu, cu.chType);
+  ctxId += (cuLeft && !cuLeft->firstPU->mergeFlag && (cuLeft->ibcLicFlag || cuLeft->ibcFilterFlag)) ? 1 : 0;
+
+  const CodingUnit *cuAbove = cs->getCURestricted(pos.offset(0, -1), cu, cu.chType);
+  ctxId += (cuAbove && !cuAbove->firstPU->mergeFlag && (cuAbove->ibcLicFlag || cuAbove->ibcFilterFlag)) ? 1 : 0;
+  return ctxId;
+}
+#endif

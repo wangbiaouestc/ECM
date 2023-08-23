@@ -209,6 +209,10 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
 #endif
                 {
                   pcEncPic->copySAO( *pic, 0 );
+
+#if JVET_V0094_BILATERAL_FILTER
+                  pcEncPic->copyBIF( *pic );
+#endif
                 }
 
 #if JVET_W0066_CCSAO
@@ -625,11 +629,14 @@ Picture* DecLib::xGetNewPicBuffer( const SPS &sps, const PPS &pps, const uint32_
   {
     pcPic = new Picture();
 
+
+    pcPic->create(
 #if JVET_Z0118_GDR
-    pcPic->create( sps.getGDREnabledFlag(), sps.getChromaFormatIdc(), Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(), sps.getMaxCUWidth() + EXT_PICTURE_SIZE, true, layerId);
-#else
-    pcPic->create( sps.getChromaFormatIdc(), Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(), sps.getMaxCUWidth() + EXT_PICTURE_SIZE, true, layerId);
+      sps.getGDREnabledFlag(),
 #endif
+      sps.getWrapAroundEnabledFlag(), sps.getChromaFormatIdc(),
+      Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(),
+      sps.getMaxCUWidth() + EXT_PICTURE_SIZE, true, layerId);
 
     m_cListPic.push_back( pcPic );
 
@@ -665,23 +672,30 @@ Picture* DecLib::xGetNewPicBuffer( const SPS &sps, const PPS &pps, const uint32_
 
     m_cListPic.push_back( pcPic );
 
+
+    pcPic->create(
 #if JVET_Z0118_GDR
-    pcPic->create( sps.getGDREnabledFlag(), sps.getChromaFormatIdc(), Size( pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples() ), sps.getMaxCUWidth(), sps.getMaxCUWidth() + EXT_PICTURE_SIZE, true, layerId );
-#else
-    pcPic->create( sps.getChromaFormatIdc(), Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(), sps.getMaxCUWidth() + EXT_PICTURE_SIZE, true, layerId);
+      sps.getGDREnabledFlag(),
 #endif
+      sps.getWrapAroundEnabledFlag(), sps.getChromaFormatIdc(),
+      Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(),
+      sps.getMaxCUWidth() + EXT_PICTURE_SIZE, true, layerId);
   }
   else
   {
     if( !pcPic->Y().Size::operator==( Size( pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples() ) ) || pps.pcv->maxCUWidth != sps.getMaxCUWidth() || pps.pcv->maxCUHeight != sps.getMaxCUHeight() || pcPic->layerId != layerId )
     {
       pcPic->destroy();
-#if JVET_Z0118_GDR
-      pcPic->create( sps.getGDREnabledFlag(), sps.getChromaFormatIdc(), Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(), sps.getMaxCUWidth() + EXT_PICTURE_SIZE, true, layerId);
-#else
-      pcPic->create( sps.getChromaFormatIdc(), Size( pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples() ), sps.getMaxCUWidth(), sps.getMaxCUWidth() + EXT_PICTURE_SIZE, true, layerId );
+
+      pcPic->create( 
+#if JVET_Z0118_GDR        
+        sps.getGDREnabledFlag(),
 #endif
+        sps.getWrapAroundEnabledFlag(), sps.getChromaFormatIdc(),
+        Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(),
+        sps.getMaxCUWidth() + EXT_PICTURE_SIZE, true, layerId);
     }
+
 #if JVET_Z0118_GDR // picHeader should be deleted in case pcPic slot gets reused
     if (pcPic && pcPic->cs && pcPic->cs->isGdrEnabled() && pcPic->cs->picHeader)
     {          
@@ -778,6 +792,13 @@ void DecLib::executeLoopFilters()
   m_cLoopFilter.loopFilterPic( cs );
 #if !MULTI_PASS_DMVR
   CS::setRefinedMotionField(cs);
+#endif
+
+#if JVET_AE0043_CCP_MERGE_TEMPORAL
+  if ((cs.picture->temporalId == 0) || (cs.picture->temporalId < cs.slice->getSPS()->getMaxTLayers() - 1))
+  {
+    CS::saveTemporalCcpModel(cs);
+  }
 #endif
 
 #if JVET_W0066_CCSAO
@@ -2550,6 +2571,21 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
       if(isCurLayerNotOutput)
       {
         m_picHeader.setPicOutputFlag(false);
+      }
+    }
+  }
+
+  if (m_apsMapEnc) // saving ALF APS for debug bitstream mode
+  {
+    const auto& apsMap = m_parameterSetManager.getApsMap();
+    for (int psId = ALF_APS; psId < (ALF_CTB_MAX_NUM_APS<<NUM_APS_TYPE_LEN) + ALF_APS; psId += (1<<NUM_APS_TYPE_LEN))
+    {
+      APS* aps = apsMap->getPS(psId);
+      if (aps && apsMap->getChangedFlag(psId))
+      {
+        APS* apsEnc = new APS();
+        *apsEnc = *aps;
+        m_apsMapEnc->storePS(psId, apsEnc);
       }
     }
   }

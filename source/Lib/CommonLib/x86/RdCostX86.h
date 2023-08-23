@@ -2678,184 +2678,191 @@ Distortion RdCost::xGetMRSAD_SIMD(const DistParam &rcDtParam)
   uint32_t sum = 0;
 
   // internal bit-depth must be 12-bit or lower
-
-  if (width & 7) // multiple of 4
-  {
-    __m128i vzero = _mm_setzero_si128();
-    __m128i vsum32 = vzero;
-
-    for (; height != 0; height -= subStep)
-    {
-      __m128i vsum16 = vzero;
-
-      for (int n = 0; n < width; n += 4)
-      {
-        __m128i org = _mm_loadl_epi64((__m128i*)(pOrg + n));
-        __m128i cur = _mm_loadl_epi64((__m128i*)(pCur + n));
-        vsum16 = _mm_adds_epi16(vsum16, _mm_sub_epi16(org, cur));
-      }
-
-      __m128i vsign = _mm_cmpgt_epi16(vzero, vsum16);
-      vsum32 = _mm_add_epi32(vsum32, _mm_unpacklo_epi16(vsum16, vsign));
-
-      pOrg += strideOrg;
-      pCur += strideCur;
-      rowCnt++;
-    }
-
-    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
-    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
-    deltaAvg = _mm_cvtsi128_si32(vsum32) / (width * rowCnt);
-
-    pOrg = (const short*)rcDtParam.org.buf;
-    pCur = (const short*)rcDtParam.cur.buf;
-    height = rcDtParam.org.height;
-
-    __m128i delta = _mm_set1_epi16(deltaAvg);
-    vsum32 = vzero;
-
-    for (; height != 0; height -= subStep)
-    {
-      __m128i vsum16 = vzero;
-
-      for (int n = 0; n < width; n += 4)
-      {
-        __m128i org = _mm_loadl_epi64((__m128i*)(pOrg + n));
-        __m128i cur = _mm_loadl_epi64((__m128i*)(pCur + n));
-        __m128i abs = _mm_abs_epi16(_mm_sub_epi16(_mm_sub_epi16(org, cur), delta));
-        vsum16 = _mm_adds_epu16(abs, vsum16);
-      }
-
-      vsum32 = _mm_add_epi32(vsum32, _mm_unpacklo_epi16(vsum16, vzero));
-
-      pOrg += strideOrg;
-      pCur += strideCur;
-    }
-
-    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
-    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
-    sum = _mm_cvtsi128_si32(vsum32);
-  }
 #ifdef USE_AVX2
-  else if (vext >= AVX2 && width >= 16) // multiple of 16
+  if( vext >= AVX2 && !( width & 15 ) ) // multiple of 16
   {
     __m256i vzero = _mm256_setzero_si256();
     __m256i vsum32 = vzero;
 
-    for (; height != 0; height -= subStep)
+    for( int m = 0; m < height; m += subStep )
     {
       __m256i vsum16 = vzero;
 
-      for (int n = 0; n < width; n += 16)
+      for( int n = 0; n < width; n += 16 )
       {
-        __m256i org = _mm256_lddqu_si256((__m256i*)(pOrg + n));
-        __m256i cur = _mm256_lddqu_si256((__m256i*)(pCur + n));
-        vsum16 = _mm256_adds_epi16(vsum16, _mm256_sub_epi16(org, cur));
+        __m256i org = _mm256_lddqu_si256( ( __m256i* )( pOrg + n ) );
+        __m256i cur = _mm256_lddqu_si256( ( __m256i* )( pCur + n ) );
+        vsum16 = _mm256_adds_epi16( vsum16, _mm256_sub_epi16( org, cur ) );
       }
 
-      __m256i vsign = _mm256_cmpgt_epi16(vzero, vsum16);
-      __m256i vsumtemp = _mm256_add_epi32(_mm256_unpacklo_epi16(vsum16, vsign), _mm256_unpackhi_epi16(vsum16, vsign));
-      vsum32 = _mm256_add_epi32(vsum32, vsumtemp);
+      __m256i vsign = _mm256_cmpgt_epi16( vzero, vsum16 );
+      __m256i vsumtemp = _mm256_add_epi32( _mm256_unpacklo_epi16( vsum16, vsign ), _mm256_unpackhi_epi16( vsum16, vsign ) );
+      vsum32 = _mm256_add_epi32( vsum32, vsumtemp );
 
       pOrg += strideOrg;
       pCur += strideCur;
       rowCnt++;
     }
 
-    vsum32 = _mm256_hadd_epi32(vsum32, vzero);
-    vsum32 = _mm256_hadd_epi32(vsum32, vzero);
-    deltaAvg = _mm_cvtsi128_si32(_mm256_castsi256_si128(vsum32)) + _mm_cvtsi128_si32(_mm256_castsi256_si128(_mm256_permute2x128_si256(vsum32, vsum32, 0x11)));
+    vsum32 = _mm256_hadd_epi32( vsum32, vzero );
+    vsum32 = _mm256_hadd_epi32( vsum32, vzero );
+    deltaAvg = _mm_cvtsi128_si32( _mm256_castsi256_si128( vsum32 ) ) + _mm_cvtsi128_si32( _mm256_castsi256_si128( _mm256_permute2x128_si256( vsum32, vsum32, 0x11 ) ) );
     deltaAvg /= width * rowCnt;
 
     pOrg = (const short*)rcDtParam.org.buf;
     pCur = (const short*)rcDtParam.cur.buf;
-    height = rcDtParam.org.height;
 
-    __m256i delta = _mm256_set1_epi16(deltaAvg);
+    __m256i delta = _mm256_set1_epi16( deltaAvg );
     vsum32 = vzero;
 
-    for (; height != 0; height -= subStep)
+    for( int m = 0; m < height; m += subStep )
     {
       __m256i vsum16 = vzero;
 
-      for (int n = 0; n < width; n += 16)
+      for( int n = 0; n < width; n += 16 )
       {
-        __m256i org = _mm256_lddqu_si256((__m256i*)(pOrg + n));
-        __m256i cur = _mm256_lddqu_si256((__m256i*)(pCur + n));
-        __m256i abs = _mm256_abs_epi16(_mm256_sub_epi16(_mm256_sub_epi16(org, cur), delta));
-        vsum16 = _mm256_adds_epi16(abs, vsum16);
+        __m256i org = _mm256_lddqu_si256( ( __m256i* )( pOrg + n ) );
+        __m256i cur = _mm256_lddqu_si256( ( __m256i* )( pCur + n ) );
+        __m256i abs = _mm256_abs_epi16( _mm256_sub_epi16( _mm256_sub_epi16( org, cur ), delta ) );
+        vsum16 = _mm256_adds_epi16( abs, vsum16 );
       }
 
-      __m256i vsumtemp = _mm256_add_epi32(_mm256_unpacklo_epi16(vsum16, vzero), _mm256_unpackhi_epi16(vsum16, vzero));
-      vsum32 = _mm256_add_epi32(vsum32, vsumtemp);
+      __m256i vsumtemp = _mm256_add_epi32( _mm256_unpacklo_epi16( vsum16, vzero ), _mm256_unpackhi_epi16( vsum16, vzero ) );
+      vsum32 = _mm256_add_epi32( vsum32, vsumtemp );
 
       pOrg += strideOrg;
       pCur += strideCur;
     }
 
-    vsum32 = _mm256_hadd_epi32(vsum32, vzero);
-    vsum32 = _mm256_hadd_epi32(vsum32, vzero);
-    sum = _mm_cvtsi128_si32(_mm256_castsi256_si128(vsum32)) + _mm_cvtsi128_si32(_mm256_castsi256_si128(_mm256_permute2x128_si256(vsum32, vsum32, 0x11)));
+    vsum32 = _mm256_hadd_epi32( vsum32, vzero );
+    vsum32 = _mm256_hadd_epi32( vsum32, vzero );
+    sum = _mm_cvtsi128_si32( _mm256_castsi256_si128( vsum32 ) ) + _mm_cvtsi128_si32( _mm256_castsi256_si128( _mm256_permute2x128_si256( vsum32, vsum32, 0x11 ) ) );
   }
+  else
 #endif
-  else // multiple of 8
+  if( !( width & 7 ) )// multiple of 8
   {
     __m128i vzero = _mm_setzero_si128();
     __m128i vsum32 = vzero;
+    
+    int num = width >= 128 ? 4 : ( width >= 64 ? 2 : 1 );
+    int size = width / num;
 
-    for (; height != 0; height -= subStep)
+    for( int m = 0; m < height; m += subStep )
     {
-      __m128i vsum16 = vzero;
-
-      for (int n = 0; n < width; n += 8)
+      for( int i = 0; i < num; i++ )
       {
-        __m128i org = _mm_lddqu_si128((__m128i*)(pOrg + n));
-        __m128i cur = _mm_lddqu_si128((__m128i*)(pCur + n));
-        vsum16 = _mm_adds_epi16(vsum16, _mm_sub_epi16(org, cur));
-      }
+        __m128i vsum16 = vzero;
 
-      __m128i vsign = _mm_cmpgt_epi16(vzero, vsum16);
-      __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vsign), _mm_unpackhi_epi16(vsum16, vsign));
-      vsum32 = _mm_add_epi32(vsum32, vsumtemp);
+        for( int n = i * size; n < ( i + 1 ) * size; n += 8 )
+        {
+          __m128i org = _mm_lddqu_si128( ( __m128i* )( pOrg + n ) );
+          __m128i cur = _mm_lddqu_si128( ( __m128i* )( pCur + n ) );
+          vsum16 = _mm_adds_epi16( vsum16, _mm_sub_epi16( org, cur ) );
+        }
+
+        __m128i vsign = _mm_cmpgt_epi16( vzero, vsum16 );
+        __m128i vsumtemp = _mm_add_epi32( _mm_unpacklo_epi16( vsum16, vsign ), _mm_unpackhi_epi16( vsum16, vsign ) );
+        vsum32 = _mm_add_epi32( vsum32, vsumtemp );
+      }
 
       pOrg += strideOrg;
       pCur += strideCur;
       rowCnt++;
     }
 
-    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
-    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
-    deltaAvg = _mm_cvtsi128_si32(vsum32) / (width * rowCnt);
+    vsum32 = _mm_add_epi32( vsum32, _mm_shuffle_epi32( vsum32, 0x4e ) );   // 01001110
+    vsum32 = _mm_add_epi32( vsum32, _mm_shuffle_epi32( vsum32, 0xb1 ) );   // 10110001
+    deltaAvg = _mm_cvtsi128_si32( vsum32 ) / ( width * rowCnt );
 
     pOrg = (const short*)rcDtParam.org.buf;
     pCur = (const short*)rcDtParam.cur.buf;
-    height = rcDtParam.org.height;
 
-    __m128i delta = _mm_set1_epi16(deltaAvg);
+    __m128i delta = _mm_set1_epi16( deltaAvg );
     vsum32 = vzero;
 
-    for (; height != 0; height -= subStep)
+    for( int m = 0; m < height; m += subStep )
     {
       __m128i vsum16 = vzero;
 
-      for (int n = 0; n < width; n += 8)
+      for( int n = 0; n < width; n += 8 )
       {
-        __m128i org = _mm_lddqu_si128((__m128i*)(pOrg + n));
-        __m128i cur = _mm_lddqu_si128((__m128i*)(pCur + n));
-        __m128i abs = _mm_abs_epi16(_mm_sub_epi16(_mm_sub_epi16(org, cur), delta));
-        vsum16 = _mm_adds_epu16(abs, vsum16);
+        __m128i org = _mm_lddqu_si128( ( __m128i* )( pOrg + n ) );
+        __m128i cur = _mm_lddqu_si128( ( __m128i* )( pCur + n ) );
+        __m128i abs = _mm_abs_epi16( _mm_sub_epi16( _mm_sub_epi16( org, cur ), delta ) );
+        vsum16 = _mm_adds_epu16( abs, vsum16 );
       }
 
-      __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
-      vsum32 = _mm_add_epi32(vsum32, vsumtemp);
+      __m128i vsumtemp = _mm_add_epi32( _mm_unpacklo_epi16( vsum16, vzero ), _mm_unpackhi_epi16( vsum16, vzero ) );
+      vsum32 = _mm_add_epi32( vsum32, vsumtemp );
 
       pOrg += strideOrg;
       pCur += strideCur;
     }
 
-    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
-    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
-    sum = _mm_cvtsi128_si32(vsum32);
+    vsum32 = _mm_add_epi32( vsum32, _mm_shuffle_epi32( vsum32, 0x4e ) );   // 01001110
+    vsum32 = _mm_add_epi32( vsum32, _mm_shuffle_epi32( vsum32, 0xb1 ) );   // 10110001
+    sum = _mm_cvtsi128_si32( vsum32 );
+  }
+  else if( !( width & 3 ) ) // multiple of 4
+  {
+    __m128i vzero = _mm_setzero_si128();
+    __m128i vsum32 = vzero;
+
+    for( int m = 0; m < height; m += subStep )
+    {
+      __m128i vsum16 = vzero;
+
+      for( int n = 0; n < width; n += 4 )
+      {
+        __m128i org = _mm_loadl_epi64( ( __m128i* )( pOrg + n ) );
+        __m128i cur = _mm_loadl_epi64( ( __m128i* )( pCur + n ) );
+        vsum16 = _mm_adds_epi16( vsum16, _mm_sub_epi16( org, cur ) );
+      }
+
+      __m128i vsign = _mm_cmpgt_epi16( vzero, vsum16 );
+      vsum32 = _mm_add_epi32( vsum32, _mm_unpacklo_epi16( vsum16, vsign ) );
+
+      pOrg += strideOrg;
+      pCur += strideCur;
+      rowCnt++;
+    }
+
+    vsum32 = _mm_add_epi32( vsum32, _mm_shuffle_epi32( vsum32, 0x4e ) );   // 01001110
+    vsum32 = _mm_add_epi32( vsum32, _mm_shuffle_epi32( vsum32, 0xb1 ) );   // 10110001
+    deltaAvg = _mm_cvtsi128_si32( vsum32 ) / ( width * rowCnt );
+
+    pOrg = (const short*)rcDtParam.org.buf;
+    pCur = (const short*)rcDtParam.cur.buf;
+
+    __m128i delta = _mm_set1_epi16( deltaAvg );
+    vsum32 = vzero;
+
+    for( int m = 0; m < height; m += subStep )
+    {
+      __m128i vsum16 = vzero;
+
+      for( int n = 0; n < width; n += 4 )
+      {
+        __m128i org = _mm_loadl_epi64( ( __m128i* )( pOrg + n ) );
+        __m128i cur = _mm_loadl_epi64( ( __m128i* )( pCur + n ) );
+        __m128i abs = _mm_abs_epi16( _mm_sub_epi16( _mm_sub_epi16( org, cur ), delta ) );
+        vsum16 = _mm_adds_epu16( abs, vsum16 );
+      }
+
+      vsum32 = _mm_add_epi32( vsum32, _mm_unpacklo_epi16( vsum16, vzero ) );
+
+      pOrg += strideOrg;
+      pCur += strideCur;
+    }
+
+    vsum32 = _mm_add_epi32( vsum32, _mm_shuffle_epi32( vsum32, 0x4e ) );   // 01001110
+    vsum32 = _mm_add_epi32( vsum32, _mm_shuffle_epi32( vsum32, 0xb1 ) );   // 10110001
+    sum = _mm_cvtsi128_si32( vsum32 );
+  }
+  else
+  {
+    return RdCost::xGetMRSAD( rcDtParam );
   }
 
   sum <<= subShift;
@@ -2902,127 +2909,131 @@ Distortion RdCost::xGetTMErrorFull_SIMD(const DistParam& rcDtParam)
 
   // compute matching cost
   Distortion partSum = 0;
-  if (trueAfalseL)
+  if( trueAfalseL )
   {
     const int subblkWidth = iCols >> 2;
-
-    if (subblkWidth & 7) // multiple of 4
-    {
-      __m128i vzero  = _mm_setzero_si128();
-      __m128i vsum32 = vzero;
-      __m128i delta  = mr ? _mm_set1_epi16(deltaMean) : vzero;
-
-      for (uint32_t j = 0; j < iRows; j += iSubStep)
-      {
-        __m128i vsum32row = vzero;
-        for (uint32_t m = 0, n = 0; m < iCols; m += (iCols >> 2), n++)
-        {
-          __m128i vsum32subblk = vzero;
-          for (uint32_t i = m; i < m + (iCols >> 2); i += 4)
-          {
-            __m128i vsum16 = vzero;
-            // 4 samples per iteration
-            {
-              __m128i cur = _mm_loadl_epi64((__m128i*)(piCur + i));
-              __m128i ref = _mm_loadl_epi64((__m128i*)(piRef + i));
-              vsum16      = mr ? _mm_abs_epi16(_mm_sub_epi16(_mm_sub_epi16(cur, ref), delta)) : _mm_abs_epi16(_mm_sub_epi16(cur, ref));
-            }
-
-            vsum32subblk = _mm_add_epi32(vsum32subblk, _mm_unpacklo_epi16(vsum16, vzero));
-          }
-
-          vsum32row = _mm_add_epi32(vsum32row, _mm_slli_epi32(vsum32subblk, tplWeightS[n]));
-        }
-
-        vsum32 = _mm_add_epi32(vsum32, _mm_slli_epi32(vsum32row, tplWeightD[j]));
-
-        piCur += iStrideCur;
-        piRef += iStrideRef;
-      }
-
-      vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
-      vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
-      partSum = _mm_cvtsi128_si32(vsum32);
-    }
 #ifdef USE_AVX2
-    else if (vext >= AVX2 && subblkWidth >= 16) // multiple of 16
+    if( vext >= AVX2 && !( subblkWidth & 15 ) ) // multiple of 16
     {
-      __m256i vzero  = _mm256_setzero_si256();
+      __m256i vzero = _mm256_setzero_si256();
       __m256i vsum32 = vzero;
-      __m256i delta  = mr ? _mm256_set1_epi16(deltaMean) : vzero;
+      __m256i delta = mr ? _mm256_set1_epi16( deltaMean ) : vzero;
 
-      for (uint32_t j = 0; j < iRows; j += iSubStep)
+      for( uint32_t j = 0; j < iRows; j += iSubStep )
       {
         __m256i vsum32row = vzero;
-        for (uint32_t m = 0, n = 0; m < iCols; m += (iCols >> 2), n++)
+        for( uint32_t m = 0, n = 0; m < iCols; m += ( iCols >> 2 ), n++ )
         {
           __m256i vsum32subblk = vzero;
-          for (uint32_t i = m; i < m + (iCols >> 2); i += 16)
+          for( uint32_t i = m; i < m + ( iCols >> 2 ); i += 16 )
           {
             __m256i vsum16 = vzero;
             // 16 samples per iteration
             {
-              __m256i cur = _mm256_lddqu_si256((__m256i*)(piCur + i));
-              __m256i ref = _mm256_lddqu_si256((__m256i*)(piRef + i));
-              vsum16      = mr ? _mm256_abs_epi16(_mm256_sub_epi16(_mm256_sub_epi16(cur, ref), delta)) : _mm256_abs_epi16(_mm256_sub_epi16(cur, ref));
+              __m256i cur = _mm256_lddqu_si256( ( __m256i* )( piCur + i ) );
+              __m256i ref = _mm256_lddqu_si256( ( __m256i* )( piRef + i ) );
+              vsum16 = mr ? _mm256_abs_epi16( _mm256_sub_epi16( _mm256_sub_epi16( cur, ref ), delta ) ) : _mm256_abs_epi16( _mm256_sub_epi16( cur, ref ) );
             }
 
-            __m256i vsumtemp = _mm256_add_epi32(_mm256_unpacklo_epi16(vsum16, vzero), _mm256_unpackhi_epi16(vsum16, vzero));
-            vsum32subblk = _mm256_add_epi32(vsum32subblk, vsumtemp);
+            __m256i vsumtemp = _mm256_add_epi32( _mm256_unpacklo_epi16( vsum16, vzero ), _mm256_unpackhi_epi16( vsum16, vzero ) );
+            vsum32subblk = _mm256_add_epi32( vsum32subblk, vsumtemp );
           }
 
-          vsum32row = _mm256_add_epi32(vsum32row, _mm256_slli_epi32(vsum32subblk, tplWeightS[n]));
+          vsum32row = _mm256_add_epi32( vsum32row, _mm256_slli_epi32( vsum32subblk, tplWeightS[n] ) );
         }
 
-        vsum32 = _mm256_add_epi32(vsum32, _mm256_slli_epi32(vsum32row, tplWeightD[j]));
+        vsum32 = _mm256_add_epi32( vsum32, _mm256_slli_epi32( vsum32row, tplWeightD[j] ) );
 
         piCur += iStrideCur;
         piRef += iStrideRef;
       }
 
-      vsum32  = _mm256_hadd_epi32(vsum32, vzero);
-      vsum32  = _mm256_hadd_epi32(vsum32, vzero);
-      partSum = _mm_cvtsi128_si32(_mm256_castsi256_si128(vsum32)) + _mm_cvtsi128_si32(_mm256_castsi256_si128(_mm256_permute2x128_si256(vsum32, vsum32, 0x11)));
+      vsum32 = _mm256_hadd_epi32( vsum32, vzero );
+      vsum32 = _mm256_hadd_epi32( vsum32, vzero );
+      partSum = _mm_cvtsi128_si32( _mm256_castsi256_si128( vsum32 ) ) + _mm_cvtsi128_si32( _mm256_castsi256_si128( _mm256_permute2x128_si256( vsum32, vsum32, 0x11 ) ) );
     }
+    else
 #endif
-    else // multiple of 8
+    if( !( subblkWidth & 7 ) ) // multiple of 8
     {
-      __m128i vzero  = _mm_setzero_si128();
+      __m128i vzero = _mm_setzero_si128();
       __m128i vsum32 = vzero;
-      __m128i delta  = mr ? _mm_set1_epi16(deltaMean) : vzero;
+      __m128i delta = mr ? _mm_set1_epi16( deltaMean ) : vzero;
 
-      for (uint32_t j = 0; j < iRows; j += iSubStep)
+      for( uint32_t j = 0; j < iRows; j += iSubStep )
       {
         __m128i vsum32row = vzero;
-        for (uint32_t m = 0, n = 0; m < iCols; m += (iCols >> 2), n++)
+        for( uint32_t m = 0, n = 0; m < iCols; m += ( iCols >> 2 ), n++ )
         {
           __m128i vsum32subblk = vzero;
-          for (uint32_t i = m; i < m + (iCols >> 2); i += 8)
+          for( uint32_t i = m; i < m + ( iCols >> 2 ); i += 8 )
           {
             __m128i vsum16 = vzero;
             // 8 samples per iteration
             {
-              __m128i cur = _mm_lddqu_si128((__m128i*)(piCur + i));
-              __m128i ref = _mm_lddqu_si128((__m128i*)(piRef + i));
-              vsum16      = mr ? _mm_abs_epi16(_mm_sub_epi16(_mm_sub_epi16(cur, ref), delta)) : _mm_abs_epi16(_mm_sub_epi16(cur, ref));
+              __m128i cur = _mm_lddqu_si128( ( __m128i* )( piCur + i ) );
+              __m128i ref = _mm_lddqu_si128( ( __m128i* )( piRef + i ) );
+              vsum16 = mr ? _mm_abs_epi16( _mm_sub_epi16( _mm_sub_epi16( cur, ref ), delta ) ) : _mm_abs_epi16( _mm_sub_epi16( cur, ref ) );
             }
 
-            __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
-            vsum32subblk = _mm_add_epi32(vsum32subblk, vsumtemp);
+            __m128i vsumtemp = _mm_add_epi32( _mm_unpacklo_epi16( vsum16, vzero ), _mm_unpackhi_epi16( vsum16, vzero ) );
+            vsum32subblk = _mm_add_epi32( vsum32subblk, vsumtemp );
           }
 
-          vsum32row = _mm_add_epi32(vsum32row, _mm_slli_epi32(vsum32subblk, tplWeightS[n]));
+          vsum32row = _mm_add_epi32( vsum32row, _mm_slli_epi32( vsum32subblk, tplWeightS[n] ) );
         }
 
-        vsum32 = _mm_add_epi32(vsum32, _mm_slli_epi32(vsum32row, tplWeightD[j]));
+        vsum32 = _mm_add_epi32( vsum32, _mm_slli_epi32( vsum32row, tplWeightD[j] ) );
 
         piCur += iStrideCur;
         piRef += iStrideRef;
       }
 
-      vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
-      vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
-      partSum = _mm_cvtsi128_si32(vsum32);
+      vsum32 = _mm_add_epi32( vsum32, _mm_shuffle_epi32( vsum32, 0x4e ) );   // 01001110
+      vsum32 = _mm_add_epi32( vsum32, _mm_shuffle_epi32( vsum32, 0xb1 ) );   // 10110001
+      partSum = _mm_cvtsi128_si32( vsum32 );
+    }
+    else if( !( subblkWidth & 3 ) ) // multiple of 4
+    {
+      __m128i vzero = _mm_setzero_si128();
+      __m128i vsum32 = vzero;
+      __m128i delta = mr ? _mm_set1_epi16( deltaMean ) : vzero;
+
+      for( uint32_t j = 0; j < iRows; j += iSubStep )
+      {
+        __m128i vsum32row = vzero;
+        for( uint32_t m = 0, n = 0; m < iCols; m += ( iCols >> 2 ), n++ )
+        {
+          __m128i vsum32subblk = vzero;
+          for( uint32_t i = m; i < m + ( iCols >> 2 ); i += 4 )
+          {
+            __m128i vsum16 = vzero;
+            // 4 samples per iteration
+            {
+              __m128i cur = _mm_loadl_epi64( ( __m128i* )( piCur + i ) );
+              __m128i ref = _mm_loadl_epi64( ( __m128i* )( piRef + i ) );
+              vsum16 = mr ? _mm_abs_epi16( _mm_sub_epi16( _mm_sub_epi16( cur, ref ), delta ) ) : _mm_abs_epi16( _mm_sub_epi16( cur, ref ) );
+            }
+
+            vsum32subblk = _mm_add_epi32( vsum32subblk, _mm_unpacklo_epi16( vsum16, vzero ) );
+          }
+
+          vsum32row = _mm_add_epi32( vsum32row, _mm_slli_epi32( vsum32subblk, tplWeightS[n] ) );
+        }
+
+        vsum32 = _mm_add_epi32( vsum32, _mm_slli_epi32( vsum32row, tplWeightD[j] ) );
+
+        piCur += iStrideCur;
+        piRef += iStrideRef;
+      }
+
+      vsum32 = _mm_add_epi32( vsum32, _mm_shuffle_epi32( vsum32, 0x4e ) );   // 01001110
+      vsum32 = _mm_add_epi32( vsum32, _mm_shuffle_epi32( vsum32, 0xb1 ) );   // 10110001
+      partSum = _mm_cvtsi128_si32( vsum32 );
+    }
+    else
+    {
+      return RdCost::xGetTMErrorFull<tplSize, trueAfalseL, mr>( rcDtParam );
     }
   }
   else
@@ -3038,12 +3049,10 @@ Distortion RdCost::xGetTMErrorFull_SIMD(const DistParam& rcDtParam)
       {
         __m128i vsum16 = vzero;
         // 4 samples per row
-        {
-          __m128i cur = _mm_loadl_epi64((__m128i*)piCur);
-          __m128i ref = _mm_loadl_epi64((__m128i*)piRef);
-          __m128i abs = mr ? _mm_abs_epi16(_mm_sub_epi16(_mm_sub_epi16(cur, ref), delta)) : _mm_abs_epi16(_mm_sub_epi16(cur, ref));
-          vsum16 = _mm_adds_epu16(abs, vsum16);
-        }
+        __m128i cur = _mm_loadl_epi64( ( __m128i* )piCur );
+        __m128i ref = _mm_loadl_epi64( ( __m128i* )piRef );
+        __m128i abs = mr ? _mm_abs_epi16( _mm_sub_epi16( _mm_sub_epi16( cur, ref ), delta ) ) : _mm_abs_epi16( _mm_sub_epi16( cur, ref ) );
+        vsum16 = _mm_adds_epu16( abs, vsum16 );
 
         vsum32subblks = _mm_add_epi32(vsum32subblks, _mm_unpacklo_epi16(vsum16, vzero));
 

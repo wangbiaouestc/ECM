@@ -448,6 +448,9 @@ public:
 #endif
 #if JVET_AC0112_IBC_LIC
   static const CtxSet   IbcLicFlag;
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  static const CtxSet   IbcLicIndex;
+#endif
 #endif
 
 #if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
@@ -489,6 +492,11 @@ public:
   static const CtxSet   SigCoeffGroup   [2];    // [ ChannelType ]
   static const CtxSet   LastX           [2];    // [ ChannelType ]
   static const CtxSet   LastY           [2];    // [ ChannelType ]
+#if JVET_AE0102_LFNST_CTX
+  static const CtxSet   SigFlagL[6];    // [ ChannelType + State ]
+  static const CtxSet   ParFlagL[2];    // [ ChannelType ]
+  static const CtxSet   GtxFlagL[4];    // [ ChannelType + x ]
+#endif
   static const CtxSet   SigFlag         [6];    // [ ChannelType + State ]
   static const CtxSet   ParFlag         [2];    // [ ChannelType ]
   static const CtxSet   GtxFlag         [4];    // [ ChannelType + x ]
@@ -505,11 +513,7 @@ public:
   static const CtxSet   SaoMergeFlag;
   static const CtxSet   SaoTypeIdx;
 #if JVET_V0094_BILATERAL_FILTER
-  static const CtxSet   BifCtrlFlags;
-#endif
-#if JVET_X0071_CHROMA_BILATERAL_FILTER
-  static const CtxSet   ChromaBifCtrlFlagsCb;
-  static const CtxSet   ChromaBifCtrlFlagsCr;
+  static const CtxSet   BifCtrlFlags[];
 #endif
 #if JVET_W0066_CCSAO
   static const CtxSet   CcSaoControlIdc;
@@ -552,6 +556,9 @@ public:
   static const CtxSet   CiipFlag;
   static const CtxSet   SmvdFlag;
   static const CtxSet   IBCFlag;
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  static const CtxSet   BiPredIbcFlag;
+#endif
   static const CtxSet   ISPMode;
   static const CtxSet   JointCbCrFlag;
 #if INTER_LIC
@@ -568,6 +575,9 @@ public:
 #endif
 #if JVET_AA0057_CCCM
   static const CtxSet   CccmFlag;
+#endif
+#if JVET_AE0100_BVGCCCM
+  static const CtxSet   BvgCccmFlag;
 #endif
 #if JVET_AD0202_CCCM_MDF
   static const CtxSet   CccmMpfFlag;
@@ -615,19 +625,19 @@ public:
   CtxStore( bool dummy );
   CtxStore( const CtxStore<BinProbModel>& ctxStore );
 public:
-  void copyFrom( const CtxStore<BinProbModel> &src )
+  void copyFrom(const CtxStore<BinProbModel>& src)
   {
     checkInit();
-    std::copy_n( reinterpret_cast< const char * >(src.m_ctx), sizeof( BinProbModel ) * ContextSetCfg::NumberOfContexts,
-                 reinterpret_cast< char * >(m_ctx) );
+    std::copy_n(reinterpret_cast<const char*>(src.m_ctx), sizeof(BinProbModel) * ContextSetCfg::NumberOfContexts,
+      reinterpret_cast<char*>(m_ctx));
   }
-  void copyFrom( const CtxStore<BinProbModel> &src, const CtxSet &ctxSet )
+  void copyFrom(const CtxStore<BinProbModel>& src, const CtxSet& ctxSet)
   {
     checkInit();
-    std::copy_n( reinterpret_cast< const char * >(src.m_ctx + ctxSet.Offset), sizeof( BinProbModel ) * ctxSet.Size,
-                 reinterpret_cast< char * >(m_ctx + ctxSet.Offset) );
+    std::copy_n(reinterpret_cast<const char*>(src.m_ctx + ctxSet.Offset), sizeof(BinProbModel) * ctxSet.Size,
+      reinterpret_cast<char*>(m_ctx + ctxSet.Offset));
   }
-  void init       ( int qp, int initId );
+  void init(int qp, int initId);
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   void loadWinSizes( const std::vector<uint8_t>&   windows );
   void saveWinSizes( std::vector<uint8_t>&         windows ) const;
@@ -702,14 +712,14 @@ public:
     return std::move(subCtx);
   }
 
-  void  init ( int qp, int initId )
+  void  init(int qp, int initId)
   {
-    switch( m_BPMType )
+    switch (m_BPMType)
     {
     case BPM_Std:   m_ctxStore_Std  .init( qp, initId );  break;
     default:        break;
     }
-    for( std::size_t k = 0; k < RExt__GOLOMB_RICE_ADAPTATION_STATISTICS_SETS; k++ )
+    for (std::size_t k = 0; k < RExt__GOLOMB_RICE_ADAPTATION_STATISTICS_SETS; k++)
     {
       m_GRAdaptStats[k] = 0;
     }

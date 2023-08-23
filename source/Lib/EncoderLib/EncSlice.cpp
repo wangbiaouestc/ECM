@@ -1599,6 +1599,21 @@ void EncSlice::compressSlice( Picture* pcPic, const bool bCompressEntireSlice, c
     }
   }
 #endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  if (pcSlice->getUseIBC())
+#else
+  if (pcSlice->getSPS()->getIBCFlag())
+#endif
+  {
+    bool mode = m_pcCfg->getIbcBiPred();
+    pcSlice->setBiPredictionIBCFlag(mode);
+  }
+  else
+  {
+    pcSlice->setBiPredictionIBCFlag(false);
+  }
+#endif
 
   if ( bWp_explicit )
   {
@@ -1840,6 +1855,15 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
       }
 #endif
     }
+  }
+#endif
+#if JVET_AE0159_FIBC
+  if (m_pcCuEncoder->getEncCfg()->getIbcFilter())
+  {
+    SPS* spsTmp = const_cast<SPS*>(cs.sps);
+    hashBlkHitPerc = (hashBlkHitPerc == -1) ? m_pcCuEncoder->getIbcHashMap().calHashBlkMatchPerc(cs.area.Y()) : hashBlkHitPerc;
+    bool isSCC = hashBlkHitPerc >= 20;
+    spsTmp->setUseIbcFilter(isSCC);   
   }
 #endif
 #if JVET_AD0188_CCP_MERGE
@@ -2271,16 +2295,11 @@ void EncSlice::encodeSlice   ( Picture* pcPic, OutputBitstream* pcSubstreams, ui
 #if JVET_V0094_BILATERAL_FILTER
     if (ctuRsAddr == 0)
     {
-      BifParams& bifParam = cs.picture->getBifParam();
-      m_CABACWriter->bif(*pcSlice, bifParam);
-    }
-#endif
+      m_CABACWriter->bif( COMPONENT_Y, *pcSlice, cs.picture->getBifParam( COMPONENT_Y ) );
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-    if(ctuRsAddr == 0)
-    {
-        ChromaBifParams& chromaBifParam = cs.picture->getChromaBifParam();
-        m_CABACWriter->chromaBifCb(*pcSlice, chromaBifParam);
-        m_CABACWriter->chromaBifCr(*pcSlice, chromaBifParam);
+      m_CABACWriter->bif( COMPONENT_Cb, *pcSlice, cs.picture->getBifParam( COMPONENT_Cb ) );
+      m_CABACWriter->bif( COMPONENT_Cr, *pcSlice, cs.picture->getBifParam( COMPONENT_Cr ) );
+#endif
     }
 #endif
     m_CABACWriter->coding_tree_unit( cs, ctuArea, pcPic->m_prevQP, ctuRsAddr );
