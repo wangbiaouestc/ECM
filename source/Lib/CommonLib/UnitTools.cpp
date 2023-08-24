@@ -21640,7 +21640,7 @@ void PU::spanGeoMMVDMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const u
   Mv mvOffset0[2], mvOffset1[2], deltaMv;
 
 #if JVET_AE0046_BI_GPM
-  int interDirIdx0 = mergeCtx0->interDirNeighbours[mergeIdx0];
+  int interDirIdx0 = (mergeIdx0 >= GEO_MAX_NUM_UNI_CANDS) ? -1 : mergeCtx0->interDirNeighbours[mergeIdx0];
 
   if (mmvdFlag0)
   {
@@ -21653,7 +21653,7 @@ void PU::spanGeoMMVDMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const u
     }
   }
 
-  int interDirIdx1 = mergeCtx1->interDirNeighbours[mergeIdx1];
+  int interDirIdx1 = (mergeIdx1 >= GEO_MAX_NUM_UNI_CANDS) ? -1 : mergeCtx1->interDirNeighbours[mergeIdx1];
 
   if (mmvdFlag1)
   {
