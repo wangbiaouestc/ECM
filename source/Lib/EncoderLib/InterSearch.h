@@ -477,6 +477,9 @@ struct SrchCostBv
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
          , bool bvFlip
 #endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+         , int bvLic
+#endif
   )
   {
     for (int i = 0; i < (int)cnt; ++i)
@@ -490,6 +493,9 @@ struct SrchCostBv
 #endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
         && bvFlipList[i] == bvFlip
+#endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+        && bvLicIdx[i] == bvLic
 #endif
         )
       {
@@ -516,6 +522,9 @@ struct SrchCostBv
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
       bvFlipList[idxDst] = bvFlipList[idxSrc];
 #endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+      bvLicIdx[idxDst] = bvLicIdx[idxSrc];
+#endif
     }
   }
 
@@ -528,6 +537,9 @@ struct SrchCostBv
 #endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
             , bool bvFlip = true
+#endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+            , int bvLic = 0
 #endif
   )
   {
@@ -560,6 +572,9 @@ struct SrchCostBv
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
             && bvFlipList[i] == bvFlip
 #endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+            && bvLicIdx[i] == bvLic
+#endif
             )
           {
             return NOT_VALID;
@@ -587,6 +602,9 @@ struct SrchCostBv
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
       bvFlipList[idx] = bvFlip;
 #endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+      bvLicIdx[idx] = bvLic;
+#endif
     };
 
     auto replaceNext = [&](uint32_t idx)
@@ -601,6 +619,9 @@ struct SrchCostBv
 #endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
       bvFlipList[idx + 1] = bvFlipList[idx];
+#endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+      bvLicIdx[idx + 1] = bvLicIdx[idx];
 #endif
     };
 
