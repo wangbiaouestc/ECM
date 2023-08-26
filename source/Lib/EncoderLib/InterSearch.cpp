@@ -4052,6 +4052,9 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
                                               , (pu.cu->rribcFlipType > 0)
 #endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+                                              , pu.cu->ibcLicIdx
+#endif
       ))
       {
         m_bestSrchCostIntBv.insert(0, curBestBv.getHor(), curBestBv.getVer()
@@ -4063,6 +4066,9 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
 #endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
                                  , (pu.cu->rribcFlipType > 0)
+#endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+                                 , pu.cu->ibcLicIdx
 #endif
         );
       }
@@ -4769,6 +4775,9 @@ Distortion InterSearch::xPredIBCFracPelSearch(PredictionUnit&              pu
 #endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
                                   , intBvList.bvFlipList[intBvList.maxSize]
+#endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+                                  , intBvList.bvLicIdx[intBvList.maxSize]
 #endif
       ))
     {
