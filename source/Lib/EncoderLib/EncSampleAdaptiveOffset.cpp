@@ -2954,7 +2954,11 @@ void EncSampleAdaptiveOffset::getBlkStats(const ComponentID compIdx, const int c
 void EncSampleAdaptiveOffset::CCSAOProcess(CodingStructure& cs, const double* lambdas, const int intraPeriod)
 {
 #if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
-  if (cs.slice->isIDRorBLA())
+#if JVET_Z0118_GDR
+  if( cs.slice->isIDRorBLA() || cs.slice->getPendingRasInit() || cs.slice->isInterGDR() )
+#else
+  if( cs.slice->isIDRorBLA() || cs.slice->getPendingRasInit() )
+#endif
   {
     g_ccSaoPrvParam[COMPONENT_Y ].clear();
     g_ccSaoPrvParam[COMPONENT_Cb].clear();
