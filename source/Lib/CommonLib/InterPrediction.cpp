@@ -16613,7 +16613,11 @@ void InterPrediction::xGetIbcFilterRefBuf(PelBuf& piPred, CodingUnit* cu, const 
   {
     int filterIdx = 1;
     Mv curMv;
+#if JVET_AF0066_ENABLE_DBV_4_SINGLE_TREE
+    curMv.set(bv.hor + (-refSizeX << (MV_FRACTIONAL_BITS_INTERNAL + shiftSampleHor)), bv.ver + ((-refSizeY) << (MV_FRACTIONAL_BITS_INTERNAL + shiftSampleVer)));
+#else
     curMv.set(bv.hor + (-refSizeX << MV_FRACTIONAL_BITS_INTERNAL), bv.ver + ((-refSizeY) << MV_FRACTIONAL_BITS_INTERNAL));
+#endif
     PelUnitBuf pcUnitBuf(cu->chromaFormat, tmpRefBuf, tmpRefBuf, tmpRefBuf);
     getPredIBCBlk(*cu->firstPU, compID, cu->slice->getPic(), curMv, pcUnitBuf, filterIdx == 1, true);
   }

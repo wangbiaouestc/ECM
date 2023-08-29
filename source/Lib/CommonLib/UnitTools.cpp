@@ -2922,7 +2922,11 @@ bool PU::hasCcInsideFilterFlag(const PredictionUnit &pu, int intraMode)
 #if JVET_AC0071_DBV
 bool PU::hasChromaBvFlag(const PredictionUnit &pu)
 {
+#if JVET_AF0066_ENABLE_DBV_4_SINGLE_TREE
+  if (pu.cu->slice->getSPS()->getUseIntraDBV())
+#else
   if (CS::isDualITree(*pu.cs) && pu.cu->slice->getSPS()->getUseIntraDBV())
+#endif
   {
     return dbvModeAvail(pu);
   }
@@ -4407,6 +4411,13 @@ uint32_t PU::getCoLocatedIntraLumaMode(const PredictionUnit &pu)
 #if JVET_AC0071_DBV
 bool PU::dbvModeAvail(const PredictionUnit &pu)
 {
+#if JVET_AF0066_ENABLE_DBV_4_SINGLE_TREE
+  if (!CS::isDualITree(*pu.cs))
+  {
+    const PredictionUnit &lumaPU = PU::getCoLocatedLumaPU(pu);
+    return lumaPU.cu->tmpFlag || CU::isIBC(*lumaPU.cu);
+  }
+#endif
   CompArea lumaArea = CompArea(COMPONENT_Y, pu.chromaFormat, pu.Cb().lumaPos(), recalcSize(pu.chromaFormat, CHANNEL_TYPE_CHROMA, CHANNEL_TYPE_LUMA, pu.Cb().size()));
   lumaArea = clipArea(lumaArea, pu.cs->picture->block(COMPONENT_Y));
   Position posList[5] = { lumaArea.center(), lumaArea.topLeft(), lumaArea.topRight(), lumaArea.bottomLeft(), lumaArea.bottomRight() };
@@ -4427,6 +4438,12 @@ bool PU::dbvModeAvail(const PredictionUnit &pu)
 
 void PU::deriveChromaBv(PredictionUnit &pu)
 {
+#if JVET_AF0066_ENABLE_DBV_4_SINGLE_TREE
+  if (!CS::isDualITree(*pu.cs))
+  {
+    return;
+  }
+#endif
   pu.bv.set(0, 0);
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   pu.mv[0].setZero();
