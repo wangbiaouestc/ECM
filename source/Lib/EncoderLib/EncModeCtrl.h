@@ -335,6 +335,9 @@ protected:
   InterSearch*          m_pcInterSearch;
 
   bool                  m_doPlt;
+#if JVET_AE0057_MTT_ET
+  double                m_noSplitIntraRdCost;   
+#endif
 
 public:
 
@@ -372,7 +375,9 @@ public:
   bool         getIsHashPerfectMatch() { return m_ComprCUCtxList.back().isHashPerfectMatch; }
   virtual void setBest              ( CodingStructure& cs );
   bool         anyMode              () const;
-
+#if JVET_AE0057_MTT_ET
+  void         setNoSplitIntraCost  (double cost) { m_noSplitIntraRdCost = cost; }
+#endif
   const ComprCUCtx& getComprCUCtx   () { CHECK( m_ComprCUCtxList.empty(), "Accessing empty list!"); return m_ComprCUCtxList.back(); }
 
 #if SHARP_LUMA_DELTA_QP

@@ -72,6 +72,7 @@ private:
   double    m_upscaledPSNR[MAX_NUM_COMPONENT];
 #if MSSIM_UNIFORM_METRICS_LOG
   double    m_msssim[MAX_NUM_COMPONENT];
+  double    m_upscaledMsssim[MAX_NUM_COMPONENT];
 #endif
 #if EXTENSION_360_VIDEO
   TExt360EncAnalyze m_ext360;
@@ -90,6 +91,8 @@ public:
 #if MSSIM_UNIFORM_METRICS_LOG
                  ,
                  const double msssim[MAX_NUM_COMPONENT]
+                 , 
+                 const double upscaledMsssim[MAX_NUM_COMPONENT]
 #endif
                  ,
                  bool isEncodeLtRef)
@@ -104,6 +107,7 @@ public:
       m_upscaledPSNR[i] += upscaledPSNR[i];
 #if MSSIM_UNIFORM_METRICS_LOG
       m_msssim[i] += msssim[i];
+      m_upscaledMsssim[i] += upscaledMsssim[i];
 #endif
     }
 
@@ -148,6 +152,7 @@ public:
       m_upscaledPSNR[i] = 0;
 #if MSSIM_UNIFORM_METRICS_LOG
       m_msssim[i] = 0;
+      m_upscaledMsssim[i] = 0;
 #endif
     }
     m_uiNumPic = 0;
@@ -367,6 +372,9 @@ public:
       addFieldD("Y-PSNR2  ", "%-8.4lf ", m_upscaledPSNR[COMPONENT_Y] / (double) getNumPic());
       addFieldD("U-PSNR2  ", "%-8.4lf ", m_upscaledPSNR[COMPONENT_Cb] / (double) getNumPic(), withchroma);
       addFieldD("V-PSNR2  ", "%-8.4lf ", m_upscaledPSNR[COMPONENT_Cr] / (double) getNumPic(), withchroma);
+      addFieldD("Y-MS-SSIM2  ", "%-11.7lf ", m_upscaledMsssim[COMPONENT_Y] / (double) getNumPic());
+      addFieldD("U-MS-SSIM2  ", "%-11.7lf ", m_upscaledMsssim[COMPONENT_Cb] / (double) getNumPic(), withchroma);
+      addFieldD("V-MS-SSIM2  ", "%-11.7lf ", m_upscaledMsssim[COMPONENT_Cr] / (double) getNumPic(), withchroma);
     }
     header  = headeross.str();
     metrics = metricoss.str();

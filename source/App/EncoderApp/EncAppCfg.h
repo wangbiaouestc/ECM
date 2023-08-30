@@ -472,6 +472,9 @@ protected:
 #if JVET_AD0082_TMRL_CONFIG
   bool      m_tmrl;
 #endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  bool      m_tmNoninterToolsEnableFlag;
+#endif
 #if JVET_AD0085_MPM_SORTING
   bool      m_mpmSorting;
 #endif
@@ -529,6 +532,9 @@ protected:
   unsigned  m_IBCFastMethod;
 #if JVET_AA0061_IBC_MBVD
   bool      m_ibcMbvd;
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  bool      m_ibcMbvdAdSearch;
+#endif
 #endif
 #if JVET_AC0112_IBC_CIIP
   bool     m_ibcCiip;
@@ -538,6 +544,15 @@ protected:
 #endif
 #if JVET_AC0112_IBC_LIC
   bool      m_ibcLic;
+#endif
+#if JVET_AE0159_FIBC
+  bool      m_ibcFilter;
+#endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  bool      m_ibcBiPred;
+#endif
+#if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
+  bool      m_ibcNonAdjCand;
 #endif
 
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
@@ -564,6 +579,12 @@ protected:
 #endif
 #if JVET_AC0071_DBV
   bool m_intraDBV; ///< Direct Block Vector
+#endif
+#if JVET_AE0059_INTER_CCCM
+  bool m_interCccm; ///< CCCM for inter prediction
+#endif
+#if JVET_AE0100_BVGCCCM
+  bool m_bvgCccm; ///< Block vector guided CCCM
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   bool      m_BIF;                                            ///< bilateral filter
@@ -598,6 +619,9 @@ protected:
   unsigned  m_uiMaxCUWidth;                                   ///< max. CU width in pixel
   unsigned  m_uiMaxCUHeight;                                  ///< max. CU height in pixel
   unsigned m_log2MinCuSize;                                   ///< min. CU size log2
+#if JVET_AE0057_MTT_ET
+  bool m_useMttSkip;
+#endif
 
   bool      m_useFastLCTU;
   bool      m_usePbIntraFast;

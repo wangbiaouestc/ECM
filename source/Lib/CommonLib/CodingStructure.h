@@ -321,6 +321,10 @@ public:
   PelBuf m_pcBufPredRefTop;
   PelBuf m_pcBufPredRefLeft;
 #endif
+#if JVET_AE0043_CCP_MERGE_TEMPORAL
+  int    *m_ccpmIdxBuf;
+  std::vector<CCPModelCandidate> m_ccpModelLUT;
+#endif
 private:
   PelStorage m_reco0; // for GDR dirty
   PelStorage m_reco1; // for GDR clean
@@ -385,6 +389,18 @@ public:
 
   MotionInfo& getMotionInfo( const Position& pos );
   const MotionInfo& getMotionInfo( const Position& pos ) const;
+
+#if JVET_AE0043_CCP_MERGE_TEMPORAL
+  CCPModelIdxBuf getCcpmIdxBuf( const     Area& bufArea);
+  CCPModelIdxBuf getCcpmIdxBuf( const UnitArea& bufArea) { return getCcpmIdxBuf( bufArea.Cb() ); }
+  CCPModelIdxBuf getCcpmIdxBuf()                         { return getCcpmIdxBuf( area.Cb() ); }
+  const CCCPModelIdxBuf getCcpmIdxBuf( const     Area& bufArea ) const;
+  const CCCPModelIdxBuf getCcpmIdxBuf( const UnitArea& bufArea ) const { return getCcpmIdxBuf( bufArea.Cb() ); }
+  const CCCPModelIdxBuf getCcpmIdxBuf()                          const { return getCcpmIdxBuf( area.Cb() ); }
+
+  int& getCcpmIdxInfo( const Position& pos );
+  const int& getCcpmIdxInfo( const Position& pos ) const;
+#endif
 
 #if JVET_W0123_TIMD_FUSION && RPR_ENABLE
   bool  picContain( const Position _pos );

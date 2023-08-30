@@ -42,6 +42,7 @@
 #error Include CommonDef.h not TypeDef.h
 #endif
 
+
 #include <vector>
 #include <utility>
 #include <sstream>
@@ -49,7 +50,6 @@
 #include <cstring>
 #include <assert.h>
 #include <cassert>
-
 
 
 
@@ -65,6 +65,8 @@
 #define ALF_SAO_TRUE_ORG                                  1 // using true original samples for SAO and ALF optimization
 #define REMOVE_PCM                                        1 // Remove PCM related code for memory reduction and speedup
 #define JVET_Y0152_TT_ENC_SPEEDUP                         1 // TT encoding speedup
+#define JVET_AE0057_MTT_ET                                1 // JVET-AE0057: MTT early termination of 64x64 luma CU based on no-split RD cost 
+
 
 // Software optimization
 #define JVET_X0144_MAX_MTT_DEPTH_TID                      1 // JVET-X0144: max MTT hierarchy depth set by temporal ID
@@ -133,6 +135,7 @@
 #define JVET_W0069_TMP_BOUNDARY                           1 // JVET-W0069: Boundary handling for TMP
 #define JVET_AB0061_ITMP_BV_FOR_IBC                       1 // JVET-AB0061: Storing IntraTMP BV for IBC BV prediction
 #define JVET_AD0086_ENHANCED_INTRA_TMP                    1 // JVET-AD0086: Enhanced intra TMP
+#define JVET_AE0077_EXT_INTRATMP                          1 // JVET-AE0077: Extended search areas for intraTMP
 #endif
 
 #define JVET_W0123_TIMD_FUSION                            1 // JVET-W0123: Template based intra mode derivation and fusion
@@ -158,8 +161,9 @@
 #if JVET_AA0057_CCCM
 #define JVET_AB0143_CCCM_TS                               1 // JVET-AB0143: CCCM template selection
 #define JVET_AC0147_CCCM_NO_SUBSAMPLING                   1 // JVET-AC0147: Subsampling is not applied to CCCM
-#define JVET_AC0054_GLCCCM                                1 // JVET_AC0054: Gradient and location based CCCM
-#define JVET_AD0202_CCCM_MDF                              1 // JVET_AD0202: CCCM with multiple downsampling filters
+#define JVET_AC0054_GLCCCM                                1 // JVET-AC0054: Gradient and location based CCCM
+#define JVET_AD0202_CCCM_MDF                              1 // JVET-AD0202: CCCM with multiple downsampling filters
+#define JVET_AE0100_BVGCCCM                               1 // JVET-AE0100: Block vector guided CCCM
 #endif
 #define JVET_AA0126_GLM                                   1 // JVET-AA0126: Gradient linear model
 #if JVET_AA0126_GLM
@@ -170,7 +174,9 @@
 #define JVET_AC0053_GAUSSIAN_SOLVER                       1 // JVET-AC0053: Filter parameters using Gaussian elimination steps
 #endif
 #define JVET_AB0155_SGPM                                  1 // JVET-AB0155: Spatial geometric partitioning mode
+#if JVET_AB0155_SGPM
 #define JVET_AC0189_SGPM_NO_BLENDING                      1 // JVET-AC0189: Allow no blending for SGPM
+#endif
 #define JVET_AB0157_TMRL                                  1 // JVET-AB0157: Template-based multiple reference line intra prediction
 #if JVET_AB0157_TMRL
 #define JVET_AD0082_TMRL_CONFIG                           1 // JVET-AD0082: a configuration option for TMRL
@@ -181,8 +187,12 @@
 #define JVET_AC0105_DIRECTIONAL_PLANAR                    1 // JVET-AC0105: Directional planar
 #define JVET_AD0184_REMOVAL_OF_DIVISION_OPERATIONS        1 // JVET-AD0184: Removal of division operations
 #define JVET_AD0085_MPM_SORTING                           1 // JVET-AD0085: Template-based intra MPM list construction
-#define JVET_AD0188_CCP_MERGE                             1 // JVET_AD0188: Non-local cross-component prediction and cross-component merge mode
-#define JVET_AD0120_LBCCP                                 1 // JVET_AD0120: Local-Boosting Cross-Component Prediction, wherein the template part is controlled by CCCM SPS
+#define JVET_AD0188_CCP_MERGE                             1 // JVET-AD0188: Non-local cross-component prediction and cross-component merge mode
+#if JVET_AD0188_CCP_MERGE
+#define JVET_AE0097_RM_OFFSET_UPDATE_IN_CCP_MERGE         1 // JVET-AE0097: Remove offset update process in CCP merge
+#endif
+#define JVET_AD0120_LBCCP                                 1 // JVET-AD0120: Local-Boosting Cross-Component Prediction, wherein the template part is controlled by CCCM SPS
+#define JVET_AE0043_CCP_MERGE_TEMPORAL                    1 // JVET-AE0043: Cross-component merge mode with temporal candidates
 
 //IBC
 #define JVET_Y0058_IBC_LIST_MODIFY                        1 // JVET-Y0058: Modifications of IBC merge/AMVP list construction, ARMC-TM-IBC part is included under JVET_W0090_ARMC_TM
@@ -197,15 +207,27 @@
 #define JVET_Z0160_IBC_ZERO_PADDING                       1 // JVET-Z0160: Replacement of zero-padding candidates
 #define JVET_AA0106_IBCBUF_CTU256                         1 // JVET-AA0106: Adjust IBC reference area to 2*128 rows above the current CTU
 #define JVET_AA0061_IBC_MBVD                              1 // JVET-AA0061: IBC merge mode with block vector differences
+#if JVET_AA0061_IBC_MBVD
+#define JVET_AE0169_IBC_MBVD_LIST_DERIVATION              1 // JVET-AE0169: IBC MBVD list derivation
+#endif
 #define JVET_AA0070_RRIBC                                 1 // JVET-AA0070: Reconstruction-Reordered IBC
 #define JVET_AC0112_IBC_CIIP                              1 // JVET-AC0112: Combined IBC and intra prediction (IBC-CIIP)
 #define JVET_AC0112_IBC_GPM                               1 // JVET-AC0112: IBC with geometry partitioning mode (IBC-GPM)
 #define JVET_AC0112_IBC_LIC                               1 // JVET-AC0112: IBC with local illumination compensation (IBC-LIC)
+#if JVET_AC0112_IBC_LIC
+#define JVET_AE0078_IBC_LIC_EXTENSION                     1 // JVET-AE0078: IBC-LIC extension
+#endif
 #define JVET_AC0104_IBC_BVD_PREDICTION                    1 // JVET-AC0104: IBC block vector difference prediction (part of JVET-AC0113 Test 3.5a) 
 #define JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV  1 // JVET-AC0060: IBC BVP candidates clustering and BVD sign derivation for BV with one zero component (part of JVET-AC0113 Test 3.5a) 
 #define JVET_AC0071_DBV                                   1 // JVET-AC0071: Direct block vector mode for chroma prediction
 #define JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS   1 // JVET-AD0208: IBC adaptation for camera-captured contents and IBC extension to fractional-pel BV
+#define JVET_AE0084_IBC_LIC_INHERITANCE                   1 // JVET-AE0084: Harmonization of IBC HMVP and IBC-LIC
+#define JVET_AE0159_FIBC                                  1 // JVET-AE0159: Filtered Intra Block Copy (FIBC)
+#define JVET_AE0169_GPM_IBC_IBC                           1 // JVET-AE0169: Bi-predictive IBC GPM
+#define JVET_AE0169_BIPREDICTIVE_IBC                      1 // JVET-AE0169: IBC BVP-merge and bi-predictive IBC merge
 
+#define JVET_AE0174_NONINTER_TM_TOOLS_CONTROL             1 // JVET-AE0174: Add non-inter TM sps flag to control whether template matching is used for non-inter (Intra and IBC) tools
+#define JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES    1 // JVET-AE0094: IBC with non-adjacent spatial candidates
 
 // Inter
 #define CIIP_PDPC                                         1 // Apply pdpc to megre prediction as a new CIIP mode (CIIP_PDPC) additional to CIIP mode
@@ -268,8 +290,14 @@
 #define JVET_AC0144_AFFINE_DMVR_REGRESSION                1 // JVET-AC0144: DMVR for affine with regression refinement
 #define JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS           1 // JVET-AD0182: Affine parameter refinement and adaptive affine DMVR mode extension
 #define JVET_AC0158_PIXEL_AFFINE_MC                       1 // JVET-AC0158: Pixel based affine motion compensation
-#define JVET_AD0195_HIGH_PRECISION_BDOF_CORE              1 // JVET_AD0195: High-Precision MV Refinement for BDOF
+#define JVET_AD0195_HIGH_PRECISION_BDOF_CORE              1 // JVET-AD0195: High-Precision MV Refinement for BDOF
+#define JVET_AE0091_ITERATIVE_BDOF                        1 // JVET-AE0091: Iterative BDOF part of JVET-AE0091
 #define JVET_AD0123_REF_PICTURE_PADDING_FOR_GDR           1 // JVET-AD0123: Reference picture padding for GDR
+#define JVET_AE0059_INTER_CCCM                            1 // JVET-AE0059: Convolutional cross-component model for inter prediction
+#define JVET_AE0046_BI_GPM                                1 // JVET-AE0046: Allow bi-MVs for inter partitions in GPM
+#if IF_12TAP && JVET_AA0042_RPR_FILTERS && JVET_Z0117_CHROMA_IF
+#define JVET_AE0150_SMALL_SCALE_RPR_FILTERS               1 // RPR filters and thresholds for scale factors 1.1x to 1.35x
+#endif
 
 // Inter template matching tools
 #define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction
@@ -298,6 +326,7 @@
 #define JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC          1 // JVET-AA0093: Diversity criterion for ARMC reordering
 #define JVET_AB0079_TM_BCW_MRG                            1 // JVET-AB0079: Template matching based BCW index derivation for merge mode with positive weights only
 #define JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION   1 // JVET-AC0185: Enhanced temporal motion information derivation
+#define JVET_AE0091_HIGH_ACCURACY_TEMPLATE_MATCHING       1 // JVET-AE0091: High-Accuracy template matching
 #endif
 
 // Transform and coefficient coding
@@ -323,7 +352,12 @@
 #define JVET_AA0133_INTER_MTS_OPT                         1 // JVET-AA0133: Inter MTS optimization
 #define JVET_AB0067_MIP_DIMD_LFNST                        1 // JVET-AB0067: Modification of LFNST for MIP coded block
 #define JVET_AC0130_NSPT                                  1 // JVET-AC0130: NSPT replacing DCT-II + LFNST for certain block shapes
+#if JVET_AC0130_NSPT
+#define JVET_AE0086_LARGE_NSPT                            1 // JVET-AE0086: Large NSPT kernels (4x32, 8x32)
+#endif
 #define JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST              1 // JVET-AC0115: Modifications of MTS/LFNST for Intra TMP coded block
+#define JVET_AE0125_SHIFT_QUANTIZATION_CENTER             1 // JVET-AE0125: Shifting quantization center
+#define JVET_AE0102_LFNST_CTX                             1 // JVET-AE0102: Context modelling for transform coefficients for LFNST/NSPT
 
 // Entropy Coding
 #define EC_HIGH_PRECISION                                 1 // CABAC high precision
@@ -349,6 +383,8 @@
 #define JVET_AD0222_ALF_LONG_FIXFILTER                    1 // JVET-AD0222: More taps for fixed filter outputs
 #define JVET_AD0222_ALF_RESI_CLASS                        1 // JVET-AD0222: Residual-based classifier
 #define JVET_AD0222_ADDITONAL_ALF_FIXFILTER               1 // JVET-AD0222: Additional ALF fixed filter
+#define JVET_AE0139_ALF_IMPROVED_FIXFILTER                1 // JVET-AE0139: Improved ALF fixed filter
+#define JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO      1 // JVET-AE0151: CCSAO with history offsets and extended edge classifiers
 
 // SIMD optimizations
 #if IF_12TAP
@@ -1244,6 +1280,15 @@ enum SAOEOClasses
 #define NUM_SAO_BO_CLASSES_LOG2  5
 #define NUM_SAO_BO_CLASSES       (1<<NUM_SAO_BO_CLASSES_LOG2)
 
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+enum CCSAOSetTypes
+{
+  CCSAO_SET_TYPE_BAND = 0,
+  CCSAO_SET_TYPE_EDGE = 1,
+  NUM_CCSAO_SET_TYPES = 2
+};
+#endif
+
 namespace Profile
 {
   enum Name
@@ -1472,19 +1517,6 @@ public:
   int allCtuOn;             // slice_bif_all_ctb_enabled_flag
   int numBlocks;
   std::vector<int> ctuOn;   // bif_ctb_flag[][]
-};
-#endif
-#if JVET_X0071_CHROMA_BILATERAL_FILTER
-class ChromaBifParams
-{
-public:
-  int frmOnCb;                // slice_bif_enabled_flag for chroma
-  int frmOnCr;                // slice_bif_enabled_flag for chroma
-  int allCtuOnCb;             // slice_bif_all_ctb_enabled_flag for chroma
-  int allCtuOnCr;             // slice_bif_all_ctb_enabled_flag for chroma
-  int numBlocks;
-  std::vector<int> ctuOnCb;   // bif_ctb_flag[][] for chroma
-  std::vector<int> ctuOnCr;   // bif_ctb_flag[][] for chroma
 };
 #endif
 
@@ -1894,7 +1926,7 @@ public:
   template<class InputIt>
   iterator        insert( const_iterator _pos, InputIt first, InputIt last )
                                                 { const difference_type numEl = last - first;
-                                                  CHECKD( _size + numEl >= N, "capacity exceeded" );
+                                                  CHECKD( _size + numEl > N, "capacity exceeded" );
                                                   for( difference_type i = _size - 1; i >= _pos - _arr; i-- ) _arr[i + numEl] = _arr[i];
                                                   iterator it = const_cast<iterator>( _pos ); _size += numEl;
                                                   while( first != last ) *it++ = *first++;
@@ -1902,7 +1934,7 @@ public:
 
   iterator        insert( const_iterator _pos, size_t numEl, const T& val )
                                                 { //const difference_type numEl = last - first;
-                                                  CHECKD( _size + numEl >= N, "capacity exceeded" );
+                                                  CHECKD( _size + numEl > N, "capacity exceeded" );
                                                   for( difference_type i = _size - 1; i >= _pos - _arr; i-- ) _arr[i + numEl] = _arr[i];
                                                   iterator it = const_cast<iterator>( _pos ); _size += numEl;
                                                   for ( int k = 0; k < numEl; k++) *it++ = val;

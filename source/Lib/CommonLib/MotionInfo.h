@@ -186,6 +186,12 @@ struct MotionInfo
 #endif
 #if JVET_AC0112_IBC_LIC
   bool     useIbcLic;
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  int      ibcLicIdx;
+#endif
+#endif
+#if JVET_AE0159_FIBC
+  bool      useIbcFilter;
 #endif
 #if JVET_AA0070_RRIBC
   int  rribcFlipType;

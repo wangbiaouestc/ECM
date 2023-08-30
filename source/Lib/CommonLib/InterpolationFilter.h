@@ -73,8 +73,14 @@ public:
   static const TFilterCoeff m_chromaFilter4[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][4]; ///< Chroma filter taps
 #endif
 #if JVET_Z0117_CHROMA_IF
+#if JVET_AE0150_SMALL_SCALE_RPR_FILTERS
+  static const TFilterCoeff m_chromaFilterRPR1[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA_RPR]; ///< Chroma filter taps 1.35x
+  static const TFilterCoeff m_chromaFilterRPR2[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA_RPR]; ///< Chroma filter taps 1.5x
+  static const TFilterCoeff m_chromaFilterRPR3[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA_RPR]; ///< Chroma filter taps 2x
+#else
   static const TFilterCoeff m_chromaFilterRPR1[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA_RPR]; ///< Chroma filter taps 1.5x
   static const TFilterCoeff m_chromaFilterRPR2[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA_RPR]; ///< Chroma filter taps 2x
+#endif
 #else
   static const TFilterCoeff m_chromaFilterRPR1[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA]; ///< Chroma filter taps 1.5x
   static const TFilterCoeff m_chromaFilterRPR2[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA]; ///< Chroma filter taps 2x
@@ -83,11 +89,23 @@ public:
   static const TFilterCoeff m_lumaFilter12[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS + 1][12];     ///< Luma filter taps //+1 added by //kolya
   static const TFilterCoeff m_lumaFilter[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][8]; ///< Luma filter taps, for affine 
 #if JVET_AA0042_RPR_FILTERS
+#if JVET_AE0150_SMALL_SCALE_RPR_FILTERS
+  static const TFilterCoeff m_lumaFilterRPR1[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS + 1][12]; ///< Luma filter taps 1.35x
+  static const TFilterCoeff m_lumaFilterRPR2[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS + 1][12]; ///< Luma filter taps 1.5x
+  static const TFilterCoeff m_lumaFilterRPR3[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS + 1][12]; ///< Luma filter taps 2x
+#else
   static const TFilterCoeff m_lumaFilterRPR1[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS + 1][12]; ///< Luma filter taps 1.5x
   static const TFilterCoeff m_lumaFilterRPR2[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS + 1][12]; ///< Luma filter taps 2x
+#endif
   static const TFilterCoeff m_affineLumaFilterUpRPR[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS + 1][12];
+#if JVET_AE0150_SMALL_SCALE_RPR_FILTERS
+  static const TFilterCoeff m_affineLumaFilterRPR1[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS + 1][12]; ///< Luma filter taps 1.35x
+  static const TFilterCoeff m_affineLumaFilterRPR2[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS + 1][12]; ///< Luma filter taps 1.5x
+  static const TFilterCoeff m_affineLumaFilterRPR3[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS + 1][12]; ///< Luma filter taps 2x
+#else
   static const TFilterCoeff m_affineLumaFilterRPR1[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS + 1][12]; ///< Luma filter taps 1.5x
   static const TFilterCoeff m_affineLumaFilterRPR2[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS + 1][12]; ///< Luma filter taps 2x
+#endif
 #else
   static const TFilterCoeff m_lumaFilterRPR1[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][8]; ///< Luma filter taps 1.5x
   static const TFilterCoeff m_lumaFilterRPR2[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][8]; ///< Luma filter taps 2x

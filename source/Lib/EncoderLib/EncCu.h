@@ -363,9 +363,18 @@ private:
   Mv                    m_mvBufEncBDOF4BM[BM_MRG_MAX_NUM_CANDS<<1][BDOF_SUBPU_MAX_NUM];
 #endif
 #endif
+#if JVET_AE0046_BI_GPM
+  Mv*                   m_mvBufBDMVR4GPM[2];
+  Mv*                   m_mvBufEncBDOF4GPM[GEO_NUM_TM_MV_CAND][MRG_MAX_NUM_CANDS];
+#if !JVET_AA0093_REFINED_MOTION_FOR_ARMC
+  Mv                    m_mvExtraBufEncBDOF4GPM[MRG_MAX_NUM_CANDS][BDOF_SUBPU_MAX_NUM];
+#endif
+#endif
+#endif
+#if JVET_X0083_BM_AMVP_MERGE_MODE || JVET_AE0046_BI_GPM
+  Mv                    m_mvBufEncAmBDMVR[2][MAX_NUM_SUBCU_DMVR];
 #endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
-  Mv                    m_mvBufEncAmBDMVR[2][MAX_NUM_SUBCU_DMVR];
   MvField               m_mvFieldAmListEnc[MAX_NUM_AMVP_CANDS_MAX_REF << 1];
 #if JVET_AD0213_LIC_IMP
   bool                  m_licAmListEnc[MAX_NUM_AMVP_CANDS_MAX_REF << 1];
@@ -394,6 +403,9 @@ private:
 #if JVET_W0097_GPM_MMVD_TM
   MergeCtx              m_mergeCand;
   bool                  m_mergeCandAvail;
+#endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  bool                  m_skipIbcMerge;
 #endif
 public:
   /// copy parameters from encoder class

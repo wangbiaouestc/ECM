@@ -533,6 +533,79 @@ void licRemoveWeightHighFreq_SSE(Pel* src0, Pel* src1, Pel* dst, int length, int
 }
 #endif
 
+#if JVET_AE0169_BIPREDICTIVE_IBC
+template< X86_VEXT vext >
+void avg_SSE( const int16_t* src1, int src1Stride, const int16_t* src2, int src2Stride, int16_t *dst, int dstStride, int width, int height)
+{
+#ifdef USE_AVX2
+  if( !( width & 15 ) )
+  {
+    for( int y = 0; y < height; y++ )
+    {
+      for( int x = 0; x < width; x += 16 )
+      {
+        __m256i mmSrc1 = _mm256_loadu_si256( ( const __m256i* )( src1 + x ) );
+        __m256i mmSrc2 = _mm256_loadu_si256( ( const __m256i* )( src2 + x ) );
+        __m256i mmDst = _mm256_avg_epu16( mmSrc1, mmSrc2 );
+        _mm256_storeu_si256( ( __m256i * ) ( dst + x ), mmDst );
+      }
+      src1 += src1Stride;
+      src2 += src2Stride;
+      dst += dstStride;
+    }
+  }
+  else
+#endif
+  {
+    if( !( width & 7 ) )
+    {
+      for( int y = 0; y < height; y++ )
+      {
+        for( int x = 0; x < width; x += 8 )
+        {
+          __m128i mmSrc1 = _mm_loadu_si128( ( const __m128i* )( src1 + x ) );
+          __m128i mmSrc2 = _mm_loadu_si128( ( const __m128i* )( src2 + x ) );
+          __m128i mmDst = _mm_avg_epu16( mmSrc1, mmSrc2 );
+          _mm_storeu_si128( ( __m128i * )( dst + x ), mmDst );
+        }
+        src1 += src1Stride;
+        src2 += src2Stride;
+        dst += dstStride;
+      }
+    }
+    else if( !( width & 3 ) )
+    {
+      for( int y = 0; y < height; y++ )
+      {
+        for( int x = 0; x < width; x += 4 )
+        {
+          __m128i mmSrc1 = _mm_loadl_epi64( ( const __m128i* )( src1 + x ) );
+          __m128i mmSrc2 = _mm_loadl_epi64( ( const __m128i* )( src2 + x ) );
+          __m128i mmDst = _mm_avg_epu16( mmSrc1, mmSrc2 );
+          _mm_storel_epi64( ( __m128i * )( dst + x ), mmDst );
+        }
+        src1 += src1Stride;
+        src2 += src2Stride;
+        dst += dstStride;
+      }
+    }
+    else
+    {
+      for( int y = 0; y < height; y++ )
+      {
+        for( int x = 0; x < width; x++ )
+        {
+          dst[x] = ( src1[x] + src2[x] + 1 ) >> 1;
+        }
+        src1 += src1Stride;
+        src2 += src2Stride;
+        dst += dstStride;
+      }
+    }
+  }
+}
+#endif
+
 template<X86_VEXT vext>
 void copyBufferSimd(Pel *src, int srcStride, Pel *dst, int dstStride, int width, int height)
 {
@@ -555,8 +628,11 @@ void copyBufferSimd(Pel *src, int srcStride, Pel *dst, int dstStride, int width,
   {
     for (size_t x = 0; x < width; x += 8)
     {
-      if (x > width - 8)
+      if( x > width - 8 )
+      {
         x = width - 8;
+      }
+
       for (size_t y = 0; y < height; y++)
       {
         __m128i val = _mm_loadu_si128((const __m128i *) (src + y * srcStride + x));
@@ -966,6 +1042,9 @@ void calcBIOParamSum5_SSE(Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signG
       c1 = _mm_add_epi32(c1, _mm_unpackhi_epi64(a12, b12));
       c1 = _mm_add_epi32(c1, _mm_unpacklo_epi64(a3, b3));
       
+#if JVET_AE0091_ITERATIVE_BDOF
+      int regVxVy = (1 << 8);
+#endif
       *(sumAbsGX+0) = _mm_cvtsi128_si32(c1);
       *(sumAbsGY+0) = _mm_cvtsi128_si32(_mm_shuffle_epi32(c1, 0x55));
       *(sumDIX+0)   = _mm_cvtsi128_si32(_mm_shuffle_epi32(c1, 0xaa));
@@ -1041,6 +1120,16 @@ void calcBIOParamSum5_SSE(Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signG
       *(sumAbsGY+3) = _mm_cvtsi128_si32(_mm_shuffle_epi32(c1, 0x55));
       *(sumDIX+3)   = _mm_cvtsi128_si32(_mm_shuffle_epi32(c1, 0xaa));
       *(sumDIY+3)   = _mm_cvtsi128_si32(_mm_shuffle_epi32(c1, 0xff));
+#if JVET_AE0091_ITERATIVE_BDOF 
+      *(sumAbsGX+0) += regVxVy;
+      *(sumAbsGY+0) += regVxVy;
+      *(sumAbsGX+1) += regVxVy;
+      *(sumAbsGY+1) += regVxVy;
+      *(sumAbsGX+2) += regVxVy;
+      *(sumAbsGY+2) += regVxVy;
+      *(sumAbsGX+3) += regVxVy;
+      *(sumAbsGY+3) += regVxVy;
+#endif
       
       sumSignGyGxTmp32 = _mm_madd_epi16(sumSignGyGxTmp16, vmask[3]);
       sumSignGyGxTmp32 = _mm_add_epi32(sumSignGyGxTmp32, _mm_shuffle_epi32(sumSignGyGxTmp32, 0x4e));   // 01001110
@@ -2676,12 +2765,71 @@ int64_t getSumOfDifference_SSE(const Pel* src0, int src0Stride, const Pel* src1,
 
   // internal bit-depth must be 12-bit or lower
 
-  if (width & 7) // multiple of 4
+#ifdef USE_AVX2
+  if( vext >= AVX2 && !( width & 15 ) ) // multiple of 16
+  {
+    __m256i vzero = _mm256_setzero_si256();
+    __m256i vsum32 = vzero;
+
+    for( int m = 0; m < height; m += subStep )
+    {
+      __m256i vsum16 = vzero;
+
+      for( int n = 0; n < width; n += 16 )
+      {
+        __m256i org = _mm256_lddqu_si256( ( __m256i* )( pOrg + n ) );
+        __m256i cur = _mm256_lddqu_si256( ( __m256i* )( pCur + n ) );
+        vsum16 = _mm256_adds_epi16( vsum16, _mm256_sub_epi16( org, cur ) );
+      }
+
+      __m256i vsign = _mm256_cmpgt_epi16( vzero, vsum16 );
+      __m256i vsumtemp = _mm256_add_epi32( _mm256_unpacklo_epi16( vsum16, vsign ), _mm256_unpackhi_epi16( vsum16, vsign ) );
+      vsum32 = _mm256_add_epi32( vsum32, vsumtemp );
+
+      pOrg += strideOrg;
+      pCur += strideCur;
+    }
+
+    vsum32 = _mm256_hadd_epi32( vsum32, vzero );
+    vsum32 = _mm256_hadd_epi32( vsum32, vzero );
+    deltaAvg = _mm_cvtsi128_si32( _mm256_castsi256_si128( vsum32 ) ) + _mm_cvtsi128_si32( _mm256_castsi256_si128( _mm256_permute2x128_si256( vsum32, vsum32, 0x11 ) ) );
+  }
+  else
+#endif
+  if( !( width & 7 ) )// multiple of 8
   {
     __m128i vzero = _mm_setzero_si128();
     __m128i vsum32 = vzero;
 
-    for (; height != 0; height -= subStep)
+    for( int m = 0; m < height; m += subStep )
+    {
+      __m128i vsum16 = vzero;
+
+      for( int n = 0; n < width; n += 8 )
+      {
+        __m128i org = _mm_lddqu_si128( ( __m128i* )( pOrg + n ) );
+        __m128i cur = _mm_lddqu_si128( ( __m128i* )( pCur + n ) );
+        vsum16 = _mm_adds_epi16( vsum16, _mm_sub_epi16( org, cur ) );
+      }
+
+      __m128i vsign = _mm_cmpgt_epi16( vzero, vsum16 );
+      __m128i vsumtemp = _mm_add_epi32( _mm_unpacklo_epi16( vsum16, vsign ), _mm_unpackhi_epi16( vsum16, vsign ) );
+      vsum32 = _mm_add_epi32( vsum32, vsumtemp );
+
+      pOrg += strideOrg;
+      pCur += strideCur;
+    }
+
+    vsum32 = _mm_add_epi32( vsum32, _mm_shuffle_epi32( vsum32, 0x4e ) );   // 01001110
+    vsum32 = _mm_add_epi32( vsum32, _mm_shuffle_epi32( vsum32, 0xb1 ) );   // 10110001
+    deltaAvg = _mm_cvtsi128_si32( vsum32 );
+  }
+  else if( !( width & 3 ) ) // multiple of 4
+  {
+    __m128i vzero = _mm_setzero_si128();
+    __m128i vsum32 = vzero;
+
+    for( int m = 0; m < height; m += subStep )
     {
       __m128i vsum16 = vzero;
 
@@ -2703,63 +2851,9 @@ int64_t getSumOfDifference_SSE(const Pel* src0, int src0Stride, const Pel* src1,
     vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
     deltaAvg = _mm_cvtsi128_si32(vsum32);
   }
-#ifdef USE_AVX2
-  else if (vext >= AVX2 && width >= 16) // multiple of 16
+  else
   {
-    __m256i vzero = _mm256_setzero_si256();
-    __m256i vsum32 = vzero;
-
-    for (; height != 0; height -= subStep)
-    {
-      __m256i vsum16 = vzero;
-
-      for (int n = 0; n < width; n += 16)
-      {
-        __m256i org = _mm256_lddqu_si256((__m256i*)(pOrg + n));
-        __m256i cur = _mm256_lddqu_si256((__m256i*)(pCur + n));
-        vsum16 = _mm256_adds_epi16(vsum16, _mm256_sub_epi16(org, cur));
-      }
-
-      __m256i vsign = _mm256_cmpgt_epi16(vzero, vsum16);
-      __m256i vsumtemp = _mm256_add_epi32(_mm256_unpacklo_epi16(vsum16, vsign), _mm256_unpackhi_epi16(vsum16, vsign));
-      vsum32 = _mm256_add_epi32(vsum32, vsumtemp);
-
-      pOrg += strideOrg;
-      pCur += strideCur;
-    }
-
-    vsum32 = _mm256_hadd_epi32(vsum32, vzero);
-    vsum32 = _mm256_hadd_epi32(vsum32, vzero);
-    deltaAvg = _mm_cvtsi128_si32(_mm256_castsi256_si128(vsum32)) + _mm_cvtsi128_si32(_mm256_castsi256_si128(_mm256_permute2x128_si256(vsum32, vsum32, 0x11)));
-  }
-#endif
-  else // multiple of 8
-  {
-    __m128i vzero = _mm_setzero_si128();
-    __m128i vsum32 = vzero;
-
-    for (; height != 0; height -= subStep)
-    {
-      __m128i vsum16 = vzero;
-
-      for (int n = 0; n < width; n += 8)
-      {
-        __m128i org = _mm_lddqu_si128((__m128i*)(pOrg + n));
-        __m128i cur = _mm_lddqu_si128((__m128i*)(pCur + n));
-        vsum16 = _mm_adds_epi16(vsum16, _mm_sub_epi16(org, cur));
-      }
-
-      __m128i vsign = _mm_cmpgt_epi16(vzero, vsum16);
-      __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vsign), _mm_unpackhi_epi16(vsum16, vsign));
-      vsum32 = _mm_add_epi32(vsum32, vsumtemp);
-
-      pOrg += strideOrg;
-      pCur += strideCur;
-    }
-
-    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
-    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
-    deltaAvg = _mm_cvtsi128_si32(vsum32);
+    return getSumOfDifferenceCore( src0, src0Stride, src1, src1Stride, width, height, rowSubShift, bitDepth );
   }
 
   deltaAvg <<= subShift;
@@ -3808,6 +3902,9 @@ void PelBufferOps::_initPelBufOpsX86()
 #endif
   addAvg8 = addAvg_SSE<vext, 8>;
   addAvg4 = addAvg_SSE<vext, 4>;
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  avg = avg_SSE<vext>;
+#endif
 #if JVET_AD0213_LIC_IMP
   toLast4 = toLast_SSE<vext, 4>;
   toLast2 = toLast_SSE<vext, 2>;

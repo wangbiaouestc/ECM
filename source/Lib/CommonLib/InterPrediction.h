@@ -257,6 +257,9 @@ protected:
   bool                 m_skipPROF;
   bool                 m_encOnly;
   bool                 m_isBi;
+#if JVET_AE0046_BI_GPM
+  bool                 m_lumaBdofReady;
+#endif
 
   Pel*                 m_gradX0;
   Pel*                 m_gradY0;
@@ -278,6 +281,9 @@ protected:
   int*                 m_sumSignGyGxSample32bit;
   bool                 m_bdofMvRefined;
   Mv                   m_bdofSubPuMvOffset[BDOF_SUBPU_MAX_NUM];
+#if JVET_AE0091_ITERATIVE_BDOF
+  Mv                   m_bdofSubPuMvOffse2[BDOF_SUBPU_MAX_NUM];
+#endif
 #endif
 #if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
   int32_t*             m_piDotProduct1;
@@ -307,6 +313,11 @@ protected:
   Pel m_acYuvRefAMLBiPredTemplateIdMotionCache[MAX_NUM_REFIDX][NUM_REF_PIC_LIST_01][MAX_NUM_CANDS][2][MAX_CU_SIZE];
 #endif
 
+#if JVET_AE0159_FIBC || JVET_AE0078_IBC_LIC_EXTENSION || JVET_AE0059_INTER_CCCM
+  IntraPrediction*  m_pcIntraPred;
+  Area m_ibcRefArea;
+#endif
+
   void xIntraBlockCopy          (PredictionUnit &pu, PelUnitBuf &predBuf, const ComponentID compID);
   int             rightShiftMSB(int numer, int    denom);
 #if MULTI_PASS_DMVR
@@ -320,6 +331,9 @@ protected:
                                             PelUnitBuf &yuvDst, const BitDepths &clipBitDepths, bool *mcMask[2] = NULL, bool *mcMaskChroma[2] = NULL, bool *isOOB = NULL
 #if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
                                             , int ww = 4, int hh = 4
+#endif
+#if JVET_AE0091_ITERATIVE_BDOF
+                                            ,int iter = 0
 #endif
   );
 #else
@@ -357,6 +371,9 @@ protected:
 #if MULTI_PASS_DMVR
   void xPredInterBiBDMVR        ( PredictionUnit &pu, PelUnitBuf &pcYuvPred, const bool luma, const bool chroma, PelUnitBuf *yuvPredTmp = NULL );
 #endif
+#if JVET_AE0091_ITERATIVE_BDOF
+  void xPredInterBiBDMVR2       ( PredictionUnit &pu, PelUnitBuf &pcYuvPred, const bool luma, const bool chroma, PelUnitBuf *yuvPredTmp = NULL, int iter = 1 );
+#endif
   void xPredInterBi             ( PredictionUnit& pu, PelUnitBuf &pcYuvPred, const bool luma = true, const bool chroma = true, PelUnitBuf* yuvPredTmp = NULL );
   void xPredInterBlk            ( const ComponentID& compID, const PredictionUnit& pu, const Picture* refPic, const Mv& _mv, PelUnitBuf& dstPic, const bool& bi, const ClpRng& clpRng
                                  , const bool& bioApplied
@@ -393,6 +410,9 @@ protected:
   void xWeightedAverage         ( const bool isBdofMvRefine, const int bdofBlockOffset, const PredictionUnit& pu, const CPelUnitBuf& pcYuvSrc0, const CPelUnitBuf& pcYuvSrc1, PelUnitBuf& pcYuvDst, const BitDepths& clipBitDepths, const ClpRngs& clpRngs, const bool& bioApplied, const bool lumaOnly = false, const bool chromaOnly = false, PelUnitBuf* yuvDstTmp = NULL, bool *mcMask[2] = NULL, int mcStride = -1, bool *mcMaskChroma[2] = NULL, int mcCStride = -1, bool *isOOB = NULL
 #if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
                                  , int ww = 4, int  hh = 4
+#endif
+#if JVET_AE0091_ITERATIVE_BDOF
+                                 ,int iter = 0
 #endif
   );
 #else
@@ -483,6 +503,11 @@ protected:
   Pel    (*m_tplColWeightTbl)[GEO_MAX_CU_SIZE * GEO_MODE_SEL_TM_SIZE];
 #endif
 
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  Distortion*   m_mbvdCandCostList;
+  int*          m_mbvdSearchCandsList;
+  bool*         m_mbvdTestedCandsList;
+#endif
 #if JVET_J0090_MEMORY_BANDWITH_MEASURE
   CacheModel      *m_cacheModel;
 #endif
@@ -549,6 +574,10 @@ public:
 #endif
 
   // inter
+#if JVET_AE0046_BI_GPM
+  void    setLumaBdofReady(bool isReady) { m_lumaBdofReady = isReady; }
+  void    convert2HighPrec(PredictionUnit& pu, PelUnitBuf& predBuf, bool lumaOnly, bool chromaOnly, PelUnitBuf* yuvPredTmp = nullptr);
+#endif
   void    motionCompensation  (PredictionUnit &pu, PelUnitBuf& predBuf, const RefPicList &eRefPicList = REF_PIC_LIST_X
     , const bool luma = true, const bool chroma = true
     , PelUnitBuf* predBufWOBIO = NULL
@@ -635,10 +664,15 @@ public:
 #endif
   );
 #endif
+
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   void    motionCompensationGeo(CodingUnit &cu, MergeCtx &geoMrgCtx
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG
                               , MergeCtx (&geoTmMrgCtx)[GEO_NUM_TM_MV_CAND]
+#endif
+#if JVET_AE0046_BI_GPM
+                              , Mv(&subMvBuf)[MRG_MAX_NUM_CANDS << 1][MAX_NUM_SUBCU_DMVR]
+                              , Mv(&subBdofBuf)[MRG_MAX_NUM_CANDS][BDOF_SUBPU_MAX_NUM]
 #endif
 #if JVET_Y0065_GPM_INTRA
                               , IntraPrediction* pcIntraPred, std::vector<Pel>* reshapeLUT
@@ -653,7 +687,14 @@ public:
 #endif
 #else
 #if JVET_Y0065_GPM_INTRA
+#if JVET_AE0046_BI_GPM
+  void    motionCompensationGeo(CodingUnit& cu, MergeCtx& geoMrgCtx
+                               ,Mv(&subMvBuf)[MRG_MAX_NUM_CANDS << 1][MAX_NUM_SUBCU_DMVR]
+                               ,Mv(&subBdofBuf)[MRG_MAX_NUM_CANDS][BDOF_SUBPU_MAX_NUM]
+                               ,IntraPrediction* pcIntraPred, std::vector<Pel>* reshapeLUT);
+#else
   void    motionCompensationGeo( CodingUnit &cu, MergeCtx &geoMrgCtx, IntraPrediction* pcIntraPred, std::vector<Pel>* reshapeLUT );
+#endif
 #else
   void    motionCompensationGeo(CodingUnit &cu, MergeCtx &GeoMrgCtx);
 #endif
@@ -694,11 +735,18 @@ public:
   void xProcessDMVR(PredictionUnit& pu, PelUnitBuf &pcYuvDst, const ClpRngs &clpRngs, const bool bioApplied );
 #if JVET_AA0061_IBC_MBVD
   void sortIbcMergeMbvdCandidates(PredictionUnit &pu, MergeCtx& mrgCtx, uint32_t * ibcMbvdLUT, uint32_t * ibcMbvdValidNum, int ibcMbvdIdx= -1);
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  void sortIbcAdaptiveMergeMbvdCandidates(PredictionUnit &pu, MergeCtx& mrgCtx, uint32_t * ibcMbvdLUT, uint32_t * ibcMbvdValidNum, int ibcMbvdIdx= -1);
+#endif
 #endif
 #if JVET_AA0061_IBC_MBVD || (JVET_W0090_ARMC_TM && JVET_Y0058_IBC_LIST_MODIFY)
   bool xAMLIBCGetCurBlkTemplate(PredictionUnit& pu, int nCurBlkWidth, int nCurBlkHeight);
 #if JVET_AC0112_IBC_LIC
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  void getIBCAMLRefTemplate(PredictionUnit &pu, int nCurBlkWidth, int nCurBlkHeight, bool doIbcLic = false, bool checkTmlBvValidaion = true);
+#else
   void getIBCAMLRefTemplate(PredictionUnit &pu, int nCurBlkWidth, int nCurBlkHeight, bool doIbcLic = false);
+#endif
 #else
   void getIBCAMLRefTemplate(PredictionUnit &pu, int nCurBlkWidth, int nCurBlkHeight);
 #endif
@@ -1005,7 +1053,19 @@ public:
   }
 #endif
 #if INTER_LIC || JVET_AC0112_IBC_LIC
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  void xGetLICParamGeneral (const CodingUnit& cu, const ComponentID compID, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate, int& shift, int& scale, int& offset, int* shift2 = nullptr, int* scale2 = nullptr, int* offset2 = nullptr, int* mean = nullptr);
+#else
   void xGetLICParamGeneral (const CodingUnit& cu, const ComponentID compID, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate, int& shift, int& scale, int& offset);
+#endif
+#endif
+#if JVET_AE0159_FIBC
+  void xGetIbcFilterRefBuf(PelBuf& piPred, CodingUnit* pcCU, const ComponentID compID, const Mv& mv, unsigned int uiBlkWidth, unsigned int uiBlkHeight );
+  void xCalIbcFilterParam(PelBuf& piPred, CodingUnit* pcCU, const ComponentID compID, const Mv& mv, unsigned int uiBlkWidth, unsigned int uiBlkHeight ); 
+  void xGenerateIbcFilterPred(PelBuf& piPred, unsigned int uiBlkWidth, unsigned int uiBlkHeight, const ComponentID compID, CodingUnit* pcCU);
+#endif
+#if JVET_AE0159_FIBC || JVET_AE0059_INTER_CCCM || JVET_AE0078_IBC_LIC_EXTENSION
+  void setIntraPrediction( IntraPrediction* intra );
 #endif
 #if INTER_LIC
 #if JVET_AA0146_WRAP_AROUND_FIX
@@ -1218,6 +1278,13 @@ public:
   void mcFramePadRepExt(Picture *pcCurPic, Slice &slice);
 #endif
 #endif
+
+#if JVET_AE0059_INTER_CCCM
+  inline void getNonDownSampledLumaValsOffset( const PredictionUnit* pu, const PelBuf& luma, const int x, const int y, Pel* s, const int offset, const int flipType = 0 );
+  inline void getNonDownSampledLumaVals( const PredictionUnit* pu, const PelBuf& luma, const int x, const int y, Pel* s, const int flipType = 0 );
+  inline int computeOffset( const PelBuf& buf );
+  bool deriveInterCccmPrediction( const TransformUnit* tu, const PelBuf& lumaPrediction, const PelBuf& lumaReconstruction, const PelBuf& inBufCb, const PelBuf& inBufCr, PelBuf& outBufCb, PelBuf& outBufCr );
+#endif
 };
 
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
@@ -1279,6 +1346,9 @@ public:
 #if MULTI_PASS_DMVR
   Distortion m_tmCostArrayDiamond[9];
   Distortion m_tmCostArrayCross[5];
+#if JVET_AE0091_HIGH_ACCURACY_TEMPLATE_MATCHING
+  Distortion m_tmCostArrayDiamond16[17];
+#endif
 #endif
 
 #if JVET_AC0104_IBC_BVD_PREDICTION
@@ -1356,7 +1426,6 @@ public:
 #endif
 };
 #endif // TM_AMVP || TM_MRG
-
 //! \}
 
 #endif // __INTERPREDICTION__

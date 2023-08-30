@@ -300,6 +300,21 @@ static const int MAX_CCSAO_FILTER_LENGTH     =                      3;
 #endif
 
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+static const int MAX_CCSAO_EDGE_CMP_BITS     =                      2;
+static const int MAX_CCSAO_EDGE_IDC          =                      2;
+static const int MAX_CCSAO_EDGE_IDC_BITS     =                      1;
+static const int MAX_CCSAO_EDGE_DIR          =                      4;
+static const int MAX_CCSAO_EDGE_DIR_BITS     =                      2;
+static const int MAX_CCSAO_EDGE_THR          =                     16;
+static const int MAX_CCSAO_EDGE_THR_BITS     =                      4;
+static const int MAX_CCSAO_EDGE_NUM          =                     16;
+static const int MAX_CCSAO_EDGE_NUM_BITS     =                      4;
+static const int MAX_CCSAO_BAND_IDC          =                     16;
+static const int MAX_CCSAO_BAND_IDC_BITS     =                      4;
+static const int MAX_CCSAO_PRV_NUM           =                     16;
+static const int MAX_CCSAO_PRV_NUM_BITS      =                      4;
+#else
 static const int N_C                            = 3; /* Num components*/
 static const int Y_C                            = 0; /* Y luma */
 static const int U_C                            = 1; /* Cb Chroma */
@@ -311,6 +326,7 @@ static const int CCSAO_QUAN_NUM                 = 16;
 static const int CCSAO_EDGE_BAND_NUM_Y          = 4;
 static const int CCSAO_EDGE_BAND_NUM_C          = 4;
 static const int MAX_CCSAO_BAND_NUM_U_BAND_BITS = 4;
+#endif
 #endif
 
 static const int MAX_NUM_ALF_ALTERNATIVES_CHROMA =                  8;
@@ -811,7 +827,12 @@ static const int MAX_TU_LEVEL_CTX_CODED_BIN_CONSTRAINT_CHROMA =    28;
 #if MULTI_PASS_DMVR || SAMPLE_BASED_BDOF
 #if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
 static const int BDOF_SUBPU_DIM_LOG2          =                     2;
+#if JVET_AE0091_ITERATIVE_BDOF
+static const int BDOF_SUBPU_AREA_THRESHOLD0   =                     0;
+static const int BDOF_SUBPU_AREA_THRESHOLD1   =                  1024;
+#else
 static const int BDOF_SUBPU_AREA_THRESHOLD    =                   256;
+#endif
 #else
 static const int BDOF_SUBPU_DIM_LOG2          =                     3;
 #endif
@@ -825,6 +846,9 @@ static const int BIO_EXTEND_SIZE              =                     1;
 #endif
 static const int BIO_TEMP_BUFFER_SIZE         =                     (MAX_CU_SIZE + 2 * BIO_EXTEND_SIZE) * (MAX_CU_SIZE + 2 * BIO_EXTEND_SIZE);
 
+#if JVET_AE0091_ITERATIVE_BDOF
+static const int BDOF_DMVR_MAX_ITER           =                     2;
+#endif
 static const int PROF_BORDER_EXT_W            =                     1;
 static const int PROF_BORDER_EXT_H            =                     1;
 static const int BCW_NUM =                                          5; ///< the number of weight options
@@ -1054,7 +1078,11 @@ static const int CCCM_NUM_PARAMS          = 7;
 static const int CCCM_MIN_PU_SIZE         = 0; // Set to 0 for no size restriction
 static const int CCCM_REF_LINES_ABOVE_CTU = 0; // Number of chroma lines allowed to be included in the reference area above the CTU (0: no restrictions)
 static const int CCCM_FILTER_PADDING      = 1; // E.g. 3x3 filter needs one padded sample
+#if JVET_AE0100_BVGCCCM
+static const int CCCM_MAX_REF_SAMPLES     = 4 * ( 2 * CCCM_WINDOW_SIZE * ( 2 * MAX_CU_SIZE + CCCM_WINDOW_SIZE ) );
+#else
 static const int CCCM_MAX_REF_SAMPLES     = ( 2 * CCCM_WINDOW_SIZE * ( 2 * MAX_CU_SIZE + CCCM_WINDOW_SIZE ) );
+#endif
 #if JVET_AB0174_CCCM_DIV_FREE
 static const int CCCM_MATRIX_BITS         = 22;
 static const int CCCM_DECIM_BITS          = 16;
@@ -1096,6 +1124,11 @@ static const int CCCM_MULTI_PRED_FILTER_NUM_PARAMS2 = 11;
 #if JVET_AD0120_LBCCP
 static const int LBCCP_FILTER_MMLMNUM = 4 + 3;// multi-model TL mode of CCLM, CCCM w/ subsample, CCCM w/o subsample if applicable, GL-CCCM, and three more from CCCM_MDF
 #endif
+#if JVET_AE0100_BVGCCCM
+static const int NUM_BVG_CCCM_CANDS       = 5;
+static const int BVG_CCCM_POS_OFFSET      = 4;
+static const int BVG_CCCM_NUM_PARAMS      = 11;
+#endif
 #endif
 
 #if JVET_AA0126_GLM
@@ -1129,11 +1162,19 @@ static const int NUM_GLM_IDC =                                     33;
 static const int CFLM_NUM_PARAMS = 3;
 static const int CFLM_MAX_REF_SAMPLES = CCCM_MAX_REF_SAMPLES;
 #endif
+#if JVET_AE0059_INTER_CCCM
+static const int INTER_CCCM_NUM_PARAMS = 8;
+static const int INTER_CCCM_MAX_REF_SAMPLES = 256;
+#endif
 #if JVET_AC0071_DBV
 static const int NUM_DBV_POSITION = 5;
 static const int DBV_TEMPLATE_SIZE = 1;
 #endif
-
+#if JVET_AE0159_FIBC
+static const int FIBC_TEMPLATE_SIZE = 4; 
+static const int FIBC_PADDING       = 1;
+static const int FIBC_PARAMS        = 7;
+#endif
 #if JVET_Y0152_TT_ENC_SPEEDUP
 static constexpr int FAST_METHOD_TT_ENC_SPEEDUP =              0x0001;  ///< Embedding flag, which, if false, de-activates all the following ABT_ENC_SPEEDUP_* modes
 static constexpr int FAST_METHOD_HOR_XOR_VER =                 0x0002;
@@ -1298,7 +1339,19 @@ static const int IBC_MBVD_OFFSET_DIR =                               4; // (+, 0
 static const int IBC_MBVD_MAX_REFINE_NUM = IBC_MBVD_STEP_NUM * IBC_MBVD_OFFSET_DIR; ///< max number of candidate from a base candidate
 static const int IBC_MBVD_NUM = IBC_MBVD_BASE_NUM * IBC_MBVD_MAX_REFINE_NUM;        ///< total number of IBC mmvd candidate
 static const int IBC_MBVD_SIZE_ENC =                                 8;
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+static const int IBC_MBVD_AD_STEP_NUM =                            256; ///< number of distance offsets in an adaptive algorithm
+static const int IBC_MBVD_AD_MAX_REFINE_NUM = IBC_MBVD_AD_STEP_NUM * IBC_MBVD_OFFSET_DIR;  ///< max number of candidate from a base candidate
+static const int IBC_MBVD_AD_NUM = IBC_MBVD_BASE_NUM * IBC_MBVD_AD_MAX_REFINE_NUM;            ///< total number of IBC mmvd candidate
+static const int IBC_MBVD_ENC_NUM = IBC_MBVD_BASE_NUM * IBC_MBVD_SIZE_ENC;                    ///< total number of IBC mmvd candidate for encoder
+static const int IBC_MBVD_BASE_DIFF_TH = 32 << MV_FRACTIONAL_BITS_INTERNAL;                   ///< linear distance threshold for bases in MBVD
+static const int IBC_MBVD_LOG2_START_STEP =                          2; ///< search step at the first step in pels = 1 << N
+static const int IBC_MBVD_NEI_NUM =    (1<<IBC_MBVD_LOG2_START_STEP)-1; ///< number of neighbors for the second step
+#endif
 static const int ADAPTIVE_SUB_GROUP_SIZE_IBC_MBVD = IBC_MBVD_MAX_REFINE_NUM;
+#if JVET_AE0169_BIPREDICTIVE_IBC
+static const int IBC_MBVD_NUM_BI_CANDIDATES =                       10;
+#endif
 #endif
 #if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_GPM
 static const int IBC_GPM_MAX_NUM_UNI_CANDS =                        15;
@@ -1312,7 +1365,17 @@ static const int IBC_GPM_MAX_TRY_WEIGHTED_SAD =                     36;
 static const int IBC_GPM_MAX_TRY_WEIGHTED_SATD =                    20;
 static const int IBC_GPM_MAX_SPLIT_DIR_FIRST_SET_NUM =               8;
 static const int IBC_GPM_MAX_SPLIT_DIR_SECOND_SET_NUM =             40;
+#if JVET_AE0169_GPM_IBC_IBC
+static const int IBC_GPM_NUM_BLENDING =                              5;   // 1 or 5
+#else
 static const int IBC_GPM_NUM_BLENDING =                              1; // 1 or 5
+#endif
+#endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+static const int IBC_LIC_IDX =                                       0;
+static const int IBC_LIC_IDX_T =                                     1;
+static const int IBC_LIC_IDX_L =                                     2;
+static const int IBC_LIC_IDX_M =                                     3;
 #endif
 static constexpr int MV_EXPONENT_BITCOUNT    = 4;
 static constexpr int MV_MANTISSA_BITCOUNT    = 6;
@@ -1433,6 +1496,11 @@ static const int MVD_PREDICTION_SIGN_SUFFIX_BIN_THR =            2;
 static const int MVD_PREDICTION_EGC_OFFSET =                     1;
 static const int MAX_NUM_REFIDX =                                5;
 static const int MAX_NUM_CANDS =                                64;
+#endif
+#if JVET_AA0057_CCCM
+// max number of parameters used in CCCM related methods
+static const int CCCM_NUM_PARAMS_MAX =      CCCM_NO_SUB_NUM_PARAMS;
+static const int CCCM_REF_SAMPLES_MAX =       CCCM_MAX_REF_SAMPLES;
 #endif
 
 // ====================================================================================================================
@@ -1784,9 +1852,21 @@ static const int NUM_CLASSIFIER          = 2;
 static const int NUM_SETS_FIXED_FILTERS  = 8;
 static const int NUM_DIR_FIX             = 7;
 static const int NUM_ACT_FIX             = 16;
+#if JVET_AE0139_ALF_IMPROVED_FIXFILTER
+static const int DIST_CLASS              = 4;
+static const int NUM_DIST_FIX            = 8;
+static const int NUM_CLASSES_FIX         = ((NUM_DIR_FIX*(NUM_DIR_FIX + 1))*NUM_ACT_FIX * NUM_DIST_FIX);
+#else
 static const int NUM_CLASSES_FIX         = ((NUM_DIR_FIX*(NUM_DIR_FIX + 1))*NUM_ACT_FIX);
+#endif
 static const int MAX_FILTER_LENGTH_FIXED = 13;
+#if JVET_AE0139_ALF_IMPROVED_FIXFILTER
+static const int FIX_FILTER_NUM_COEFF_9_DB_9            = 41;
+static const int FIX_FILTER_NUM_COEFF_DB_COMBINE_9_DB_9 = 21;
+static const int FIX_FILTER_NUM_COEFF_13_DB_9           = 64;
+#else
 static const int FIX_FILTER_NUM_COEFF    = 42;
+#endif
 #endif
 
 #if JVET_V0130_INTRA_TMP

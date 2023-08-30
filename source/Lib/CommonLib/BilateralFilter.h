@@ -49,16 +49,7 @@ class BIFCabacEst
 {
 public:
   virtual ~BIFCabacEst() {};
-  virtual uint64_t getBits(const Slice& slice, const BifParams& htdfParams) = 0;
-};
-#endif
-#if JVET_X0071_CHROMA_BILATERAL_FILTER
-class ChromaBIFCabacEst
-{
-public:
-    virtual ~ChromaBIFCabacEst() {};
-    virtual uint64_t getBitsCb(const Slice& slice, const ChromaBifParams& htdfParams) = 0;
-    virtual uint64_t getBitsCr(const Slice& slice, const ChromaBifParams& htdfParams) = 0;
+  virtual uint64_t getBits( const ComponentID compID, const Slice& slice, const BifParams& htdfParams) = 0;
 };
 #endif
 class BilateralFilter
@@ -71,23 +62,18 @@ private:
   int64_t tempblockSIMD[2 * 2320];
   int64_t tempblockFilteredSIMD[2 * 2320];
 #endif
-  short *tempblock = (short *) tempblockSIMD;
-  short *tempblockFilteredTemp = (short *) (&tempblockFilteredSIMD[1]);
+  Pel *tempblock = (Pel*) tempblockSIMD;
+  Pel *tempblockFilteredTemp = (Pel*) (&tempblockFilteredSIMD[1]);
   // SIMD method writes to tempblockFiltered + 4 so that address
   // must be 128-aligned. Hence tempblockFilteredSIMD is a bit bigger than
   // it otherwise would need to be and we don't use the first 14 bytes.
   // We pad 8 bytes so required sizes is (128+8)*(128+8)*2+16 bytes = 37008 bytes
   // = 2313 128-bit words which has been rounded up to 2320 above. 
-  short *tempblockFiltered = &tempblockFilteredTemp[-2];
+  Pel *tempblockFiltered = &tempblockFilteredTemp[-2];
 
-  void (*m_bilateralFilterDiamond5x5)( uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift, bool isRDO, const char* LUTrowPtr);
-#if JVET_W0066_CCSAO
-  void (*m_bilateralFilterDiamond5x5NoClip)(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift, bool isRDO, const char* LUTrowPtr);
-#endif
-  static void blockBilateralFilterDiamond5x5(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift, bool isRDO, const char* LUTrowPtr);
-#if JVET_W0066_CCSAO
-  static void blockBilateralFilterDiamond5x5NoClip(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift, bool isRDO, const char* LUTrowPtr);
-#endif
+  void (*m_bilateralFilterDiamond5x5)( uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bifRoundAdd, int bifRoundShift, bool isRDO, const char* lutRowPtr, bool noClip);
+  static void blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bifRoundAdd, int bifRoundShift, bool isRDO, const char* lutRowPtr, bool noClip );
+
 #if JVET_V0094_BILATERAL_FILTER
   char m_wBIF[26][16] = {
   {  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, },
@@ -155,63 +141,27 @@ public:
   void create();
   void destroy();
 #if JVET_V0094_BILATERAL_FILTER
-  void bilateralFilterRDOdiamond5x5(PelBuf& resiBuf, const CPelBuf& predBuf, PelBuf& recoBuf, int32_t qp, const CPelBuf& recIPredBuf, const ClpRng& clpRng, TransformUnit & currTU, bool useReco, bool doReshape, std::vector<Pel>& pLUT);
-  
-  void bilateralFilterPicRDOperCTU(CodingStructure& cs, PelUnitBuf& src,BIFCabacEst* BifCABACEstimator);
-  
-  void bilateralFilterDiamond5x5(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit & currTU
+  void bilateralFilterRDOdiamond5x5(const ComponentID compID, PelBuf& resiBuf, const CPelBuf& predBuf, PelBuf& recoBuf, int32_t qp, const CPelBuf& recIPredBuf, const ClpRng& clpRng, TransformUnit & currTU, bool useReco, bool doReshape = false, std::vector<Pel>* pLUT = nullptr);
+  void bilateralFilterPicRDOperCTU( const ComponentID compID, CodingStructure& cs, PelUnitBuf& src,BIFCabacEst* bifCABACEstimator);
+  void bilateralFilterDiamond5x5( const ComponentID compID, const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit & currTU, bool noClip
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
     , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
     , bool clipTop, bool clipBottom, bool clipLeft, bool clipRight
 #endif
   );
-#if JVET_W0066_CCSAO
-  void bilateralFilterDiamond5x5NoClip(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit& currTU
-#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-    , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
-    , bool clipTop, bool clipBottom, bool clipLeft, bool clipRight
-#endif
-  );
-#endif
-#endif
-  void clipNotBilaterallyFilteredBlocks(const CPelUnitBuf& src, PelUnitBuf& rec, const ClpRng& clpRng, TransformUnit & currTU);
-#if JVET_V0094_BILATERAL_FILTER
+
   const char* getFilterLutParameters( const int size, const PredMode predMode, const int qp, int& bfac );
-#endif
-
+  void clipNotBilaterallyFilteredBlocks( const ComponentID compID, const CPelUnitBuf& src, PelUnitBuf& rec, const ClpRng& clpRng, TransformUnit & currTU);
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  void bilateralFilterRDOdiamond5x5Chroma(PelBuf& resiBuf, const CPelBuf& predBuf, PelBuf& recoBuf, int32_t qp, const CPelBuf& recIPredBuf, const ClpRng& clpRng, TransformUnit & currTU, bool useReco, bool isCb);
-
-  void bilateralFilterPicRDOperCTUChroma(CodingStructure& cs, PelUnitBuf& src, ChromaBIFCabacEst* ChromaBifCABACEstimator, bool isCb);
-
-  void bilateralFilterDiamond5x5Chroma(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit & currTU, bool isCb
-#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-      , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
-      , bool clipTop, bool clipBottom, bool clipLeft, bool clipRight
+  const char* getFilterLutParametersChroma( const int size, const PredMode predMode, const int qp, int& bfac, int widthForStrength, int heightForStrength, bool isLumaValid);
 #endif
-  );
+#endif
 
-  void clipNotBilaterallyFilteredBlocksChroma(const CPelUnitBuf& src, PelUnitBuf& rec, const ClpRng& clpRng, TransformUnit & currTU, bool isCb);
-
-#if JVET_W0066_CCSAO
-    void bilateralFilterDiamond5x5NoClipChroma(const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit & currTU, bool isCb
-#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-      , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
-      , bool clipTop, bool clipBottom, bool clipLeft, bool clipRight
-#endif
-    );
-#endif
-    const char* getFilterLutParametersChroma( const int size, const PredMode predMode, const int qp, int& bfac, int widthForStrength, int heightForStrength, bool isLumaValid);
-#endif
 
 #if ENABLE_SIMD_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER_ENABLE_SIMD
 #ifdef TARGET_SIMD_X86
   template<X86_VEXT vext>
-  static void simdFilterDiamond5x5( uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift, bool isRDO, const char* LUTrowPtr );
-#if JVET_W0066_CCSAO
-  template<X86_VEXT vext>
-  static void simdFilterDiamond5x5NoClip(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bif_round_add, int bif_round_shift, bool isRDO, const char* LUTrowPtr);
-#endif
+  static void simdFilterDiamond5x5( uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bifRoundAdd, int bifRoundShift, bool isRDO, const char* lutRowPtr, bool noClip );
 
   void    initBilateralFilterX86();
   template <X86_VEXT vext>

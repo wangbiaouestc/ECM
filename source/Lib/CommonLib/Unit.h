@@ -421,6 +421,13 @@ struct CodingUnit : public UnitArea
 #endif
 #if JVET_AC0112_IBC_LIC
   bool           ibcLicFlag;
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  int            ibcLicIdx;
+#endif
+#endif
+#if JVET_AE0159_FIBC
+  int64_t ibcFilterParams[FIBC_PARAMS];
+  bool           ibcFilterFlag;
 #endif
 #if JVET_AA0070_RRIBC
   int            rribcFlipType;
@@ -538,6 +545,12 @@ struct IntraPredictionData
 #if JVET_AD0202_CCCM_MDF
   int       cccmMultiFilterIdx;
 #endif
+#if JVET_AE0100_BVGCCCM
+  int       bvgCccmFlag;
+  int       numBvgCands;
+  Mv        bvList[NUM_BVG_CCCM_CANDS];
+  int       rrIbcList[NUM_BVG_CCCM_CANDS];
+#endif
 #endif
 #if JVET_AD0188_CCP_MERGE
   int       idxNonLocalCCP;
@@ -588,6 +601,9 @@ struct InterPredictionData
   uint16_t      mmvdMergeIdx;
 #else
   uint8_t       mmvdMergeIdx;
+#endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  int         ibcMergeIdx1;
 #endif
 #if JVET_AA0061_IBC_MBVD
   bool          ibcMbvdMergeFlag;
@@ -674,6 +690,12 @@ struct InterPredictionData
   MultiHypVec addHypData;
   int8_t      numMergedAddHyps;
 #endif
+
+#if JVET_AE0046_BI_GPM
+  int8_t   gpmDirMode; // 0: use uni list gen, 1 : use bi list gen
+  bool     gpmDmvrRefinePart0;
+  bool     gpmDmvrRefinePart1;
+#endif
 };
 
 struct PredictionUnit : public UnitArea, public IntraPredictionData, public InterPredictionData
@@ -757,7 +779,13 @@ struct TransformUnit : public UnitArea
   bool           noResidual;
   uint8_t        jointCbCr;
   uint8_t        cbf        [ MAX_NUM_TBLOCKS ];
+#if JVET_AE0102_LFNST_CTX
+  int            lastPosition[ MAX_NUM_TBLOCKS ];
+#endif
 
+#if JVET_AE0059_INTER_CCCM
+  int8_t         interCccm;
+#endif
   TransformUnit() : chType( CH_L ) { }
   TransformUnit(const UnitArea& unit);
   TransformUnit(const ChromaFormat _chromaFormat, const Area &area);

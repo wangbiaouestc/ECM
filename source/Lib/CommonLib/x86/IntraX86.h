@@ -45,6 +45,38 @@
 
 #if ENABLE_SIMD_TMP
 #if JVET_AD0086_ENHANCED_INTRA_TMP
+// Calculation with step of 4
+inline uint32_t calcDiff4(const short* pSrc1, const short* pSrc2, const int start, const int end)
+{
+  __m128i vzero = _mm_setzero_si128();
+  __m128i vsum16 = vzero;
+  for (int iX = start; iX < end; iX += 4)
+  {
+    __m128i vsrc1 = _mm_loadl_epi64((const __m128i*) & pSrc1[iX]);
+    __m128i vsrc2 = _mm_loadl_epi64((const __m128i*) & pSrc2[iX]);
+    vsum16 = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
+  }
+  __m128i vsum32 = _mm_unpacklo_epi16(vsum16, vzero);
+  vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01 00 11 10
+  vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10 11 00 01
+  return _mm_cvtsi128_si32(vsum32);
+}
+// Calculation with step of 8
+inline uint32_t calcDiff8(const short* pSrc1, const short* pSrc2, const int start, const int end)
+{
+  __m128i vzero = _mm_setzero_si128();
+  __m128i vsum16 = vzero;
+  for (int iX = start; iX < end; iX += 8)
+  {
+    __m128i vsrc1 = _mm_loadu_si128((const __m128i*) & pSrc1[iX]);
+    __m128i vsrc2 = _mm_lddqu_si128((const __m128i*) & pSrc2[iX]);
+    vsum16 = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
+  }
+  __m128i vsum32 = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
+  vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01 00 11 10
+  vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10 11 00 01
+  return _mm_cvtsi128_si32(vsum32);
+}
 template<X86_VEXT vext>
 void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsigned int uiPatchWidth,
                           unsigned int uiPatchHeight, int *diff, int *iMax, RefTemplateType tempType,
@@ -93,58 +125,16 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
         int iCols = uiPatchWidth;
 
         // TopLeft
-        // Do with step of 4
-        __m128i vzero  = _mm_setzero_si128();
-        __m128i vsum32 = vzero;
-        __m128i vsum16 = vzero;
-        for (int iX = 0; iX < 4; iX += 4)
-        {
-          __m128i vsrc1 = _mm_loadl_epi64((const __m128i *) &pSrc1[iX]);
-          __m128i vsrc2 = _mm_loadl_epi64((const __m128i *) &pSrc2[iX]);
-          vsum16        = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
-        }
-        __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
-        vsum32           = _mm_add_epi32(vsum32, vsumtemp);
-        vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
-        vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
-        uiSum            = _mm_cvtsi128_si32(vsum32);
+        uiSum = calcDiff4(pSrc1, pSrc2, 0, TMP_TEMPLATE_SIZE);
         diffSum += uiSum;
 
         if (((iCols - TMP_TEMPLATE_SIZE) & 7) == 0)
         {
-          // Do with step of 8
-          __m128i vzero  = _mm_setzero_si128();
-          __m128i vsum32 = vzero;
-          __m128i vsum16 = vzero;
-          for (int iX = TMP_TEMPLATE_SIZE; iX < iCols; iX += 8)
-          {
-            __m128i vsrc1 = _mm_loadu_si128((const __m128i *) &pSrc1[iX]);
-            __m128i vsrc2 = _mm_lddqu_si128((const __m128i *) &pSrc2[iX]);
-            vsum16        = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
-          }
-          __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
-          vsum32           = _mm_add_epi32(vsum32, vsumtemp);
-          vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
-          vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
-          uiSum            = _mm_cvtsi128_si32(vsum32);
+          uiSum = calcDiff8(pSrc1, pSrc2, TMP_TEMPLATE_SIZE, iCols);
         }
         else
         {
-          // Do with step of 4
-          __m128i vzero  = _mm_setzero_si128();
-          __m128i vsum32 = vzero;
-          __m128i vsum16 = vzero;
-          for (int iX = TMP_TEMPLATE_SIZE; iX < iCols; iX += 4)
-          {
-            __m128i vsrc1 = _mm_loadl_epi64((const __m128i *) &pSrc1[iX]);
-            __m128i vsrc2 = _mm_loadl_epi64((const __m128i *) &pSrc2[iX]);
-            vsum16        = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
-          }
-          __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
-          vsum32           = _mm_add_epi32(vsum32, vsumtemp);
-          vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
-          vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
-          uiSum            = _mm_cvtsi128_si32(vsum32);
+          uiSum = calcDiff4(pSrc1, pSrc2, TMP_TEMPLATE_SIZE, iCols);
         }
         diffSum += uiSum;
         topDiff += uiSum;
@@ -170,22 +160,7 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
         const short *pSrc2 = (const short *) refPatchRow;
 
         // SIMD difference
-
-        // Do with step of 4
-        __m128i vzero  = _mm_setzero_si128();
-        __m128i vsum32 = vzero;
-        __m128i vsum16 = vzero;
-        for (int iX = 0; iX < iCols; iX += 4)
-        {
-          __m128i vsrc1 = _mm_loadl_epi64((const __m128i *) &pSrc1[iX]);
-          __m128i vsrc2 = _mm_loadl_epi64((const __m128i *) &pSrc2[iX]);
-          vsum16        = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
-        }
-        __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
-        vsum32           = _mm_add_epi32(vsum32, vsumtemp);
-        vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
-        vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
-        uiSum            = _mm_cvtsi128_si32(vsum32);
+        uiSum = calcDiff4(pSrc1, pSrc2, 0, iCols);
 
         diffSum += uiSum;
         leftDiff += uiSum;
@@ -211,39 +186,11 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
         int iCols = uiPatchWidth;
         if ((iCols & 7) == 0)
         {
-          // Do with step of 8
-          __m128i vzero  = _mm_setzero_si128();
-          __m128i vsum32 = vzero;
-          __m128i vsum16 = vzero;
-          for (int iX = 0; iX < iCols; iX += 8)
-          {
-            __m128i vsrc1 = _mm_loadu_si128((const __m128i *) &pSrc1[iX]);
-            __m128i vsrc2 = _mm_lddqu_si128((const __m128i *) &pSrc2[iX]);
-            vsum16        = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
-          }
-          __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
-          vsum32           = _mm_add_epi32(vsum32, vsumtemp);
-          vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
-          vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
-          uiSum            = _mm_cvtsi128_si32(vsum32);
+          uiSum = calcDiff8(pSrc1, pSrc2, 0, iCols);
         }
         else
         {
-          // Do with step of 4
-          __m128i vzero  = _mm_setzero_si128();
-          __m128i vsum32 = vzero;
-          __m128i vsum16 = vzero;
-          for (int iX = 0; iX < iCols; iX += 4)
-          {
-            __m128i vsrc1 = _mm_loadl_epi64((const __m128i *) &pSrc1[iX]);
-            __m128i vsrc2 = _mm_loadl_epi64((const __m128i *) &pSrc2[iX]);
-            vsum16        = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
-          }
-          __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
-          vsum32           = _mm_add_epi32(vsum32, vsumtemp);
-          vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
-          vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
-          uiSum            = _mm_cvtsi128_si32(vsum32);
+          uiSum = calcDiff4(pSrc1, pSrc2, 0, iCols);
         }
         diffSum += uiSum;
 
@@ -265,22 +212,7 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
         const short *pSrc2 = (const short *) refPatchRow;
 
         // SIMD difference
-
-        // Do with step of 4
-        __m128i vzero  = _mm_setzero_si128();
-        __m128i vsum32 = vzero;
-        __m128i vsum16 = vzero;
-        for (int iX = 0; iX < iCols; iX += 4)
-        {
-          __m128i vsrc1 = _mm_loadl_epi64((const __m128i *) &pSrc1[iX]);
-          __m128i vsrc2 = _mm_loadl_epi64((const __m128i *) &pSrc2[iX]);
-          vsum16        = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
-        }
-        __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
-        vsum32           = _mm_add_epi32(vsum32, vsumtemp);
-        vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
-        vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
-        uiSum            = _mm_cvtsi128_si32(vsum32);
+        uiSum = calcDiff4(pSrc1, pSrc2, 0, iCols);
 
         diffSum += uiSum;
 
@@ -305,40 +237,11 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
 
         if (((iCols - TMP_TEMPLATE_SIZE) & 7) == 0)
         {
-          // Do with step of 8
-          __m128i vzero  = _mm_setzero_si128();
-          __m128i vsum32 = vzero;
-          __m128i vsum16 = vzero;
-
-          for (int iX = TMP_TEMPLATE_SIZE; iX < iCols; iX += 8)
-          {
-            __m128i vsrc1 = _mm_loadu_si128((const __m128i *) &pSrc1[iX]);
-            __m128i vsrc2 = _mm_lddqu_si128((const __m128i *) &pSrc2[iX]);
-            vsum16        = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
-          }
-          __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
-          vsum32           = _mm_add_epi32(vsum32, vsumtemp);
-          vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
-          vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
-          uiSum            = _mm_cvtsi128_si32(vsum32);
+          uiSum = calcDiff8(pSrc1, pSrc2, TMP_TEMPLATE_SIZE, iCols);
         }
         else
         {
-          // Do with step of 4
-          __m128i vzero  = _mm_setzero_si128();
-          __m128i vsum32 = vzero;
-          __m128i vsum16 = vzero;
-          for (int iX = TMP_TEMPLATE_SIZE; iX < iCols; iX += 4)
-          {
-            __m128i vsrc1 = _mm_loadl_epi64((const __m128i *) &pSrc1[iX]);
-            __m128i vsrc2 = _mm_loadl_epi64((const __m128i *) &pSrc2[iX]);
-            vsum16        = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
-          }
-          __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
-          vsum32           = _mm_add_epi32(vsum32, vsumtemp);
-          vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
-          vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
-          uiSum            = _mm_cvtsi128_si32(vsum32);
+          uiSum = calcDiff4(pSrc1, pSrc2, TMP_TEMPLATE_SIZE, iCols);
         }
         topDiff += uiSum;
 
@@ -365,21 +268,7 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
 
         // SIMD difference
 
-        // Do with step of 4
-        __m128i vzero  = _mm_setzero_si128();
-        __m128i vsum32 = vzero;
-        __m128i vsum16 = vzero;
-        for (int iX = 0; iX < iCols; iX += 4)
-        {
-          __m128i vsrc1 = _mm_loadl_epi64((const __m128i *) &pSrc1[iX]);
-          __m128i vsrc2 = _mm_loadl_epi64((const __m128i *) &pSrc2[iX]);
-          vsum16        = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
-        }
-        __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
-        vsum32           = _mm_add_epi32(vsum32, vsumtemp);
-        vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
-        vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
-        uiSum            = _mm_cvtsi128_si32(vsum32);
+        uiSum = calcDiff4(pSrc1, pSrc2, 0, iCols);
 
         leftDiff += uiSum;
 
@@ -408,39 +297,11 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
       int iCols = uiPatchWidth - TMP_TEMPLATE_SIZE;
       if ((iCols & 7) == 0)
       {
-        // Do with step of 8
-        __m128i vzero  = _mm_setzero_si128();
-        __m128i vsum32 = vzero;
-        __m128i vsum16 = vzero;
-        for (int iX = 0; iX < iCols; iX += 8)
-        {
-          __m128i vsrc1 = _mm_loadu_si128((const __m128i *) (&pSrc1[iX]));
-          __m128i vsrc2 = _mm_lddqu_si128((const __m128i *) (&pSrc2[iX]));
-          vsum16        = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
-        }
-        __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
-        vsum32           = _mm_add_epi32(vsum32, vsumtemp);
-        vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
-        vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
-        uiSum            = _mm_cvtsi128_si32(vsum32);
+        uiSum = calcDiff8(pSrc1, pSrc2, 0, iCols);
       }
       else
       {
-        // Do with step of 4
-        __m128i vzero  = _mm_setzero_si128();
-        __m128i vsum32 = vzero;
-        __m128i vsum16 = vzero;
-        for (int iX = 0; iX < iCols; iX += 4)
-        {
-          __m128i vsrc1 = _mm_loadl_epi64((const __m128i *) &pSrc1[iX]);
-          __m128i vsrc2 = _mm_loadl_epi64((const __m128i *) &pSrc2[iX]);
-          vsum16        = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
-        }
-        __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
-        vsum32           = _mm_add_epi32(vsum32, vsumtemp);
-        vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
-        vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
-        uiSum            = _mm_cvtsi128_si32(vsum32);
+        uiSum = calcDiff4(pSrc1, pSrc2, 0, iCols);
       }
       diffSum += uiSum;
 
@@ -466,21 +327,7 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
 
       // SIMD difference
 
-      // Do with step of 4
-      __m128i vzero  = _mm_setzero_si128();
-      __m128i vsum32 = vzero;
-      __m128i vsum16 = vzero;
-      for (int iX = 0; iX < iCols; iX += 4)
-      {
-        __m128i vsrc1 = _mm_loadl_epi64((const __m128i *) &pSrc1[iX]);
-        __m128i vsrc2 = _mm_loadl_epi64((const __m128i *) &pSrc2[iX]);
-        vsum16        = _mm_add_epi16(vsum16, _mm_abs_epi16(_mm_sub_epi16(vsrc1, vsrc2)));
-      }
-      __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vzero), _mm_unpackhi_epi16(vsum16, vzero));
-      vsum32           = _mm_add_epi32(vsum32, vsumtemp);
-      vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
-      vsum32           = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
-      uiSum            = _mm_cvtsi128_si32(vsum32);
+      uiSum = calcDiff4(pSrc1, pSrc2, 0, iCols);
 
       diffSum += uiSum;
 

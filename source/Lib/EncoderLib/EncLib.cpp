@@ -751,6 +751,9 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
   m_cInterSearch.setTempBuffers( m_cIntraSearch.getSplitCSBuf(), m_cIntraSearch.getFullCSBuf(), m_cIntraSearch.getSaveCSBuf() );
 #endif // ENABLE_SPLIT_PARALLELISM || ENABLE_WPP_PARALLELISM
 
+#if JVET_AE0159_FIBC || JVET_AE0059_INTER_CCCM || JVET_AE0078_IBC_LIC_EXTENSION
+  m_cInterSearch.setIntraPrediction(&m_cIntraSearch);
+#endif
   m_iMaxRefPicNum = 0;
 
 #if ER_CHROMA_QP_WCG_PPS
@@ -773,13 +776,15 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
   if (getUseCompositeRef())
   {
     Picture *picBg = new Picture;
+
+    picBg->create(
 #if JVET_Z0118_GDR
-    picBg->create(sps0.getGDREnabledFlag(), sps0.getChromaFormatIdc(), Size(pps0.getPicWidthInLumaSamples(), pps0.getPicHeightInLumaSamples()),
-                   sps0.getMaxCUWidth(), sps0.getMaxCUWidth() + EXT_PICTURE_SIZE, false, m_layerId, getGopBasedTemporalFilterEnabled());
-#else
-    picBg->create( sps0.getChromaFormatIdc(), Size( pps0.getPicWidthInLumaSamples(), pps0.getPicHeightInLumaSamples() ),
-                   sps0.getMaxCUWidth(), sps0.getMaxCUWidth() + EXT_PICTURE_SIZE, false, m_layerId, getGopBasedTemporalFilterEnabled() );
+      sps0.getGDREnabledFlag(),
 #endif
+      sps0.getWrapAroundEnabledFlag(), sps0.getChromaFormatIdc(),
+      Size(pps0.getPicWidthInLumaSamples(), pps0.getPicHeightInLumaSamples()), sps0.getMaxCUWidth(),
+      sps0.getMaxCUWidth() + EXT_PICTURE_SIZE, false, m_layerId, getGopBasedTemporalFilterEnabled());
+
     picBg->getRecoBuf().fill(0);
 
     picBg->finalInit( m_vps, sps0, pps0, &m_picHeader, m_apss, m_lmcsAPS, m_scalinglistAPS );
@@ -789,13 +794,15 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
     picBg->createSpliceIdx(pps0.pcv->sizeInCtus);
     m_cGOPEncoder.setPicBg(picBg);
     Picture *picOrig = new Picture;
+
+    picOrig->create(
 #if JVET_Z0118_GDR
-    picOrig->create(sps0.getGDREnabledFlag(), sps0.getChromaFormatIdc(), Size(pps0.getPicWidthInLumaSamples(), pps0.getPicHeightInLumaSamples()),
-      sps0.getMaxCUWidth(), sps0.getMaxCUWidth() + EXT_PICTURE_SIZE, false, m_layerId, getGopBasedTemporalFilterEnabled());
-#else
-    picOrig->create( sps0.getChromaFormatIdc(), Size( pps0.getPicWidthInLumaSamples(), pps0.getPicHeightInLumaSamples() ),
-                     sps0.getMaxCUWidth(), sps0.getMaxCUWidth() + EXT_PICTURE_SIZE, false, m_layerId, getGopBasedTemporalFilterEnabled() );
+      sps0.getGDREnabledFlag(),
 #endif
+      sps0.getWrapAroundEnabledFlag(), sps0.getChromaFormatIdc(),
+      Size(pps0.getPicWidthInLumaSamples(), pps0.getPicHeightInLumaSamples()), sps0.getMaxCUWidth(),
+      sps0.getMaxCUWidth() + EXT_PICTURE_SIZE, false, m_layerId, getGopBasedTemporalFilterEnabled());
+
     picOrig->getOrigBuf().fill(0);
     m_cGOPEncoder.setPicOrig(picOrig);
   }
@@ -1381,13 +1388,14 @@ void EncLib::xGetNewPicBuffer ( std::list<PelUnitBuf*>& rcListPicYuvRecOut, Pict
   if (rpcPic==0)
   {
     rpcPic = new Picture;
+
+    rpcPic->create(
 #if JVET_Z0118_GDR
-    rpcPic->create( getGdrEnabled(), sps.getChromaFormatIdc(), Size( pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples() ),
-                    sps.getMaxCUWidth(), sps.getMaxCUWidth() + EXT_PICTURE_SIZE, false, m_layerId, getGopBasedTemporalFilterEnabled());
-#else
-    rpcPic->create( sps.getChromaFormatIdc(), Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()),
-      sps.getMaxCUWidth(), sps.getMaxCUWidth() + EXT_PICTURE_SIZE, false, m_layerId, getGopBasedTemporalFilterEnabled());
+      getGdrEnabled(),
 #endif
+      sps.getWrapAroundEnabledFlag(), sps.getChromaFormatIdc(),
+      Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(),
+      sps.getMaxCUWidth() + EXT_PICTURE_SIZE, false, m_layerId, getGopBasedTemporalFilterEnabled());
 
 
     if (m_resChangeInClvsEnabled)
@@ -1848,6 +1856,9 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_AD0082_TMRL_CONFIG
   sps.setUseTmrl            ( m_tmrl );
 #endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  sps.setTMnoninterToolsEnableFlag            ( m_tmNoninterToolsEnableFlag );
+#endif
 #if JVET_AD0085_MPM_SORTING
   sps.setUseMpmSorting      ( m_mpmSorting );
 #endif
@@ -1922,6 +1933,9 @@ void EncLib::xInitSPS( SPS& sps )
 #endif
 #if JVET_AA0061_IBC_MBVD
   sps.setUseIbcMbvd                         ( m_ibcMbvd );
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  sps.setUseIbcMbvdAdSearch                 ( m_ibcMbvdAdSearch );
+#endif
 #endif
 #if JVET_AC0112_IBC_CIIP
   sps.setUseIbcCiip                         ( m_ibcCiip );
@@ -1931,6 +1945,12 @@ void EncLib::xInitSPS( SPS& sps )
 #endif
 #if JVET_AC0112_IBC_LIC
   sps.setUseIbcLic                          ( m_ibcLic );
+#endif
+#if JVET_AE0159_FIBC
+  sps.setUseIbcFilter                       ( m_ibcFilter );
+#endif
+#if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
+  sps.setUseIbcNonAdjCand                   ( m_ibcNonAdjCand );
 #endif
   sps.setWrapAroundEnabledFlag                      ( m_wrapAround );
 #if MULTI_HYP_PRED
@@ -1942,8 +1962,14 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setUseIntraTMP(m_intraTMP);
   sps.setIntraTMPMaxSize(m_intraTmpMaxSize);
 #endif
+#if JVET_AE0100_BVGCCCM
+  sps.setUseBvgCccm(m_bvgCccm);
+#endif
 #if JVET_AC0071_DBV
   sps.setUseIntraDBV(m_intraDBV);
+#endif
+#if JVET_AE0059_INTER_CCCM
+  sps.setUseInterCccm(m_interCccm);
 #endif
   // ADD_NEW_TOOL : (encoder lib) set tool enabling flags and associated parameters here
   sps.setUseISP                             ( m_ISP );

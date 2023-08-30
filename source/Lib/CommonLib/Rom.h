@@ -234,6 +234,12 @@ extern const     int8_t   g_nspt4x16[ 35 ][ 3 ][ 24 ][ 64 ];
 extern const     int8_t   g_nspt16x4[ 35 ][ 3 ][ 24 ][ 64 ];
 extern const     int8_t   g_nspt8x16[ 35 ][ 3 ][ 40 ][ 128 ];
 extern const     int8_t   g_nspt16x8[ 35 ][ 3 ][ 40 ][ 128 ];
+#if JVET_AE0086_LARGE_NSPT
+extern const     int8_t   g_nspt4x32[ 35 ][ 3 ][ 20 ][ 128 ];
+extern const     int8_t   g_nspt32x4[ 35 ][ 3 ][ 20 ][ 128 ];
+extern const     int8_t   g_nspt8x32[ 35 ][ 3 ][ 24 ][ 256 ];
+extern const     int8_t   g_nspt32x8[ 35 ][ 3 ][ 24 ][ 256 ];
+#endif
 #endif
 
 // ====================================================================================================================
@@ -395,9 +401,17 @@ extern const int8_t g_ccSaoCandPosX[MAX_NUM_LUMA_COMP][MAX_CCSAO_CAND_POS_Y];
 extern const int8_t g_ccSaoCandPosY[MAX_NUM_LUMA_COMP][MAX_CCSAO_CAND_POS_Y];
 #endif
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+extern const int8_t g_ccSaoEdgePosX[MAX_CCSAO_EDGE_DIR][2];
+extern const int8_t g_ccSaoEdgePosY[MAX_CCSAO_EDGE_DIR][2];
+extern const short  g_ccSaoEdgeThr [MAX_CCSAO_EDGE_IDC][MAX_CCSAO_EDGE_THR];
+extern const int8_t g_ccSaoEdgeNum [MAX_CCSAO_EDGE_IDC][2];
+extern const int8_t g_ccSaoBandTab [MAX_CCSAO_BAND_IDC][2];
+#else
 extern const int8_t g_ccSaoEdgeTypeX[CCSAO_EDGE_TYPE][2];
 extern const int8_t g_ccSaoEdgeTypeY[CCSAO_EDGE_TYPE][2];
 extern const short  g_ccSaoQuanValue[CCSAO_QUAN_NUM];
+#endif
 #endif
 #if JVET_V0130_INTRA_TMP
 extern unsigned int g_uiDepth2Width[5];
@@ -415,6 +429,11 @@ extern const int8_t g_glmPattern[NUM_GLM_PATTERN][6];
 extern const int8_t g_ibcGpmFirstSetSplitDirToIdx[GEO_NUM_PARTITION_MODE];
 extern const int8_t g_ibcGpmFirstSetSplitDir[IBC_GPM_MAX_SPLIT_DIR_FIRST_SET_NUM];
 extern const int8_t g_ibcGpmSecondSetSplitDir[GEO_NUM_PARTITION_MODE];
+#endif
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+extern int g_ibcMbvdCandOffsets[IBC_MBVD_AD_STEP_NUM];
+extern int g_ibcMbvdStepCandIdxList[IBC_MBVD_AD_NUM >> IBC_MBVD_LOG2_START_STEP];
+extern int g_ibcMbvdNeiOffsets[IBC_MBVD_NEI_NUM * 2];
 #endif
 #endif  //__TCOMROM__
 

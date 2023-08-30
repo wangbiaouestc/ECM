@@ -1456,11 +1456,19 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
     if (cs.slice->getSliceType() == I_SLICE && cs.slice->getUseIBC() && checkIbc && (m_pcEncCfg->getIBCFastMethod() & IBC_FAST_METHOD_NONSCC ))
     {
+#if JVET_AE0169_BIPREDICTIVE_IBC
+      if (m_pcEncCfg->getIbcMerge() && partitioner.chType == CHANNEL_TYPE_LUMA)
+      {
+        m_ComprCUCtxList.back().testModes.push_back({ ETM_IBC_MERGE,   ETO_STANDARD,  qp });
+      }
+      m_ComprCUCtxList.back().testModes.push_back({ ETM_IBC,         ETO_STANDARD,  qp });
+#else
       m_ComprCUCtxList.back().testModes.push_back({ ETM_IBC,         ETO_STANDARD,  qp });
       if (m_pcEncCfg->getIbcMerge() && partitioner.chType == CHANNEL_TYPE_LUMA)
       {
         m_ComprCUCtxList.back().testModes.push_back({ ETM_IBC_MERGE,   ETO_STANDARD,  qp });
       }
+#endif
     }
 #endif
     // add intra modes
@@ -1671,6 +1679,37 @@ void EncModeCtrlMTnoRQT::finishCULevel( Partitioner &partitioner )
 bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingStructure &cs, Partitioner& partitioner )
 {
   ComprCUCtx& cuECtx = m_ComprCUCtxList.back();
+
+  // MTT modes early termination for 64x64 luma CU based on nosplit intra cost
+#if JVET_AE0057_MTT_ET
+  if (m_pcEncCfg->getUseMttSkip() && partitioner.currQtDepth == (cs.sps->getCTUSize() == 256 ? 2 : 1)
+      && partitioner.currBtDepth == 0
+      && partitioner.currArea().lwidth() == 64 && partitioner.currArea().lheight() == 64)
+  {
+    if (((partitioner.currArea().Y().x + 63 < cs.picture->lwidth())
+         && (partitioner.currArea().Y().y + 63 < cs.picture->lheight()))
+        && (encTestmode.type == ETM_SPLIT_BT_H || encTestmode.type == ETM_SPLIT_BT_V
+            || encTestmode.type == ETM_SPLIT_TT_H || encTestmode.type == ETM_SPLIT_TT_V)
+        && partitioner.chType == CHANNEL_TYPE_LUMA)
+    {
+      int thresholdMTT = Clip3(0, MAX_INT, (120 - ((m_pcEncCfg->getBaseQP() - 22) * 4)) * 1000000);
+      if (m_noSplitIntraRdCost > thresholdMTT)
+      {
+        const PartSplit split = getPartSplit(encTestmode);
+
+        if (split == CU_HORZ_SPLIT)
+        {
+          cuECtx.set(DID_HORZ_SPLIT, false);
+        }
+        if (split == CU_VERT_SPLIT)
+        {
+          cuECtx.set(DID_VERT_SPLIT, false);
+        }
+        return false;
+      }
+    }
+  }
+#endif
 
   // Fast checks, partitioning depended
 #if MERGE_ENC_OPT
@@ -2583,7 +2622,7 @@ bool EncModeCtrlMTnoRQT::useModeResult( const EncTestMode& encTestmode, CodingSt
   }
   else if( encTestmode.type == ETM_INTRA )
   {
-    const CodingUnit cu = *tempCS->getCU( partitioner.chType );
+    const CodingUnit& cu = *tempCS->getCU( partitioner.chType );
 
     if( !cu.mtsFlag )
     {

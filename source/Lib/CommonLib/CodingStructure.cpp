@@ -115,6 +115,11 @@ CodingStructure::CodingStructure(CUCache& cuCache, PUCache& puCache, TUCache& tu
   m_motionBuf     = nullptr;
 #endif
 
+#if JVET_AE0043_CCP_MERGE_TEMPORAL
+  m_ccpmIdxBuf = nullptr;
+  m_ccpModelLUT.clear();
+#endif
+
 #if JVET_W0123_TIMD_FUSION
 #if JVET_Z0118_GDR
   m_ipmBuf0 = nullptr;
@@ -199,6 +204,15 @@ void CodingStructure::destroy()
 #else
   delete[] m_motionBuf;
   m_motionBuf = nullptr;
+#endif
+
+#if JVET_AE0043_CCP_MERGE_TEMPORAL
+  if (m_ccpmIdxBuf)
+  {
+    delete [] m_ccpmIdxBuf;
+  }
+  m_ccpmIdxBuf = nullptr;
+  m_ccpModelLUT.clear();
 #endif
 
 #if JVET_W0123_TIMD_FUSION
@@ -1791,6 +1805,11 @@ void CodingStructure::createInternals(const UnitArea& _unit, const bool isTopLay
   m_motionBuf       = new MotionInfo[_lumaAreaScaled];
 #endif
 
+#if JVET_AE0043_CCP_MERGE_TEMPORAL
+  m_ccpmIdxBuf = new int[_lumaAreaScaled];
+  m_ccpModelLUT.resize(0);
+#endif
+
 #if JVET_W0123_TIMD_FUSION
 #if JVET_Z0118_GDR
   m_ipmBuf0 = new uint8_t[_lumaAreaScaled];
@@ -1903,6 +1922,47 @@ void CodingStructure::addAffInheritToLut(static_vector<AffineInheritInfo, MAX_NU
 #if JVET_Z0075_IBC_HMVP_ENLARGE
 void CodingStructure::addMiToLutIBC(static_vector<MotionInfo, MAX_NUM_HMVP_IBC_CANDS> &lut, const MotionInfo &mi)
 {
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  if (mi.interDir == 3)
+  {
+    for (int l = 1; l >= 0; l--)
+    {
+      MotionInfo saveMi = mi;
+      if (l == 1)
+      {
+        saveMi.mv[0] = saveMi.mv[1];
+      }
+      saveMi.interDir = 1;
+      saveMi.mv[1] = Mv();
+      saveMi.refIdx[1] = -1;
+      saveMi.bv = saveMi.mv[0];
+      saveMi.bv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
+
+      size_t currCnt = lut.size();
+
+      bool pruned      = false;
+      int  sameCandIdx = 0;
+
+      for (int idx = 0; idx < currCnt; idx++)
+      {
+        if (lut[idx] == saveMi)
+        {
+          sameCandIdx = idx;
+          pruned      = true;
+          break;
+        }
+      }
+
+      if (pruned || currCnt == lut.capacity())
+      {
+        lut.erase(lut.begin() + sameCandIdx);
+      }
+
+      lut.push_back(saveMi);
+    }
+    return;
+  }
+#endif
   size_t currCnt = lut.size();
 
   bool pruned      = false;
@@ -2539,6 +2599,12 @@ void CodingStructure::copyStructure( const CodingStructure& other, const Channel
 #if JVET_AD0188_CCP_MERGE
   ccpLut = other.ccpLut;
 #endif
+#if JVET_AE0043_CCP_MERGE_TEMPORAL
+  CCPModelIdxBuf  ownIdxB = getCcpmIdxBuf();
+  CCCPModelIdxBuf subIdxB = other.getCcpmIdxBuf();
+  ownIdxB.copyFrom( subIdxB );
+  m_ccpModelLUT = other.m_ccpModelLUT;
+#endif
 
 #if JVET_W0123_TIMD_FUSION
   IpmBuf  ownIB = getIpmBuf();
@@ -2861,6 +2927,66 @@ const MotionInfo& CodingStructure::getMotionInfo(const Position& pos, PictureTyp
   const Position miPos = g_miScaling.scale(pos - area.lumaPos());
 
   return *(((pt == PIC_RECONSTRUCTION_0) ? m_motionBuf0 : m_motionBuf1) + miPos.y * stride + miPos.x);
+}
+#endif
+
+#if JVET_AE0043_CCP_MERGE_TEMPORAL
+CCPModelIdxBuf CodingStructure::getCcpmIdxBuf( const Area& bufArea)
+{
+  const CompArea& chromaArea = area.Cb();
+  CHECK( !chromaArea.contains( bufArea ), "Trying to access CC model information outside of this coding structure");
+
+  int lumaScaleX = getChannelTypeScaleX( CHANNEL_TYPE_CHROMA, sps->getChromaFormatIdc() );
+  int lumaScaleY = getChannelTypeScaleY( CHANNEL_TYPE_CHROMA, sps->getChromaFormatIdc() );
+
+  UnitScale scaling(MIN_CU_LOG2 - lumaScaleX, MIN_CU_LOG2 - lumaScaleY);
+  const Area miArea   = scaling.scale( bufArea );
+  const Area selfArea = scaling.scale( chromaArea );
+  
+  return CCPModelIdxBuf( m_ccpmIdxBuf + rsAddr( miArea.pos(), selfArea.pos(), selfArea.width ), selfArea.width, miArea.size() );
+}
+
+const CCCPModelIdxBuf CodingStructure::getCcpmIdxBuf( const Area& bufArea ) const
+{
+  const CompArea& chromaArea = area.Cb();
+  CHECK( !chromaArea.contains( bufArea ), "Trying to access CC model information outside of this coding structure");
+
+  int lumaScaleX = getChannelTypeScaleX( CHANNEL_TYPE_CHROMA, sps->getChromaFormatIdc() );
+  int lumaScaleY = getChannelTypeScaleY( CHANNEL_TYPE_CHROMA, sps->getChromaFormatIdc() );
+
+  UnitScale scaling(MIN_CU_LOG2 - lumaScaleX, MIN_CU_LOG2 - lumaScaleY);
+  const Area miArea   = scaling.scale( bufArea );
+  const Area selfArea = scaling.scale( chromaArea );
+  
+  return CCCPModelIdxBuf( m_ccpmIdxBuf + rsAddr( miArea.pos(), selfArea.pos(), selfArea.width ), selfArea.width, miArea.size() );
+}
+
+int& CodingStructure::getCcpmIdxInfo( const Position& pos )
+{
+  CHECK( !area.Cb().contains( pos ), "Trying to access CC model information outside of this coding structure");
+
+  int lumaScaleX = getChannelTypeScaleX( CHANNEL_TYPE_CHROMA, sps->getChromaFormatIdc() );
+  int lumaScaleY = getChannelTypeScaleY( CHANNEL_TYPE_CHROMA, sps->getChromaFormatIdc() );
+
+  UnitScale scaling(MIN_CU_LOG2 - lumaScaleX, MIN_CU_LOG2 - lumaScaleY);
+  const unsigned stride = scaling.scaleHor(area.Cb().width);
+  const Position miPos = scaling.scale(pos - area.chromaPos());
+
+  return *( m_ccpmIdxBuf + miPos.y * stride + miPos.x );
+}
+
+const int& CodingStructure::getCcpmIdxInfo( const Position& pos ) const
+{
+  CHECK( !area.Cb().contains( pos ), "Trying to access CC model information outside of this coding structure");
+
+  int lumaScaleX = getChannelTypeScaleX( CHANNEL_TYPE_CHROMA, sps->getChromaFormatIdc() );
+  int lumaScaleY = getChannelTypeScaleY( CHANNEL_TYPE_CHROMA, sps->getChromaFormatIdc() );
+
+  UnitScale scaling(MIN_CU_LOG2 - lumaScaleX, MIN_CU_LOG2 - lumaScaleY);
+  const unsigned stride = scaling.scaleHor(area.Cb().width);
+  const Position miPos = scaling.scale(pos - area.chromaPos());
+
+  return *( m_ccpmIdxBuf + miPos.y * stride + miPos.x );
 }
 #endif
 

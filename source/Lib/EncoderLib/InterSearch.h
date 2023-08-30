@@ -277,7 +277,11 @@ struct ModeIbcInfo
   int      splitDir;
   int      bldIdx;
   int      combIdx;
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  ModeIbcInfo() : mergeCand(0), isCIIP(false), dirIdx(0), isIbcGpm(false), mergeIdx0(MAX_UCHAR), mergeIdx1(MAX_UCHAR), splitDir(0), bldIdx(0), combIdx(0)
+#else
   ModeIbcInfo() : mergeCand(0), isCIIP(false), dirIdx(0), isIbcGpm(false), mergeIdx0(0), mergeIdx1(0), splitDir(0), bldIdx(0), combIdx(0)
+#endif
   {}
   ModeIbcInfo(const uint32_t mergeCand, const bool isCIIP, const int dirIdx, const bool isIbcGpm, const int mergeIdx0, const int mergeIdx1, const int splitDir, const int bldIdx, const int combIdx
   ) :
@@ -398,6 +402,9 @@ struct SrchCostBv
   bool       enableMultiCandSrch;   // True: search best fracBv among best N integer BVs; False: search best fracBv among best integer BVs and best fracBv of previous round
   Distortion costList  [capacity];
   Mv         mvList    [capacity];
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  int        mergeIdxList[capacity];
+#endif
   uint8_t    imvList   [capacity];
   uint8_t    mvpIdxList[capacity];
 #if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
@@ -405,6 +412,13 @@ struct SrchCostBv
 #endif
 #if JVET_AA0070_RRIBC && JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
   bool       bvFlipList[capacity];
+#endif
+#if JVET_AE0159_FIBC
+  bool       bvFilter[capacity];
+#endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  bool       skipLicSrch[capacity];
+  int        bvLicIdx[capacity];
 #endif
 
   SrchCostBv()
@@ -423,6 +437,13 @@ struct SrchCostBv
     if (resetHistoryMv)
     {
       mvList[maxSize].setZero();
+#if JVET_AE0159_FIBC
+      bvFilter[maxSize] = false;
+#endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+      bvLicIdx[maxSize] = 0;
+      skipLicSrch[maxSize] = false;
+#endif
     }
   }
 
@@ -447,22 +468,34 @@ struct SrchCostBv
   }
 
   int find(int mvx, int mvy
+#if JVET_AE0169_BIPREDICTIVE_IBC
+         , int mergeIdx
+#endif
 #if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
          , int bvType
 #endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
          , bool bvFlip
 #endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+         , int bvLic
+#endif
   )
   {
     for (int i = 0; i < (int)cnt; ++i)
     {
       if (mvList[i].getHor() == mvx && mvList[i].getVer() == mvy
+#if JVET_AE0169_BIPREDICTIVE_IBC
+        && mergeIdxList[i] == mergeIdx
+#endif
 #if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
         && bvTypeList[i] == bvType
 #endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
         && bvFlipList[i] == bvFlip
+#endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+        && bvLicIdx[i] == bvLic
 #endif
         )
       {
@@ -478,6 +511,9 @@ struct SrchCostBv
     {
       costList  [idxDst] = costList  [idxSrc];
       mvList    [idxDst] = mvList    [idxSrc];
+#if JVET_AE0169_BIPREDICTIVE_IBC
+      mergeIdxList[idxDst] = mergeIdxList[idxSrc];
+#endif
       imvList   [idxDst] = imvList   [idxSrc];
       mvpIdxList[idxDst] = mvpIdxList[idxSrc];
 #if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
@@ -486,15 +522,24 @@ struct SrchCostBv
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
       bvFlipList[idxDst] = bvFlipList[idxSrc];
 #endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+      bvLicIdx[idxDst] = bvLicIdx[idxSrc];
+#endif
     }
   }
 
   int  insert(Distortion cost, int mvx, int mvy
+#if JVET_AE0169_BIPREDICTIVE_IBC
+            , int mergeIdx
+#endif
 #if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
             , int bvType = 0
 #endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
             , bool bvFlip = true
+#endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+            , int bvLic = 0
 #endif
   )
   {
@@ -518,11 +563,17 @@ struct SrchCostBv
         if (cost == costList[i])
         {
           if (mvList[i].getHor() == mvx && mvList[i].getVer() == mvy
+#if JVET_AE0169_BIPREDICTIVE_IBC
+            && mergeIdxList[i] == mergeIdx
+#endif
 #if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
             && bvTypeList[i] == bvType
 #endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
             && bvFlipList[i] == bvFlip
+#endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+            && bvLicIdx[i] == bvLic
 #endif
             )
           {
@@ -542,11 +593,17 @@ struct SrchCostBv
     {
       costList[idx] = cost;
       mvList[idx].set(mvx, mvy);
+#if JVET_AE0169_BIPREDICTIVE_IBC
+      mergeIdxList[idx] = mergeIdx;
+#endif
 #if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
       bvTypeList[idx] = bvType;
 #endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
       bvFlipList[idx] = bvFlip;
+#endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+      bvLicIdx[idx] = bvLic;
 #endif
     };
 
@@ -554,11 +611,17 @@ struct SrchCostBv
     {
       costList[idx + 1] = costList[idx];
       mvList[idx + 1].set(mvList[idx].getHor(), mvList[idx].getVer());
+#if JVET_AE0169_BIPREDICTIVE_IBC
+      mergeIdxList[idx + 1] = mergeIdxList[idx];
+#endif
 #if JVET_AA0070_RRIBC || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
       bvTypeList[idx + 1] = bvTypeList[idx];
 #endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
       bvFlipList[idx + 1] = bvFlipList[idx];
+#endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+      bvLicIdx[idx + 1] = bvLicIdx[idx];
 #endif
     };
 
@@ -607,6 +670,9 @@ private:
   PelStorage      m_tmpStorageCUflipV;
 public:
   SrchCostIntBv   m_bestSrchCostIntBv;
+#if JVET_AE0159_FIBC || JVET_AE0078_IBC_LIC_EXTENSION
+  SrchCostIntBv   m_bestSrchCostIbcFilter;
+#endif
 private:
 #endif
   PelStorage      m_tmpAffiStorage;
@@ -634,6 +700,10 @@ private:
   AMVPInfo        m_amvpInfoHPel;
   AMVPInfo        m_amvpInfoQPel;
 #endif
+#endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  Pel**           m_amvpMergeBuffer;
+  MergeCtx        m_amvpMergeCtx;
 #endif
 #endif
 
@@ -695,6 +765,12 @@ private:
   Distortion      m_hevcCost;
   EncAffineMotion m_affineMotion;
   PatentBvCand    m_defaultCachedBvs;
+#if JVET_AE0059_INTER_CCCM
+  Pel             **m_interCccmStorage;
+#endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  Distortion      m_bestBvpSADHADCost;
+#endif
 protected:
   // interface to option
   EncCfg*         m_pcEncCfg;
@@ -998,6 +1074,9 @@ public:
   bool searchBv(PredictionUnit& pu, int xPos, int yPos, int width, int height, int picWidth, int picHeight, int xBv, int yBv, int ctuSize);
 #endif
   void setClipMvInSubPic(bool flag) { m_clipMvInSubPic = flag; }
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  int getAmvpMergeValidCand() { return m_amvpMergeCtx.numValidMergeCand; }
+#endif
 protected:
 
   /// sub-function for motion vector refinement used in fractional-pel accuracy
@@ -1005,6 +1084,9 @@ protected:
 
 #if JVET_Z0131_IBC_BVD_BINARIZATION
   void xEstBvdBitCosts(EstBvdBitsStruct *p
+#if JVET_AE0169_BIPREDICTIVE_IBC
+                     , bool bi
+#endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
                      , unsigned useIBCFrac = 0
 #if JVET_AA0070_RRIBC
@@ -1131,6 +1213,9 @@ public:
 #endif
   );
 #endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  void getBvpMergeOrgBuf(const PredictionUnit& pu, int mergeIdx, CPelBuf* pcPatternKey, const CPelBuf& refBuf, const PelBuf& ibcCiipIntraBuf, PelUnitBuf& orgBufForAmvpMerge);
+#endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   template <int N>
   Distortion xPredIBCFracPelSearch  ( PredictionUnit&              pu 
@@ -1208,6 +1293,13 @@ public:
   void setGeoTMSplitModeToSyntaxTable(PredictionUnit& pu, MergeCtx (&mergeCtx)[GEO_NUM_TM_MV_CAND], int mergeCand0, int mergeCand1, int mmvdCand0 = -1, int mmvdCand1 = -1); // mmvdCandX = -1: regular, 0~GPM_EXT_MMVD_MAX_REFINE_NUM-1: MMVD, >=GPM_EXT_MMVD_MAX_REFINE_NUM: TM
 #endif
   int  convertGeoSplitModeToSyntax(int splitDir, int mergeCand0, int mergeCand1, int mmvdCand0 = -1, int mmvdCand1 = -1); // mmvdCandX = -1: regular, 0~GPM_EXT_MMVD_MAX_REFINE_NUM-1: MMVD, >=GPM_EXT_MMVD_MAX_REFINE_NUM: TM
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  void resetBestBvpSADHADCost()     { m_bestBvpSADHADCost = std::numeric_limits<Distortion>::max(); }
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  void setBestBvpSADHADCost(Distortion cost) { m_bestBvpSADHADCost = std::min(m_bestBvpSADHADCost, cost); }
+#endif
+  Distortion getBestBvpSADHADCost() { return m_bestBvpSADHADCost; }
+#endif
 
 protected:
 #if JVET_Y0065_GPM_INTRA

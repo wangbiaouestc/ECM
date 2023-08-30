@@ -479,6 +479,9 @@ protected:
 #if JVET_AD0082_TMRL_CONFIG
   bool      m_tmrl;
 #endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  bool      m_tmNoninterToolsEnableFlag;
+#endif
 #if JVET_AD0085_MPM_SORTING
   bool      m_mpmSorting;
 #endif
@@ -535,6 +538,9 @@ protected:
   unsigned  m_IBCFastMethod;
 #if JVET_AA0061_IBC_MBVD
   bool      m_ibcMbvd;
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  bool      m_ibcMbvdAdSearch;
+#endif
 #endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   bool      m_rribc;
@@ -549,6 +555,15 @@ protected:
 #endif
 #if JVET_AC0112_IBC_LIC
   bool      m_ibcLic;
+#endif
+#if JVET_AE0159_FIBC
+  bool      m_ibcFilter;
+#endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  bool      m_ibcBiPred;
+#endif
+#if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
+  bool      m_ibcNonAdjCand;
 #endif
 
   bool      m_wrapAround;
@@ -593,6 +608,9 @@ protected:
   int       m_fastLocalDualTreeMode;
 #endif
   uint32_t  m_log2MaxTbSize;
+#if JVET_AE0057_MTT_ET
+  bool      m_useMttSkip;
+#endif
 
   //====== Loop/Deblock Filter ========
   bool      m_bLoopFilterDisable;
@@ -971,6 +989,12 @@ protected:
 #endif
 #if JVET_AC0071_DBV
   bool m_intraDBV;
+#endif
+#if JVET_AE0059_INTER_CCCM
+  bool m_interCccm;
+#endif
+#if JVET_AE0100_BVGCCCM
+  bool m_bvgCccm;
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   bool        m_BIF;
@@ -1450,6 +1474,10 @@ public:
 #if JVET_AA0061_IBC_MBVD
   void      setIbcMbvd                      ( bool b )       { m_ibcMbvd = b; }
   bool      getIbcMbvd                      ()         const { return m_ibcMbvd; }
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  void      setIbcMbvdAdSearch              ( bool b )       { m_ibcMbvdAdSearch = b; }
+  bool      getIbcMbvdAdSearch              ()         const { return m_ibcMbvdAdSearch; }
+#endif
 #endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   void      setRRIbc                        ( bool b )       { m_rribc = b; }
@@ -1473,6 +1501,19 @@ public:
   void      setIbcLic                       ( bool b )       { m_ibcLic = b; }
   bool      getIbcLic                       ()         const { return m_ibcLic; }
 #endif
+#if JVET_AE0159_FIBC
+  void      setIbcFilter                       ( bool b )       { m_ibcFilter = b; }
+  bool      getIbcFilter                       ()         const { return m_ibcFilter; }
+#endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  void      setIbcBiPred                    ( bool b )       { m_ibcBiPred = b; }
+  bool      getIbcBiPred                    ()         const { return m_ibcBiPred; }
+#endif
+#if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
+  void      setIbcNonAdjCand                 ( bool b )       { m_ibcNonAdjCand = b; }
+  bool      getIbcNonAdjCand                 ()         const { return m_ibcNonAdjCand; }
+#endif
+
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   void      setUseDMVDMode                  (bool b)         { m_DMVDMode = b; }
   bool      getUseDMVDMode                  ()         const { return m_DMVDMode; }
@@ -1590,6 +1631,10 @@ public:
   void      setUseTmrl                   (bool b)         { m_tmrl = b; }
   bool      getUseTmrl                   ()         const { return m_tmrl; }
 #endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  void      setTMnoninterToolsEnableFlag                   (bool b)         { m_tmNoninterToolsEnableFlag = b; }
+  bool      getTMnoninterToolsEnableFlag                   ()         const { return m_tmNoninterToolsEnableFlag; }
+#endif
 #if JVET_AD0085_MPM_SORTING
   void      setUseMpmSorting             (bool b)         { m_mpmSorting = b; }
   bool      getUseMpmSorting             () const         { return m_mpmSorting; }
@@ -1691,9 +1736,17 @@ public:
   bool      getUseFastIntraTMP()                       const { return m_fastIntraTMP; }
 #endif
 #endif
+#if JVET_AE0100_BVGCCCM
+  void setUseBvgCccm                        (bool b)         { m_bvgCccm = b; }
+  bool getUseBvgCccm()                                 const { return m_bvgCccm; }
+#endif
 #if JVET_AC0071_DBV
   void setUseIntraDBV(bool b) { m_intraDBV = b; }
   bool getUseIntraDBV() const { return m_intraDBV; }
+#endif
+#if JVET_AE0059_INTER_CCCM
+  void setUseInterCccm(bool b) { m_interCccm = b; }
+  bool getUseInterCccm() const { return m_interCccm; }
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   void      setUseBIF                       ( bool b )       { m_BIF = b; }
@@ -1792,6 +1845,10 @@ public:
   int      getFastLocalDualTreeMode         () const         { return m_fastLocalDualTreeMode; }
 #endif
   void      setLog2MaxTbSize                ( uint32_t  u )   { m_log2MaxTbSize = u; }
+#if JVET_AE0057_MTT_ET
+  void      setUseMttSkip                   (bool i)         { m_useMttSkip = i; }
+  bool      getUseMttSkip                   () const         { return m_useMttSkip; }
+#endif
 
   //====== Loop/Deblock Filter ========
 #if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR

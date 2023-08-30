@@ -53,14 +53,25 @@ namespace DQIntern
 
   struct NbInfoSbb
   {
+#if JVET_AE0102_LFNST_CTX
+    uint8_t   inPos[2][5]; // 0-tpl for normal ctx, 1-for lfnst
+    uint8_t   num[2];
+#else
     uint8_t   num;
     uint8_t   inPos[5];
+#endif
   };
   struct NbInfoOut
   {
+#if JVET_AE0102_LFNST_CTX
+    uint16_t  outPos[2][5]; // 0-tpl for normal ctx, 1-for lfnst
+    uint16_t  num[2];
+    uint16_t  maxDist[2];
+#else
     uint16_t  maxDist;
     uint16_t  num;
     uint16_t  outPos[5];
+#endif
   };
   struct CoeffFracBits
   {
@@ -204,7 +215,8 @@ namespace DQIntern
             //===== inside subband neighbours =====
             NbInfoSbb&     nbSbb  = sId2NbSbb[ scanId ];
             const int      begSbb = scanId - ( scanId & (groupSize-1) ); // first pos in current subblock
-            int            cpos[5];
+            int            cpos[5]; 
+
 
             cpos[0] = ( posX + 1 < blkWidthNZOut                              ? ( raster2id[rpos+1           ] < groupSize + begSbb ? raster2id[rpos+1           ] - begSbb : 0 ) : 0 );
             cpos[1] = ( posX + 2 < blkWidthNZOut                              ? ( raster2id[rpos+2           ] < groupSize + begSbb ? raster2id[rpos+2           ] - begSbb : 0 ) : 0 );
@@ -212,7 +224,47 @@ namespace DQIntern
             cpos[3] = ( posY + 1 < blkHeightNZOut                             ? ( raster2id[rpos+  blockWidth] < groupSize + begSbb ? raster2id[rpos+  blockWidth] - begSbb : 0 ) : 0 );
             cpos[4] = ( posY + 2 < blkHeightNZOut                             ? ( raster2id[rpos+2*blockWidth] < groupSize + begSbb ? raster2id[rpos+2*blockWidth] - begSbb : 0 ) : 0 );
 
-            for( nbSbb.num = 0; true; )
+#if JVET_AE0102_LFNST_CTX
+            int lpos[5];
+            for (int i = 0; i < 5; i++)
+            {
+              lpos[i] = ((scanId + i + 1 < totalValues) && scanId2RP[scanId + i + 1].x < blkWidthNZOut&& scanId2RP[scanId + i + 1].y < blkHeightNZOut) ? (scanId + i + 1 < groupSize + begSbb ? scanId + i + 1 - begSbb : 0) : 0;
+            }
+
+            for (nbSbb.num[0] = 0; true; )
+            {
+              int nk = -1;
+
+              for (int k = 0; k < 5; k++)
+              {
+                if (cpos[k] != 0 && (nk < 0 || cpos[k] < cpos[nk]))
+                {
+                  nk = k;
+                }
+              }
+              if (nk < 0)
+              {
+                break;
+              }
+              nbSbb.inPos[0][nbSbb.num[0]++] = uint8_t(cpos[nk]);
+              cpos[nk] = 0;
+            }
+            for (int k = nbSbb.num[0]; k < 5; k++)
+            {
+              nbSbb.inPos[0][k] = 0;
+            }
+            nbSbb.num[1] = 0;
+            for (int k = 0; k < 5; k++)
+            {
+              if (lpos[k] > 0)
+              {
+                nbSbb.num[1]++;
+              }
+              nbSbb.inPos[1][k] = lpos[k];
+            }
+#undef CHECK_POS
+#else
+            for (nbSbb.num = 0; true; )
             {
               int nk = -1;
               for( int k = 0; k < 5; k++ )
@@ -233,6 +285,7 @@ namespace DQIntern
             {
               nbSbb.inPos[k] = 0;
             }
+#endif
           }
           {
             //===== outside subband neighbours =====
@@ -246,10 +299,81 @@ namespace DQIntern
             cpos[3] = ( posY + 1 < blkHeightNZOut                             ? ( raster2id[rpos+  blockWidth] >= groupSize + begSbb ? raster2id[rpos+  blockWidth] : 0 ) : 0 );
             cpos[4] = ( posY + 2 < blkHeightNZOut                             ? ( raster2id[rpos+2*blockWidth] >= groupSize + begSbb ? raster2id[rpos+2*blockWidth] : 0 ) : 0 );
 
-            for( nbOut.num = 0; true; )
+#if JVET_AE0102_LFNST_CTX
+            int lpos[5];
+            for (int i = 0; i < 5; i++)
+            {
+              lpos[i] = ((scanId + i + 1) < totalValues && scanId2RP[scanId + i + 1].x < blkWidthNZOut&& scanId2RP[scanId + i + 1].y < blkHeightNZOut) ? ((scanId + i + 1) >= groupSize + begSbb ? scanId + i + 1 : 0) : 0;
+            }
+
+            for (nbOut.num[0] = 0; true; )
             {
               int nk = -1;
-              for( int k = 0; k < 5; k++ )
+              for (int k = 0; k < 5; k++)
+              {
+                if (cpos[k] != 0 && (nk < 0 || cpos[k] < cpos[nk]))
+                {
+                  nk = k;
+                }
+              }
+              if (nk < 0)
+              {
+                break;
+              }
+              nbOut.outPos[0][nbOut.num[0]++] = uint16_t(cpos[nk]);
+              cpos[nk] = 0;
+            }
+            for (int k = nbOut.num[0]; k < 5; k++)
+            {
+              nbOut.outPos[0][k] = 0;
+            }
+            
+// needs checking
+            for (nbOut.num[1] = 0; true; )
+            {
+              int nk = -1;
+              for (int k = 0; k < 5; k++)
+              {
+                if (lpos[k] != 0 && (nk < 0 || lpos[k] < lpos[nk]))
+                {
+                  nk = k;
+                }
+              }
+              if (nk < 0)
+              {
+                break;
+              }
+              nbOut.outPos[1][nbOut.num[1]++] = uint16_t(lpos[nk]);
+              lpos[nk] = 0;
+            }
+            for (int k = nbOut.num[1]; k < 5; k++)
+            {
+              nbOut.outPos[1][k] = 0;
+            }
+
+            nbOut.maxDist[0] = (scanId == 0 ? 0 : sId2NbOut[scanId - 1].maxDist[0]);
+            for (int k = 0; k < nbOut.num[0]; k++)
+            {
+              if (nbOut.outPos[0][k] > nbOut.maxDist[0])
+              {
+                nbOut.maxDist[0] = nbOut.outPos[0][k];
+              }
+            }
+
+            // PN TODO add maxdist for lfnst
+            nbOut.maxDist[1] = (scanId == 0 ? 0 : sId2NbOut[scanId - 1].maxDist[1]);
+            for (int k = 0; k < nbOut.num[1]; k++)
+            {
+              if (nbOut.outPos[1][k] > nbOut.maxDist[1])
+              {
+                nbOut.maxDist[1] = nbOut.outPos[1][k];
+              }
+            }
+#else
+            for (nbOut.num = 0; true; )
+            {
+              int nk = -1;
+              for (int k = 0; k < 5; k++)
               {
                 if( cpos[k] != 0 && ( nk < 0 || cpos[k] < cpos[nk] ) )
                 {
@@ -275,9 +399,36 @@ namespace DQIntern
                 nbOut.maxDist = nbOut.outPos[k];
               }
             }
+#endif
           }
         }
 
+#if JVET_AE0102_LFNST_CTX
+        // make it relative
+        for (unsigned scanId = 0; scanId < totalValues; scanId++)
+        {
+          NbInfoOut& nbOut = sId2NbOut[scanId];
+          const int  begSbb = scanId - (scanId & (groupSize - 1)); // first pos in current subblock
+          for (int k = 0; k < nbOut.num[0]; k++)
+          {
+            CHECK(begSbb > nbOut.outPos[0][k], "Position must be past sub block begin");
+            nbOut.outPos[0][k] -= begSbb;
+          }
+          nbOut.maxDist[0] -= scanId;
+        }
+
+        for (unsigned scanId = 0; scanId < totalValues; scanId++)
+        {
+          NbInfoOut& nbOut = sId2NbOut[scanId];
+          const int  begSbb = scanId - (scanId & (groupSize - 1)); // first pos in current subblock
+          for (int k = 0; k < nbOut.num[1]; k++)
+          {
+            //CHECK(begSbb > nbOut.outPos[1][k], "Position must be past sub block begin");
+            nbOut.outPos[1][k] -= begSbb;
+          }
+          nbOut.maxDist[1] -= scanId;
+        }
+#else
         // make it relative
         for( unsigned scanId = 0; scanId < totalValues; scanId++ )
         {
@@ -290,6 +441,7 @@ namespace DQIntern
           }
           nbOut.maxDist -= scanId;
         }
+#endif
 
         for( int chId = 0; chId < MAX_NUM_CHANNEL_TYPE; chId++ )
         {
@@ -425,7 +577,11 @@ namespace DQIntern
   public:
     RateEstimator () {}
     ~RateEstimator() {}
-    void initCtx  ( const TUParameters& tuPars, const TransformUnit& tu, const ComponentID compID, const FracBitsAccess& fracBitsAccess );
+    void initCtx  ( const TUParameters& tuPars, const TransformUnit& tu, const ComponentID compID, const FracBitsAccess& fracBitsAccess
+#if JVET_AE0102_LFNST_CTX
+      , const uint32_t lfnstIdx = 0
+#endif
+    );
 
     inline const BinFracBits *sigSbbFracBits() const { return m_sigSbbFracBits; }
     inline const BinFracBits *sigFlagBits(unsigned stateId) const
@@ -445,8 +601,13 @@ namespace DQIntern
   private:
     void  xSetLastCoeffOffset ( const FracBitsAccess& fracBitsAccess, const TUParameters& tuPars, const TransformUnit& tu, const ComponentID compID );
     void  xSetSigSbbFracBits  ( const FracBitsAccess& fracBitsAccess, ChannelType chType );
-    void  xSetSigFlagBits     ( const FracBitsAccess& fracBitsAccess, ChannelType chType );
-    void  xSetGtxFlagBits     ( const FracBitsAccess& fracBitsAccess, ChannelType chType );
+#if JVET_AE0102_LFNST_CTX
+    void  xSetSigFlagBits(const FracBitsAccess& fracBitsAccess, ChannelType chType, const bool isLfnst);
+    void  xSetGtxFlagBits(const FracBitsAccess& fracBitsAccess, ChannelType chType, const bool isLfnst);
+#else
+    void  xSetSigFlagBits(const FracBitsAccess& fracBitsAccess, ChannelType chType);
+    void  xSetGtxFlagBits(const FracBitsAccess& fracBitsAccess, ChannelType chType);
+#endif
 
   private:
     static const unsigned sm_numCtxSetsSig    = 3;
@@ -464,12 +625,21 @@ namespace DQIntern
     CoeffFracBits       m_gtxFracBits                          [ sm_maxNumGtxCtx ];
   };
 
-  void RateEstimator::initCtx( const TUParameters& tuPars, const TransformUnit& tu, const ComponentID compID, const FracBitsAccess& fracBitsAccess )
+  void RateEstimator::initCtx( const TUParameters& tuPars, const TransformUnit& tu, const ComponentID compID, const FracBitsAccess& fracBitsAccess
+#if JVET_AE0102_LFNST_CTX
+    , const uint32_t lfnstIdx
+#endif
+  )
   {
     m_scanId2Pos = tuPars.m_scanId2BlkPos;
     xSetSigSbbFracBits  ( fracBitsAccess, tuPars.m_chType );
-    xSetSigFlagBits     ( fracBitsAccess, tuPars.m_chType );
-    xSetGtxFlagBits     ( fracBitsAccess, tuPars.m_chType );
+#if JVET_AE0102_LFNST_CTX
+    xSetSigFlagBits(fracBitsAccess, tuPars.m_chType, lfnstIdx > 0);
+    xSetGtxFlagBits(fracBitsAccess, tuPars.m_chType, lfnstIdx > 0);
+#else
+    xSetSigFlagBits(fracBitsAccess, tuPars.m_chType);
+    xSetGtxFlagBits(fracBitsAccess, tuPars.m_chType);
+#endif
     xSetLastCoeffOffset ( fracBitsAccess, tuPars, tu, compID );
   }
 
@@ -555,13 +725,20 @@ namespace DQIntern
       m_sigSbbFracBits[ ctxId ] = fracBitsAccess.getFracBitsArray( ctxSet( ctxId ) );
     }
   }
-
-  void RateEstimator::xSetSigFlagBits( const FracBitsAccess& fracBitsAccess, ChannelType chType )
+  void RateEstimator::xSetSigFlagBits( const FracBitsAccess& fracBitsAccess, ChannelType chType
+#if JVET_AE0102_LFNST_CTX
+    , const bool isLfnst
+#endif
+  )
   {
     for( unsigned ctxSetId = 0; ctxSetId < sm_numCtxSetsSig; ctxSetId++ )
     {
       BinFracBits*    bits    = m_sigFracBits [ ctxSetId ];
-      const CtxSet&   ctxSet  = Ctx::SigFlag  [ chType + 2*ctxSetId ];
+#if JVET_AE0102_LFNST_CTX
+      const CtxSet& ctxSet = isLfnst ? Ctx::SigFlagL[chType + 2 * ctxSetId] : Ctx::SigFlag[chType + 2 * ctxSetId];
+#else
+      const CtxSet& ctxSet = Ctx::SigFlag[chType + 2 * ctxSetId];
+#endif
       const unsigned  numCtx  = ( chType == CHANNEL_TYPE_LUMA ? 12 : 8 );
       for( unsigned ctxId = 0; ctxId < numCtx; ctxId++ )
       {
@@ -570,11 +747,21 @@ namespace DQIntern
     }
   }
 
-  void RateEstimator::xSetGtxFlagBits( const FracBitsAccess& fracBitsAccess, ChannelType chType )
+  void RateEstimator::xSetGtxFlagBits( const FracBitsAccess& fracBitsAccess, ChannelType chType
+#if JVET_AE0102_LFNST_CTX
+    , const bool isLfnst
+#endif
+  )
   {
-    const CtxSet&   ctxSetPar   = Ctx::ParFlag [     chType ];
-    const CtxSet&   ctxSetGt1   = Ctx::GtxFlag [ 2 + chType ];
-    const CtxSet&   ctxSetGt2   = Ctx::GtxFlag [     chType ];
+#if JVET_AE0102_LFNST_CTX
+    const CtxSet& ctxSetPar = isLfnst ? Ctx::ParFlagL[chType] : Ctx::ParFlag[chType];
+    const CtxSet& ctxSetGt1 = isLfnst ? Ctx::GtxFlagL[2 + chType] : Ctx::GtxFlag[2 + chType];
+    const CtxSet& ctxSetGt2 = isLfnst ? Ctx::GtxFlagL[chType] : Ctx::GtxFlag[chType];
+#else
+    const CtxSet& ctxSetPar = Ctx::ParFlag[chType];
+    const CtxSet& ctxSetGt1 = Ctx::GtxFlag[2 + chType];
+    const CtxSet& ctxSetGt2 = Ctx::GtxFlag[chType];
+#endif
     const unsigned  numCtx      = ( chType == CHANNEL_TYPE_LUMA ? 21 : 11 );
     for( unsigned ctxId = 0; ctxId < numCtx; ctxId++ )
     {
@@ -647,6 +834,11 @@ namespace DQIntern
     inline TCoeff getSSbbThreshold() const { return m_thresSSbb; }
 
     inline int64_t getQScale()       const { return m_QScale; }
+
+#if JVET_AE0125_SHIFT_QUANTIZATION_CENTER
+    const int m_coeffShift[64]={0,63, 31, 21, 15, 12, 10, 9, 7, 7, 6, 5, 5, 4, 4, 4, 3, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+#endif
+
   private:
     // quantization
     int               m_QShift;
@@ -788,6 +980,22 @@ namespace DQIntern
         Intermediate_Int  qIdx      = ( level << 1 ) + ( level > 0 ? -(state>>1) : (state>>1) );
 #endif
 				int64_t  nomTCoeff          = ((int64_t)qIdx * (int64_t)invQScale + add) >> ((shift < 0) ? 0 : shift);
+
+#if JVET_AE0125_SHIFT_QUANTIZATION_CENTER
+        // Latent Shift
+        int qIdx2=qIdx;
+        qIdx2+=(qIdx>0? 1: -1);
+        int64_t  nomTCoeff2         = ((int64_t)qIdx2 *(int64_t)invQScale + add) >> ((shift < 0) ? 0 : shift) ;
+        int aqIdx  = abs(qIdx);
+        int coef=0;
+        if (aqIdx<64)
+        {
+          coef=m_coeffShift[aqIdx];
+        }
+        nomTCoeff=(int64_t)((1024-coef)*nomTCoeff+coef*nomTCoeff2)>>10;
+        // Latent Shift
+#endif
+
         tCoeff[rasterPos]           = (TCoeff)Clip3<int64_t>(minTCoeff, maxTCoeff, nomTCoeff);
       }
 #if TCQ_8STATES
@@ -872,8 +1080,11 @@ namespace DQIntern
         m_allSbbCtx[k].levels   = nextMem + numSbb;
       }
     }
-
+#if JVET_AE0102_LFNST_CTX
+    inline void update(const ScanInfo& scanInfo, const State* prevState, State& currState, bool lfnstidx);
+#else
     inline void update(const ScanInfo &scanInfo, const State *prevState, State &currState);
+#endif
 
   private:
     const NbInfoOut*            m_nbInfo;
@@ -908,10 +1119,20 @@ namespace DQIntern
     State( const RateEstimator& rateEst, CommonCtx& commonCtx, const int stateId );
 
     template<uint8_t numIPos>
-    inline void updateState(const ScanInfo &scanInfo, const State *prevStates, const Decision &decision);
+#if JVET_AE0102_LFNST_CTX 
+    inline void updateState(const ScanInfo& scanInfo, const State* prevStates, const Decision& decision, int lfnstIdx);
+#else
+    inline void updateState(const ScanInfo& scanInfo, const State* prevStates, const Decision& decision);
+#endif
 #if TCQ_8STATES
-    inline void updateStateEOS(const ScanInfo &scanInfo, const State *prevStates, const State *skipStates,
-                               const Decision &decision, int skipOffset );
+#if JVET_AE0102_LFNST_CTX
+    inline void updateStateEOS(const ScanInfo& scanInfo, const State* prevStates, const State* skipStates,
+      const Decision& decision, int skipOffsets, bool bLfnst);
+#else
+    inline void updateStateEOS(const ScanInfo& scanInfo, const State* prevStates, const State* skipStates,
+      const Decision& decision, int skipOffsets);
+#endif
+
 #else
     inline void updateStateEOS(const ScanInfo &scanInfo, const State *prevStates, const State *skipStates,
                                const Decision &decision);
@@ -937,7 +1158,6 @@ namespace DQIntern
       effHeight       = effectiveHeight;
 #endif
     }
-
     void checkRdCosts( const ScanPosType spt, const PQData& pqDataA, const PQData& pqDataB, Decision& decisionA, Decision& decisionB ) const
     {
       const int32_t*  goRiceTab = g_goRiceBits[m_goRicePar];
@@ -978,7 +1198,6 @@ namespace DQIntern
 #endif
           rdCostB += bits[absLevelB - ( value << 1 )] + goRiceTab[value < RICEMAX ? value : RICEMAX - 1];
         }
-
         const int sigBit1 = m_sigFracBits.intBits[1];
 
         if( spt == SCAN_ISCSBB )
@@ -1124,7 +1343,11 @@ namespace DQIntern
   }
 
   template<uint8_t numIPos>
-  inline void State::updateState(const ScanInfo &scanInfo, const State *prevStates, const Decision &decision)
+#if JVET_AE0102_LFNST_CTX
+  inline void State::updateState(const ScanInfo& scanInfo, const State* prevStates, const Decision& decision, int lfnstIdx)
+#else
+  inline void State::updateState(const ScanInfo& scanInfo, const State* prevStates, const Decision& decision)
+#endif
   {
     m_rdCost = decision.rdCost;
     if( decision.prevId > -2 )
@@ -1168,7 +1391,16 @@ namespace DQIntern
         TCoeff  tinit = m_absLevelsAndCtxInit[8 + scanInfo.nextInsidePos];
         TCoeff  sumAbs1 = (tinit >> 3) & 31;
         TCoeff  sumNum = tinit & 7;
+
+#if JVET_AE0102_LFNST_CTX
+        int ctxType = 0;
+        ctxType = lfnstIdx > 0  ? 1 : 0;
+#endif
+#if JVET_AE0102_LFNST_CTX
+#define UPDATE(k) {TCoeff t=levels[scanInfo.nextNbInfoSbb.inPos[ctxType][k]]; sumAbs1+=std::min<TCoeff>(4+(t&1),t); sumNum+=!!t; }
+#else
 #define UPDATE(k) {TCoeff t=levels[scanInfo.nextNbInfoSbb.inPos[k]]; sumAbs1+=std::min<TCoeff>(4+(t&1),t); sumNum+=!!t; }
+#endif
         if (numIPos == 1)
         {
           UPDATE(0);
@@ -1209,7 +1441,14 @@ namespace DQIntern
         m_coeffFracBits = m_gtxFracBitsArray[scanInfo.gtxCtxOffsetNext + (sumGt1 < 4 ? sumGt1 : 4)];
 
         TCoeff  sumAbs = m_absLevelsAndCtxInit[8 + scanInfo.nextInsidePos] >> 8;
+#if JVET_AE0102_LFNST_CTX
+        ctxType = 0;
+        ctxType = lfnstIdx > 0  ? 1 : 0;
+
+#define UPDATE(k) {TCoeff t=levels[scanInfo.nextNbInfoSbb.inPos[ctxType][k]]; sumAbs+=t; }
+#else
 #define UPDATE(k) {TCoeff t=levels[scanInfo.nextNbInfoSbb.inPos[k]]; sumAbs+=t; }
+#endif
         if (numIPos == 1)
         {
           UPDATE(0);
@@ -1247,7 +1486,13 @@ namespace DQIntern
       else
       {
         TCoeff  sumAbs = m_absLevelsAndCtxInit[8 + scanInfo.nextInsidePos] >> 8;
+#if JVET_AE0102_LFNST_CTX
+        int ctxType = 0;
+        ctxType = lfnstIdx > 0  ? 1 : 0;
+#define UPDATE(k) {TCoeff t=levels[scanInfo.nextNbInfoSbb.inPos[ctxType][k]]; sumAbs+=t; }
+#else
 #define UPDATE(k) {TCoeff t=levels[scanInfo.nextNbInfoSbb.inPos[k]]; sumAbs+=t; }
+#endif
         if (numIPos == 1)
         {
           UPDATE(0);
@@ -1287,8 +1532,13 @@ namespace DQIntern
   }
 
 #if TCQ_8STATES
-  inline void State::updateStateEOS(const ScanInfo &scanInfo, const State *prevStates, const State *skipStates,
-                                    const Decision &decision, int skipOffset )
+#if JVET_AE0102_LFNST_CTX
+  inline void State::updateStateEOS(const ScanInfo& scanInfo, const State* prevStates, const State* skipStates,
+    const Decision& decision, int skipOffset, bool bLfnst)
+#else
+  inline void State::updateStateEOS(const ScanInfo& scanInfo, const State* prevStates, const State* skipStates,
+    const Decision& decision, int skipOffset)
+#endif
 #else
   inline void State::updateStateEOS(const ScanInfo &scanInfo, const State *prevStates, const State *skipStates,
                                     const Decision &decision)
@@ -1325,27 +1575,39 @@ namespace DQIntern
         ::memset( m_absLevelsAndCtxInit, 0, 16*sizeof(uint8_t) );
       }
       reinterpret_cast<uint8_t*>(m_absLevelsAndCtxInit)[ scanInfo.insidePos ] = (uint8_t)std::min<TCoeff>( 255, decision.absLevel );
-
+#if JVET_AE0102_LFNST_CTX 
+      m_commonCtx.update(scanInfo, prvState, *this, bLfnst);
+#else
       m_commonCtx.update( scanInfo, prvState, *this );
+#endif
 
       TCoeff  tinit   = m_absLevelsAndCtxInit[ 8 + scanInfo.nextInsidePos ];
       TCoeff  sumNum  =   tinit        & 7;
       TCoeff  sumAbs1 = ( tinit >> 3 ) & 31;
       TCoeff  sumGt1  = sumAbs1        - sumNum;
+      // PN check it
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
       m_sigFracBits   = m_sigFracBitsArray[ scanInfo.sigCtxOffsetNext + std::min<TCoeff>( (sumAbs1+1)>>1, 3 ) ];
 #else
       m_sigFracBits   = m_sigFracBitsArray[ scanInfo.sigCtxOffsetNext + std::min( (sumAbs1+1)>>1, 3 ) ];
 #endif
       m_coeffFracBits = m_gtxFracBitsArray[ scanInfo.gtxCtxOffsetNext + ( sumGt1  < 4 ? sumGt1  : 4 ) ];
+
     }
   }
-
+#if JVET_AE0102_LFNST_CTX
+  inline void CommonCtx::update(const ScanInfo& scanInfo, const State* prevState, State& currState, bool lfnstidx)
+#else
   inline void CommonCtx::update(const ScanInfo &scanInfo, const State *prevState, State &currState)
+#endif
   {
     uint8_t*    sbbFlags  = m_currSbbCtx[ currState.m_stateId ].sbbFlags;
     uint8_t*    levels    = m_currSbbCtx[ currState.m_stateId ].levels;
+#if JVET_AE0102_LFNST_CTX
+    std::size_t setCpSize = m_nbInfo[scanInfo.scanIdx - 1].maxDist[lfnstidx] * sizeof(uint8_t);
+#else
     std::size_t setCpSize = m_nbInfo[ scanInfo.scanIdx - 1 ].maxDist * sizeof(uint8_t);
+#endif
     if( prevState && prevState->m_refSbbCtxId >= 0 )
     {
       ::memcpy( sbbFlags,                  m_prevSbbCtx[prevState->m_refSbbCtxId].sbbFlags,                  scanInfo.numSbb*sizeof(uint8_t) );
@@ -1380,7 +1642,32 @@ namespace DQIntern
     const uint8_t*    absLevels = levels   + scanBeg;
     for( int id = 0; id < scanInfo.sbbSize; id++, nbOut++ )
     {
-      if( nbOut->num )
+#if JVET_AE0102_LFNST_CTX
+      if (nbOut->num[lfnstidx])
+      {
+        TCoeff sumAbs = 0, sumAbs1 = 0, sumNum = 0;
+#define UPDATE(k) {TCoeff t=absLevels[nbOut->outPos[lfnstidx][k]]; sumAbs+=t; sumAbs1+=std::min<TCoeff>(4+(t&1),t); sumNum+=!!t; }
+        UPDATE(0);
+        if (nbOut->num[lfnstidx] > 1)
+        {
+          UPDATE(1);
+          if (nbOut->num[lfnstidx] > 2)
+          {
+            UPDATE(2);
+#if 5 == 5
+            if (nbOut->num[lfnstidx] > 3)
+            {
+              UPDATE(3);
+              if (nbOut->num[lfnstidx] > 4)
+              {
+                UPDATE(4);
+              }
+            }
+#endif
+          }
+        }
+#else
+      if (nbOut->num)
       {
         TCoeff sumAbs = 0, sumAbs1 = 0, sumNum = 0;
 #define UPDATE(k) {TCoeff t=absLevels[nbOut->outPos[k]]; sumAbs+=t; sumAbs1+=std::min<TCoeff>(4+(t&1),t); sumNum+=!!t; }
@@ -1401,7 +1688,9 @@ namespace DQIntern
             }
           }
         }
+#endif
 #undef UPDATE
+
         templateCtxInit[id] = uint16_t(sumNum) + ( uint16_t(sumAbs1) << 3 ) + ( (uint16_t)std::min<TCoeff>( 127, sumAbs ) << 8 );
       }
       else
@@ -1435,7 +1724,11 @@ namespace DQIntern
 		template<int numStates>
 #endif
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT_VS
-    void    xDecideAndUpdate  ( const TCoeff absCoeff, const ScanInfo& scanInfo, TCoeff quantCoeff);
+#if JVET_AE0102_LFNST_CTX
+    void    xDecideAndUpdate(const TCoeff absCoeff, const ScanInfo& scanInfo, TCoeff quantCoeff, int lfnstIdx);
+#else
+    void    xDecideAndUpdate(const TCoeff absCoeff, const ScanInfo& scanInfo, TCoeff quantCoeff);
+#endif
 #else
     void    xDecideAndUpdate  ( const TCoeff absCoeff, const ScanInfo& scanInfo, int quantCoeff);
 #endif    
@@ -1648,7 +1941,11 @@ namespace DQIntern
 #endif
 #if TU_256 && !EXTENDED_LFNST
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT_VS
-  void DepQuant::xDecideAndUpdate( const TCoeff absCoeff, const ScanInfo& scanInfo, TCoeff quantCoeff )
+#if JVET_AE0102_LFNST_CTX
+  void DepQuant::xDecideAndUpdate(const TCoeff absCoeff, const ScanInfo& scanInfo, TCoeff quantCoeff, int lfnstIdx)
+#else
+  void DepQuant::xDecideAndUpdate(const TCoeff absCoeff, const ScanInfo& scanInfo, TCoeff quantCoeff)
+#endif
 #else
   void DepQuant::xDecideAndUpdate( const TCoeff absCoeff, const ScanInfo& scanInfo, int quantCoeff )
 #endif
@@ -1686,6 +1983,21 @@ namespace DQIntern
       {
         m_commonCtx.swap();
 #if TCQ_8STATES
+        // PN add propagation of lfnstidx
+#if JVET_AE0102_LFNST_CTX 
+        m_currStates[0].updateStateEOS(scanInfo, m_prevStates, m_skipStates, decisions[0], numStates, lfnstIdx > 0);
+        m_currStates[1].updateStateEOS(scanInfo, m_prevStates, m_skipStates, decisions[1], numStates, lfnstIdx > 0);
+        m_currStates[2].updateStateEOS(scanInfo, m_prevStates, m_skipStates, decisions[2], numStates, lfnstIdx > 0);
+        m_currStates[3].updateStateEOS(scanInfo, m_prevStates, m_skipStates, decisions[3], numStates, lfnstIdx > 0);
+
+        if (numStates > 4)
+        {
+          m_currStates[4].updateStateEOS(scanInfo, m_prevStates, m_skipStates, decisions[4], numStates, lfnstIdx > 0);
+          m_currStates[5].updateStateEOS(scanInfo, m_prevStates, m_skipStates, decisions[5], numStates, lfnstIdx > 0);
+          m_currStates[6].updateStateEOS(scanInfo, m_prevStates, m_skipStates, decisions[6], numStates, lfnstIdx > 0);
+          m_currStates[7].updateStateEOS(scanInfo, m_prevStates, m_skipStates, decisions[7], numStates, lfnstIdx > 0);
+        }
+#else
         m_currStates[0].updateStateEOS( scanInfo, m_prevStates, m_skipStates, decisions[0], numStates );
         m_currStates[1].updateStateEOS( scanInfo, m_prevStates, m_skipStates, decisions[1], numStates );
         m_currStates[2].updateStateEOS( scanInfo, m_prevStates, m_skipStates, decisions[2], numStates );
@@ -1698,7 +2010,7 @@ namespace DQIntern
           m_currStates[6].updateStateEOS( scanInfo, m_prevStates, m_skipStates, decisions[6], numStates );
           m_currStates[7].updateStateEOS( scanInfo, m_prevStates, m_skipStates, decisions[7], numStates );
         }
-
+#endif
         ::memcpy(decisions + numStates, decisions, numStates * sizeof(Decision));
 #else
         m_currStates[0].updateStateEOS( scanInfo, m_prevStates, m_skipStates, decisions[0] );
@@ -1715,6 +2027,100 @@ namespace DQIntern
 #endif
       {
 #if TCQ_8STATES
+#if JVET_AE0102_LFNST_CTX
+        int ctxType = 0;
+        ctxType = lfnstIdx>0 ? 1 : 0;
+#if JVET_AE0102_LFNST_CTX
+        switch (scanInfo.nextNbInfoSbb.num[ctxType])
+#else
+        switch (scanInfo.nextNbInfoSbb.num)
+#endif
+        {
+        case 0:
+          m_currStates[0].updateState<0>(scanInfo, m_prevStates, decisions[0], ctxType);
+          m_currStates[1].updateState<0>(scanInfo, m_prevStates, decisions[1], ctxType);
+          m_currStates[2].updateState<0>(scanInfo, m_prevStates, decisions[2], ctxType);
+          m_currStates[3].updateState<0>(scanInfo, m_prevStates, decisions[3], ctxType);
+
+          if (numStates > 4)
+          {
+            m_currStates[4].updateState<0>(scanInfo, m_prevStates, decisions[4], ctxType);
+            m_currStates[5].updateState<0>(scanInfo, m_prevStates, decisions[5], ctxType);
+            m_currStates[6].updateState<0>(scanInfo, m_prevStates, decisions[6], ctxType);
+            m_currStates[7].updateState<0>(scanInfo, m_prevStates, decisions[7], ctxType);
+          }
+          break;
+        case 1:
+          m_currStates[0].updateState<1>(scanInfo, m_prevStates, decisions[0], ctxType);
+          m_currStates[1].updateState<1>(scanInfo, m_prevStates, decisions[1], ctxType);
+          m_currStates[2].updateState<1>(scanInfo, m_prevStates, decisions[2], ctxType);
+          m_currStates[3].updateState<1>(scanInfo, m_prevStates, decisions[3], ctxType);
+
+          if (numStates > 4)
+          {
+            m_currStates[4].updateState<1>(scanInfo, m_prevStates, decisions[4], ctxType);
+            m_currStates[5].updateState<1>(scanInfo, m_prevStates, decisions[5], ctxType);
+            m_currStates[6].updateState<1>(scanInfo, m_prevStates, decisions[6], ctxType);
+            m_currStates[7].updateState<1>(scanInfo, m_prevStates, decisions[7], ctxType);
+          }
+          break;
+        case 2:
+          m_currStates[0].updateState<2>(scanInfo, m_prevStates, decisions[0], ctxType);
+          m_currStates[1].updateState<2>(scanInfo, m_prevStates, decisions[1], ctxType);
+          m_currStates[2].updateState<2>(scanInfo, m_prevStates, decisions[2], ctxType);
+          m_currStates[3].updateState<2>(scanInfo, m_prevStates, decisions[3], ctxType);
+
+          if (numStates > 4)
+          {
+            m_currStates[4].updateState<2>(scanInfo, m_prevStates, decisions[4], ctxType);
+            m_currStates[5].updateState<2>(scanInfo, m_prevStates, decisions[5], ctxType);
+            m_currStates[6].updateState<2>(scanInfo, m_prevStates, decisions[6], ctxType);
+            m_currStates[7].updateState<2>(scanInfo, m_prevStates, decisions[7], ctxType);
+          }
+          break;
+        case 3:
+          m_currStates[0].updateState<3>(scanInfo, m_prevStates, decisions[0], ctxType);
+          m_currStates[1].updateState<3>(scanInfo, m_prevStates, decisions[1], ctxType);
+          m_currStates[2].updateState<3>(scanInfo, m_prevStates, decisions[2], ctxType);
+          m_currStates[3].updateState<3>(scanInfo, m_prevStates, decisions[3], ctxType);
+
+          if (numStates > 4)
+          {
+            m_currStates[4].updateState<3>(scanInfo, m_prevStates, decisions[4], ctxType);
+            m_currStates[5].updateState<3>(scanInfo, m_prevStates, decisions[5], ctxType);
+            m_currStates[6].updateState<3>(scanInfo, m_prevStates, decisions[6], ctxType);
+            m_currStates[7].updateState<3>(scanInfo, m_prevStates, decisions[7], ctxType);
+          }
+          break;
+        case 4:
+          m_currStates[0].updateState<4>(scanInfo, m_prevStates, decisions[0], ctxType);
+          m_currStates[1].updateState<4>(scanInfo, m_prevStates, decisions[1], ctxType);
+          m_currStates[2].updateState<4>(scanInfo, m_prevStates, decisions[2], ctxType);
+          m_currStates[3].updateState<4>(scanInfo, m_prevStates, decisions[3], ctxType);
+
+          if (numStates > 4)
+          {
+            m_currStates[4].updateState<4>(scanInfo, m_prevStates, decisions[4], ctxType);
+            m_currStates[5].updateState<4>(scanInfo, m_prevStates, decisions[5], ctxType);
+            m_currStates[6].updateState<4>(scanInfo, m_prevStates, decisions[6], ctxType);
+            m_currStates[7].updateState<4>(scanInfo, m_prevStates, decisions[7], ctxType);
+          }
+          break;
+        default:
+          m_currStates[0].updateState<5>(scanInfo, m_prevStates, decisions[0], ctxType);
+          m_currStates[1].updateState<5>(scanInfo, m_prevStates, decisions[1], ctxType);
+          m_currStates[2].updateState<5>(scanInfo, m_prevStates, decisions[2], ctxType);
+          m_currStates[3].updateState<5>(scanInfo, m_prevStates, decisions[3], ctxType);
+
+          if (numStates > 4)
+          {
+            m_currStates[4].updateState<5>(scanInfo, m_prevStates, decisions[4], ctxType);
+            m_currStates[5].updateState<5>(scanInfo, m_prevStates, decisions[5], ctxType);
+            m_currStates[6].updateState<5>(scanInfo, m_prevStates, decisions[6], ctxType);
+            m_currStates[7].updateState<5>(scanInfo, m_prevStates, decisions[7], ctxType);
+          }
+        }
+#else
         switch( scanInfo.nextNbInfoSbb.num )
         {
         case 0:
@@ -1801,6 +2207,7 @@ namespace DQIntern
             m_currStates[7].updateState<5>( scanInfo, m_prevStates, decisions[7] );
           }
         }
+#endif
 #else
         switch( scanInfo.nextNbInfoSbb.num )
         {
@@ -1975,7 +2382,12 @@ namespace DQIntern
     }
 
     //===== real init =====
-    RateEstimator::initCtx( tuPars, tu, compID, ctx.getFracBitsAcess() );
+    RateEstimator::initCtx( tuPars, tu, compID, ctx.getFracBitsAcess()
+#if JVET_AE0102_LFNST_CTX
+      , lfnstIdx
+#endif
+    );
+
     m_commonCtx.reset( tuPars, *this );
 #if !TCQ_8STATES 
     for( int k = 0; k < 12; k++ )
@@ -2015,7 +2427,11 @@ namespace DQIntern
     //===== populate trellis ===== // 
 #if TCQ_8STATES
 #if TU_256 && !EXTENDED_LFNST
-		void (DepQuant::*fdecide)(const TCoeff, const ScanInfo&, int) = (numStates>4 ? &DepQuant::xDecideAndUpdate<8> : &DepQuant::xDecideAndUpdate<4>);
+#if JVET_AE0102_LFNST_CTX
+    void (DepQuant::* fdecide)(const TCoeff, const ScanInfo&, int, int) = (numStates > 4 ? &DepQuant::xDecideAndUpdate<8> : &DepQuant::xDecideAndUpdate<4>);
+#else
+    void (DepQuant::* fdecide)(const TCoeff, const ScanInfo&, int) = (numStates > 4 ? &DepQuant::xDecideAndUpdate<8> : &DepQuant::xDecideAndUpdate<4>);
+#endif
 #else
     void (DepQuant::*fdecide)(const TCoeff,const ScanInfo&,bool,int) = ( numStates>4 ? &DepQuant::xDecideAndUpdate<8> : &DepQuant::xDecideAndUpdate<4> );
 #endif
@@ -2023,13 +2439,20 @@ namespace DQIntern
     for( int scanIdx = firstTestPos; scanIdx >= 0; scanIdx-- )
     {
       const ScanInfo& scanInfo = tuPars.m_scanInfo[ scanIdx ];
+#if JVET_AE0102_LFNST_CTX
+      int lfnstIdx = tu.cu->lfnstIdx;
+#endif
 
       if (enableScalingLists)
       {
         m_quant.initQuantBlock(tu, compID, cQP, lambda, quantCoeff[scanInfo.rasterPos]);
 #if TU_256 && !EXTENDED_LFNST
 #if TCQ_8STATES
+#if JVET_AE0102_LFNST_CTX
+        (this->*fdecide)(abs(tCoeff[scanInfo.rasterPos]), scanInfo, quantCoeff[scanInfo.rasterPos], lfnstIdx);
+#else
 				(this->*fdecide)(abs(tCoeff[scanInfo.rasterPos]), scanInfo, quantCoeff[scanInfo.rasterPos]);
+#endif
 #else
         xDecideAndUpdate( abs( tCoeff[scanInfo.rasterPos]), scanInfo, quantCoeff[scanInfo.rasterPos] );
 #endif
@@ -2044,9 +2467,13 @@ namespace DQIntern
       else
 #if TU_256 && !EXTENDED_LFNST
 #if TCQ_8STATES
-        (this->*fdecide)( abs( tCoeff[scanInfo.rasterPos]), scanInfo, defaultQuantisationCoefficient );
+#if JVET_AE0102_LFNST_CTX 
+        (this->*fdecide)(abs(tCoeff[scanInfo.rasterPos]), scanInfo, defaultQuantisationCoefficient, lfnstIdx);
 #else
-        xDecideAndUpdate( abs( tCoeff[scanInfo.rasterPos]), scanInfo, defaultQuantisationCoefficient );
+        (this->*fdecide)(abs(tCoeff[scanInfo.rasterPos]), scanInfo, defaultQuantisationCoefficient);
+#endif
+#else
+        xDecideAndUpdate(abs(tCoeff[scanInfo.rasterPos]), scanInfo, defaultQuantisationCoefficient);
 #endif
 #else
 #if TCQ_8STATES
