@@ -364,8 +364,8 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
     for (int idx = 0; idx < m_numQPOffset; idx++)
     {
       sps0.setQPOffsets(idx, m_qpOffsetList[idx]);
-      sps0.setLambdaVal(idx, (uint32_t)LAMBDA_DEC_SIDE[26 + pps0.getPicInitQPMinus26() + m_qpOffsetList[idx] - 4 * ((int)m_isRA)]);
-      uint32_t lambda = (uint32_t)LAMBDA_DEC_SIDE[26 + pps0.getPicInitQPMinus26() + m_qpOffsetList[idx] - 4 * ((int)m_isRA)];
+      const uint32_t lambda = (uint32_t)LAMBDA_DEC_SIDE[min(max(26 + pps0.getPicInitQPMinus26() + m_qpOffsetList[idx] - 4 * ((int)m_isRA), 0), MAX_QP)];
+      sps0.setLambdaVal(idx, lambda);
       for (int shift = 0; shift < 16; shift++)
         if (lambda >> shift == 0)
         {
