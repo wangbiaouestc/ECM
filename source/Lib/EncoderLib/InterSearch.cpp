@@ -14323,6 +14323,12 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
               m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng( compID ), currTU, true, false, &invLUT );
             }
           }
+          else
+          {
+            CompArea compArea = currTU.blocks[compID];
+            PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
+            recIPredBuf.copyFrom(tmpSubBuf);
+          }
         }
       }
     }
@@ -14347,6 +14353,12 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
             CompArea compArea = currTU.blocks[compID];
             PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
             m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(compID), currTU, true );
+          }
+          else
+          {
+            CompArea compArea = currTU.blocks[compID];
+            PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
+            recIPredBuf.copyFrom(tmpSubBuf);
           }
         }
       }
@@ -14411,6 +14423,12 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
             CompArea compArea = currTU.blocks[compID];
             PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
             m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(compID), currTU, true );
+          }
+          else
+          {
+            CompArea compArea = currTU.blocks[compID];
+            PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
+            recIPredBuf.copyFrom(tmpSubBuf);
           }
         }
       }
