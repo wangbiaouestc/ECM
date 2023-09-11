@@ -938,7 +938,8 @@ public:
 #if ENABLE_SPLIT_PARALLELISM
 protected:
 #endif
-  void create();
+  int m_maxCuSize;
+  void create(const int maxCuSize);
   void destroy();
 
 private:
@@ -1017,7 +1018,8 @@ private:
 
 protected:
 
-  void create   ();
+  int m_maxCuSize;
+  void create   (const int maxCuSize);
   void destroy  ();
 #if ENABLE_SPLIT_PARALLELISM
 public:
@@ -1062,14 +1064,12 @@ struct BestEncodingInfo
   PredictionUnit pu;
 #if CONVERT_NUM_TU_SPLITS_TO_CFG
   std::vector<TransformUnit> tus;
-  size_t         numTus;
 #elif REUSE_CU_RESULTS_WITH_MULTIPLE_TUS
   TransformUnit  tus[MAX_NUM_TUS];
   size_t         numTus;
 #else
   TransformUnit  tu;
 #endif
-  EncTestMode    testMode;
 
   int            poc;
 
@@ -1106,7 +1106,8 @@ private:
 protected:
 
 #if CONVERT_NUM_TU_SPLITS_TO_CFG
-  void create   ( const ChromaFormat chFmt, const int maxNumTUs );
+  int m_maxCuSize;
+  void create(const ChromaFormat chFmt, const int maxNumTUs, const int maxCuSize);
 #else
   void create   ( const ChromaFormat chFmt );
 #endif

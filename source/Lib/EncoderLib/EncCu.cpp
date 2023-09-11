@@ -116,7 +116,7 @@ void EncCu::create( EncCfg* encCfg )
   m_pBestCS2 = new CodingStructure** [numWidths];
 #endif
 #if ENABLE_OBMC
-  m_tempWoOBMCBuffer.create(UnitArea(chromaFormat, Area(0, 0, MAX_CU_SIZE, MAX_CU_SIZE)));
+  m_tempWoOBMCBuffer.create(UnitArea(chromaFormat, Area(0, 0, uiMaxWidth, uiMaxHeight)));
 #endif
   for( unsigned w = 0; w < numWidths; w++ )
   {
@@ -131,7 +131,8 @@ void EncCu::create( EncCfg* encCfg )
       unsigned width  = gp_sizeIdxInfo->sizeFrom( w );
       unsigned height = gp_sizeIdxInfo->sizeFrom( h );
 
-      if( gp_sizeIdxInfo->isCuSize( width ) && gp_sizeIdxInfo->isCuSize( height ) )
+      if (gp_sizeIdxInfo->isCuSize( width ) && gp_sizeIdxInfo->isCuSize( height )
+        && width <= uiMaxWidth && height <= uiMaxHeight)
       {
         m_pTempCS[w][h] = new CodingStructure( m_unitCache.cuCache, m_unitCache.puCache, m_unitCache.tuCache );
         m_pBestCS[w][h] = new CodingStructure( m_unitCache.cuCache, m_unitCache.puCache, m_unitCache.tuCache );
@@ -181,7 +182,8 @@ void EncCu::create( EncCfg* encCfg )
         uint32_t width = gp_sizeIdxInfo->sizeFrom(w);
         uint32_t height = gp_sizeIdxInfo->sizeFrom(h);
 
-        if (gp_sizeIdxInfo->isCuSize(width) && gp_sizeIdxInfo->isCuSize(height))
+        if (gp_sizeIdxInfo->isCuSize(width) && gp_sizeIdxInfo->isCuSize(height)
+          && width <= uiMaxWidth && height <= uiMaxHeight)
         {
           m_pTempCUWoOBMC[w][h] = new CodingStructure(m_unitCache.cuCache, m_unitCache.puCache, m_unitCache.tuCache);
 #if JVET_Z0118_GDR
@@ -190,6 +192,10 @@ void EncCu::create( EncCfg* encCfg )
           m_pTempCUWoOBMC[w][h]->create(chromaFormat, Area(0, 0, width, height), false, false);
 #endif
           m_pPredBufWoOBMC[w][h].create(UnitArea(chromaFormat, Area(0, 0, width, height)));
+        }
+        else
+        {
+          m_pTempCUWoOBMC[w][h] = nullptr;
         }
       }
     }
@@ -349,7 +355,8 @@ void EncCu::destroy()
     {
       for (unsigned h = 0; h < numHeights; h++)
       {
-        if( gp_sizeIdxInfo->isCuSize( gp_sizeIdxInfo->sizeFrom( w ) ) && gp_sizeIdxInfo->isCuSize( gp_sizeIdxInfo->sizeFrom( h ) ) )
+        if( gp_sizeIdxInfo->isCuSize( gp_sizeIdxInfo->sizeFrom( w ) ) && gp_sizeIdxInfo->isCuSize( gp_sizeIdxInfo->sizeFrom( h ) )
+          && gp_sizeIdxInfo->sizeFrom(w) <= m_pcEncCfg->getMaxCUWidth() && gp_sizeIdxInfo->sizeFrom(h) <= m_pcEncCfg->getMaxCUHeight())
         {
           m_pTempCUWoOBMC[w][h]->destroy();
           delete m_pTempCUWoOBMC[w][h];
