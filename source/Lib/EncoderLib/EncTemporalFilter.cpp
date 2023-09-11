@@ -207,6 +207,8 @@ bool EncTemporalFilter::filter(PelStorage *orgPic, int receivedPoc)
       srcPic.mvs.allocate(m_sourceWidth / 4, m_sourceHeight / 4);
 
       motionEstimation(srcPic.mvs, origPadded, srcPic.picBuffer, origSubsampled2, origSubsampled4);
+      applyMotion(srcPic.mvs, srcPic.picBuffer, dummyPicBufferTO);
+      srcPic.picBuffer.swap(dummyPicBufferTO);
       srcPic.origOffset = poc - currentFilePoc;
     }
 
@@ -703,12 +705,6 @@ void EncTemporalFilter::bilateralFilter(const PelStorage &orgPic,
   double overallStrength) const
 {
   const int numRefs = int(srcFrameInfo.size());
-  std::vector<PelStorage> correctedPics(numRefs);
-  for (int i = 0; i < numRefs; i++)
-  {
-    correctedPics[i].create(m_chromaFormatIDC, m_area, 0, m_padding);
-    applyMotion(srcFrameInfo[i].mvs, srcFrameInfo[i].picBuffer, correctedPics[i]);
-  }
 
   const int refStrengthRow = m_futureRefs > 0 ? 0 : 1;
 
@@ -751,8 +747,8 @@ void EncTemporalFilter::bilateralFilter(const PelStorage &orgPic,
           for (int i = 0; i < numRefs; i++)
           {
             double variance = 0, diffsum = 0;
-            const ptrdiff_t refStride = correctedPics[i].bufs[c].stride;
-            const Pel *     refPel = correctedPics[i].bufs[c].buf + y * refStride + x;
+            const ptrdiff_t refStride = srcFrameInfo[i].picBuffer.bufs[c].stride;
+            const Pel *     refPel = srcFrameInfo[i].picBuffer.bufs[c].buf + y * refStride + x;
             for( int y1 = 0; y1 < blockSizeY; y1++ )
             {
               for( int x1 = 0; x1 < blockSizeX; x1++ )
@@ -795,7 +791,7 @@ void EncTemporalFilter::bilateralFilter(const PelStorage &orgPic,
           const int error = srcFrameInfo[i].mvs.get(x / blockSizeX, y / blockSizeY).error;
           const int noise = srcFrameInfo[i].mvs.get(x / blockSizeX, y / blockSizeY).noise;
 #endif
-          const Pel *pCorrectedPelPtr = correctedPics[i].bufs[c].buf + (y * correctedPics[i].bufs[c].stride + x);
+          const Pel* pCorrectedPelPtr = srcFrameInfo[i].picBuffer.bufs[c].buf + (y * srcFrameInfo[i].picBuffer.bufs[c].stride + x);
           const int refVal = (int) *pCorrectedPelPtr;
           double diff = (double)(refVal - orgVal);
           diff *= bitDepthDiffWeighting;
