@@ -22787,7 +22787,7 @@ void InterPrediction::deriveMVDCandVecFromMotionInforPred(const PredictionUnit &
 #if JVET_AD0140_MVD_PREDICTION
       for (int i = 0; i < miPredList.size(); ++i)
       {
-        if (miPredList[i].refIdx[eRefPicList] == pu.refIdx[eRefPicList] && miPredList[i].interDir == pu.interDir)
+        if (miPredList[i].interDir == pu.interDir && miPredList[i].refIdx[eRefPicList] == pu.refIdx[eRefPicList])
         {
           miPredListSub.push_back(i);
         }
@@ -23189,7 +23189,7 @@ void InterPrediction::reorderRefCombList(PredictionUnit &pu, std::vector<RefList
 
           if (res)
           {
-            if ((sideOrder[sideIdx] == 0 && uiCost < refListComb[idx].cost && m_bAMLTemplateAvailabe[0]) || pu.cu->licFlag )
+            if ((sideOrder[sideIdx] == 0 && uiCost < refListComb[idx].cost && m_bAMLTemplateAvailabe[0]) || (pu.cu->licFlag && m_bAMLTemplateAvailabe[0]))
             {
               if (!pu.cu->licFlag)
               {
@@ -23208,7 +23208,7 @@ void InterPrediction::reorderRefCombList(PredictionUnit &pu, std::vector<RefList
               bAboveCostCalculated = true;
             }
 
-            if ((sideOrder[sideIdx] == 1 && uiCost < refListComb[idx].cost && m_bAMLTemplateAvailabe[1]) || pu.cu->licFlag )
+            if ((sideOrder[sideIdx] == 1 && uiCost < refListComb[idx].cost && m_bAMLTemplateAvailabe[1]) || (pu.cu->licFlag && m_bAMLTemplateAvailabe[1]))
             {
               if (!pu.cu->licFlag)
               {
