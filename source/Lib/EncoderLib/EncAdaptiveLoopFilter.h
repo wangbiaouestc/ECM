@@ -229,7 +229,8 @@ struct AlfCovariance
     for (ptrdiff_t k = 0; k < size; k++)
     {
       _y[k] = y(clip[k], k);
-      for (ptrdiff_t l = 0; l < size; l++)
+      // Upper triangular
+      for (ptrdiff_t l = k; l < size; l++)
       {
         _E[k][l] = E(clip[k], clip[l], k, l);
       }

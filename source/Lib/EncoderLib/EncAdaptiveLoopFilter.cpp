@@ -153,10 +153,14 @@ double AlfCovariance::optimizeFilter(const AlfFilterShape& alfShape, int* clip, 
       {
         clip[k] -= step;
         ky[k] = y(clip[k],k);
-        for( int l = 0; l < size; l++ )
+        // Upper triangular
+        for( int l = 0; l < k; l++ )
+        {
+          kE[l][k] = E(clip[l],clip[k],l,k);
+        }
+        for( int l = k; l < size; l++ )
         {
           kE[k][l] = E(clip[k],clip[l],k,l);
-          kE[l][k] = E(clip[l],clip[k],l,k);
         }
 
         gnsSolveByChol( kE, ky, f, size );
@@ -175,10 +179,14 @@ double AlfCovariance::optimizeFilter(const AlfFilterShape& alfShape, int* clip, 
       {
         clip[k] += step;
         ky[k] = y(clip[k],k);
-        for( int l = 0; l < size; l++ )
+        // Upper triangular
+        for (int l = 0; l < k; l++)
         {
-          kE[k][l] = E(clip[k],clip[l],k,l);
-          kE[l][k] = E(clip[l],clip[k],l,k);
+          kE[l][k] = E(clip[l], clip[k], l, k);
+        }
+        for (int l = k; l < size; l++)
+        {
+          kE[k][l] = E(clip[k], clip[l], k, l);
         }
 
         gnsSolveByChol( kE, ky, f, size );
@@ -195,10 +203,14 @@ double AlfCovariance::optimizeFilter(const AlfFilterShape& alfShape, int* clip, 
 
       }
       ky[k] = y(clip[k],k);
-      for( int l = 0; l < size; l++ )
+      // Upper triangular
+      for (int l = 0; l < k; l++)
       {
-        kE[k][l] = E(clip[k],clip[l],k,l);
-        kE[l][k] = E(clip[l],clip[k],l,k);
+        kE[l][k] = E(clip[l], clip[k], l, k);
+      }
+      for (int l = k; l < size; l++)
+      {
+        kE[k][l] = E(clip[k], clip[l], k, l);
       }
     }
 
@@ -207,10 +219,14 @@ double AlfCovariance::optimizeFilter(const AlfFilterShape& alfShape, int* clip, 
       err_best = err_min;
       clip[idx_min] += inc_min;
       ky[idx_min] = y(clip[idx_min],idx_min);
-      for( int l = 0; l < size; l++ )
+      // Upper triangular
+      for (int l = 0; l < idx_min; l++)
+      {
+        kE[l][idx_min] = E(clip[l],clip[idx_min],l,idx_min);
+      }
+      for (int l = idx_min; l < size; l++)
       {
         kE[idx_min][l] = E(clip[idx_min],clip[l],idx_min,l);
-        kE[l][idx_min] = E(clip[l],clip[idx_min],l,idx_min);
       }
     }
     else
@@ -6648,7 +6664,8 @@ void EncAdaptiveLoopFilter::deriveCcAlfFilterCoeff( ComponentID compID, const Pe
   for (int k = 0; k < size; k++)
   {
     ky[k] = m_alfCovarianceFrameCcAlf[0].y(0,k);
-    for (int l = 0; l < size; l++)
+    // Upper triangular
+    for (int l = k; l < size; l++)
     {
       kE[k][l] = m_alfCovarianceFrameCcAlf[0].E(0,0,k,l);
     }
