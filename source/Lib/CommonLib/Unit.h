@@ -507,14 +507,10 @@ struct IntraPredictionData
   bool      parseLumaMode = false;
   int8_t    candId = -1;
   bool      parseChromaMode = false;
+#endif
   bool      mpmFlag = false;
   int8_t    ipredIdx = -1;
   bool      secondMpmFlag = false;
-#endif
-#if SECONDARY_MPM
-  uint8_t intraMPM[NUM_MOST_PROBABLE_MODES];
-  uint8_t intraNonMPM[NUM_NON_MPM_MODES];
-#endif
   uint8_t  intraDir[MAX_NUM_CHANNEL_TYPE];
 #if JVET_AB0155_SGPM
   uint8_t intraDir1[MAX_NUM_CHANNEL_TYPE];

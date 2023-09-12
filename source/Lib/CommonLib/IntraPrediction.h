@@ -238,6 +238,10 @@ public:
   Pel m_cr[CCCM_REF_SAMPLES_MAX];
 #endif
 
+#if SECONDARY_MPM
+  uint8_t m_intraMPM[NUM_MOST_PROBABLE_MODES];
+  uint8_t m_intraNonMPM[NUM_NON_MPM_MODES];
+#endif
 protected:
 #if JVET_AC0094_REF_SAMPLES_OPT
   Pel m_refBuffer[MAX_NUM_COMPONENT][NUM_PRED_BUF][((MAX_CU_SIZE << 3) + 1 + MAX_REF_LINE_IDX) * 2];

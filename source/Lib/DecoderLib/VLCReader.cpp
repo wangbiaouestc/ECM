@@ -5336,9 +5336,9 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
     if (!lambdaCanBePredicted)
     {
 #if JVET_AB0082
-      READ_CODE(10, uiCode, "lambda");
+      READ_CODE(10, uiCode, "Lambda");
 #else
-      READ_CODE(9, uiCode, "lambda");
+      READ_CODE(9, uiCode, "Lambda");
 #endif
       pcSlice->setCostForARMC((uint32_t)uiCode);
     }

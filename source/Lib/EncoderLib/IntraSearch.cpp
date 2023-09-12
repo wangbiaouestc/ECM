@@ -714,10 +714,6 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 
     CHECK(pu.cu != &cu, "PU is not contained in the CU");
 
-#if SECONDARY_MPM
-    std::memcpy( pu.intraMPM, m_mpmList, sizeof( pu.intraMPM ) );
-    std::memcpy( pu.intraNonMPM, m_nonMPMList, sizeof( pu.intraNonMPM ) );
-#endif
 
     //===== determine set of modes to be tested (using prediction signal only) =====
     int numModesAvailable = NUM_LUMA_MODE; // total number of Intra modes
@@ -1201,11 +1197,10 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
             pu.multiRefIdx    = 1;
 #if SECONDARY_MPM
             const int numMPMs = NUM_PRIMARY_MOST_PROBABLE_MODES;
-            uint8_t* multiRefMPM = m_mpmList;
 #else
             const int numMPMs = NUM_MOST_PROBABLE_MODES;
-            unsigned  multiRefMPM[numMPMs];
 #endif
+            uint8_t* multiRefMPM = m_intraMPM;
 #if !SECONDARY_MPM
             PU::getIntraMPMs(pu, multiRefMPM);
 #endif
@@ -1893,7 +1888,7 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
           {
 
 #if SECONDARY_MPM
-            auto uiPreds = m_mpmList;
+            auto uiPreds = m_intraMPM;
 #else
             const int numMPMs = NUM_MOST_PROBABLE_MODES;
             unsigned  uiPreds[numMPMs];
@@ -6988,6 +6983,7 @@ void IntraSearch::xEncIntraHeader( CodingStructure &cs, Partitioner &partitioner
         m_CABACEstimator->pred_mode( cu );
       }
       m_CABACEstimator->bdpcm_mode( cu, COMPONENT_Y );
+      setLumaIntraPredIdx(pu);
       m_CABACEstimator->intra_luma_pred_mode( pu );
     }
   }
@@ -10682,6 +10678,7 @@ uint64_t IntraSearch::xFracModeBitsIntra(PredictionUnit &pu, const uint32_t &uiM
     if (!pu.ciipFlag)
 #endif
     {
+      setLumaIntraPredIdx(pu);
       m_CABACEstimator->intra_luma_pred_mode(pu);
     }
   }
@@ -11546,5 +11543,69 @@ void IntraSearch::xFinishISPModes()
       }
     }
   }
+}
+void IntraSearch::setLumaIntraPredIdx(PredictionUnit& pu)
+{
+#if SECONDARY_MPM
+  const int numMPMs = NUM_PRIMARY_MOST_PROBABLE_MODES + NUM_SECONDARY_MOST_PROBABLE_MODES;
+#else
+  const int numMPMs = NUM_MOST_PROBABLE_MODES;
+#endif
+  int pred_idx = numMPMs;
+  for (int idx = 0; idx < numMPMs; idx++)
+  {
+    if (pu.intraDir[0] == m_intraMPM[idx])
+    {
+      pred_idx = idx;
+      break;
+    }
+  }
+#if SECONDARY_MPM
+  if (pred_idx < NUM_PRIMARY_MOST_PROBABLE_MODES)
+  {
+    pu.mpmFlag = true;
+    pu.secondMpmFlag = false;
+  }
+  else if (pred_idx < numMPMs)
+  {
+    pu.mpmFlag = false;
+    pu.secondMpmFlag = true;
+    pred_idx -= NUM_PRIMARY_MOST_PROBABLE_MODES;
+  }
+  else
+  {
+    pu.mpmFlag = false;
+    pu.secondMpmFlag = false;
+    pred_idx = NUM_NON_MPM_MODES;
+    for (int idx = 0; idx < NUM_NON_MPM_MODES; idx++)
+    {
+      if (pu.intraDir[0] == m_intraNonMPM[idx])
+      {
+        pred_idx = idx;
+        break;
+      }
+    }
+
+  }
+#else
+  if (mpm_idx < NUM_MOST_PROBABLE_MODES)
+  {
+    pu.mpmFlag = true;
+  }
+  else
+  {
+    std::sort(mpmPred, mpmPred + numMPMs);
+    int pred_idx = pu.intraDir[0];
+    for (int idx = numMPMs - 1; idx >= 0; idx--)
+    {
+      if (pred_idx > mpmPred[idx])
+      {
+        pred_idx--;
+      }
+    }
+    CHECK(pred_idx >= 64, "Incorrect mode");
+  }
+#endif
+  pu.ipredIdx = pred_idx;
 }
 

@@ -863,10 +863,6 @@ PredictionUnit::PredictionUnit(const ChromaFormat _chromaFormat, const Area &_ar
 void PredictionUnit::initData()
 {
   // intra data - need this default initialization for PCM
-#if SECONDARY_MPM
-  ::memset(intraMPM, 0, sizeof(intraMPM));
-  ::memset(intraNonMPM, 0, sizeof(intraNonMPM));
-#endif
 
   intraDir[0] = DC_IDX;
   intraDir[1] = PLANAR_IDX;
@@ -887,9 +883,10 @@ void PredictionUnit::initData()
   parseLumaMode = false;
   candId = -1;
   parseChromaMode = false;
+#endif
   mpmFlag = false;
   ipredIdx = -1;
-#endif
+  secondMpmFlag = false;
 #if JVET_Z0050_CCLM_SLOPE
   cclmOffsets = {};
 #endif
@@ -1053,10 +1050,6 @@ void PredictionUnit::initData()
 
 PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
 {
-#if SECONDARY_MPM
-  ::memcpy(intraMPM, predData.intraMPM, sizeof(intraMPM));
-  ::memcpy(intraNonMPM, predData.intraNonMPM, sizeof(intraNonMPM));
-#endif
 
   for (uint32_t i = 0; i < MAX_NUM_CHANNEL_TYPE; i++)
   {
@@ -1074,9 +1067,10 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
   parseLumaMode = predData.parseLumaMode;
   candId = predData.candId;
   parseChromaMode = predData.parseChromaMode;
+#endif
   mpmFlag = predData.mpmFlag;
   ipredIdx = predData.ipredIdx;
-#endif
+  secondMpmFlag = predData.secondMpmFlag;
 #if JVET_Z0050_CCLM_SLOPE
   cclmOffsets = predData.cclmOffsets;
 #endif
@@ -1248,10 +1242,6 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
 
 PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 {
-#if SECONDARY_MPM
-  ::memcpy(intraMPM, other.intraMPM, sizeof(intraMPM));
-  ::memcpy(intraNonMPM, other.intraNonMPM, sizeof(intraNonMPM));
-#endif
 
   for( uint32_t i = 0; i < MAX_NUM_CHANNEL_TYPE; i++ )
   {
@@ -1310,9 +1300,10 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   parseLumaMode = other.parseLumaMode;
   candId = other.candId;
   parseChromaMode = other.parseChromaMode;
+#endif
   mpmFlag = other.mpmFlag;
   ipredIdx = other.ipredIdx;
-#endif
+  secondMpmFlag = other.secondMpmFlag;
   geoSplitDir  = other.geoSplitDir;
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   geoSyntaxMode = other.geoSyntaxMode;

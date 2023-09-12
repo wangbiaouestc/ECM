@@ -1997,10 +1997,7 @@ void CABACReader::intra_luma_pred_modes( CodingUnit &cu )
 
   PredictionUnit *pu = cu.firstPU;
 
-#if SECONDARY_MPM
-  uint8_t* mpmPred = pu->intraMPM;  // mpm_idx / rem_intra_luma_pred_mode
-  uint8_t* nonMpmPred = pu->intraNonMPM;
-#else
+#if !SECONDARY_MPM
   unsigned int mpmPred[NUM_MOST_PROBABLE_MODES];  // mpm_idx / rem_intra_luma_pred_mode
 #endif
 
@@ -2059,11 +2056,8 @@ void CABACReader::intra_luma_pred_modes( CodingUnit &cu )
           ipredIdx += m_BinDecoder.decodeBinEP();
         }
       }
-#if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
       pu->secondMpmFlag = false;
       pu->ipredIdx = ipredIdx;
-#endif
-      pu->intraDir[0] = mpmPred[ipredIdx];
     }
     else
     {
@@ -2100,21 +2094,17 @@ void CABACReader::intra_luma_pred_modes( CodingUnit &cu )
 #else
         int idx = m_BinDecoder.decodeBinsEP( 4 ) + NUM_PRIMARY_MOST_PROBABLE_MODES;
 #endif
-        ipredMode = mpmPred[idx];
-        pu->secondMpmFlag = true;
         pu->ipredIdx = idx;
 #else
-        ipredMode = mpmPred[m_BinDecoder.decodeBinsEP( 4 ) + NUM_PRIMARY_MOST_PROBABLE_MODES];
+        pu->ipredIdx = m_BinDecoder.decodeBinsEP( 4 ) + NUM_PRIMARY_MOST_PROBABLE_MODES;
 #endif
+        pu->secondMpmFlag = true;
       }
       else
       {
         xReadTruncBinCode( ipredMode, NUM_LUMA_MODE - NUM_MOST_PROBABLE_MODES );
-#if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
         pu->secondMpmFlag = false;
         pu->ipredIdx = ipredMode;
-#endif
-        ipredMode = nonMpmPred[ipredMode];
       }
 #else
       xReadTruncBinCode( ipredMode, NUM_LUMA_MODE - NUM_MOST_PROBABLE_MODES );
@@ -2156,7 +2146,7 @@ void CABACReader::intra_luma_pred_modes( CodingUnit &cu )
 #if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
     DTRACE( g_trace_ctx, D_SYNTAX, "intra_luma_pred_modes() idx=%d pos=(%d,%d) predIdx=%d mpm=%d secondmpm=%d\n", k, pu->lumaPos().x, pu->lumaPos().y, pu->ipredIdx, pu->mpmFlag, pu->secondMpmFlag);
 #else
-    DTRACE( g_trace_ctx, D_SYNTAX, "intra_luma_pred_modes() idx=%d pos=(%d,%d) mode=%d\n", k, pu->lumaPos().x, pu->lumaPos().y, pu->intraDir[0] );
+    DTRACE( g_trace_ctx, D_SYNTAX, "intra_luma_pred_modes() idx=%d pos=(%d,%d) predIdx=%d mpm=%d secondmpm=%d \n", k, pu->lumaPos().x, pu->lumaPos().y, pu->ipredIdx, pu->mpmFlag, pu->secondMpmFlag);
 #endif
     pu = pu->next;
   }
