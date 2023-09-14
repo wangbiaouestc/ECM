@@ -367,8 +367,8 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
           IntraPrediction::deriveDimdMode(currCU.cs->picture->getRecoBuf(area), area, currCU);
 #endif
           m_pcIntraPred->getTmrlList(currCU);
-          pu->multiRefIdx = currCU.tmrlList[currCU.tmrlListIdx].multiRefIdx;
-          pu->intraDir[0] = currCU.tmrlList[currCU.tmrlListIdx].intraDir;
+          pu->multiRefIdx = m_pcIntraPred->m_tmrlList[currCU.tmrlListIdx].multiRefIdx;
+          pu->intraDir[0] = m_pcIntraPred->m_tmrlList[currCU.tmrlListIdx].intraDir;
         }
 #endif
         else if (currCU.firstPU->parseLumaMode)

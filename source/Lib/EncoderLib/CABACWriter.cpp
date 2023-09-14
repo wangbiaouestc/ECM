@@ -9119,7 +9119,6 @@ void CABACWriter::cuTmrlFlag(const CodingUnit& cu)
       uint32_t mrlIdxSuffix = uint32_t(cu.tmrlListIdx & (MRL_IDX_RICE_CODE_DIVISOR - 1));
       m_BinEncoder.encodeBin((mrlIdxSuffix & 1), Ctx::TmrlDerive(maxNumCtxBins + 1));
       m_BinEncoder.encodeBin(((mrlIdxSuffix >> 1) & 1), Ctx::TmrlDerive(maxNumCtxBins + 2));
-      CHECK(cu.tmrlList[cu.tmrlListIdx].intraDir != pu->intraDir[0] || cu.tmrlList[cu.tmrlListIdx].multiRefIdx != pu->multiRefIdx, "? ");
       DTRACE(g_trace_ctx, D_SYNTAX, "cu_tmrl_idx() ctx=%d pos=(%d,%d) tmrlidx=%d\n", 0, cu.lumaPos().x, cu.lumaPos().y, cu.tmrlListIdx);
     }
     else

@@ -1221,12 +1221,12 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 
                 for (auto i = 0; i < MRL_LIST_SIZE; i++)
                 {
-                  if (cu.tmrlList[i].multiRefIdx != multiRefIdx)
+                  if (m_tmrlList[i].multiRefIdx != multiRefIdx)
                   {
                     continue;
                   }
 
-                  pu.intraDir[0] = cu.tmrlList[i].intraDir;
+                  pu.intraDir[0] = m_tmrlList[i].intraDir;
                   cu.tmrlListIdx = i;
                   uint32_t uiMode = i + MAX_REF_LINE_IDX;
 
@@ -1409,10 +1409,10 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
                       continue;
                     }
 
-                    int idxNum = cu.tmpFusionFlag ? TMP_GROUP_IDX << 1 : cu.tmpNumCand;
+                    int idxNum = cu.tmpFusionFlag ? TMP_GROUP_IDX << 1 : m_tmpNumCand;
                     for (int tmpIdx = 0; tmpIdx < idxNum; tmpIdx++)
                     {
-                      if(cu.tmpFusionFlag && !cu.tmpFusionInfo[tmpIdx].bValid)
+                      if(cu.tmpFusionFlag && !m_tmpFusionInfo[tmpIdx].bValid)
                       {
                         continue;
                       }
@@ -2386,8 +2386,8 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
       {
         int tmrlListIdx = uiOrgMode.mRefId - MAX_REF_LINE_IDX;
         cu.tmrlListIdx = tmrlListIdx;
-        pu.multiRefIdx = cu.tmrlList[tmrlListIdx].multiRefIdx;
-        pu.intraDir[0] = cu.tmrlList[tmrlListIdx].intraDir;
+        pu.multiRefIdx = m_tmrlList[tmrlListIdx].multiRefIdx;
+        pu.intraDir[0] = m_tmrlList[tmrlListIdx].intraDir;
         cu.tmrlFlag = true;
       }
 #endif
@@ -2782,8 +2782,8 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
       {
         int tmrlListIdx = uiBestPUMode.mRefId - MAX_REF_LINE_IDX;
         cu.tmrlListIdx = tmrlListIdx;
-        pu.multiRefIdx = cu.tmrlList[tmrlListIdx].multiRefIdx;
-        pu.intraDir[0] = cu.tmrlList[tmrlListIdx].intraDir;
+        pu.multiRefIdx = m_tmrlList[tmrlListIdx].multiRefIdx;
+        pu.intraDir[0] = m_tmrlList[tmrlListIdx].intraDir;
       }
 #endif
 #if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST 
@@ -7336,9 +7336,9 @@ void IntraSearch::xSelectAMTForFullRD(TransformUnit &tu)
 #if JVET_AD0086_ENHANCED_INTRA_TMP
       CodingUnit *cu         = pu.cu;
       int         pX, pY;
-      int tmpIdx = cu->tmpFusionFlag ? cu->tmpFusionInfo[cu->tmpIdx].tmpFusionIdx : cu->tmpIdx;
-      pX = cu->tmpXdisp[tmpIdx];
-      pY = cu->tmpYdisp[tmpIdx];
+      int tmpIdx = cu->tmpFusionFlag ? m_tmpFusionInfo[cu->tmpIdx].tmpFusionIdx : cu->tmpIdx;
+      pX = m_tmpXdisp[tmpIdx];
+      pY = m_tmpYdisp[tmpIdx];
       pu.mv->set(pX << MV_FRACTIONAL_BITS_INTERNAL, pY << MV_FRACTIONAL_BITS_INTERNAL);
       pu.bv.set(pX, pY);
 #else
@@ -7586,9 +7586,9 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
 #if JVET_AD0086_ENHANCED_INTRA_TMP
             CodingUnit *cu = pu.cu;
             int pX, pY;
-            int tmpIdx = cu->tmpFusionFlag ? cu->tmpFusionInfo[cu->tmpIdx].tmpFusionIdx : cu->tmpIdx;
-            pX = cu->tmpXdisp[tmpIdx];
-            pY = cu->tmpYdisp[tmpIdx];
+            int tmpIdx = cu->tmpFusionFlag ? m_tmpFusionInfo[cu->tmpIdx].tmpFusionIdx : cu->tmpIdx;
+            pX = m_tmpXdisp[tmpIdx];
+            pY = m_tmpYdisp[tmpIdx];
             pu.mv->set(pX << MV_FRACTIONAL_BITS_INTERNAL, pY << MV_FRACTIONAL_BITS_INTERNAL);
             pu.bv.set(pX, pY);
 #else
