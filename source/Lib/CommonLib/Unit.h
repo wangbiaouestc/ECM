@@ -285,17 +285,6 @@ struct TransformUnit;
 struct PredictionUnit;
 class  CodingStructure;
 
-#if JVET_AB0157_TMRL
-struct TmrlMode
-{
-  int8_t  multiRefIdx;
-  uint8_t intraDir;
-  TmrlMode() : multiRefIdx(0), intraDir(0) {}
-  TmrlMode(int8_t _multiRefIdx, uint8_t _intraDir) :
-    multiRefIdx(_multiRefIdx), intraDir(_intraDir) {}
-};
-#endif
-
 struct CodingUnit : public UnitArea
 {
   CodingStructure *cs;
@@ -359,20 +348,12 @@ struct CodingUnit : public UnitArea
 #endif
 #if TMP_FAST_ENC
 #if JVET_AD0086_ENHANCED_INTRA_TMP
-  int                tmpXdisp[MTMP_NUM];
-  int                tmpYdisp[MTMP_NUM];
-  IntraTMPFusionInfo tmpFusionInfo[TMP_GROUP_IDX << 1];
   bool               tmpFlmFlag;
-  int64_t            tmpFlmParams[TMP_FLM_PARAMS][MTMP_NUM];
   uint8_t            tmpIdx;
   bool               tmpFusionFlag;
   int                tmpIsSubPel;
   int                tmpSubPelIdx;
-#else
-  int            tmpXdisp;
-  int            tmpYdisp;
 #endif
-  int            tmpNumCand;
 #endif
 #if JVET_W0123_TIMD_FUSION
   bool           timd;
@@ -439,7 +420,6 @@ struct CodingUnit : public UnitArea
 #if JVET_AB0157_TMRL
   bool           tmrlFlag;
   uint8_t        tmrlListIdx;
-  TmrlMode       tmrlList[MRL_LIST_SIZE];
 #endif
 #if JVET_AC0094_REF_SAMPLES_OPT
   bool           areAboveRightUnavail;

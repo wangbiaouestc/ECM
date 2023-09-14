@@ -2359,11 +2359,11 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
   int timdVerMode = 0;
 #endif
 #if JVET_AD0086_ENHANCED_INTRA_TMP
-  int tmpXdisp[MTMP_NUM] = { 0 }, tmpYdisp[MTMP_NUM] = { 0 }, tmpNumCand = 0;
-  IntraTMPFusionInfo tmpFusionInfo[TMP_GROUP_IDX << 1] = {};
-  int64_t tmpFlmParams[TMP_FLM_PARAMS][MTMP_NUM] = {0};
+  m_pcIntraSearch->initTmpDisp();
+  m_pcIntraSearch->initTmpFlmParams();
+  m_pcIntraSearch->initTmpFusionInfo();
 #elif TMP_FAST_ENC
-  int tmpXdisp = 0, tmpYdisp = 0, tmpNumCand = 0;
+  m_pcIntraSearch->initTmpDisp();
 #endif
 
 
@@ -2586,7 +2586,6 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
 #endif
 #if JVET_AB0157_TMRL
   bool tmrlDerived = false;
-  TmrlMode tmrlList[MRL_LIST_SIZE];
 #endif
 #if INTRA_TRANS_ENC_OPT
   m_pcIntraSearch->m_skipTimdLfnstMtsPass = false;
@@ -2752,17 +2751,6 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
             {
               m_pcIntraSearch->getTmrlList(cu);
               tmrlDerived = true;
-              for (auto i = 0; i < MRL_LIST_SIZE; i++)
-              {
-                tmrlList[i] = cu.tmrlList[i];
-              }
-            }
-            else
-            {
-              for (auto i = 0; i < MRL_LIST_SIZE; i++)
-              {
-                cu.tmrlList[i] = tmrlList[i];
-              }
             }
           }
 #endif
@@ -2781,7 +2769,7 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
                 m_pcIntraSearch->getTargetTemplate(&cu, cu.lwidth(), cu.lheight(), templateType);
                 m_pcIntraSearch->candidateSearchIntra(&cu, cu.lwidth(), cu.lheight(), templateType);
 #if JVET_AD0086_ENHANCED_INTRA_TMP
-                for (int idx = 0; idx < cu.tmpNumCand && idx < MTMP_NUM; idx++)
+                for (int idx = 0; idx < m_pcIntraSearch->getTmpNumCand() && idx < MTMP_NUM; idx++)
                 {
                   cu.tmpIdx = idx;
                   m_pcIntraSearch->xCalTmpFlmParam(&cu, cu.lwidth(), cu.lheight(), templateType);
@@ -2797,54 +2785,6 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
               m_pcIntraSearch->candidateSearchIntra(&cu, cu.lwidth(), cu.lheight());
 #endif
               tmpDerived = 1;
-
-#if JVET_AD0086_ENHANCED_INTRA_TMP
-              for (int tmpIdx = 0; tmpIdx < MTMP_NUM; tmpIdx++)
-              {
-                tmpXdisp[tmpIdx] = cu.tmpXdisp[tmpIdx];
-                tmpYdisp[tmpIdx] = cu.tmpYdisp[tmpIdx];
-              }
-              for (int j = 0; j < TMP_GROUP_IDX << 1; j++)
-              {
-                tmpFusionInfo[j] = cu.tmpFusionInfo[j];
-              }
-              for (int j = 0; j < MTMP_NUM; j++)
-              {
-                for (int i = 0; i < TMP_FLM_PARAMS; i++)
-                {
-                  tmpFlmParams[i][j] = cu.tmpFlmParams[i][j];
-                }
-              }
-#else
-              tmpXdisp = cu.tmpXdisp;
-              tmpYdisp = cu.tmpYdisp;
-#endif
-              tmpNumCand = cu.tmpNumCand;
-            }
-            else
-            {
-#if JVET_AD0086_ENHANCED_INTRA_TMP
-              for (int tmpIdx = 0; tmpIdx < MTMP_NUM; tmpIdx++)
-              {
-                cu.tmpXdisp[tmpIdx] = tmpXdisp[tmpIdx];
-                cu.tmpYdisp[tmpIdx] = tmpYdisp[tmpIdx];
-              }
-              for(int j = 0; j < TMP_GROUP_IDX << 1; j++)
-              {
-                cu.tmpFusionInfo[j] = tmpFusionInfo[j];
-              }
-              for (int j = 0; j < MTMP_NUM; j++)
-              {
-                for (int i = 0; i < TMP_FLM_PARAMS; i++)
-                {
-                  cu.tmpFlmParams[i][j] = tmpFlmParams[i][j];
-                }
-              }
-#else
-              cu.tmpXdisp = tmpXdisp;
-              cu.tmpYdisp = tmpYdisp;
-#endif
-              cu.tmpNumCand = tmpNumCand;
             }
           }
 #endif
