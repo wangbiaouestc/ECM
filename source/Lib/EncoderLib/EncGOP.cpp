@@ -2166,7 +2166,45 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
 #if ENABLE_SPLIT_PARALLELISM
     pcPic->scheduler.init( pcPic->cs->pcv->heightInCtus, pcPic->cs->pcv->widthInCtus, 1                          , 0                             , m_pcCfg->getNumSplitThreads() );
 #endif
-    pcPic->createTempBuffers( pcPic->cs->pps->pcv->maxCUWidth );
+#if JVET_Y0240_BIM
+    const bool isCurrentFrameFiltered = m_pcCfg->getGopBasedTemporalFilterEnabled() || m_pcCfg->getBIM();
+#else
+    const bool isCurrentFrameFiltered = m_pcCfg->getGopBasedTemporalFilterEnabled();
+#endif
+    const SPS& sps = *pcPic->cs->sps;
+    pcPic->createTempBuffers(pcPic->cs->pps->pcv->maxCUWidth, isCurrentFrameFiltered, m_pcEncLib->isResChangeInClvsEnabled(), false);
+    pcPic->getTrueOrigBuf().copyFrom(pcPic->getOrigBuf());
+    if (m_pcEncLib->isResChangeInClvsEnabled())
+    {
+      pcPic->M_BUFS(0, PIC_TRUE_ORIGINAL_INPUT).copyFrom(pcPic->M_BUFS(0, PIC_ORIGINAL_INPUT));
+    }
+    if(isCurrentFrameFiltered)
+    {
+      if (m_pcEncLib->isResChangeInClvsEnabled())
+      {
+        m_pcEncLib->getTemporalFilter().filter(pcPic->M_BUFS(0, PIC_ORIGINAL_INPUT), pocCurr);
+
+        const Window& curScalingWindow = pcPic->getScalingWindow();
+        const int curPicWidth = pcPic->M_BUFS(0, PIC_ORIGINAL).Y().width - SPS::getWinUnitX(sps.getChromaFormatIdc()) * (curScalingWindow.getWindowLeftOffset() + curScalingWindow.getWindowRightOffset());
+        const int curPicHeight = pcPic->M_BUFS(0, PIC_ORIGINAL).Y().height - SPS::getWinUnitY(sps.getChromaFormatIdc()) * (curScalingWindow.getWindowTopOffset() + curScalingWindow.getWindowBottomOffset());
+        
+        const PPS* pps = m_pcEncLib->getPPS(0);
+        const Window& refScalingWindow = pps->getScalingWindow();
+        const int refPicWidth = pcPic->M_BUFS(0, PIC_ORIGINAL_INPUT).Y().width - SPS::getWinUnitX(sps.getChromaFormatIdc()) * (refScalingWindow.getWindowLeftOffset() + refScalingWindow.getWindowRightOffset());
+        const int refPicHeight = pcPic->M_BUFS(0, PIC_ORIGINAL_INPUT).Y().height - SPS::getWinUnitY(sps.getChromaFormatIdc()) * (refScalingWindow.getWindowTopOffset() + refScalingWindow.getWindowBottomOffset());
+        const int xScale = ((refPicWidth << SCALE_RATIO_BITS) + (curPicWidth >> 1)) / curPicWidth;
+        const int yScale = ((refPicHeight << SCALE_RATIO_BITS) + (curPicHeight >> 1)) / curPicHeight;
+        std::pair<int, int> scalingRatio = std::pair<int, int>(xScale, yScale);
+
+        Picture::rescalePicture(scalingRatio, pcPic->M_BUFS(0, PIC_ORIGINAL_INPUT), curScalingWindow, pcPic->M_BUFS(0, PIC_ORIGINAL), pps->getScalingWindow(), chromaFormatIDC, sps.getBitDepths(), true, true,
+          sps.getHorCollocatedChromaFlag(), sps.getVerCollocatedChromaFlag());
+      }
+      else
+      {
+        m_pcEncLib->getTemporalFilter().filter(pcPic->M_BUFS(0, PIC_ORIGINAL), pocCurr);
+      }
+      pcPic->getFilteredOrigBuf().copyFrom(pcPic->getOrigBuf());
+    }
     pcPic->cs->createCoeffs((bool)pcPic->cs->sps->getPLTMode());
 
     //  Slice data initialization
