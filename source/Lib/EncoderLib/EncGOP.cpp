@@ -2205,7 +2205,7 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
       }
       pcPic->getFilteredOrigBuf().copyFrom(pcPic->getOrigBuf());
     }
-    pcPic->cs->createCoeffs((bool)pcPic->cs->sps->getPLTMode());
+    pcPic->cs->createTemporaryCsData((bool)pcPic->cs->sps->getPLTMode());
 
     //  Slice data initialization
     pcPic->clearSliceBuffer();
@@ -4454,8 +4454,7 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
     }
 
     pcPic->destroyTempBuffers();
-    pcPic->cs->destroyCoeffs();
-    pcPic->cs->releaseIntermediateData();
+    pcPic->cs->destroyTemporaryCsData();
 #if JVET_AA0096_MC_BOUNDARY_PADDING
     m_pcFrameMcPadPrediction->init(m_pcEncLib->getRdCost(), pcSlice->getSPS()->getChromaFormatIdc(),
                                    pcSlice->getSPS()->getMaxCUHeight(), NULL, pcPic->getPicWidthInLumaSamples());

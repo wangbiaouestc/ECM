@@ -454,15 +454,9 @@ void Picture::finalInit( const VPS* vps, const SPS& sps, const PPS& pps, PicHead
   const int          iWidth = pps.getPicWidthInLumaSamples();
   const int          iHeight = pps.getPicHeightInLumaSamples();
 
-  if( cs )
-  {
-    cs->initStructData();
-    cs->sps = &sps; 
-  }
-  else
+  if (cs == nullptr)
   {
     cs = new CodingStructure( g_globalUnitCache.cuCache, g_globalUnitCache.puCache, g_globalUnitCache.tuCache );
-    cs->sps = &sps;
 #if JVET_Z0118_GDR
     cs->create(chromaFormatIDC, Area(0, 0, iWidth, iHeight), true, (bool)sps.getPLTMode(), sps.getGDREnabledFlag());
 #else
@@ -470,6 +464,7 @@ void Picture::finalInit( const VPS* vps, const SPS& sps, const PPS& pps, PicHead
 #endif
 
   }
+  cs->sps = &sps;
 
   cs->vps = vps;
   cs->picture = this;

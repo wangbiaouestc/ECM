@@ -114,6 +114,9 @@ public:
 
   void destroy();
   void releaseIntermediateData();
+  bool m_isTopLayer;
+  void destroyTemporaryCsData();
+  void createTemporaryCsData(const bool isPLTused);
 #if JVET_Z0118_GDR
   bool isCuCrossIRA(int begX) const;
   bool isCuCrossVB(int endX) const;
@@ -159,7 +162,6 @@ public:
   void destroyTMBuf();
 #endif
 
-  void createCoeffs(const bool isPLTused);
   void destroyCoeffs();
 
   void allocateVectorsAtPicLevel();
@@ -253,6 +255,7 @@ public:
 #endif
 
 private:
+  void createCoeffs(const bool isPLTused);
   void createInternals(const UnitArea& _unit, const bool isTopLayer, const bool isPLTused);
 
 public:

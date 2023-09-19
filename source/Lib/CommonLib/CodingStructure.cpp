@@ -63,6 +63,7 @@ CodingStructure::CodingStructure(CUCache& cuCache, PUCache& puCache, TUCache& tu
   , picture   ( nullptr )
   , parent    ( nullptr )
   , bestCS    ( nullptr )
+  , m_isTopLayer(false)
   , m_isTuEnc ( false )
   , m_cuCache ( cuCache )
   , m_puCache ( puCache )
@@ -169,22 +170,8 @@ void CodingStructure::destroy()
 #endif
   m_orgr.destroy();
 
-  destroyCoeffs();
+  destroyTemporaryCsData();
 
-  for( uint32_t i = 0; i < MAX_NUM_CHANNEL_TYPE; i++ )
-  {
-    delete[] m_isDecomp[ i ];
-    m_isDecomp[ i ] = nullptr;
-
-    delete[] m_cuIdx[ i ];
-    m_cuIdx[ i ] = nullptr;
-
-    delete[] m_puIdx[ i ];
-    m_puIdx[ i ] = nullptr;
-
-    delete[] m_tuIdx[ i ];
-    m_tuIdx[ i ] = nullptr;
-  }
 
 #if JVET_Z0118_GDR
   delete[] m_motionBuf0;
@@ -230,6 +217,26 @@ void CodingStructure::destroy()
 #endif
 #endif
 
+}
+
+void CodingStructure::destroyTemporaryCsData()
+{
+  destroyCoeffs();
+  for (uint32_t i = 0; i < MAX_NUM_CHANNEL_TYPE; i++)
+  {
+    delete[] m_isDecomp[i];
+    m_isDecomp[i] = nullptr;
+
+    delete[] m_cuIdx[i];
+    m_cuIdx[i] = nullptr;
+
+    delete[] m_puIdx[i];
+    m_puIdx[i] = nullptr;
+
+    delete[] m_tuIdx[i];
+    m_tuIdx[i] = nullptr;
+  }
+
 #if JVET_Z0136_OOB
   for (uint32_t i = 0; i < 2; i++)
   {
@@ -247,9 +254,49 @@ void CodingStructure::destroy()
   }
 #endif
 
-  m_tuCache.cache( tus );
-  m_puCache.cache( pus );
-  m_cuCache.cache( cus );
+  for (auto& pcu : cus)
+  {
+    pcu->firstTU = pcu->lastTU = nullptr;
+  }
+  m_tuCache.cache(tus);
+  m_numTUs = 0;
+  m_puCache.cache(pus);
+  m_numPUs = 0;
+  for (auto& pcu : cus)
+  {
+    pcu->firstPU = pcu->lastPU = nullptr;
+  }
+  m_cuCache.cache(cus);
+  m_numCUs = 0;
+}
+
+void CodingStructure::createTemporaryCsData(const bool isPLTused)
+{
+  const unsigned numCh = ::getNumberValidChannels(area.chromaFormat);
+  createCoeffs(isPLTused);
+  for (unsigned i = 0; i < numCh; i++)
+  {
+    unsigned _area = unitScale[i].scale(area.blocks[i].size()).area();
+
+    CHECK(m_cuIdx[i] != nullptr, "m_cuIdx[i] != nullptr");
+    CHECK(m_puIdx[i] != nullptr, "m_puIdx[i] != nullptr");
+    CHECK(m_tuIdx[i] != nullptr, "m_tuIdx[i] != nullptr");
+    CHECK(m_isDecomp[i] != nullptr, "m_isDecomp[i] != nullptr");
+    m_cuIdx[i] = _area > 0 ? new unsigned[_area] : nullptr;
+    m_puIdx[i] = _area > 0 ? new unsigned[_area] : nullptr;
+    m_tuIdx[i] = _area > 0 ? new unsigned[_area] : nullptr;
+    m_isDecomp[i] = _area > 0 ? new bool[_area] : nullptr;
+  }
+
+#if JVET_Z0136_OOB
+  int extendLumaArea = area.lumaSize().area();
+  for (unsigned i = 0; i < 2; i++)
+  {
+    CHECK(mcMask[i] != nullptr, "mcMask[i] != nullptr");
+    mcMask[i] = (bool*)xMalloc(bool, extendLumaArea);
+    mcMaskChroma[i] = (bool*)xMalloc(bool, extendLumaArea);
+  }
+#endif
 }
 
 void CodingStructure::releaseIntermediateData()
@@ -1775,24 +1822,14 @@ void CodingStructure::createInternals(const UnitArea& _unit, const bool isTopLay
 
   unsigned numCh = ::getNumberValidChannels(area.chromaFormat);
 
-  for (unsigned i = 0; i < numCh; i++)
-  {
-    unsigned _area = unitScale[i].scale( area.blocks[i].size() ).area();
-
-    m_cuIdx[i]    = _area > 0 ? new unsigned[_area] : nullptr;
-    m_puIdx[i]    = _area > 0 ? new unsigned[_area] : nullptr;
-    m_tuIdx[i]    = _area > 0 ? new unsigned[_area] : nullptr;
-    m_isDecomp[i] = _area > 0 ? new bool    [_area] : nullptr;
-  }
-
-  numCh = getNumberValidComponents(area.chromaFormat);
 
   for (unsigned i = 0; i < numCh; i++)
   {
     m_offsets[i] = 0;
   }
 
-  if( !isTopLayer ) createCoeffs(isPLTused);
+  m_isTopLayer = isTopLayer;
+  if( !isTopLayer ) createTemporaryCsData(isPLTused);
 
   unsigned _lumaAreaScaled = g_miScaling.scale( area.lumaSize() ).area();
 #if JVET_Z0118_GDR
@@ -1821,16 +1858,7 @@ void CodingStructure::createInternals(const UnitArea& _unit, const bool isTopLay
   m_ipmBuf          = new uint8_t[_lumaAreaScaled];
 #endif
 #endif // JVET_W0123_TIMD_FUSION
-#if JVET_Z0136_OOB
-  int extendLumaArea = area.lumaSize().area();
-  for (unsigned i = 0; i < 2; i++)
-  {
-
-    mcMask[i] = (bool*)xMalloc(bool, extendLumaArea);
-    mcMaskChroma[i] = (bool*)xMalloc(bool, extendLumaArea);
-  }
-#endif
-  initStructData();
+  if (!isTopLayer) initStructData();
 }
 
 void CodingStructure::addMiToLut(static_vector<MotionInfo, MAX_NUM_HMVP_CANDS> &lut, const MotionInfo &mi)
