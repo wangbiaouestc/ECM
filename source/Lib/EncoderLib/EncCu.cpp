@@ -1925,13 +1925,6 @@ void EncCu::xCheckModeSplit(CodingStructure *&tempCS, CodingStructure *&bestCS, 
 
   m_CABACEstimator->getCtx() = m_CurrCtx->start;
 
-  const TempCtx ctxStartSP( m_ctxCache, SubCtx( Ctx::SplitFlag,   m_CABACEstimator->getCtx() ) );
-  const TempCtx ctxStartQt( m_ctxCache, SubCtx( Ctx::SplitQtFlag, m_CABACEstimator->getCtx() ) );
-  const TempCtx ctxStartHv( m_ctxCache, SubCtx( Ctx::SplitHvFlag, m_CABACEstimator->getCtx() ) );
-  const TempCtx ctxStart12( m_ctxCache, SubCtx( Ctx::Split12Flag, m_CABACEstimator->getCtx() ) );
-#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
-  const TempCtx ctxStartMC( m_ctxCache, SubCtx( Ctx::ModeConsFlag, m_CABACEstimator->getCtx() ) );
-#endif
   m_CABACEstimator->resetBits();
 
   m_CABACEstimator->split_cu_mode( split, *tempCS, partitioner );
@@ -1944,13 +1937,7 @@ void EncCu::xCheckModeSplit(CodingStructure *&tempCS, CodingStructure *&bestCS, 
     CHECK(bestCS->costDbOffset != 0, "error");
   const double cost   = m_pcRdCost->calcRdCost( uint64_t( m_CABACEstimator->getEstFracBits() + ( ( bestCS->fracBits ) / factor ) ), Distortion( bestCS->dist / factor ) ) + bestCS->costDbOffset / factor;
 
-  m_CABACEstimator->getCtx() = SubCtx( Ctx::SplitFlag,   ctxStartSP );
-  m_CABACEstimator->getCtx() = SubCtx( Ctx::SplitQtFlag, ctxStartQt );
-  m_CABACEstimator->getCtx() = SubCtx( Ctx::SplitHvFlag, ctxStartHv );
-  m_CABACEstimator->getCtx() = SubCtx( Ctx::Split12Flag, ctxStart12 );
-#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
-  m_CABACEstimator->getCtx() = SubCtx( Ctx::ModeConsFlag, ctxStartMC );
-#endif
+  m_CABACEstimator->getCtx() = SubCtx( Ctx::Split, m_CurrCtx->start);
   if (cost > bestCS->cost + bestCS->costDbOffset
 #if ENABLE_QPA_SUB_CTU
     || (m_pcEncCfg->getUsePerceptQPA() && !m_pcEncCfg->getUseRateCtrl() && pps.getUseDQP() && (slice.getCuQpDeltaSubdiv() > 0) && (split == CU_HORZ_SPLIT || split == CU_VERT_SPLIT) &&
@@ -6734,7 +6721,7 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
   }
   for (int idx = 0; idx < GEO_MAX_NUM_INTRA_CANDS; idx++)
   {
-    uint64_t fracBits = m_CABACEstimator->geo_intraIdx_est(ctxStart, idx);
+    uint64_t fracBits = m_CABACEstimator->geo_intraIdx_est(idx);
     geoIntraIdxCost[idx] = (double)fracBits * sqrtLambdaFracBits;
   }
 #endif
