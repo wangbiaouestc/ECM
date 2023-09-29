@@ -393,9 +393,6 @@
 #define SIMD_4x4_12                                       1 // Enable 4x4-block combined passes for 12-tap filters
 #endif
 #endif
-#if SIGN_PREDICTION
-#define ENABLE_SIMD_SIGN_PREDICTION                       1
-#endif
 #if JVET_V0130_INTRA_TMP
 #define ENABLE_SIMD_TMP                                   1
 #endif
@@ -1446,6 +1443,15 @@ enum MergeType
   NUM_MRG_TYPE                   // 5
 };
 
+#if SIGN_PREDICTION
+enum SIGN_PRED_TYPE : uint8_t
+{
+  SIGN_PRED_BYPASS   = 0,
+  SIGN_PRED_POSITIVE = 1,
+  SIGN_PRED_NEGATIVE = 2,
+  SIGN_PRED_HIDDEN   = 3,
+};
+#endif
 
 //////////////////////////////////////////////////////////////////////////
 // Encoder modes to try out

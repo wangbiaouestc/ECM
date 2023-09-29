@@ -50,7 +50,7 @@
 
 #include "CommonLib/IbcHashMap.h"
 
-#if ENABLE_SIMD_SIGN_PREDICTION || TRANSFORM_SIMD_OPT || ENABLE_SIMD_TMP
+#if TRANSFORM_SIMD_OPT || ENABLE_SIMD_TMP
 #include "CommonLib/TrQuant.h"
 #endif
 #if ENABLE_SIMD_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER_ENABLE_SIMD
@@ -193,7 +193,7 @@ void IbcHashMap::initIbcHashMapX86()
 }
 #endif
 
-#if ENABLE_SIMD_SIGN_PREDICTION || TRANSFORM_SIMD_OPT
+#if TRANSFORM_SIMD_OPT
 void TrQuant::initTrQuantX86()
 {
   auto vext = read_x86_extension_flags();

@@ -812,7 +812,7 @@ void BestEncInfoCache::init( const Slice &slice )
 #if CONVERT_NUM_TU_SPLITS_TO_CFG
   m_pCoeff = new TCoeff[numCoeff*m_maxNumTUs];
 #if SIGN_PREDICTION
-  m_pCoeffSign = new TCoeff[numCoeff*m_maxNumTUs];
+  m_pCoeffSign = new SIGN_PRED_TYPE[numCoeff * m_maxNumTUs];
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   m_pCoeffSignScanIdx = new unsigned[numCoeff*m_maxNumTUs];
 #endif
@@ -825,7 +825,7 @@ void BestEncInfoCache::init( const Slice &slice )
 #elif REUSE_CU_RESULTS_WITH_MULTIPLE_TUS
   m_pCoeff  = new TCoeff[numCoeff*MAX_NUM_TUS];
 #if SIGN_PREDICTION
-  m_pCoeffSign = new TCoeff[numCoeff*MAX_NUM_TUS];
+  m_pCoeffSign = new SIGN_PRED_TYPE[numCoeff * MAX_NUM_TUS];
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   m_pCoeffSignScanIdx = new unsigned[numCoeff*MAX_NUM_TUS];
 #endif
@@ -838,7 +838,7 @@ void BestEncInfoCache::init( const Slice &slice )
 #else
   m_pCoeff  = new TCoeff[numCoeff];
 #if SIGN_PREDICTION
-  m_pCoeffSign  = new TCoeff[numCoeff];
+  m_pCoeffSign = new SIGN_PRED_TYPE[numCoeff];
 #endif
   m_pPcmBuf = new Pel   [numCoeff];
   if (slice.getSPS()->getPLTMode())
@@ -849,7 +849,7 @@ void BestEncInfoCache::init( const Slice &slice )
 
   TCoeff *coeffPtr = m_pCoeff;
 #if SIGN_PREDICTION
-  TCoeff *coeffSignPtr = m_pCoeffSign;
+  SIGN_PRED_TYPE *coeffSignPtr = m_pCoeffSign;
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   unsigned *coeffSignScanIdx = m_pCoeffSignScanIdx;
 #endif
@@ -870,7 +870,9 @@ void BestEncInfoCache::init( const Slice &slice )
           {
             TCoeff *coeff[MAX_NUM_TBLOCKS] = { 0, };
 #if SIGN_PREDICTION
-            TCoeff *sign[MAX_NUM_TBLOCKS] = { 0, };
+            SIGN_PRED_TYPE *sign[MAX_NUM_TBLOCKS] = {
+              0,
+            };
 #if JVET_Y0141_SIGN_PRED_IMPROVE
             unsigned *sign_scanIdx[MAX_NUM_TBLOCKS] = { 0, };
 #endif

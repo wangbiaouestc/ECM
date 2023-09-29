@@ -7915,7 +7915,7 @@ void CABACReader::residual_coding( TransformUnit& tu, ComponentID compID, CUCtx&
 #endif
 
 #if SIGN_PREDICTION
-  CoeffBuf signBuff = tu.getCoeffSigns(compID);
+  AreaBuf<SIGN_PRED_TYPE> signBuff = tu.getCoeffSigns(compID);
   tu.initSignBuffers( compID );
 #endif
 
@@ -8296,16 +8296,17 @@ static void check_coeff_conformance(TCoeff coeff)
 #if TCQ_8STATES
 #if SIGN_PREDICTION
 #if JVET_AE0102_LFNST_CTX 
-void CABACReader::residual_coding_subblock( CoeffCodingContext& cctx, TCoeff* coeff, TCoeff* sign, const uint64_t stateTransTable, int& state, int lfnstIdx )
+void CABACReader::residual_coding_subblock( CoeffCodingContext& cctx, TCoeff* coeff, SIGN_PRED_TYPE* sign, const uint64_t stateTransTable, int& state, int lfnstIdx )
 #else
-void CABACReader::residual_coding_subblock( CoeffCodingContext& cctx, TCoeff* coeff, TCoeff* sign, const uint64_t stateTransTable, int& state )
+void CABACReader::residual_coding_subblock( CoeffCodingContext& cctx, TCoeff* coeff, SIGN_PRED_TYPE* sign, const uint64_t stateTransTable, int& state )
 #endif
 #else
 void CABACReader::residual_coding_subblock( CoeffCodingContext& cctx, TCoeff* coeff, const uint64_t stateTransTable, int& state )
 #endif
 #else
 #if SIGN_PREDICTION
-void CABACReader::residual_coding_subblock( CoeffCodingContext& cctx, TCoeff* coeff, TCoeff* sign, const int stateTransTable, int& state )
+void CABACReader::residual_coding_subblock(CoeffCodingContext &cctx, TCoeff *coeff, SIGN_PRED_TYPE *sign,
+                                           const int stateTransTable, int &state)
 #else
 void CABACReader::residual_coding_subblock( CoeffCodingContext& cctx, TCoeff* coeff, const int stateTransTable, int& state )
 #endif
@@ -8543,7 +8544,7 @@ void CABACReader::residual_coding_subblock( CoeffCodingContext& cctx, TCoeff* co
 #endif
 
 #if SIGN_PREDICTION
-    sign [ sigBlkPos[k] ] = TrQuant::SIGN_PRED_HIDDEN;
+    sign[sigBlkPos[k]] = SIGN_PRED_HIDDEN;
 #endif
   }
 }
@@ -9063,9 +9064,9 @@ void CABACReader::parsePredictedSigns( TransformUnit &tu, ComponentID compID )
   RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE2(STATS__CABAC_BITS__SIGN_BIT, tu.cu->block(compID).lumaSize(), compID);
 
   CoeffBuf buff = tu.getCoeffs( compID );
-  CoeffBuf signBuff = tu.getCoeffSigns( compID );
+  AreaBuf<SIGN_PRED_TYPE> signBuff = tu.getCoeffSigns(compID);
   TCoeff *coeff = buff.buf;
-  TCoeff *signs = signBuff.buf;
+  SIGN_PRED_TYPE         *signs    = signBuff.buf;
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   uint32_t extAreaWidth = std::min(tu.blocks[compID].width, (uint32_t)SIGN_PRED_FREQ_RANGE);
   uint32_t extAreaHeight = std::min(tu.blocks[compID].height, (uint32_t)SIGN_PRED_FREQ_RANGE);
@@ -9093,7 +9094,7 @@ void CABACReader::parsePredictedSigns( TransformUnit &tu, ComponentID compID )
 
       if( coef )
       {
-        if( signs[x] != TrQuant::SIGN_PRED_HIDDEN )
+        if (signs[x] != SIGN_PRED_HIDDEN)
         {
           if( !useSignPred || numSignPred >= maxNumPredSigns )
           {

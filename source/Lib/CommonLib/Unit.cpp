@@ -1638,9 +1638,9 @@ void TransformUnit::initData()
 #if REMOVE_PCM
 #if SIGN_PREDICTION
 #if JVET_Y0141_SIGN_PRED_IMPROVE
-void TransformUnit::init(TCoeff **coeffs, TCoeff **signs, unsigned **signsScanIdx, Pel **pltIdx, bool **runType)
+void TransformUnit::init(TCoeff **coeffs, SIGN_PRED_TYPE **signs, unsigned **signsScanIdx, Pel **pltIdx, bool **runType)
 #else
-void TransformUnit::init(TCoeff **coeffs, TCoeff **signs, Pel **pltIdx, bool **runType)
+void TransformUnit::init(TCoeff **coeffs, SIGN_PRED_TYPE **signs, Pel **pltIdx, bool **runType)
 #endif
 #else
 void TransformUnit::init(TCoeff **coeffs, Pel **pltIdx, bool **runType)
@@ -1648,9 +1648,9 @@ void TransformUnit::init(TCoeff **coeffs, Pel **pltIdx, bool **runType)
 #else
 #if SIGN_PREDICTION
 #if JVET_Y0141_SIGN_PRED_IMPROVE
-void TransformUnit::init(TCoeff **coeffs, TCoeff **signs, unsigned **signsScanIdx, Pel **pcmbuf, bool **runType)
+void TransformUnit::init(TCoeff **coeffs, SIGN_PRED_TYPE **signs, unsigned **signsScanIdx, Pel **pcmbuf, bool **runType)
 #else
-void TransformUnit::init(TCoeff **coeffs, TCoeff **signs, Pel **pcmbuf, bool **runType)
+void TransformUnit::init(TCoeff **coeffs, SIGN_PRED_TYPE **signs, Pel **pcmbuf, bool **runType)
 #endif
 #else
 void TransformUnit::init(TCoeff **coeffs, Pel **pcmbuf, bool **runType)
@@ -1696,7 +1696,8 @@ TransformUnit& TransformUnit::operator=(const TransformUnit& other)
 
     if (m_coeffs[i] && other.m_coeffs[i] && m_coeffs[i] != other.m_coeffs[i]) memcpy(m_coeffs[i], other.m_coeffs[i], sizeof(TCoeff) * area);
 #if SIGN_PREDICTION
-    if (m_coeffSigns[i] && other.m_coeffSigns[i] && m_coeffSigns[i] != other.m_coeffSigns[i]) memcpy(m_coeffSigns[i], other.m_coeffSigns[i], sizeof(TCoeff) * area);
+    if (m_coeffSigns[i] && other.m_coeffSigns[i] && m_coeffSigns[i] != other.m_coeffSigns[i])
+      std::copy_n(other.m_coeffSigns[i], area, m_coeffSigns[i]);
 #if JVET_Y0141_SIGN_PRED_IMPROVE
     if (m_coeffSignsIdx[i] && other.m_coeffSignsIdx[i] && m_coeffSignsIdx[i] != other.m_coeffSignsIdx[i]) memcpy(m_coeffSignsIdx[i], other.m_coeffSignsIdx[i], sizeof(unsigned) * area);
 #endif
@@ -1733,7 +1734,8 @@ void TransformUnit::copyComponentFrom(const TransformUnit& other, const Componen
 
   if (m_coeffs[i] && other.m_coeffs[i] && m_coeffs[i] != other.m_coeffs[i]) memcpy(m_coeffs[i], other.m_coeffs[i], sizeof(TCoeff) * area);
 #if SIGN_PREDICTION
-  if (m_coeffSigns[i] && other.m_coeffSigns[i] && m_coeffSigns[i] != other.m_coeffSigns[i]) memcpy(m_coeffSigns[i], other.m_coeffSigns[i], sizeof(TCoeff) * area);
+  if (m_coeffSigns[i] && other.m_coeffSigns[i] && m_coeffSigns[i] != other.m_coeffSigns[i])
+    std::copy_n(other.m_coeffSigns[i], area, m_coeffSigns[i]);
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   if (m_coeffSignsIdx[i] && other.m_coeffSignsIdx[i] && m_coeffSignsIdx[i] != other.m_coeffSignsIdx[i]) memcpy(m_coeffSignsIdx[i], other.m_coeffSignsIdx[i], sizeof(unsigned) * area);
 #endif
@@ -1763,8 +1765,10 @@ void TransformUnit::copyComponentFrom(const TransformUnit& other, const Componen
 const CCoeffBuf TransformUnit::getCoeffs(const ComponentID id) const { return CCoeffBuf(m_coeffs[id], blocks[id]); }
 
 #if SIGN_PREDICTION
-       CoeffBuf TransformUnit::getCoeffSigns(const ComponentID id)       { return  CoeffBuf(m_coeffSigns[id], blocks[id]); }
-const CCoeffBuf TransformUnit::getCoeffSigns(const ComponentID id) const { return CCoeffBuf(m_coeffSigns[id], blocks[id]); }
+AreaBuf<SIGN_PRED_TYPE> TransformUnit::getCoeffSigns(const ComponentID id)
+{
+  return AreaBuf<SIGN_PRED_TYPE>(m_coeffSigns[id], blocks[id]);
+}
 #if JVET_Y0141_SIGN_PRED_IMPROVE
       IdxBuf    TransformUnit::getCoeffSignsScanIdx(const ComponentID id) { return  IdxBuf(m_coeffSignsIdx[id], blocks[id]); }
 const CIdxBuf   TransformUnit::getCoeffSignsScanIdx(const ComponentID id) const { return CIdxBuf(m_coeffSignsIdx[id], blocks[id]); }
@@ -1870,15 +1874,15 @@ void TransformUnit::initSignBuffers( const ComponentID compID )
 
   if( cs->sps->getNumPredSigns() > 0 && uiHeight >= 4 && uiWidth >= 4 )
   {
-    CoeffBuf signBuff = getCoeffSigns( compID );
-    TCoeff *coeff = signBuff.buf;
+    AreaBuf<SIGN_PRED_TYPE> signBuff = getCoeffSigns(compID);
+    SIGN_PRED_TYPE         *coeff    = signBuff.buf;
 #if JVET_Y0141_SIGN_PRED_IMPROVE
     IdxBuf signScanIdxBuff = getCoeffSignsScanIdx( compID );
     uint32_t spArea = std::max( cs->sps->getSignPredArea(), SIGN_PRED_FREQ_RANGE );
     unsigned int *coeffIdx = signScanIdxBuff.buf;
     uint32_t spWidth = std::min( uiWidth, spArea );
     uint32_t spHeight = std::min( uiHeight, spArea );
-    CHECK( TrQuant::SIGN_PRED_BYPASS, "SIGN_PRED_BYPASS should be equal to 0" );
+    CHECK(SIGN_PRED_BYPASS, "SIGN_PRED_BYPASS should be equal to 0");
 
     for( uint32_t y = 0; y < spHeight; y++ )
 #else
@@ -1886,14 +1890,14 @@ void TransformUnit::initSignBuffers( const ComponentID compID )
 #endif
     {
 #if JVET_Y0141_SIGN_PRED_IMPROVE
-      memset( coeff, 0, sizeof( TCoeff ) * spWidth );
+      std::fill_n(coeff, spWidth, SIGN_PRED_BYPASS);
       memset( coeffIdx, MAX_UINT, sizeof( unsigned int ) * spWidth );
       coeffIdx += signScanIdxBuff.stride;
 #else
-      coeff[0] = TrQuant::SIGN_PRED_BYPASS;
-      coeff[1] = TrQuant::SIGN_PRED_BYPASS;
-      coeff[2] = TrQuant::SIGN_PRED_BYPASS;
-      coeff[3] = TrQuant::SIGN_PRED_BYPASS;
+      coeff[0] = SIGN_PRED_BYPASS;
+      coeff[1] = SIGN_PRED_BYPASS;
+      coeff[2] = SIGN_PRED_BYPASS;
+      coeff[3] = SIGN_PRED_BYPASS;
 #endif
       coeff += signBuff.stride;
     }

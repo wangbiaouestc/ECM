@@ -816,8 +816,8 @@ namespace TU
 #if SIGN_PREDICTION
   bool getDelayedSignCoding(const TransformUnit &tu, const ComponentID compID);
   bool getUseSignPred(const TransformUnit &tu, const ComponentID compID);
-  void predBorderResi(const Position blkPos, const CPelBuf &recoBuf, const CPelBuf &predBuf, const ComponentID compID,
-                      const uint32_t uiWidth,    const uint32_t uiHeight,   Pel *predResiBorder,   const Pel defaultPel);
+  void     predBorderResi(const Position blkPos, const CPelBuf &recoBuf, const CPelBuf &predBuf, ComponentID compID,
+                          uint32_t width, uint32_t height, Pel *predResiBorder, const Pel defaultVal);
   Position posSignHidingFirstCG(const TransformUnit &tu, ComponentID compID);
 #endif
 #if JVET_AE0059_INTER_CCCM

@@ -1087,7 +1087,7 @@ private:
   BestEncodingInfo ***m_bestEncInfo[MAX_CU_SIZE >> MIN_CU_LOG2][MAX_CU_SIZE >> MIN_CU_LOG2];
   TCoeff             *m_pCoeff;
 #if SIGN_PREDICTION
-  TCoeff             *m_pCoeffSign;
+  SIGN_PRED_TYPE *m_pCoeffSign;
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   unsigned           *m_pCoeffSignScanIdx;
 #endif
