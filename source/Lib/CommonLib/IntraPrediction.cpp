@@ -14673,8 +14673,8 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
 #if JVET_AE0100_BVGCCCM
   if (pu.bvgCccmFlag)
   {
-    CccmModel cccmModelCb[2] = { CccmModel( BVG_CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)), CccmModel( CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)) };
-    CccmModel cccmModelCr[2] = { CccmModel( BVG_CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)), CccmModel( CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)) };
+    CccmModel cccmModelCb[2] = { CccmModel( BVG_CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)), CccmModel( BVG_CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)) };
+    CccmModel cccmModelCr[2] = { CccmModel( BVG_CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)), CccmModel( BVG_CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)) };
     
     if (intraDir == LM_CHROMA_IDX || intraDir == MDLM_L_IDX || intraDir == MDLM_T_IDX)
     {
