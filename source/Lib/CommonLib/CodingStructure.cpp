@@ -1499,7 +1499,7 @@ TransformUnit& CodingStructure::addTU( const UnitArea &unit, const ChannelType c
 
   TCoeff *coeffs[5] = { nullptr, nullptr, nullptr, nullptr, nullptr };
 #if SIGN_PREDICTION
-  TCoeff *signs[5] = { nullptr, nullptr, nullptr, nullptr, nullptr };
+  SIGN_PRED_TYPE *signs[5] = { nullptr, nullptr, nullptr, nullptr, nullptr };
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   unsigned *signsScanIdx[5] = { nullptr, nullptr, nullptr, nullptr, nullptr };
 #endif
@@ -2201,7 +2201,7 @@ void CodingStructure::createCoeffs(const bool isPLTused)
 
     m_coeffs[i] = _area > 0 ? ( TCoeff* ) xMalloc( TCoeff, _area ) : nullptr;
 #if SIGN_PREDICTION
-    m_coeffSigns[i] = _area > 0 ? ( TCoeff* ) xMalloc( TCoeff, _area ) : nullptr;
+    m_coeffSigns[i] = _area > 0 ? (SIGN_PRED_TYPE *) xMalloc(SIGN_PRED_TYPE, _area) : nullptr;
 #if JVET_Y0141_SIGN_PRED_IMPROVE
     m_coeffSignsIdx[i] = _area > 0 ? (unsigned*)xMalloc(unsigned, _area) : nullptr;
 #endif

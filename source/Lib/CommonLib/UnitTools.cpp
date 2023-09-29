@@ -23357,65 +23357,56 @@ bool TU::getUseSignPred( const TransformUnit &tu, const ComponentID compID )
 #endif
 }
 
-void TU::predBorderResi( const Position blkPos, const CPelBuf &recoBuf, const CPelBuf &predBuf, const ComponentID compID,
-  const uint32_t uiWidth, const uint32_t uiHeight, Pel *predResiBorder, const Pel defaultPel )
+void TU::predBorderResi(const Position blkPos, const CPelBuf &recoBuf, const CPelBuf &predBuf, const ComponentID compID,
+                        const uint32_t width, const uint32_t height, Pel *predResiBorder, const Pel defaultVal)
 {
-  Pel r1, r2, p0;
-
-  const Pel *pReco1, *pReco2, *pPred0;
-
   const Pel *pReco = recoBuf.buf;
   const Pel *pPred = predBuf.buf;
-  uint32_t strideReco = recoBuf.stride;
-  uint32_t stridePred = predBuf.stride;
+  const ptrdiff_t strideReco = recoBuf.stride;
+  const ptrdiff_t stridePred = predBuf.stride;
 
+  const bool useLeft = blkPos.x != 0 || blkPos.y == 0;
+  const bool useTop  = blkPos.y != 0 || blkPos.x == 0;
 
-  if( blkPos.y )
-  {
-    pReco1 = pReco - strideReco;
-    pReco2 = pReco - 2 * strideReco;
-    pPred0 = pPred;
-    for( int32_t x = 0; x < uiWidth; x++ )
-    {
-      p0 = pPred0[x];
-      r1 = pReco1[x];
-      r2 = pReco2[x];
-      predResiBorder[uiHeight + x] = ( ( r1 << 1 ) - r2 - p0 );
-    }
-  }
-  else
-  {
-    for( int32_t x = 0; x < uiWidth; x++ )
-    {
-      predResiBorder[uiHeight + x] = defaultPel - pPred[x];
-    }
-  }
+  Pel *dst = predResiBorder + height;
 
-  if( blkPos.x )
+  if (useLeft)
   {
-    pReco1 = pReco - 1;
-    pReco2 = pReco - 2;
-    pPred0 = pPred;
-    for( int32_t y = 0; y < uiHeight; y++ )
+    if (blkPos.x != 0)
     {
-      p0 = pPred0[0];
-      r1 = pReco1[0];
-      r2 = pReco2[0];
-      predResiBorder[uiHeight - 1 - y] = ( ( r1 << 1 ) - r2 - p0 );
-      pReco1 += strideReco;
-      pReco2 += strideReco;
-      pPred0 += stridePred;
+      for (int32_t y = 0; y < height; y++)
+      {
+        Pel predVal = 2 * pReco[y * strideReco - 1] - pReco[y * strideReco - 2];
+        dst[~y]     = predVal - pPred[y * stridePred];
+      }
     }
-  }
-  else
-  {
-    for( int32_t y = 0; y < uiHeight; y++ )
+    else
     {
-      predResiBorder[uiHeight - 1 - y] = defaultPel - pPred[0];
-      pPred += stridePred;
+      for (int32_t y = 0; y < height; y++)
+      {
+        dst[~y] = defaultVal - pPred[y * stridePred];
+      }
     }
   }
 
+  if (useTop)
+  {
+    if (blkPos.y != 0)
+    {
+      for (int32_t x = 0; x < width; x++)
+      {
+        Pel predVal = 2 * pReco[x - strideReco] - pReco[x - 2 * strideReco];
+        dst[x]      = predVal - pPred[x];
+      }
+    }
+    else
+    {
+      for (int32_t x = 0; x < width; x++)
+      {
+        dst[x] = defaultVal - pPred[x];
+      }
+    }
+  }
 }
 
 Position TU::posSignHidingFirstCG( const TransformUnit &tu, ComponentID compID )

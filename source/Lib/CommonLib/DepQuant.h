@@ -57,9 +57,12 @@ public:
   virtual void dequant( const TransformUnit &tu, CoeffBuf &dstCoeff, const ComponentID &compID, const QpParam &cQP );
 #if SIGN_PREDICTION
 #if JVET_Y0141_SIGN_PRED_IMPROVE
-  static uint32_t getPredictedSigns(TransformUnit& tu, const ComponentID compID, std::vector<Position> &predSignsXY, uint8_t* signBuf, bool isDecoder);
+  static void getPredictedSigns(TransformUnit &tu, const ComponentID compID,
+                                static_vector<Position, SIGN_PRED_MAX_NUM> &predSignsXY, uint8_t *signBuf,
+                                bool isDecoder);
 #else
-  static uint32_t getPredictedSigns( TransformUnit& tu, const ComponentID compID, std::vector<Position> &predSignsXY );
+  static void getPredictedSigns(TransformUnit &tu, const ComponentID compID,
+                                static_vector<Position, SIGN_PRED_MAX_NUM> &predSignsXY);
 #endif
 #endif
 

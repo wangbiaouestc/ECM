@@ -338,7 +338,7 @@ private:
 
   TCoeff *m_coeffs [ MAX_NUM_COMPONENT ];
 #if SIGN_PREDICTION
-  TCoeff *m_coeffSigns [ MAX_NUM_COMPONENT ];
+  SIGN_PRED_TYPE *m_coeffSigns[MAX_NUM_COMPONENT];
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   unsigned *m_coeffSignsIdx[MAX_NUM_COMPONENT];
 #endif

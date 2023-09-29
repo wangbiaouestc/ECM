@@ -67,10 +67,9 @@ struct Position
 #if JVET_Y0141_SIGN_PRED_IMPROVE
 struct PositionWithLevel
 {
-  PosType x;
-  PosType y;
-  TCoeff level;
-  PositionWithLevel(const PosType _x, const PosType _y, const TCoeff _level) : x(_x), y(_y), level(_level) { }
+  uint16_t x;
+  uint16_t y;
+  TCoeff   level;
 };
 #endif
 struct Size

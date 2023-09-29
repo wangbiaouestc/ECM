@@ -41,6 +41,7 @@
 #include "UnitTools.h"
 #include "ContextModelling.h"
 #include "CodingStructure.h"
+#include "Reshape.h"
 
 #include "dtrace_buffer.h"
 
@@ -296,13 +297,6 @@ void TrQuant::init( const Quant* otherQuant,
   } };
 #endif
 
-#if ENABLE_SIMD_SIGN_PREDICTION
-  m_computeSAD = xComputeSAD;
-#if JVET_Y0141_SIGN_PRED_IMPROVE
-  m_computeHypSampleInt8 = xComputeHypSampleInt8;
-  m_computeSynSample = xComputeSynSample;
-#endif
-#endif
 #if INTRA_TRANS_ENC_OPT
   m_fwdLfnst = forwardLfnst;
   m_invLfnst = inverseLfnst;
@@ -311,7 +305,7 @@ void TrQuant::init( const Quant* otherQuant,
   m_computeFwdNspt = computeFwdNspt;
   m_computeInvNspt = computeInvNspt;
 #endif
-#if ENABLE_SIMD_SIGN_PREDICTION || TRANSFORM_SIMD_OPT
+#if TRANSFORM_SIMD_OPT
 #ifdef TARGET_SIMD_X86
   initTrQuantX86();
 #endif
@@ -2119,7 +2113,7 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
   }
 
 #if JVET_Y0141_SIGN_PRED_IMPROVE
-  std::vector<Position> predSignsXY;
+  static_vector<Position, SIGN_PRED_MAX_NUM> predSignsXY;
   DepQuant::getPredictedSigns(tu, residCompID, predSignsXY, m_signsBuf, !tu.cs->pcv->isEncoder);
   int32_t numPredSigns = (int32_t)predSignsXY.size();
 
@@ -2127,7 +2121,7 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
   {
     return;
   }
-  auto setCoeffSign = [](CoeffBuf &buff, uint8_t* signBuf, std::vector<Position> &pos) -> void
+  auto setCoeffSign = [](CoeffBuf &buff, uint8_t *signBuf, static_vector<Position, SIGN_PRED_MAX_NUM> &pos) -> void
   {
     for (int i = 0; i < pos.size(); ++i)
     {
@@ -2136,7 +2130,7 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
       coeff = std::abs(coeff) * (bit_value ? -1 : 1);
     }
   };
-  auto extractCoeffSign = [](CoeffBuf &buff, uint8_t* signBuf, std::vector<Position> &pos) -> void
+  auto extractCoeffSign = [](CoeffBuf &buff, uint8_t *signBuf, static_vector<Position, SIGN_PRED_MAX_NUM> &pos) -> void
   {
     for (int i = 0; i < pos.size(); ++i)
     {
@@ -2144,7 +2138,7 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
       signBuf[i] = (uint8_t)coeffSign;
     }
   };
-  auto setCoeffSignPositive = [](CoeffBuf &buff, std::vector<Position> &pos) -> void
+  auto setCoeffSignPositive = [](CoeffBuf &buff, static_vector<Position, SIGN_PRED_MAX_NUM> &pos) -> void
   {
     for (int i = 0; i < pos.size(); ++i)
     {
@@ -2156,7 +2150,7 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
     }
   };
 #else
-  auto setCoeffSign = [](CoeffBuf &buff, uint32_t signMask, std::vector<Position> &pos) -> void
+  auto setCoeffSign = [](CoeffBuf &buff, uint32_t signMask, static_vector<Position, SIGN_PRED_MAX_NUM> &pos) -> void
   {
     for( int i = 0, j = (int)pos.size() - 1; i < pos.size(); ++i, j-- )
     {
@@ -2165,14 +2159,15 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
       coeff = std::abs( coeff ) * ( bit_value ? -1 : 1 );
     }
   };
-  auto extractCoeffSign = [](CoeffBuf &buff, uint32_t &signMask, std::vector<Position> &pos) -> void
+  auto extractCoeffSign = [](CoeffBuf &buff, static_vector<Position, SIGN_PRED_MAX_NUM> &pos) -> uint32_t
   {
-    signMask = 0;
+    uint32_t signMask = 0;
     for( int i = 0, j = (int)pos.size() - 1; i < pos.size(); ++i, j-- )
     {
       uint32_t coeffSign = buff.at( pos[i] ) < 0 ? 1 : 0;
       signMask |= coeffSign << j;
     }
+    return signMask;
   };
 #endif
 
@@ -2184,17 +2179,21 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
     CoeffBuf coeff(memCoeff, width, height);
     PelBuf   resi(memTmpResid, width, height);
     coeff.fill(0);
+
+    const uint32_t stride = width + height;
+    const uint32_t length = width + height;
+
 #if JVET_Y0141_SIGN_PRED_IMPROVE
     int h = (height > SIGN_PRED_FREQ_RANGE) ? SIGN_PRED_FREQ_RANGE : height;
     int w = (width > SIGN_PRED_FREQ_RANGE) ? SIGN_PRED_FREQ_RANGE : width;
     int spArea = tu.cs->sps->getSignPredArea();
     int signPredWidth = std::min((int)width, spArea);
     int signPredHeight = std::min((int)height, spArea);
-    int8_t  *pTemplate = (int8_t *)xMalloc(int8_t, (width + height - 1) * h*w);
-    AreaBuf<int8_t> templateBuf(pTemplate, (width + height - 1), h*w);
+    int8_t         *pTemplate      = (int8_t *) xMalloc(int8_t, stride * h * w);
+    AreaBuf<int8_t> templateBuf(pTemplate, stride, length, h * w);
 #else
-    int8_t  *pTemplate = (int8_t *)xMalloc(int8_t, (width + height - 1) * SIGN_PRED_FREQ_RANGE*SIGN_PRED_FREQ_RANGE);
-    AreaBuf<int8_t> templateBuf(pTemplate, (width + height - 1), SIGN_PRED_FREQ_RANGE*SIGN_PRED_FREQ_RANGE);
+    int8_t *pTemplate = (int8_t *) xMalloc(int8_t, stride * SIGN_PRED_FREQ_RANGE * SIGN_PRED_FREQ_RANGE);
+    AreaBuf<int8_t> templateBuf(pTemplate, stride, length, SIGN_PRED_FREQ_RANGE * SIGN_PRED_FREQ_RANGE);
 #endif
     Position prev(0,0);
     int8_t *templ = templateBuf.buf;
@@ -2210,6 +2209,7 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
       Position curr(j%SIGN_PRED_FREQ_RANGE, j/SIGN_PRED_FREQ_RANGE);
 #endif
       coeff.at(prev) = 0;
+      // Is this the correct value to use? Shouldn't it depend on bit depth?
       coeff.at(curr) = 1 << SIGN_PRED_SHIFT;
 
       xIT( tu, comp, coeff, resi);
@@ -2218,6 +2218,7 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
 
       for (uint32_t i = 0; i < height; i++)
       {
+        CHECK(*pelResi < -128 || *pelResi > 127, "value exceeds 8-bit range");
         templ[i] = (int8_t)(*pelResi);
         pelResi -= resi.stride;
       }
@@ -2226,7 +2227,8 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
 
       for (uint32_t i = 0; i < width; i++)
       {
-        templ[i + height - 1] = (int8_t)pelResi[i];
+        CHECK(pelResi[i] < -128 || pelResi[i] > 127, "value exceeds 8-bit range");
+        templ[i + height] = (int8_t) pelResi[i];
       }
 #if !JVET_Y0141_SIGN_PRED_IMPROVE
       templ += templateBuf.stride;
@@ -2245,13 +2247,16 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   auto createTemplateLFNST = [this, tu](ComponentID comp, uint32_t width, uint32_t height, uint32_t lfnstIdx) -> void
   {
+    const uint32_t stride = width + height;
+    const uint32_t length = width + height;
+
     Pel      *memTmpResid = (Pel *)xMalloc(Pel, width*height);
     CoeffBuf coeff(m_tempCoeff, width, height);
     PelBuf   resi(memTmpResid, width, height);
     int signPredHeight = 4;
     int signPredWidth = 4;
-    int8_t  *pTemplate = (int8_t *)xMalloc(int8_t, (width + height - 1) * signPredHeight*signPredWidth);
-    AreaBuf<int8_t> templateBuf(pTemplate, (width + height - 1), signPredHeight*signPredWidth);
+    int8_t         *pTemplate      = (int8_t *) xMalloc(int8_t, stride * signPredHeight * signPredWidth);
+    AreaBuf<int8_t> templateBuf(pTemplate, stride, length, signPredHeight * signPredWidth);
     int8_t *templ = templateBuf.buf;
     for (int j = 0; j < signPredHeight*signPredWidth; ++j)
     {
@@ -2266,6 +2271,7 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
 
       for (uint32_t i = 0; i < height; i++)
       {
+        CHECK(*pelResi < -128 || *pelResi > 127, "value exceeds 8-bit range");
         templ[i] = (int8_t)(*pelResi);
         pelResi -= resi.stride;
       }
@@ -2274,9 +2280,9 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
 
       for (uint32_t i = 0; i < width; i++)
       {
-        templ[i + height - 1] = (int8_t)pelResi[i];
+        CHECK(pelResi[i] < -128 || pelResi[i] > 127, "value exceeds 8-bit range");
+        templ[i + height] = (int8_t) pelResi[i];
       }
-
       templ += templateBuf.stride;
     }
 
@@ -2292,15 +2298,14 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
   CodingStructure &cs = *tu.cs;
   PelBuf recoBuf = cs.picture->getRecoBuf(tu.blocks[residCompID]);
   PelBuf predBuf = cs.getPredBuf(tu.blocks[residCompID]);
-  Pel        predResiBorder[2 * SIGN_PRED_MAX_BS];
-  Pel        predResiTemplate[2 * SIGN_PRED_MAX_BS]{0};
-  Pel        predResiTemplateReshape[2 * SIGN_PRED_MAX_BS]{0};
+  Pel              predResiBorder[2 * SIGN_PRED_MAX_BS];
   TU::predBorderResi(tu.blocks[residCompID], recoBuf, predBuf, residCompID, tu.blocks[residCompID].width, tu.blocks[residCompID].height, predResiBorder, (1 << (tu.cs->sps->getBitDepth(toChannelType(residCompID)) - 1)));
 
   const uint32_t     uiWidth  = tu.blocks[residCompID].width;
   const uint32_t     uiHeight = tu.blocks[residCompID].height;
-  PelBuf     bufResiTemplate(predResiTemplate, uiWidth + uiHeight - 1, 1);
-  PelBuf     bufResiTemplateReshape(predResiTemplateReshape, uiWidth + uiHeight - 1, 1);
+  const uint32_t     stride   = uiWidth + uiHeight;
+  const uint32_t     length   = uiWidth + uiHeight;
+
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   int log2Width = floorLog2(uiWidth);
   int log2Height = floorLog2(uiHeight);
@@ -2349,13 +2354,19 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
   const uint32_t signPredHeight = std::min(uiHeight, spSize);
   const uint32_t w = std::min(uiWidth, (uint32_t)SIGN_PRED_FREQ_RANGE);
   const uint32_t h = std::min(uiHeight, (uint32_t)SIGN_PRED_FREQ_RANGE);
-  AreaBuf<const int8_t>   templateNormalizedBuf = (lfnstEnabled ? AreaBuf<const int8_t>() : AreaBuf<const int8_t>(g_resiBorderTemplate[log2Width - 2][log2Height - 2][actualTrIdx], uiWidth + uiHeight - 1, w*h));
-  AreaBuf<const int8_t>   templateLfnstNormalizedBuf = (lfnstEnabled ? AreaBuf<const int8_t>(g_resiBorderTemplateLFNST[log2Width - 2][log2Height - 2][actualLfnstIdx], uiWidth + uiHeight - 1, signPredWidth*signPredHeight) : AreaBuf<const int8_t>());
-  PelBuf templateBuf(m_signPredTemplate, uiWidth + uiHeight - 1, signPredWidth*signPredHeight);
+
+  AreaBuf<const int8_t> templateNormalizedBuf =
+    (lfnstEnabled ? AreaBuf<const int8_t>()
+                  : AreaBuf<const int8_t>(g_resiBorderTemplate[log2Width - 2][log2Height - 2][actualTrIdx], stride,
+                                          length, w * h));
+  AreaBuf<const int8_t> templateLfnstNormalizedBuf =
+    (lfnstEnabled ? AreaBuf<const int8_t>(g_resiBorderTemplateLFNST[log2Width - 2][log2Height - 2][actualLfnstIdx],
+                                          stride, length, signPredWidth * signPredHeight)
+                  : AreaBuf<const int8_t>());
 #else
-  AreaBuf<const int8_t> templateNormalizedBuf(g_resiBorderTemplate[log2Width - 2][log2Height - 2][actualTrIdx], uiWidth + uiHeight - 1, SIGN_PRED_FREQ_RANGE*SIGN_PRED_FREQ_RANGE);
-  PelBuf templateBuf(m_signPredTemplate, uiWidth + uiHeight - 1, SIGN_PRED_FREQ_RANGE*SIGN_PRED_FREQ_RANGE);
-  std::vector<Position> predSignsXY;
+  AreaBuf<const int8_t> templateNormalizedBuf(g_resiBorderTemplate[log2Width - 2][log2Height - 2][actualTrIdx], stride,
+                                              length, SIGN_PRED_FREQ_RANGE * SIGN_PRED_FREQ_RANGE);
+  static_vector<Position, SIGN_PRED_MAX_NUM> predSignsXY;
   DepQuant::getPredictedSigns( tu, residCompID, predSignsXY );
   int32_t numPredSigns = (int32_t)predSignsXY.size();
 
@@ -2363,21 +2374,21 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
   {
     return;
   }
-
-  uint32_t bufferSigns;
 #endif
+  Pel m_signPredTemplate[SIGN_PRED_MAX_NUM * SIGN_PRED_MAX_BS * 2];
+
   CoeffBuf bufTmpQuant = CoeffBuf(m_tempCoeff, tu.blocks[residCompID]);
   PelBuf   piResi(m_tempSignPredResid, uiWidth, uiHeight);
   PelBuf   piResiCr(m_tempSignPredResid + uiWidth*uiHeight, uiWidth, uiHeight);
 
   CoeffBuf quantedCoeffBuff = tu.getCoeffs(residCompID);
-  CoeffBuf bufSigns         = tu.getCoeffSigns(residCompID);
+  AreaBuf<SIGN_PRED_TYPE> bufSigns         = tu.getCoeffSigns(residCompID);
 
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   extractCoeffSign(quantedCoeffBuff, m_signsBuf, predSignsXY);
   setCoeffSignPositive(quantedCoeffBuff, predSignsXY);
 #else
-  extractCoeffSign(quantedCoeffBuff, bufferSigns, predSignsXY);
+  uint32_t bufferSigns = extractCoeffSign(quantedCoeffBuff, predSignsXY);
   setCoeffSign(quantedCoeffBuff, 0, predSignsXY);
 #endif
 
@@ -2385,53 +2396,58 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
 
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   setCoeffSign(quantedCoeffBuff, m_signsBuf, predSignsXY);
-  TCoeff *tmpQuant = bufTmpQuant.bufAt( 0, 0 );
-  int tmpQuantStride = bufTmpQuant.stride;
-  for( auto xy : predSignsXY )
-  {
-    int pos = xy.y * signPredWidth + xy.x;
-    Pel *templ = templateBuf.bufAt( 0, pos );
-    TCoeff temp = tmpQuant[xy.y * tmpQuantStride + xy.x];
-    CHECK(temp <= 0, "coefficient value should be positive");
-
-    if (lfnstEnabled)
-    {
-      const int8_t *templNorm = templateLfnstNormalizedBuf.bufAt(0, pos);
-      m_computeHypSampleInt8(temp, templNorm, templ, uiWidth, uiHeight);
-    }
-    else
-    {
-      int idx = xy.y * w + xy.x;
-      const int8_t *templNorm = templateNormalizedBuf.bufAt(0, idx);
-      m_computeHypSampleInt8(temp, templNorm, templ, uiWidth, uiHeight);
-    }
-  }
 #else
   setCoeffSign(quantedCoeffBuff, bufferSigns, predSignsXY);
+#endif
+
+  const bool useLeft = tu.blocks[residCompID].x != 0 || tu.blocks[residCompID].y == 0;
+  const bool useTop  = tu.blocks[residCompID].y != 0 || tu.blocks[residCompID].x == 0;
+
+  const int first = useLeft ? 0 : uiHeight;
+  const int last  = useTop ? length : uiHeight;
+
   TCoeff *tmpQuant = bufTmpQuant.bufAt( 0, 0 );
-  int tmpQuantStride = bufTmpQuant.stride;
+  const ptrdiff_t tmpQuantStride = bufTmpQuant.stride;
 
-  for( auto xy : predSignsXY )
+  // Compute impact on template area of each coeff where sign is to be determined
+  for (int predSignIdx = 0; predSignIdx < predSignsXY.size(); predSignIdx++)
   {
-    int pos = xy.y * SIGN_PRED_FREQ_RANGE + xy.x;
+    const auto &xy = predSignsXY[predSignIdx];
 
-    Pel *templ = templateBuf.bufAt( 0, pos );
-    const int8_t *templNorm = templateNormalizedBuf.bufAt( 0, pos );
-    TCoeff temp = tmpQuant[xy.y * tmpQuantStride + xy.x];
+    Pel         *templateVec = m_signPredTemplate + predSignIdx * stride;
+    const TCoeff coeffVal    = tmpQuant[xy.y * tmpQuantStride + xy.x];
 
-    if( temp )
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+    CHECK(coeffVal <= 0, "coefficient value should be positive");
+#else
+    CHECK(coeffVal == 0, "coefficient value should be nonzero");
+#endif
+
+    const int8_t *templateBasisVec;
+
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+    if (lfnstEnabled)
     {
-      for( auto j = 0; j < uiWidth + uiHeight - 1; ++j )
-      {
-        templ[j] = ( temp * templNorm[j] + SIGN_PRED_OFFSET ) >> SIGN_PRED_SHIFT;
-      }
+      const int pos = xy.y * signPredWidth + xy.x;
+
+      templateBasisVec = templateLfnstNormalizedBuf.bufAt(0, pos);
     }
     else
+#endif
     {
-      std::memset( templ, 0, sizeof( *templ ) * ( uiWidth + uiHeight - 1 ) );
+      const int idx = xy.y * w + xy.x;
+
+      templateBasisVec = templateNormalizedBuf.bufAt(0, idx);
+    }
+
+    for (int j = first; j < last; j++)
+    {
+      // coeffVal should be in -32768..32767 range and templateBasisVec[j] in -63..63
+      // output range should be about -8064..8064
+      templateVec[j] = (coeffVal * templateBasisVec[j] + SIGN_PRED_OFFSET) >> SIGN_PRED_SHIFT;
     }
   }
-#endif
+
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   if (lfnstEnabled)
   {
@@ -2448,7 +2464,7 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
   }
 
   Pel *pelResi = piResi.buf;
-  int resiStride = piResi.stride;
+  ptrdiff_t resiStride = piResi.stride;
 
   if( bIsJCCR )
   {
@@ -2460,158 +2476,124 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
     }
   }
 
-  Pel *resiTemplate = bufResiTemplate.buf + uiHeight - 1;
-#if JVET_Y0141_SIGN_PRED_IMPROVE
-  memcpy(resiTemplate, pelResi, uiWidth * sizeof(Pel));
+  Pel predResiTemplate[2 * SIGN_PRED_MAX_BS];
 
-  pelResi += resiStride;
-  for (int i = 1; i < uiHeight; i++)
+  // Copy residual before any sign change
+  Pel *resiTemplate = predResiTemplate + uiHeight;
+  if (useLeft)
   {
-    resiTemplate[-i] = pelResi[0];
-    pelResi += resiStride;
-  }
-#else
-  for( int i = 1; i < uiWidth; i++ )
-  {
-    resiTemplate[i] += pelResi[i];
-  }
-
-  for( int i = 0; i < uiHeight; i++ )
-  {
-    resiTemplate[-i] += pelResi[0];
-    pelResi += resiStride;
-  }
-#endif
-  int signPrev = 0;
-
-  for (uint32_t idx = 0; idx < (1 << numPredSigns); idx++)
-  {
-    const int32_t signCurr = (idx ^ (idx >> 1)); // Gray code
-
-    if(idx)
+    for (int i = 0; i < uiHeight; i++)
     {
-      if( reshapeChroma )
-      {
-        std::swap( bufResiTemplateReshape, bufResiTemplate );
-      }
-      int uiBit;
-      int uiXor = signCurr ^ signPrev;
-      for (uiBit = 0; uiBit < numPredSigns; uiBit++, uiXor >>= 1)
-      {
-        if (uiXor & 1)
-        {
-          break;
-        }
-      }
-
-      bool signModifyTo = (signCurr >> uiBit) & 0x1;
-      int  predSignIdx = numPredSigns - uiBit - 1;
-#if JVET_Y0141_SIGN_PRED_IMPROVE
-      int pos_idx = predSignsXY[predSignIdx].y * signPredWidth + predSignsXY[predSignIdx].x;
-#else
-      int pos_idx = predSignsXY[predSignIdx].y * SIGN_PRED_FREQ_RANGE + predSignsXY[predSignIdx].x;
-#endif
-      Pel *templ = templateBuf.bufAt(0, pos_idx);
-
-#if JVET_Y0141_SIGN_PRED_IMPROVE
-      m_computeSynSample(templ, bufResiTemplate.buf, uiWidth, uiHeight, signModifyTo);
-#else
-      for (uint32_t i = 0; i < uiHeight + uiWidth - 1; i++)
-      {
-        bufResiTemplate.buf[i] += templ[i] * (signModifyTo ? -2 : 2);
-      }
-#endif
+      resiTemplate[~i] = pelResi[resiStride * i];
     }
+  }
 
-    if(reshapeChroma)
+  if (useTop)
+  {
+    for (int i = 0; i < uiWidth; i++)
     {
-      bufResiTemplateReshape.copyFrom(bufResiTemplate);
-      bufResiTemplate.scaleSignal(tu.getChromaAdj(), 0, tu.cu->cs->slice->clpRng(residCompID));
+      resiTemplate[i] = pelResi[i];
     }
+  }
 
-    /*Compute cost of modificiation*/
-    signPrev = signCurr;
+  int16_t chromaScale = 0;
+  Pel     maxVal      = 0;
+  if (reshapeChroma)
+  {
+    CHECK(tu.getChromaAdj() > std::numeric_limits<int16_t>::max(), "scale out of range");
+    chromaScale = tu.getChromaAdj();
+    maxVal      = (1 << tu.cu->cs->slice->clpRng(residCompID).bd) - 1;
+  }
 
-    const bool firstBlock = !tu.blocks[residCompID].x && !tu.blocks[residCompID].y;
+  // Compute SADs for all possible combinations of sign changes
+  uint32_t cost = 0;
 
-#if ENABLE_SIMD_SIGN_PREDICTION
+  if (reshapeChroma)
+  {
+    for (uint32_t i = first; i < last; i++)
+    {
+      cost += abs(predResiBorder[i] - Reshape::scalePel(predResiTemplate[i], chromaScale, maxVal));
+    }
+  }
+  else
+  {
+    for (uint32_t i = first; i < last; i++)
+    {
+      cost += abs(predResiBorder[i] - predResiTemplate[i]);
+    }
+  }
+
+  uint32_t costs[1 << SIGN_PRED_MAX_NUM];
+
+  costs[0] = cost << SIGN_PRED_MAX_NUM;
+
+  for (uint32_t idx = 1; idx < (1 << numPredSigns); idx++)
+  {
+    const uint32_t signXor  = idx & ~(idx - 1);
+    const uint32_t curSigns = idx ^ (idx >> 1);
+
+    const int16_t scale        = (curSigns & signXor) != 0 ? -2 : 2;
+    const int  predSignIdx  = numPredSigns - 1 - floorLog2(signXor);
+
+    const Pel *templ = m_signPredTemplate + predSignIdx * stride;
+
+    // Compute cost of modification
     uint32_t cost = 0;
 
-    if( tu.blocks[residCompID].x || firstBlock )
+    if (reshapeChroma)
     {
-      cost += m_computeSAD( predResiBorder, bufResiTemplate.buf, uiHeight );
-    }
-
-    if( tu.blocks[residCompID].y || firstBlock )
-    {
-      cost += m_computeSAD( predResiBorder + uiHeight, bufResiTemplate.buf + uiHeight - 1, uiWidth );
-    }
-#else
-    uint32_t cost = 0;
-
-    const Pel *pRef = predResiBorder;
-
-    Pel *pCurr = bufResiTemplate.buf;
-
-    if( tu.blocks[residCompID].x || firstBlock )
-    {
-      for( uint32_t i = 0; i < uiHeight; i++ )
+      for (uint32_t i = first; i < last; i++)
       {
-        cost += abs( pRef[i] - pCurr[i] );
+        predResiTemplate[i] += templ[i] * scale;
+        cost += abs(predResiBorder[i] - Reshape::scalePel(predResiTemplate[i], chromaScale, maxVal));
+      }
+    }
+    else
+    {
+      for (uint32_t i = first; i < last; i++)
+      {
+        predResiTemplate[i] += templ[i] * scale;
+        cost += abs(predResiBorder[i] - predResiTemplate[i]);
       }
     }
 
-    pRef += uiHeight;
-    pCurr += uiHeight - 1;
-
-    if( tu.blocks[residCompID].y || firstBlock )
-    {
-      for( uint32_t i = 0; i < uiWidth; i++ )
-      {
-        cost += abs( pRef[i] - pCurr[i] );
-      }
-    }
-#endif
-
-    m_aiSignPredCost[signCurr] = cost;
+    costs[curSigns] = (cost << SIGN_PRED_MAX_NUM) | curSigns;
   }
 
+  uint32_t  minIdx            = 0;
+  uint32_t  base              = 0;
+  bool      resiSign          = true;
+  uint32_t  signMask          = 1 << numPredSigns;
 
-  uint8_t realSign, resiSign = 1;
-  uint32_t *pcCost            = m_aiSignPredCost;
-  uint32_t  numSignsToProcess = numPredSigns;
-  uint32_t  min_idx           = 0;
-
-  for (uint32_t idx = 0; idx < numPredSigns; idx++)
+  for (uint32_t predSignIdx = 0; predSignIdx < numPredSigns; predSignIdx++)
   {
-    Position xyPos = predSignsXY[idx];
+    const Position &xyPos = predSignsXY[predSignIdx];
 
     // Find predicted sign value
     if( resiSign )
     {
-      uint32_t min_cost = -1;
-      for (uint32_t c = 0; c < (1 << numSignsToProcess); c++)
+      uint32_t minVal = ~0u;
+      for (uint32_t idx = base; idx < base + signMask; idx++)
       {
-        if (pcCost[c] < min_cost)
-        {
-          min_cost = pcCost[c];
-          min_idx  = c;
-        }
+        minVal = std::min(minVal, costs[idx]);
       }
+      minIdx = minVal & ~(~0u << SIGN_PRED_MAX_NUM);
     }
 
-    const uint8_t predSign = (min_idx >> (numSignsToProcess - 1)) & 1;
+    signMask >>= 1;
 
-    numSignsToProcess--;
+    const bool predSign = (minIdx & signMask) != 0;
+
+    bool realSign;
 
     if( tu.cs->pcv->isEncoder )
     {
-      realSign = quantedCoeffBuff.at(xyPos) > 0 ? 0 : 1;
+      realSign = quantedCoeffBuff.at(xyPos) < 0;
       resiSign = predSign ^ realSign;
     }
     else
     {
-      resiSign = quantedCoeffBuff.at(xyPos) > 0 ? 0 : 1;
+      resiSign = quantedCoeffBuff.at(xyPos) < 0;
       realSign = predSign ^ resiSign;
       if (predSign)
       {
@@ -2623,42 +2605,11 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
 
     if( realSign )
     {
-      pcCost += (uint32_t)(1 << numSignsToProcess);
+      base += signMask;
     }
   }
 }
 
-#if ENABLE_SIMD_SIGN_PREDICTION
-inline uint32_t TrQuant::xComputeSAD( const Pel* ref, const Pel* cur, const int size )
-{
-  uint32_t dist = 0;
-  for( uint32_t i = 0; i < size; i++ )
-  {
-    dist += abs( ref[i] - cur[i] );
-  }
-
-  return dist;
-}
-#if JVET_Y0141_SIGN_PRED_IMPROVE
-inline uint32_t TrQuant::xComputeHypSampleInt8(const int dequant, const int8_t* templateNormalizedBuf, Pel* templ, const uint32_t uiWidth, const uint32_t uiHeight)
-{
-  uint32_t energy = 0;
-  for (int j = 0; j < uiWidth + uiHeight - 1; ++j)
-  {
-    templ[j] = (dequant * templateNormalizedBuf[j] + SIGN_PRED_OFFSET) >> SIGN_PRED_SHIFT;
-  }
-
-  return energy;
-}
-inline void TrQuant::xComputeSynSample(const Pel* templ, Pel* resiBuf, const uint32_t uiWidth, const uint32_t uiHeight, const bool signModifyTo)
-{
-  for (uint32_t i = 0; i < uiHeight + uiWidth - 1; i++)
-  {
-    resiBuf[i] += templ[i] * (signModifyTo ? -2 : 2);
-  }
-}
-#endif
-#endif
 #if JVET_Y0141_SIGN_PRED_IMPROVE
 int TrQuant::getLfnstIdx(const TransformUnit &tu, ComponentID compID)
 {

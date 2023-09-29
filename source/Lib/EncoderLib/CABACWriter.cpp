@@ -8858,16 +8858,19 @@ void CABACWriter::rribcData(const CodingUnit& cu)
 
 #if SIGN_PREDICTION
 #if JVET_Y0141_SIGN_PRED_IMPROVE
-struct signCombInfo
+struct SignCombInfo
 {
-  uint32_t sign;
   unsigned idx;
+  bool     sign;
   bool     isSignPred;
 
-  signCombInfo(const unsigned _sign, const unsigned _idx, const bool _isPred) : sign(_sign), idx(_idx), isSignPred(_isPred) { }
+  SignCombInfo(const unsigned _sign, const unsigned _idx, const bool _isPred)
+    : idx(_idx), sign(_sign), isSignPred(_isPred)
+  {
+  }
 };
 
-bool compareOrderIdx(signCombInfo cand0, signCombInfo cand1)
+bool compareOrderIdx(SignCombInfo cand0, SignCombInfo cand1)
 {
   return (cand0.idx < cand1.idx);
 }
@@ -8879,9 +8882,9 @@ void CABACWriter::codePredictedSigns( TransformUnit &tu, ComponentID compID )
   const bool useSignPred = TU::getUseSignPred( tu, compID );
 
   CoeffBuf buff = tu.getCoeffs( compID );
-  CoeffBuf signBuff = tu.getCoeffSigns( compID );
+  AreaBuf<SIGN_PRED_TYPE> signBuff = tu.getCoeffSigns(compID);
   TCoeff *coeff = buff.buf;
-  TCoeff *signs = signBuff.buf;
+  SIGN_PRED_TYPE         *signs    = signBuff.buf;
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   IdxBuf signScanIdxBuff = tu.getCoeffSignsScanIdx(compID);
   unsigned *signScanIdx = signScanIdxBuff.buf;
@@ -8896,7 +8899,7 @@ void CABACWriter::codePredictedSigns( TransformUnit &tu, ComponentID compID )
         TCoeff coef = coeff[x];
         if (coef)
         {
-          if (signs[x] != TrQuant::SIGN_PRED_HIDDEN)
+          if (signs[x] != SIGN_PRED_HIDDEN)
           {
             m_BinEncoder.encodeBinEP(coef < 0 ? 1 : 0);
           }
@@ -8908,11 +8911,12 @@ void CABACWriter::codePredictedSigns( TransformUnit &tu, ComponentID compID )
   }
   else
   {
-    std::vector<signCombInfo> signCombList;
+    std::vector<SignCombInfo>                  signCombList;
     bool lfnstEnabled = tu.checkLFNSTApplied(compID);
-    std::vector<uint32_t> levelList;
-    const int32_t maxNumPredSigns = lfnstEnabled ? std::min<int>( 4, tu.cs->sps->getNumPredSigns() ) : tu.cs->sps->getNumPredSigns();
-    int numScanPos = 0;
+    static_vector<uint32_t, SIGN_PRED_MAX_NUM> levelList;
+    const int32_t                              maxNumPredSigns =
+      lfnstEnabled ? std::min<int>(4, tu.cs->sps->getNumPredSigns()) : tu.cs->sps->getNumPredSigns();
+    CHECK(maxNumPredSigns > levelList.max_size(), "levelList is too small");
     uint32_t extAreaSize = (lfnstEnabled ? 4 : tu.cs->sps->getSignPredArea());
     uint32_t spAreaWidth = std::min(tu.blocks[compID].width, extAreaSize);
     uint32_t spAreaHeight = std::min(tu.blocks[compID].height, extAreaSize);
@@ -8923,27 +8927,27 @@ void CABACWriter::codePredictedSigns( TransformUnit &tu, ComponentID compID )
         TCoeff coef = coeff[x];
         if (coef)
         {
-          TCoeff sign = signs[x];
-          if (sign != TrQuant::SIGN_PRED_HIDDEN)
+          SIGN_PRED_TYPE sign = signs[x];
+          if (sign != SIGN_PRED_HIDDEN)
           {
-            if (sign == TrQuant::SIGN_PRED_BYPASS)
+            if (sign == SIGN_PRED_BYPASS)
             {
-              uint32_t curSign = (coef < 0) ? 1 : 0;
+              const bool   curSign = coef < 0;
               unsigned scanIdx = signScanIdx[x];
-              signCombInfo signCand(curSign, scanIdx, false);
+              SignCombInfo signCand(curSign, scanIdx, false);
               signCombList.push_back(signCand);
             }
             else
             {
-              uint32_t errSignPred = ((coef > 0 && sign == TrQuant::SIGN_PRED_POSITIVE) || (coef < 0 && sign == TrQuant::SIGN_PRED_NEGATIVE)) ? 0 : 1;
+              const bool errSignPred =
+                !(coef > 0 && sign == SIGN_PRED_POSITIVE) && !(coef < 0 && sign == SIGN_PRED_NEGATIVE);
               unsigned scanIdx = signScanIdx[x];
-              signCombInfo signCand(errSignPred, scanIdx, true);
+              SignCombInfo signCand(errSignPred, scanIdx, true);
               signCombList.push_back(signCand);
             }
-            if (numScanPos < maxNumPredSigns)
+            if (levelList.size() < maxNumPredSigns)
             {
               levelList.push_back(abs(coef));
-              numScanPos++;
             }
           }
         }
@@ -8953,20 +8957,20 @@ void CABACWriter::codePredictedSigns( TransformUnit &tu, ComponentID compID )
       signScanIdx += signScanIdxBuff.stride;
     }
     std::stable_sort(signCombList.begin(), signCombList.end(), compareOrderIdx);
-    numScanPos = 0;
+    int numScanPos = 0;
     for (uint32_t idx = 0; idx < signCombList.size(); idx++)
     {
       if (signCombList[idx].isSignPred)
       {
-        uint32_t errSignPred = signCombList[idx].sign;
+        const bool errSignPred = signCombList[idx].sign;
         uint32_t level = levelList[numScanPos++];
         int levOffset = (level < 2) ? 0 : 1;
-        m_BinEncoder.encodeBin(errSignPred, (*ctx)(ctxOffset + levOffset));
+        m_BinEncoder.encodeBin(errSignPred ? 1 : 0, (*ctx)(ctxOffset + levOffset));
       }
       else
       {
-        uint32_t curSign = signCombList[idx].sign;
-        m_BinEncoder.encodeBinEP(curSign);
+        const bool curSign = signCombList[idx].sign;
+        m_BinEncoder.encodeBinEP(curSign ? 1 : 0);
       }
     }
     if (spAreaWidth != extAreaWidth || spAreaHeight != extAreaHeight)
@@ -8998,17 +9002,18 @@ void CABACWriter::codePredictedSigns( TransformUnit &tu, ComponentID compID )
 
       if( coef )
       {
-        TCoeff sign = signs[x];
-        if( sign != TrQuant::SIGN_PRED_HIDDEN )
+        SIGN_PRED_TYPE sign = signs[x];
+        if (sign != SIGN_PRED_HIDDEN)
         {
 
-          if( sign == TrQuant::SIGN_PRED_BYPASS || !useSignPred )
+          if( sign == SIGN_PRED_BYPASS || !useSignPred )
           {
             m_BinEncoder.encodeBinEP( coef < 0 ? 1 : 0 );
           }
           else
           {
-            uint32_t   errSignPred = ( ( coef > 0 && sign == TrQuant::SIGN_PRED_POSITIVE ) || ( coef < 0 && sign == TrQuant::SIGN_PRED_NEGATIVE ) ) ? 0 : 1;
+            uint32_t errSignPred =
+              ((coef > 0 && sign == SIGN_PRED_POSITIVE) || (coef < 0 && sign == SIGN_PRED_NEGATIVE)) ? 0 : 1;
             uint32_t ctxId = ( x || y ) ? 1 : 0;
             m_BinEncoder.encodeBin( errSignPred, ( *ctx )( ctxId + ctxOffset ) );
           }

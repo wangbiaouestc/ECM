@@ -354,16 +354,17 @@ public:
 #if TCQ_8STATES
 #if SIGN_PREDICTION
 #if JVET_AE0102_LFNST_CTX
-  void        residual_coding_subblock(CoeffCodingContext& cctx, TCoeff* coeff, TCoeff* sign, const uint64_t stateTransTable, int& state, int lfnstIdx);
+  void        residual_coding_subblock(CoeffCodingContext& cctx, TCoeff* coeff, SIGN_PRED_TYPE* sign, const uint64_t stateTransTable, int& state, int lfnstIdx);
 #else
-  void        residual_coding_subblock(CoeffCodingContext& cctx, TCoeff* coeff, TCoeff* sign, const uint64_t stateTransTable, int& state);
+  void        residual_coding_subblock(CoeffCodingContext& cctx, TCoeff* coeff, SIGN_PRED_TYPE* sign, const uint64_t stateTransTable, int& state);
 #endif
 #else
   void        residual_coding_subblock  ( CoeffCodingContext&           cctx,   TCoeff*         coeff, const uint64_t stateTransTable, int& state );
 #endif
 #else
 #if SIGN_PREDICTION
-	void        residual_coding_subblock  ( CoeffCodingContext&           cctx,   TCoeff*         coeff,   TCoeff*         sign, const int stateTransTable, int& state );
+  void        residual_coding_subblock(CoeffCodingContext &cctx, TCoeff *coeff, SIGN_PRED_TYPE *sign,
+                                       const int stateTransTable, int &state);
 #else
 	void        residual_coding_subblock  ( CoeffCodingContext&           cctx,   TCoeff*         coeff, const int stateTransTable, int& state );
 #endif
