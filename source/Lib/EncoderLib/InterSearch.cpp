@@ -12398,7 +12398,6 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
   uint64_t   uiSingleFracBits[3] = { 0, 0, 0 };
 
   const TempCtx ctxStart  ( m_ctxCache, m_CABACEstimator->getCtx() );
-  TempCtx       ctxBest   ( m_ctxCache );
 
   if (bCheckFull)
   {

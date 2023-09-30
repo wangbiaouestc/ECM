@@ -280,12 +280,12 @@ public:
   }
 private:
   uint16_t m_state[2];
-  uint8_t  m_rate;
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT 
   uint16_t m_stateUsed[2];
   uint8_t  m_rateOffset[2];
   uint8_t  m_weight;
 #endif
+  uint8_t  m_rate;
 };
 
 
@@ -599,6 +599,7 @@ public:
   static const CtxSet   Sao;
   static const CtxSet   Alf;
   static const CtxSet   Palette;
+  static const CtxSet   Split;
 
 public:
   static const std::vector<uint8_t>&  getInitTable( unsigned initId );

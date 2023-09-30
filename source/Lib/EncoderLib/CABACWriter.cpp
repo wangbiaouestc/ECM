@@ -5203,7 +5203,7 @@ uint64_t CABACWriter::geo_mode_est(const TempCtx& ctxStart, const int geoMode
 #endif
 )
 {
-  getCtx() = ctxStart;
+  getCtx() = SubCtx(Ctx::GeoSubModeIdx, ctxStart);
   resetBits();
 
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
@@ -5217,7 +5217,7 @@ uint64_t CABACWriter::geo_mode_est(const TempCtx& ctxStart, const int geoMode
 
 uint64_t CABACWriter::geo_mergeIdx_est(const TempCtx& ctxStart, const int candIdx, const int maxNumGeoCand)
 {
-  getCtx() = ctxStart;
+  getCtx() = SubCtx(Ctx::MergeIdx, ctxStart);
   resetBits();
 
   int numCandminus2 = maxNumGeoCand - 2;
@@ -5239,7 +5239,7 @@ uint64_t CABACWriter::geo_mergeIdx_est(const TempCtx& ctxStart, const int candId
 #if JVET_Y0065_GPM_INTRA
 uint64_t CABACWriter::geo_intraFlag_est( const TempCtx& ctxStart, const int flag)
 {
-  getCtx() = ctxStart;
+  getCtx() = SubCtx(Ctx::GPMIntraFlag, ctxStart);
   resetBits();
 
   m_BinEncoder.encodeBin(flag, Ctx::GPMIntraFlag());
@@ -5247,9 +5247,8 @@ uint64_t CABACWriter::geo_intraFlag_est( const TempCtx& ctxStart, const int flag
   return getEstFracBits();
 }
 
-uint64_t CABACWriter::geo_intraIdx_est( const TempCtx& ctxStart, const int intraIdx)
+uint64_t CABACWriter::geo_intraIdx_est( const int intraIdx)
 {
-  getCtx() = ctxStart;
   resetBits();
 
   unary_max_eqprob(intraIdx, GEO_MAX_NUM_INTRA_CANDS-1);
@@ -5260,7 +5259,7 @@ uint64_t CABACWriter::geo_intraIdx_est( const TempCtx& ctxStart, const int intra
 
 uint64_t CABACWriter::geo_mmvdFlag_est(const TempCtx& ctxStart, const int flag)
 {
-  getCtx() = ctxStart;
+  getCtx() = SubCtx(Ctx::GeoMmvdFlag, ctxStart);
   resetBits();
 
   m_BinEncoder.encodeBin(flag, Ctx::GeoMmvdFlag());
@@ -5271,7 +5270,7 @@ uint64_t CABACWriter::geo_mmvdFlag_est(const TempCtx& ctxStart, const int flag)
 #if TM_MRG
 uint64_t CABACWriter::geo_tmFlag_est(const TempCtx& ctxStart, const int flag)
 {
-  getCtx() = ctxStart;
+  getCtx() = SubCtx(Ctx::TMMergeFlag, ctxStart);
   resetBits();
 
   m_BinEncoder.encodeBin(flag, Ctx::TMMergeFlag());
@@ -5282,7 +5281,7 @@ uint64_t CABACWriter::geo_tmFlag_est(const TempCtx& ctxStart, const int flag)
 
 uint64_t CABACWriter::geo_mmvdIdx_est(const TempCtx& ctxStart, const int geoMMVDIdx, const bool extMMVD)
 {
-  getCtx() = ctxStart;
+  getCtx() = SubCtx(Ctx::GeoMmvdStepMvpIdx, ctxStart);
   resetBits();
 
   CHECK(geoMMVDIdx >= (extMMVD ? GPM_EXT_MMVD_MAX_REFINE_NUM : GPM_MMVD_MAX_REFINE_NUM), "invalid GPM MMVD index exist");
@@ -5321,7 +5320,7 @@ uint64_t CABACWriter::geo_mmvdIdx_est(const TempCtx& ctxStart, const int geoMMVD
 #if JVET_AA0058_GPM_ADAPTIVE_BLENDING
 uint64_t CABACWriter::geoBldFlagEst(const TempCtx& ctxStart, const int flag)
 {
-  getCtx() = ctxStart;
+  getCtx() = SubCtx(Ctx::GeoBldFlag, ctxStart);
   resetBits();
 
   geoAdaptiveBlendingIdx(flag);
