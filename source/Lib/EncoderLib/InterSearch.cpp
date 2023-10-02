@@ -12815,6 +12815,11 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
             currAbsSum = 0;
           }
 
+#if JVET_Z0118_GDR
+          cs.updateReconMotIPM(tu.blocks[compID], cs.getPredBuf(tu.blocks[compID]));
+#else
+          cs.picture->getRecoBuf(tu.blocks[compID]).copyFrom(cs.getPredBuf(tu.blocks[compID]));
+#endif
           if (currAbsSum > 0) //if non-zero coefficients are present, a residual needs to be derived for further prediction
           {
             if (isFirstMode)
@@ -12872,11 +12877,6 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
                 if (isLuma(compID) && slice.getPicHeader()->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !tu.cu->firstPU->ciipFlag && !CU::isIBC(*tu.cu))
 #endif
                 {
-#if JVET_Z0118_GDR
-                  cs.updateReconMotIPM(tu.blocks[COMPONENT_Y], cs.getPredBuf(tu.blocks[COMPONENT_Y]));
-#else
-                  cs.picture->getRecoBuf(tu.blocks[COMPONENT_Y]).copyFrom(cs.getPredBuf(tu.blocks[COMPONENT_Y]));
-#endif
                   cs.getPredBuf(tu.blocks[compID]).rspSignal(m_pcReshape->getFwdLUT());
                 }
 #if JVET_AE0059_INTER_CCCM
@@ -13100,7 +13100,7 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
         m_pcRdCost->lambdaAdjustColorTrans(false, compID);
       }
 #if SIGN_PREDICTION
-      if(cs.sps->getNumPredSigns() > 0)
+      if(cs.sps->getNumPredSigns() > 0 || (cs.pps->getUseBIF() && isLuma( compID )) || (cs.pps->getUseChromaBIF() && !isLuma( compID )))
       {
 #if JVET_Z0118_GDR
 #if JVET_Y0065_GPM_INTRA
@@ -14327,7 +14327,7 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
           {
             CompArea compArea = currTU.blocks[compID];
             PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
-            recIPredBuf.copyFrom(tmpSubBuf);
+            recIPredBuf.copyFrom(reco.subBuf(tuPosInCu, currTU.lumaSize()));
           }
         }
       }
