@@ -11116,7 +11116,7 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
   int pDiffSparse[3];
   for (int i = 0; i < 3; i++)
   {
-    pDiffSparse[i] = pDiff[i];
+    pDiffSparse[i] = pDiff[i]+(sparseMtmpCandList[i].size() < mtmpNumSparse[i] ? 0 : 1);
   }
   for (int temIdx = 0; temIdx < 3; temIdx++)
   {
