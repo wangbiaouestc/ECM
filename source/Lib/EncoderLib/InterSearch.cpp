@@ -4276,13 +4276,13 @@ Distortion InterSearch::xPredIBCFracPelSearch(PredictionUnit&              pu
 #endif
   for (int i = 0; i < intBvList.cnt; ++i)
   {
+    pu.cu->imv = IMV_FPEL;
+    pu.bv      = intBvList.mvList[i];
+    pu.mv[0]   = intBvList.mvList[i];
+    pu.mv[0].changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
 #if JVET_AE0159_FIBC
     if (m_pcEncCfg->getIntraPeriod() != 1) //non-AI
-    {
-      pu.cu->imv = IMV_FPEL;
-      pu.bv      = intBvList.mvList[i];
-      pu.mv[0]   = intBvList.mvList[i];
-      pu.mv[0].changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
+    {    
 #if JVET_AE0078_IBC_LIC_EXTENSION
       const int ibcLicLoopNum = pu.cu->ibcLicFlag && !pu.cu->ibcFilterFlag ? 4 : 1;
       int bestLicIdc = 0;
@@ -4457,11 +4457,6 @@ Distortion InterSearch::xPredIBCFracPelSearch(PredictionUnit&              pu
         pu.cu->ibcLicIdx = licIdc;
 #endif
 #endif
-
-    pu.cu->imv = IMV_FPEL;
-    pu.bv      = intBvList.mvList[i];
-    pu.mv[0]   = intBvList.mvList[i];
-    pu.mv[0].changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
 
 #if JVET_AC0112_IBC_LIC
     if (pu.cu->ibcLicFlag)
