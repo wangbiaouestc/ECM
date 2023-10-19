@@ -347,7 +347,8 @@ void Picture::destroyTempBuffers()
   {
     for (uint32_t t = 0; t < NUM_PIC_TYPES; t++)
     {
-      if (t == PIC_RESIDUAL || t == PIC_PREDICTION || t == PIC_FILTERED_ORIGINAL || t == PIC_TRUE_ORIGINAL)
+      if (t == PIC_RESIDUAL || t == PIC_PREDICTION || t == PIC_FILTERED_ORIGINAL || t == PIC_TRUE_ORIGINAL
+        || t == PIC_TRUE_ORIGINAL_INPUT || t == PIC_FILTERED_ORIGINAL_INPUT)
       {
         M_BUFS(jId, t).destroy();
       }
