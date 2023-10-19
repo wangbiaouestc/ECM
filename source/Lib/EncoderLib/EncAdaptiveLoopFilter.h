@@ -393,8 +393,8 @@ public:
   void getDistNewFilter( AlfParam& alfParam );
   int getNewCcAlfApsId( CodingStructure &cs, int cIdx );
   void initCABACEstimator( CABACEncoder* cabacEncoder, CtxCache* ctxCache, Slice* pcSlice, ParameterSetMap<APS>* apsMap );
-  void create( const EncCfg* encCfg, const int picWidth, const int picHeight, const ChromaFormat chromaFormatIDC, const int maxCUWidth, const int maxCUHeight, const int maxCUDepth, const int inputBitDepth[MAX_NUM_CHANNEL_TYPE], const int internalBitDepth[MAX_NUM_CHANNEL_TYPE] );
-  void destroy();
+  void create( const EncCfg* encCfg, const int picWidth, const int picHeight, const ChromaFormat chromaFormatIDC, const int maxCUWidth, const int maxCUHeight, const int maxCUDepth, const int inputBitDepth[MAX_NUM_CHANNEL_TYPE], const int internalBitDepth[MAX_NUM_CHANNEL_TYPE], bool createEncData = false );
+  void destroy( bool destroyEncData = false );
   void setApsIdStart( int i) { m_apsIdStart = i; }
 #if ALF_IMPROVEMENT
   static int lengthGolomb(int coeffVal, int k, bool signed_coeff = true);

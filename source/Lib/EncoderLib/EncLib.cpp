@@ -239,7 +239,6 @@ void EncLib::destroy ()
   {
     m_cEncALF.destroy();
   }
-  m_cEncSAO.            destroyEncData();
   m_cEncSAO.            destroy();
   m_cLoopFilter.        destroy();
   m_cRateCtrl.          destroy();
