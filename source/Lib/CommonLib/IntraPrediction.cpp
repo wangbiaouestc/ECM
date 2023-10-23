@@ -11116,7 +11116,7 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
   int pDiffSparse[3];
   for (int i = 0; i < 3; i++)
   {
-    pDiffSparse[i] = pDiff[i];
+    pDiffSparse[i] = pDiff[i]+(sparseMtmpCandList[i].size() < mtmpNumSparse[i] ? 0 : 1);
   }
   for (int temIdx = 0; temIdx < 3; temIdx++)
   {
@@ -11268,28 +11268,28 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
   m_tempLibFast.m_pDiff = pDiff;
 #endif
 #if JVET_AD0086_ENHANCED_INTRA_TMP
-  pcCU->tmpNumCand = (int) m_mtmpCandList.size();
-  for (int i = 0; i < pcCU->tmpNumCand; i++)
+  m_tmpNumCand = (int) m_mtmpCandList.size();
+  for (int i = 0; i < m_tmpNumCand; i++)
   {
-    pcCU->tmpXdisp[i] = m_mtmpCandList[i].m_pX;
-    pcCU->tmpYdisp[i] = m_mtmpCandList[i].m_pY;
+    m_tmpXdisp[i] = m_mtmpCandList[i].m_pX;
+    m_tmpYdisp[i] = m_mtmpCandList[i].m_pY;
   }
 
-  if (!pcCU->tmpNumCand)
+  if (m_tmpNumCand == 0)
   {
     return;
   }
 
-  for (int i = pcCU->tmpNumCand; i < MTMP_NUM; i++)
+  for (int i = m_tmpNumCand; i < MTMP_NUM; i++)
   {
-    pcCU->tmpXdisp[i] = pcCU->tmpXdisp[i - pcCU->tmpNumCand];
-    pcCU->tmpYdisp[i] = pcCU->tmpYdisp[i - pcCU->tmpNumCand];
-    m_mtmpCostList.push_back(m_mtmpCostList[i - pcCU->tmpNumCand]);
+    m_tmpXdisp[i] = m_tmpXdisp[i - m_tmpNumCand];
+    m_tmpYdisp[i] = m_tmpYdisp[i - m_tmpNumCand];
+    m_mtmpCostList.push_back(m_mtmpCostList[i - m_tmpNumCand]);
   }
 #else 
 #if TMP_FAST_ENC
-  pcCU->tmpXdisp = pX;
-  pcCU->tmpYdisp = pY;
+  m_tmpXdisp = pX;
+  m_tmpYdisp = pY;
 #endif
 #endif   
 }
@@ -11381,19 +11381,17 @@ void IntraPrediction::convertDiff2Weight(int *pDiff, int *weights, const int sta
 
 void IntraPrediction::xTMPBuildFusionCandidate(CodingUnit &cu, RefTemplateType tempType)
 {
-  if (!cu.tmpNumCand)
+  if (!m_tmpNumCand)
   {
     return;
   }
 
-  IntraTMPFusionInfo tmpFusionModes[TMP_GROUP_IDX << 1] = {
-    IntraTMPFusionInfo{ true, false, 0, TMP_FUSION_NUM },
-    IntraTMPFusionInfo{ true, false, TMP_FUSION_NUM, TMP_FUSION_NUM },
-    IntraTMPFusionInfo{ true, false, TMP_FUSION_NUM << 1, TMP_FUSION_NUM },
-    IntraTMPFusionInfo{ true, true, 0, TMP_FUSION_NUM },
-    IntraTMPFusionInfo{ true, true, TMP_FUSION_NUM, TMP_FUSION_NUM },
-    IntraTMPFusionInfo{ true, true, TMP_FUSION_NUM << 1, TMP_FUSION_NUM },
-  };
+  m_tmpFusionInfo[0] = IntraTMPFusionInfo{ true, false, 0, TMP_FUSION_NUM };
+  m_tmpFusionInfo[1] = IntraTMPFusionInfo{ true, false, TMP_FUSION_NUM, TMP_FUSION_NUM };
+  m_tmpFusionInfo[2] = IntraTMPFusionInfo{ true, false, TMP_FUSION_NUM << 1, TMP_FUSION_NUM };
+  m_tmpFusionInfo[3] = IntraTMPFusionInfo{ true, true, 0, TMP_FUSION_NUM };
+  m_tmpFusionInfo[4] = IntraTMPFusionInfo{ true, true, TMP_FUSION_NUM, TMP_FUSION_NUM };
+  m_tmpFusionInfo[5] = IntraTMPFusionInfo{ true, true, TMP_FUSION_NUM << 1, TMP_FUSION_NUM };
   int tmpIdx = cu.tmpIdx;
   int idx0   = cu.cs->pcv->isEncoder ? 0 : cu.tmpIdx;
   int idx1   = cu.cs->pcv->isEncoder ? TMP_GROUP_IDX << 1 : cu.tmpIdx + 1;
@@ -11401,23 +11399,22 @@ void IntraPrediction::xTMPBuildFusionCandidate(CodingUnit &cu, RefTemplateType t
   for (int i = idx0; i < idx1; i++)
   {
     cu.tmpIdx                           = i;
-    cu.tmpFusionInfo[i]                 = tmpFusionModes[i];
-    cu.tmpFusionInfo[i].tmpFusionNumber = xCalTMPFusionNumber(cu.tmpFusionInfo[i].tmpMaxNum, 0);
+    m_tmpFusionInfo[i].tmpFusionNumber = xCalTMPFusionNumber(m_tmpFusionInfo[i].tmpMaxNum, 0);
 
-    if (cu.tmpFusionInfo[i].bFilter)
+    if (m_tmpFusionInfo[i].bFilter)
     {
       xTMPFusionCalcModels(&cu, cu.lwidth(), cu.lheight(), tempType);
     }
     else
     {
       static int iDiff[TMP_FUSION_NUM];
-      const int  offset       = cu.tmpFusionInfo[i].tmpFusionIdx;
-      const int  foundCandNum = cu.tmpFusionInfo[i].tmpFusionNumber;
+      const int  offset       = m_tmpFusionInfo[i].tmpFusionIdx;
+      const int  foundCandNum = m_tmpFusionInfo[i].tmpFusionNumber;
       for (int i = 0; i < foundCandNum; i++)
       {
         iDiff[i] = (int) m_mtmpCostList[offset + i];
       }
-      convertDiff2Weight(iDiff, cu.tmpFusionInfo[i].tmpFusionWeight, 0, foundCandNum);
+      convertDiff2Weight(iDiff, m_tmpFusionInfo[i].tmpFusionWeight, 0, foundCandNum);
     }
   }
   cu.tmpIdx = tmpIdx;
@@ -11522,7 +11519,7 @@ void IntraPrediction::xTMPFusionCalcParams(CodingUnit *cu, CompArea area, CccmMo
 void IntraPrediction::xTMPFusionCalcModels(CodingUnit *cu, unsigned int uiBlkWidth, unsigned int uiBlkHeight,
                                            RefTemplateType tempType)
 {
-  int foundCandiNum = cu->tmpFusionInfo[cu->tmpIdx].tmpFusionNumber;
+  int foundCandiNum = m_tmpFusionInfo[cu->tmpIdx].tmpFusionNumber;
 
   if (foundCandiNum < 1)
   {
@@ -11538,8 +11535,8 @@ void IntraPrediction::xTMPFusionCalcModels(CodingUnit *cu, unsigned int uiBlkWid
 
   for (int i = 0; i < foundCandiNum; i++)
   {
-    iOffsetX = cu->tmpXdisp[i + cu->tmpFusionInfo[cu->tmpIdx].tmpFusionIdx];
-    iOffsetY = cu->tmpYdisp[i + cu->tmpFusionInfo[cu->tmpIdx].tmpFusionIdx];
+    iOffsetX = m_tmpXdisp[i + m_tmpFusionInfo[cu->tmpIdx].tmpFusionIdx];
+    iOffsetY = m_tmpYdisp[i + m_tmpFusionInfo[cu->tmpIdx].tmpFusionIdx];
 
     if (tempType == L_SHAPE_TEMPLATE)
     {
@@ -11563,14 +11560,14 @@ void IntraPrediction::xTMPFusionCalcModels(CodingUnit *cu, unsigned int uiBlkWid
 
   for (int i = 0; i < TMP_FUSION_PARAMS; i++)
   {
-    cu->tmpFusionInfo[cu->tmpIdx].tmpFushionParams[i] = tmpFusionModel.params[i];
+    m_tmpFusionInfo[cu->tmpIdx].tmpFushionParams[i] = tmpFusionModel.params[i];
   }
 }
 
 void IntraPrediction::xCalTmpFlmParam(CodingUnit *cu, unsigned int uiBlkWidth, unsigned int uiBlkHeight,
                                       RefTemplateType tempType)
 {
-  int foundCandiNum = cu->tmpNumCand;
+  int foundCandiNum = m_tmpNumCand;
 
   if (foundCandiNum < 1)
   {
@@ -11644,7 +11641,7 @@ void IntraPrediction::xCalTmpFlmParam(CodingUnit *cu, unsigned int uiBlkWidth, u
 
   for (int i = 0; i < TMP_FLM_PARAMS; i++)
   {
-    cu->tmpFlmParams[i][cu->tmpIdx] = tmpModel.params[i];
+    m_tmpFlmParams[i][cu->tmpIdx] = tmpModel.params[i];
   }
 }
 
@@ -11662,8 +11659,8 @@ void IntraPrediction::xCalcTmpFlmRefArea(CodingUnit *cu, unsigned int uiBlkWidth
   int      offsetLCUY = iCurrY - ctuRsAddr.y;
   int      offsetLCUX = iCurrX - ctuRsAddr.x;
 
-  int pX = cu->tmpXdisp[cu->tmpIdx];
-  int pY = cu->tmpYdisp[cu->tmpIdx];
+  int pX = m_tmpXdisp[cu->tmpIdx];
+  int pY = m_tmpYdisp[cu->tmpIdx];
 
   CHECK(regionId < 0 || regionId > 5, "region Id error\n");
   clipMvIntraConstraint(cu, regionId, iHorMin, iHorMax, iVerMin, iVerMax,
@@ -11695,8 +11692,8 @@ void IntraPrediction::xCalcTmpFlmRefArea(CodingUnit *cu, unsigned int uiBlkWidth
 void IntraPrediction::xGetTmpFlmRefBuf(CodingUnit *cu, unsigned int uiBlkWidth, unsigned int uiBlkHeight,
                                        RefTemplateType tempType)
 {
-  int pX = cu->tmpXdisp[cu->tmpIdx];
-  int pY = cu->tmpYdisp[cu->tmpIdx];
+  int pX = m_tmpXdisp[cu->tmpIdx];
+  int pY = m_tmpYdisp[cu->tmpIdx];
 
   int      iOffsetY, iOffsetX;
   Pel *    refTarget;
@@ -11809,12 +11806,12 @@ void IntraPrediction::xGetTmpFlmRefBuf(CodingUnit *cu, unsigned int uiBlkWidth, 
 void IntraPrediction::xTMPFusionApplyModel(PelBuf &piPred, unsigned int uiBlkWidth, unsigned int uiBlkHeight,
                                            RefTemplateType tempType, CodingUnit *cu, bool bDeriveDimdMode)
 {
-  bool bTmpFusion = cu->tmpFusionFlag && cu->tmpFusionInfo[cu->tmpIdx].bValid;
-  if (!bTmpFusion || !cu->tmpFusionInfo[cu->tmpIdx].bFilter)
+  bool bTmpFusion = cu->tmpFusionFlag && m_tmpFusionInfo[cu->tmpIdx].bValid;
+  if (!bTmpFusion || !m_tmpFusionInfo[cu->tmpIdx].bFilter)
   {
     return;
   }
-  int foundCandiNum = cu->tmpFusionInfo[cu->tmpIdx].tmpFusionNumber;
+  int foundCandiNum = m_tmpFusionInfo[cu->tmpIdx].tmpFusionNumber;
 
   if (foundCandiNum < 1)
   {
@@ -11824,7 +11821,7 @@ void IntraPrediction::xTMPFusionApplyModel(PelBuf &piPred, unsigned int uiBlkWid
   CccmModel tmpFusionModel( TMP_FUSION_PARAMS, cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA));
   for (int i = 0; i < TMP_FUSION_PARAMS; i++)
   {
-    tmpFusionModel.params[i] = cu->tmpFusionInfo[cu->tmpIdx].tmpFushionParams[i];
+    tmpFusionModel.params[i] = m_tmpFusionInfo[cu->tmpIdx].tmpFushionParams[i];
   }
   CompArea      area      = cu->Y();
   Pel *         ref       = cu->cs->picture->getRecoBuf(area).buf;
@@ -11838,8 +11835,8 @@ void IntraPrediction::xTMPFusionApplyModel(PelBuf &piPred, unsigned int uiBlkWid
 
   for (int i = 0; i < foundCandiNum; i++)
   {
-    iOffsetY         = cu->tmpYdisp[i + cu->tmpFusionInfo[cu->tmpIdx].tmpFusionIdx];
-    iOffsetX         = cu->tmpXdisp[i + cu->tmpFusionInfo[cu->tmpIdx].tmpFusionIdx];
+    iOffsetY         = m_tmpYdisp[i + m_tmpFusionInfo[cu->tmpIdx].tmpFusionIdx];
+    iOffsetX         = m_tmpXdisp[i + m_tmpFusionInfo[cu->tmpIdx].tmpFusionIdx];
     refPointPatch[i] = ref + iOffsetY * picStride + iOffsetX;
   }
   Pel *pPred    = piPred.buf;
@@ -11878,8 +11875,8 @@ void IntraPrediction::xTMPFusionApplyModel(PelBuf &piPred, unsigned int uiBlkWid
       pPred[y * uiStride + x] = ClipPel<Pel>(tmpFusionModel.convolve(samples), clpRng);
     }
   }
-  int pX = cu->tmpXdisp[cu->tmpFusionInfo[cu->tmpIdx].tmpFusionIdx];
-  int pY = cu->tmpYdisp[cu->tmpFusionInfo[cu->tmpIdx].tmpFusionIdx];
+  int pX = m_tmpXdisp[m_tmpFusionInfo[cu->tmpIdx].tmpFusionIdx];
+  int pY = m_tmpYdisp[m_tmpFusionInfo[cu->tmpIdx].tmpFusionIdx];
 
   cu->firstPU->interDir               = 1;
   cu->firstPU->refIdx[REF_PIC_LIST_0] = MAX_NUM_REF;
@@ -11909,7 +11906,7 @@ void IntraPrediction::xGenerateTmpFlmPred(PelBuf &piPred, unsigned int uiBlkWidt
 
   for (int i = 0; i < TMP_FLM_PARAMS; i++)
   {
-    tmpModel.params[i] = cu->tmpFlmParams[i][cu->tmpIdx];
+    tmpModel.params[i] = m_tmpFlmParams[i][cu->tmpIdx];
   }
 
   int refStride = m_tmpRefArea[cu->tmpIdx].width + 2 * TMP_FILTER_PADDING;   // Including paddings required for the 2D filter
@@ -11930,8 +11927,8 @@ void IntraPrediction::xGenerateTmpFlmPred(PelBuf &piPred, unsigned int uiBlkWidt
       piPred.at(x, y) = ClipPel<Pel>(tmpModel.convolve(samples), clpRng);
     }
   }
-  int pX = cu->tmpXdisp[cu->tmpIdx];
-  int pY = cu->tmpYdisp[cu->tmpIdx];
+  int pX = m_tmpXdisp[cu->tmpIdx];
+  int pY = m_tmpYdisp[cu->tmpIdx];
 
   cu->firstPU->interDir               = 1;
   cu->firstPU->refIdx[REF_PIC_LIST_0] = MAX_NUM_REF;
@@ -11954,7 +11951,7 @@ void IntraPrediction::xPadForInterpolation(CodingUnit *cu)
   int              uiWidth  = cu->lwidth();
   int              uiHeight = cu->lheight();
 
-  Position pos = cu->Y().offset(cu->tmpXdisp[cu->tmpIdx], cu->tmpYdisp[cu->tmpIdx]);
+  Position pos = cu->Y().offset(m_tmpXdisp[cu->tmpIdx], m_tmpYdisp[cu->tmpIdx]);
 
   const UnitArea localUnitArea(cu->firstPU->chromaFormat,
                                Area(0, 0, uiWidth + 2 * TMP_SUBPEL_PAD_NUM, uiHeight + 2 * TMP_SUBPEL_PAD_NUM));
@@ -11965,7 +11962,7 @@ void IntraPrediction::xPadForInterpolation(CodingUnit *cu)
 
   int  srcStride = cu->cs->picture->getRecoBuf(cu->firstPU->Y()).stride;
   Pel *src0 =
-    cu->cs->picture->getRecoBuf(cu->firstPU->Y()).buf + cu->tmpXdisp[cu->tmpIdx] + cu->tmpYdisp[cu->tmpIdx] * srcStride;
+    cu->cs->picture->getRecoBuf(cu->firstPU->Y()).buf + m_tmpXdisp[cu->tmpIdx] + m_tmpYdisp[cu->tmpIdx] * srcStride;
   Pel *src = src0;
 
   // block
@@ -12145,7 +12142,7 @@ bool IntraPrediction::generateTMPrediction(Pel *piPred, unsigned int uiStride, i
 #endif
 
 #if TMP_FAST_ENC
-  foundCandiNum = pu.cu->tmpNumCand;
+  foundCandiNum = m_tmpNumCand;
 #else
   foundCandiNum = m_uiVaildCandiNum;
 #endif
@@ -12164,33 +12161,33 @@ bool IntraPrediction::generateTMPrediction(Pel *piPred, unsigned int uiStride, i
   int         uiWidth    = area.width;
   Pel *       ref        = cu->cs->picture->getRecoBuf(area).buf;
   int         picStride  = cu->cs->picture->getRecoBuf(area).stride;
-  int         pX         = cu->tmpXdisp[0];
-  int         pY         = cu->tmpYdisp[0];
+  int         pX         = m_tmpXdisp[0];
+  int         pY         = m_tmpYdisp[0];
 
   bool bTmpFusion   = cu->tmpFusionFlag;
   int  tmpFusionNum = 0;
   int  tmpFusionIdx = 0;
   if (bTmpFusion)
   {
-    bool bFilter      = cu->tmpFusionInfo[cu->tmpIdx].bFilter;
-    tmpFusionNum      = cu->tmpFusionInfo[cu->tmpIdx].tmpFusionNumber;
+    bool bFilter      = m_tmpFusionInfo[cu->tmpIdx].bFilter;
+    tmpFusionNum      = m_tmpFusionInfo[cu->tmpIdx].tmpFusionNumber;
     if (tmpFusionNum < 1 || bFilter)
     {
       return bSucceedFlag;
     }
-    tmpFusionIdx      = cu->tmpFusionInfo[cu->tmpIdx].tmpFusionIdx;
-    pX         = cu->tmpXdisp[tmpFusionIdx];
-    pY         = cu->tmpYdisp[tmpFusionIdx];
+    tmpFusionIdx      = m_tmpFusionInfo[cu->tmpIdx].tmpFusionIdx;
+    pX         = m_tmpXdisp[tmpFusionIdx];
+    pY         = m_tmpYdisp[tmpFusionIdx];
   }
 
   if (bTmpFusion)
   {
     const int log2WeightSum = 6;
-    int *pDiff = cu->tmpFusionInfo[cu->tmpIdx].tmpFusionWeight;
+    int *pDiff = m_tmpFusionInfo[cu->tmpIdx].tmpFusionWeight;
     Pel *refTarget[TMP_FUSION_NUM];
     for (int i = 0; i < tmpFusionNum; i++)
     {
-      refTarget[i] = ref + cu->tmpYdisp[i + tmpFusionIdx] * picStride + cu->tmpXdisp[i + tmpFusionIdx];
+      refTarget[i] = ref + m_tmpYdisp[i + tmpFusionIdx] * picStride + m_tmpXdisp[i + tmpFusionIdx];
     }
     const int shift = 1 << (log2WeightSum - 1);
     for (unsigned int uiY = 0; uiY < uiHeight; uiY++)
@@ -12214,8 +12211,8 @@ bool IntraPrediction::generateTMPrediction(Pel *piPred, unsigned int uiStride, i
   }
   else
   {
-    pX                            = cu->tmpXdisp[cu->tmpIdx];
-    pY                            = cu->tmpYdisp[cu->tmpIdx];
+    pX                            = m_tmpXdisp[cu->tmpIdx];
+    pY                            = m_tmpYdisp[cu->tmpIdx];
     Pel *            refTarget    = ref + pY * picStride + pX;
     int              tmpIsSubPel  = cu->tmpIsSubPel;
     int              tmpSubPelIdx = cu->tmpSubPelIdx;
@@ -14676,8 +14673,8 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
 #if JVET_AE0100_BVGCCCM
   if (pu.bvgCccmFlag)
   {
-    CccmModel cccmModelCb[2] = { CccmModel( BVG_CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)), CccmModel( CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)) };
-    CccmModel cccmModelCr[2] = { CccmModel( BVG_CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)), CccmModel( CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)) };
+    CccmModel cccmModelCb[2] = { CccmModel( BVG_CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)), CccmModel( BVG_CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)) };
+    CccmModel cccmModelCr[2] = { CccmModel( BVG_CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)), CccmModel( BVG_CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)) };
     
     if (intraDir == LM_CHROMA_IDX || intraDir == MDLM_L_IDX || intraDir == MDLM_T_IDX)
     {
@@ -18294,8 +18291,8 @@ void IntraPrediction::getTmrlList(CodingUnit& cu)
   getTmrlSearchRange(pu, tmrlRefList, tmrlIntraModeList, sizeRef, sizeMode);
 
   // step-3. search and sort
-  static_vector<TmrlMode, TMRL_MODECOST> uiModeList;
-  static_vector<uint64_t, TMRL_MODECOST> uiCostList;
+  static_vector<TmrlMode, MRL_LIST_SIZE> uiModeList;
+  static_vector<uint64_t, MRL_LIST_SIZE> uiCostList;
 
   int iBestN = MRL_LIST_SIZE;
   if (!pu.cs->pcv->isEncoder)
@@ -18339,7 +18336,7 @@ void IntraPrediction::getTmrlList(CodingUnit& cu)
   // step-4. fill the list
   for (auto i = 0; i < uiModeList.size(); i++)
   {
-    cu.tmrlList[i] = uiModeList[i];
+    m_tmrlList[i] = uiModeList[i];
   }
 }
 #endif

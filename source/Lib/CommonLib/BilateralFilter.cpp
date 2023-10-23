@@ -530,9 +530,7 @@ void BilateralFilter::bilateralFilterRDOdiamond5x5(const ComponentID compID, Pel
     }
     else if (subTuHor)
     {
-      CPelBuf currRecoBuf = currTU.cs->getRecoBuf( area );
-      const int currRecoBufStride = currRecoBuf.stride;
-      const Pel *neighborPel = currRecoBuf.buf - currRecoBufStride;
+      const Pel *neighborPel = recIPredBuf.buf - uiRecIPredStride;
 
       std::copy( neighborPel, neighborPel + area.width, tmp );
 
@@ -565,13 +563,11 @@ void BilateralFilter::bilateralFilterRDOdiamond5x5(const ComponentID compID, Pel
     }
     else if( subTuVer )
     {
-      CPelBuf currRecoBuf = currTU.cs->getRecoBuf( area );
-      const int currRecoBufStride = currRecoBuf.stride;
-      const Pel *neighborPel = currRecoBuf.buf - 1;
+      const Pel *neighborPel = recIPredBuf.buf - 1;
 
       for (int yy = 0; yy < area.height; yy++)
       {
-        tmp[yy * iWidthExtSIMD] = *( neighborPel + yy * currRecoBufStride );
+        tmp[yy * iWidthExtSIMD] = *( neighborPel + yy * uiRecIPredStride );
       }
 
       if( doReshape )

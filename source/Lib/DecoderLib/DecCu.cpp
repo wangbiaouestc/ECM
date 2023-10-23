@@ -367,8 +367,8 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
           IntraPrediction::deriveDimdMode(currCU.cs->picture->getRecoBuf(area), area, currCU);
 #endif
           m_pcIntraPred->getTmrlList(currCU);
-          pu->multiRefIdx = currCU.tmrlList[currCU.tmrlListIdx].multiRefIdx;
-          pu->intraDir[0] = currCU.tmrlList[currCU.tmrlListIdx].intraDir;
+          pu->multiRefIdx = m_pcIntraPred->m_tmrlList[currCU.tmrlListIdx].multiRefIdx;
+          pu->intraDir[0] = m_pcIntraPred->m_tmrlList[currCU.tmrlListIdx].intraDir;
         }
 #endif
         else if (currCU.firstPU->parseLumaMode)
@@ -381,8 +381,8 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
         if (currCU.firstPU->parseLumaMode)
         {
 #if SECONDARY_MPM
-          uint8_t* mpmPred = currCU.firstPU->intraMPM;  // mpm_idx / rem_intra_luma_pred_mode
-          uint8_t* nonMpmPred = currCU.firstPU->intraNonMPM;
+          uint8_t* mpmPred = m_pcIntraPred->m_intraMPM;  // mpm_idx / rem_intra_luma_pred_mode
+          uint8_t* nonMpmPred = m_pcIntraPred->m_intraNonMPM;
 #if JVET_AD0085_MPM_SORTING
           if (PU::allowMPMSorted(*currCU.firstPU) && !(currCU.firstPU->mpmFlag && currCU.firstPU->ipredIdx == 0))
           {
@@ -1517,6 +1517,7 @@ void DecCu::xReconInter(CodingUnit &cu)
 #if JVET_AA0058_GPM_ADAPTIVE_BLENDING
                               , cu.firstPU->geoBldIdx
 #endif
+                              , m_pcIntraPred->m_intraMPM
 #if JVET_AE0046_BI_GPM
                                , cu.firstPU->gpmDmvrRefinePart0
                                , cu.firstPU->gpmDmvrRefinePart1

@@ -162,22 +162,10 @@ public:
   void    copyState( const TrQuant& other );
 #endif
 
-#if SIGN_PREDICTION
-  enum SIGN_PRED_TYPE
-  {
-      SIGN_PRED_BYPASS   = 0,
-      SIGN_PRED_POSITIVE = 1,
-      SIGN_PRED_NEGATIVE = 2,
-      SIGN_PRED_HIDDEN   = 3,
-  };
-  uint32_t m_aiSignPredCost[1 << SIGN_PRED_MAX_NUM];
-#endif
-
 protected:
   TCoeff   m_tempCoeff[MAX_TB_SIZEY * MAX_TB_SIZEY];
 #if SIGN_PREDICTION
-  Pel      m_tempSignPredResid[SIGN_PRED_MAX_BS * SIGN_PRED_MAX_BS * 2]{0};
-  Pel      m_signPredTemplate[SIGN_PRED_FREQ_RANGE*SIGN_PRED_FREQ_RANGE*SIGN_PRED_MAX_BS*2];
+  Pel m_tempSignPredResid[SIGN_PRED_MAX_BS * SIGN_PRED_MAX_BS * 2]{ 0 };
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   uint8_t  m_signsBuf[SIGN_PRED_FREQ_RANGE*SIGN_PRED_FREQ_RANGE];
 #endif
@@ -249,16 +237,6 @@ private:
                        double*        diagRatio,
                        double*        horVerRatio );
 
-#if ENABLE_SIMD_SIGN_PREDICTION
-  uint32_t( *m_computeSAD ) ( const Pel* ref, const Pel* cur, const int size );
-  static inline uint32_t xComputeSAD( const Pel* ref, const Pel* cur, const int size );
-#if  JVET_Y0141_SIGN_PRED_IMPROVE
-  uint32_t(*m_computeHypSampleInt8) (const int dequant, const int8_t* templateNormalizedBuf, Pel* templ, const uint32_t uiWidth, const uint32_t uiHeight);
-  static inline uint32_t xComputeHypSampleInt8(const int dequant, const int8_t* templateNormalizedBuf, Pel* templ, const uint32_t uiWidth, const uint32_t uiHeight);
-  void(*m_computeSynSample) (const Pel* templ, Pel* resiBuf, const uint32_t uiWidth, const uint32_t uiHeight, const bool signModifyTo);
-  static inline void xComputeSynSample(const Pel* templ, Pel* resiBuf, const uint32_t uiWidth, const uint32_t uiHeight, const bool signModifyTo);
-#endif
-#endif
 #if INTRA_TRANS_ENC_OPT 
   void(*m_fwdLfnst)  (TCoeff* src, TCoeff*& dst, const int8_t*& trMat, const int trSize, const int zeroOutSize);
   static void forwardLfnst(TCoeff* src, TCoeff*& dst, const int8_t*& trMat, const int trSize, const int zeroOutSize);
@@ -274,7 +252,7 @@ private:
   static void fastInverseTransform_SIMD( const TCoeff *coeff, TCoeff *block, int shift, int line, int iSkipLine, int iSkipLine2, const TCoeff outputMinimum, const TCoeff outputMaximum );
 #endif
 
-#if ENABLE_SIMD_SIGN_PREDICTION || TRANSFORM_SIMD_OPT
+#if TRANSFORM_SIMD_OPT
 #ifdef TARGET_SIMD_X86
   void    initTrQuantX86();
   template <X86_VEXT vext>

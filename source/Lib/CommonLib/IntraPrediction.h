@@ -238,6 +238,10 @@ public:
   Pel m_cr[CCCM_REF_SAMPLES_MAX];
 #endif
 
+#if SECONDARY_MPM
+  uint8_t m_intraMPM[NUM_MOST_PROBABLE_MODES];
+  uint8_t m_intraNonMPM[NUM_NON_MPM_MODES];
+#endif
 protected:
 #if JVET_AC0094_REF_SAMPLES_OPT
   Pel m_refBuffer[MAX_NUM_COMPONENT][NUM_PRED_BUF][((MAX_CU_SIZE << 3) + 1 + MAX_REF_LINE_IDX) * 2];
@@ -383,6 +387,18 @@ protected:
   unsigned int m_uiPicStride;
   unsigned int m_uiVaildCandiNum;
   Pel***       m_pppTarPatch;
+#endif
+
+#if TMP_FAST_ENC
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+  int                m_tmpXdisp[MTMP_NUM];
+  int                m_tmpYdisp[MTMP_NUM];
+  IntraTMPFusionInfo m_tmpFusionInfo[TMP_GROUP_IDX << 1];
+#else
+  int            m_tmpXdisp;
+  int            m_tmpYdisp;
+#endif
+  int            m_tmpNumCand;
 #endif
 
   // prediction
@@ -652,6 +668,9 @@ public:
 #if JVET_AD0085_MPM_SORTING
   void deriveMPMSorted(const PredictionUnit& pu, uint8_t* mpm, int& sortedSize, int iStartIdx);
 #endif
+#if TMP_FAST_ENC && JVET_AD0086_ENHANCED_INTRA_TMP
+  int64_t            m_tmpFlmParams[TMP_FLM_PARAMS][MTMP_NUM];
+#endif
 #if JVET_AB0157_TMRL
   struct TmrlInfo
   {
@@ -663,6 +682,14 @@ public:
     uint32_t uiRefHeight;
 
   };
+  struct TmrlMode
+  {
+    int8_t  multiRefIdx;
+    uint8_t intraDir;
+    TmrlMode() : multiRefIdx(0), intraDir(0) {}
+    TmrlMode(int8_t _multiRefIdx, uint8_t _intraDir) :
+      multiRefIdx(_multiRefIdx), intraDir(_intraDir) {}
+  };
 
   TmrlInfo tmrlInfo;
   void xPredTmrlIntraDc(const CPelBuf& pSrc, Pel* pDst, int iDstStride);
@@ -670,6 +697,7 @@ public:
   void predTmrlIntraAng(const PredictionUnit& pu, Pel* pPred, uint32_t uiStride);
   void initTmrlIntraParams(const PredictionUnit& pu, const CompArea area, const SPS& sps);
   void getTmrlSearchRange(const PredictionUnit& pu, int8_t* tmrlRefList, uint8_t* tmrlIntraList, uint8_t& sizeRef, uint8_t& sizeMode);
+  TmrlMode m_tmrlList[MRL_LIST_SIZE];
   void getTmrlList(CodingUnit& cu);
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING && JVET_Y0065_GPM_INTRA
@@ -872,6 +900,39 @@ public:
 #else
   void getTargetTemplate             ( CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight );
 #endif
+#endif
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+  void initTmpDisp()
+  {
+    for (int i = 0; i < MTMP_NUM; i++)
+    {
+      m_tmpXdisp[i] = 0;
+      m_tmpYdisp[i] = 0;
+    }
+  }
+  void initTmpFlmParams()
+  {
+    for (int j = 0; j < MTMP_NUM; j++)
+    {
+      for (int i = 0; i < TMP_FLM_PARAMS; i++)
+      {
+        m_tmpFlmParams[i][j] = -1;
+      }
+    }
+  }
+  void initTmpFusionInfo()
+  {
+    for (int i = 0; i < TMP_GROUP_IDX << 1; i++)
+    {
+      m_tmpFusionInfo[i] = IntraTMPFusionInfo{ false, false, 0, 1 };
+    }
+  }
+#elif TMP_FAST_ENC
+    m_tmpXdisp = 0;
+    m_tmpYdisp = 0;
+#endif
+#if TMP_FAST_ENC
+    int getTmpNumCand() { return m_tmpNumCand; }
 #endif
 
 #ifdef TARGET_SIMD_X86

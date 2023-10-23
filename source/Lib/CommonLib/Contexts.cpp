@@ -6713,6 +6713,11 @@ const CtxSet ContextSetCfg::Palette = { ContextSetCfg::RotationFlag, ContextSetC
 const CtxSet ContextSetCfg::Sao = { ContextSetCfg::SaoMergeFlag, ContextSetCfg::SaoTypeIdx };
 
 const CtxSet ContextSetCfg::Alf = { ContextSetCfg::ctbAlfFlag, ContextSetCfg::ctbAlfAlternative, ContextSetCfg::AlfUseTemporalFilt };
+#if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+const CtxSet ContextSetCfg::Split = { ContextSetCfg::SplitFlag, ContextSetCfg::SplitQtFlag, ContextSetCfg::SplitHvFlag, ContextSetCfg::Split12Flag };
+#else
+const CtxSet ContextSetCfg::Split = { ContextSetCfg::SplitFlag, ContextSetCfg::SplitQtFlag, ContextSetCfg::SplitHvFlag, ContextSetCfg::Split12Flag, ContextSetCfg::ModeConsFlag };
+#endif
 
 template <class BinProbModel>
 CtxStore<BinProbModel>::CtxStore()

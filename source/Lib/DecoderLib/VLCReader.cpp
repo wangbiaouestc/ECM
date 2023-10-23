@@ -5336,9 +5336,9 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
     if (!lambdaCanBePredicted)
     {
 #if JVET_AB0082
-      READ_CODE(10, uiCode, "lambda");
+      READ_CODE(10, uiCode, "Lambda");
 #else
-      READ_CODE(9, uiCode, "lambda");
+      READ_CODE(9, uiCode, "Lambda");
 #endif
       pcSlice->setCostForARMC((uint32_t)uiCode);
     }
@@ -6624,7 +6624,11 @@ void HLSyntaxReader::parseCcSao( Slice* pcSlice, PicHeader* picHeader, const SPS
 
 #if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
   // Should be before CcSaoControlIdc to assign setNum
-  if (pcSlice->isIDRorBLA())
+#if JVET_Z0118_GDR
+  if( pcSlice->isIDRorBLA() || pcSlice->getPendingRasInit() || pcSlice->isInterGDR() )
+#else
+  if( pcSlice->isIDRorBLA() || pcSlice->getPendingRasInit() )
+#endif
   {
     g_ccSaoPrvParam[COMPONENT_Y ].clear();
     g_ccSaoPrvParam[COMPONENT_Cb].clear();

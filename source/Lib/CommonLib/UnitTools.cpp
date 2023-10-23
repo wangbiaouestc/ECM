@@ -21141,7 +21141,7 @@ void PU::getGeoMergeCandidates( const PredictionUnit &pu, MergeCtx& geoMrgCtx )
 #endif
 }
 
-void PU::spanGeoMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const uint8_t splitDir, const uint8_t candIdx0, const uint8_t candIdx1)
+void PU::spanGeoMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const uint8_t splitDir, const uint8_t candIdx0, const uint8_t candIdx1, const uint8_t *intraMPM)
 {
   pu.geoSplitDir  = splitDir;
   pu.geoMergeIdx0 = candIdx0;
@@ -21301,8 +21301,8 @@ void PU::spanGeoMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const uint8
     const unsigned mask = ~(scale - 1);
     uint8_t* ii = ib.buf;
     int geoIpm[3];
-    geoIpm[0] = isIntra0 ? pu.intraMPM[candIdx0 - GEO_MAX_NUM_UNI_CANDS] : -1;
-    geoIpm[1] = isIntra1 ? pu.intraMPM[candIdx1 - GEO_MAX_NUM_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS] : -1;
+    geoIpm[0] = isIntra0 ? intraMPM[candIdx0 - GEO_MAX_NUM_UNI_CANDS] : -1;
+    geoIpm[1] = isIntra1 ? intraMPM[candIdx1 - GEO_MAX_NUM_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS] : -1;
     geoIpm[2] = (isIntra0 && isIntra1) ? ((candIdx1 < candIdx0) ? geoIpm[1] : geoIpm[0]) : isIntra0 ? geoIpm[0] : geoIpm[1];
 
     for (int y = 0; y < mb.height; y++)
@@ -21593,10 +21593,10 @@ void PU::spanGeoIBCMotionInfo(PredictionUnit &pu, MergeCtx &geoMrgCtx)
 #if TM_MRG
 #if JVET_AA0058_GPM_ADAPTIVE_BLENDING
 #if JVET_AE0046_BI_GPM
-void PU::spanGeoMMVDMotionInfo(PredictionUnit& pu, MergeCtx& geoMrgCtx, MergeCtx& geoTmMrgCtx0, MergeCtx& geoTmMrgCtx1, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool tmFlag0, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool tmFlag1, const bool mmvdFlag1, const uint8_t mmvdIdx1, const uint8_t bldIdx,
+void PU::spanGeoMMVDMotionInfo(PredictionUnit& pu, MergeCtx& geoMrgCtx, MergeCtx& geoTmMrgCtx0, MergeCtx& geoTmMrgCtx1, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool tmFlag0, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool tmFlag1, const bool mmvdFlag1, const uint8_t mmvdIdx1, const uint8_t bldIdx, const uint8_t *intraMPM,
   const bool dmvrPart0, const bool dmvrPart1, Mv* bdofSubPuMvOffsetPart0, Mv* bdofSubPuMvOffsetPart1)
 #else
-void PU::spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &geoMrgCtx, MergeCtx &geoTmMrgCtx0, MergeCtx &geoTmMrgCtx1, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool tmFlag0, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool tmFlag1, const bool mmvdFlag1, const uint8_t mmvdIdx1, const uint8_t bldIdx)
+void PU::spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &geoMrgCtx, MergeCtx &geoTmMrgCtx0, MergeCtx &geoTmMrgCtx1, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool tmFlag0, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool tmFlag1, const bool mmvdFlag1, const uint8_t mmvdIdx1, const uint8_t bldIdx, const uint8_t *intraMPM)
 #endif
 #else
 void PU::spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &geoMrgCtx, MergeCtx &geoTmMrgCtx0, MergeCtx &geoTmMrgCtx1, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool tmFlag0, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool tmFlag1, const bool mmvdFlag1, const uint8_t mmvdIdx1)
@@ -21640,7 +21640,7 @@ void PU::spanGeoMMVDMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const u
   Mv mvOffset0[2], mvOffset1[2], deltaMv;
 
 #if JVET_AE0046_BI_GPM
-  int interDirIdx0 = mergeCtx0->interDirNeighbours[mergeIdx0];
+  int interDirIdx0 = (mergeIdx0 >= GEO_MAX_NUM_UNI_CANDS) ? -1 : mergeCtx0->interDirNeighbours[mergeIdx0];
 
   if (mmvdFlag0)
   {
@@ -21653,7 +21653,7 @@ void PU::spanGeoMMVDMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const u
     }
   }
 
-  int interDirIdx1 = mergeCtx1->interDirNeighbours[mergeIdx1];
+  int interDirIdx1 = (mergeIdx1 >= GEO_MAX_NUM_UNI_CANDS) ? -1 : mergeCtx1->interDirNeighbours[mergeIdx1];
 
   if (mmvdFlag1)
   {
@@ -22103,8 +22103,8 @@ void PU::spanGeoMMVDMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const u
     const unsigned mask = ~(scale - 1);
     uint8_t* ii = ib.buf;
     int geoIpm[3];
-    geoIpm[0] = isIntra0 ? pu.intraMPM[mergeIdx0 - GEO_MAX_NUM_UNI_CANDS] : -1;
-    geoIpm[1] = isIntra1 ? pu.intraMPM[mergeIdx1 - GEO_MAX_NUM_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS] : -1;
+    geoIpm[0] = isIntra0 ? intraMPM[mergeIdx0 - GEO_MAX_NUM_UNI_CANDS] : -1;
+    geoIpm[1] = isIntra1 ? intraMPM[mergeIdx1 - GEO_MAX_NUM_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS] : -1;
     geoIpm[2] = (isIntra0 && isIntra1) ? ((mergeIdx1 < mergeIdx0) ? geoIpm[1] : geoIpm[0]) : isIntra0 ? geoIpm[0] : geoIpm[1];
 
     for (int y = 0; y < mb.height; y++)
@@ -23357,65 +23357,56 @@ bool TU::getUseSignPred( const TransformUnit &tu, const ComponentID compID )
 #endif
 }
 
-void TU::predBorderResi( const Position blkPos, const CPelBuf &recoBuf, const CPelBuf &predBuf, const ComponentID compID,
-  const uint32_t uiWidth, const uint32_t uiHeight, Pel *predResiBorder, const Pel defaultPel )
+void TU::predBorderResi(const Position blkPos, const CPelBuf &recoBuf, const CPelBuf &predBuf, const ComponentID compID,
+                        const uint32_t width, const uint32_t height, Pel *predResiBorder, const Pel defaultVal)
 {
-  Pel r1, r2, p0;
-
-  const Pel *pReco1, *pReco2, *pPred0;
-
   const Pel *pReco = recoBuf.buf;
   const Pel *pPred = predBuf.buf;
-  uint32_t strideReco = recoBuf.stride;
-  uint32_t stridePred = predBuf.stride;
+  const ptrdiff_t strideReco = recoBuf.stride;
+  const ptrdiff_t stridePred = predBuf.stride;
 
+  const bool useLeft = blkPos.x != 0 || blkPos.y == 0;
+  const bool useTop  = blkPos.y != 0 || blkPos.x == 0;
 
-  if( blkPos.y )
-  {
-    pReco1 = pReco - strideReco;
-    pReco2 = pReco - 2 * strideReco;
-    pPred0 = pPred;
-    for( int32_t x = 0; x < uiWidth; x++ )
-    {
-      p0 = pPred0[x];
-      r1 = pReco1[x];
-      r2 = pReco2[x];
-      predResiBorder[uiHeight + x] = ( ( r1 << 1 ) - r2 - p0 );
-    }
-  }
-  else
-  {
-    for( int32_t x = 0; x < uiWidth; x++ )
-    {
-      predResiBorder[uiHeight + x] = defaultPel - pPred[x];
-    }
-  }
+  Pel *dst = predResiBorder + height;
 
-  if( blkPos.x )
+  if (useLeft)
   {
-    pReco1 = pReco - 1;
-    pReco2 = pReco - 2;
-    pPred0 = pPred;
-    for( int32_t y = 0; y < uiHeight; y++ )
+    if (blkPos.x != 0)
     {
-      p0 = pPred0[0];
-      r1 = pReco1[0];
-      r2 = pReco2[0];
-      predResiBorder[uiHeight - 1 - y] = ( ( r1 << 1 ) - r2 - p0 );
-      pReco1 += strideReco;
-      pReco2 += strideReco;
-      pPred0 += stridePred;
+      for (int32_t y = 0; y < height; y++)
+      {
+        Pel predVal = 2 * pReco[y * strideReco - 1] - pReco[y * strideReco - 2];
+        dst[~y]     = predVal - pPred[y * stridePred];
+      }
     }
-  }
-  else
-  {
-    for( int32_t y = 0; y < uiHeight; y++ )
+    else
     {
-      predResiBorder[uiHeight - 1 - y] = defaultPel - pPred[0];
-      pPred += stridePred;
+      for (int32_t y = 0; y < height; y++)
+      {
+        dst[~y] = defaultVal - pPred[y * stridePred];
+      }
     }
   }
 
+  if (useTop)
+  {
+    if (blkPos.y != 0)
+    {
+      for (int32_t x = 0; x < width; x++)
+      {
+        Pel predVal = 2 * pReco[x - strideReco] - pReco[x - 2 * strideReco];
+        dst[x]      = predVal - pPred[x];
+      }
+    }
+    else
+    {
+      for (int32_t x = 0; x < width; x++)
+      {
+        dst[x] = defaultVal - pPred[x];
+      }
+    }
+  }
 }
 
 Position TU::posSignHidingFirstCG( const TransformUnit &tu, ComponentID compID )

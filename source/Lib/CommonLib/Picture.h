@@ -109,7 +109,7 @@ void create(
 
   void destroy();
 
-  void createTempBuffers( const unsigned _maxCUSize );
+  void createTempBuffers( const unsigned _maxCUSize, bool useFilterFrame, bool resChange, bool decoder );
   void destroyTempBuffers();
 
          PelBuf     getOrigBuf(const CompArea &blk);

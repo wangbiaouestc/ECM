@@ -520,8 +520,6 @@ private:
   int                                                m_savedRdModeIdx;
 
 #if SECONDARY_MPM
-  uint8_t m_mpmList[NUM_MOST_PROBABLE_MODES];
-  uint8_t m_nonMPMList[NUM_NON_MPM_MODES];
   int m_mpmListSize;
 #endif
 
@@ -679,8 +677,6 @@ public:
 #endif
 
 #if SECONDARY_MPM
-  uint8_t* getMPMList()           { return m_mpmList; }
-  uint8_t* getNonMPMList()        { return m_nonMPMList; }
   int& getMpmListSize()           { return m_mpmListSize; }
 #endif
 #if JVET_AE0169_BIPREDICTIVE_IBC
@@ -689,6 +685,7 @@ public:
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   double getBestIntraSADCost()    { return m_bestIntraSADCost; }
 #endif
+  void setLumaIntraPredIdx(PredictionUnit& pu);
 protected:
 
   // -------------------------------------------------------------------------------------------------------------------

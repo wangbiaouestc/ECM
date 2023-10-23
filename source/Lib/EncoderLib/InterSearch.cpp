@@ -4052,6 +4052,9 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
                                               , (pu.cu->rribcFlipType > 0)
 #endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+                                              , pu.cu->ibcLicIdx
+#endif
       ))
       {
         m_bestSrchCostIntBv.insert(0, curBestBv.getHor(), curBestBv.getVer()
@@ -4063,6 +4066,9 @@ bool InterSearch::predIBCSearch(CodingUnit& cu, Partitioner& partitioner, const 
 #endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
                                  , (pu.cu->rribcFlipType > 0)
+#endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+                                 , pu.cu->ibcLicIdx
 #endif
         );
       }
@@ -4270,13 +4276,13 @@ Distortion InterSearch::xPredIBCFracPelSearch(PredictionUnit&              pu
 #endif
   for (int i = 0; i < intBvList.cnt; ++i)
   {
+    pu.cu->imv = IMV_FPEL;
+    pu.bv      = intBvList.mvList[i];
+    pu.mv[0]   = intBvList.mvList[i];
+    pu.mv[0].changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
 #if JVET_AE0159_FIBC
     if (m_pcEncCfg->getIntraPeriod() != 1) //non-AI
-    {
-      pu.cu->imv = IMV_FPEL;
-      pu.bv      = intBvList.mvList[i];
-      pu.mv[0]   = intBvList.mvList[i];
-      pu.mv[0].changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
+    {    
 #if JVET_AE0078_IBC_LIC_EXTENSION
       const int ibcLicLoopNum = pu.cu->ibcLicFlag && !pu.cu->ibcFilterFlag ? 4 : 1;
       int bestLicIdc = 0;
@@ -4451,11 +4457,6 @@ Distortion InterSearch::xPredIBCFracPelSearch(PredictionUnit&              pu
         pu.cu->ibcLicIdx = licIdc;
 #endif
 #endif
-
-    pu.cu->imv = IMV_FPEL;
-    pu.bv      = intBvList.mvList[i];
-    pu.mv[0]   = intBvList.mvList[i];
-    pu.mv[0].changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
 
 #if JVET_AC0112_IBC_LIC
     if (pu.cu->ibcLicFlag)
@@ -4769,6 +4770,9 @@ Distortion InterSearch::xPredIBCFracPelSearch(PredictionUnit&              pu
 #endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV && JVET_AA0070_RRIBC
                                   , intBvList.bvFlipList[intBvList.maxSize]
+#endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+                                  , intBvList.bvLicIdx[intBvList.maxSize]
 #endif
       ))
     {
@@ -12389,7 +12393,6 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
   uint64_t   uiSingleFracBits[3] = { 0, 0, 0 };
 
   const TempCtx ctxStart  ( m_ctxCache, m_CABACEstimator->getCtx() );
-  TempCtx       ctxBest   ( m_ctxCache );
 
   if (bCheckFull)
   {
@@ -12806,6 +12809,11 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
             currAbsSum = 0;
           }
 
+#if JVET_Z0118_GDR
+          cs.updateReconMotIPM(tu.blocks[compID], cs.getPredBuf(tu.blocks[compID]));
+#else
+          cs.picture->getRecoBuf(tu.blocks[compID]).copyFrom(cs.getPredBuf(tu.blocks[compID]));
+#endif
           if (currAbsSum > 0) //if non-zero coefficients are present, a residual needs to be derived for further prediction
           {
             if (isFirstMode)
@@ -12863,11 +12871,6 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
                 if (isLuma(compID) && slice.getPicHeader()->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !tu.cu->firstPU->ciipFlag && !CU::isIBC(*tu.cu))
 #endif
                 {
-#if JVET_Z0118_GDR
-                  cs.updateReconMotIPM(tu.blocks[COMPONENT_Y], cs.getPredBuf(tu.blocks[COMPONENT_Y]));
-#else
-                  cs.picture->getRecoBuf(tu.blocks[COMPONENT_Y]).copyFrom(cs.getPredBuf(tu.blocks[COMPONENT_Y]));
-#endif
                   cs.getPredBuf(tu.blocks[compID]).rspSignal(m_pcReshape->getFwdLUT());
                 }
 #if JVET_AE0059_INTER_CCCM
@@ -13091,7 +13094,7 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
         m_pcRdCost->lambdaAdjustColorTrans(false, compID);
       }
 #if SIGN_PREDICTION
-      if(cs.sps->getNumPredSigns() > 0)
+      if(cs.sps->getNumPredSigns() > 0 || (cs.pps->getUseBIF() && isLuma( compID )) || (cs.pps->getUseChromaBIF() && !isLuma( compID )))
       {
 #if JVET_Z0118_GDR
 #if JVET_Y0065_GPM_INTRA
@@ -14314,6 +14317,12 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
               m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng( compID ), currTU, true, false, &invLUT );
             }
           }
+          else
+          {
+            CompArea compArea = currTU.blocks[compID];
+            PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
+            recIPredBuf.copyFrom(reco.subBuf(tuPosInCu, currTU.lumaSize()));
+          }
         }
       }
     }
@@ -14338,6 +14347,12 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
             CompArea compArea = currTU.blocks[compID];
             PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
             m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(compID), currTU, true );
+          }
+          else
+          {
+            CompArea compArea = currTU.blocks[compID];
+            PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
+            recIPredBuf.copyFrom(tmpSubBuf);
           }
         }
       }
@@ -14402,6 +14417,12 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
             CompArea compArea = currTU.blocks[compID];
             PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
             m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(compID), currTU, true );
+          }
+          else
+          {
+            CompArea compArea = currTU.blocks[compID];
+            PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
+            recIPredBuf.copyFrom(tmpSubBuf);
           }
         }
       }

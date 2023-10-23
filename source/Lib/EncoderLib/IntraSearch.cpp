@@ -128,7 +128,8 @@ void IntraSearch::destroy()
     {
       for( uint32_t height = 0; height < numHeights; height++ )
       {
-        if( gp_sizeIdxInfo->isCuSize( gp_sizeIdxInfo->sizeFrom( width ) ) && gp_sizeIdxInfo->isCuSize( gp_sizeIdxInfo->sizeFrom( height ) ) )
+        if( gp_sizeIdxInfo->isCuSize( gp_sizeIdxInfo->sizeFrom( width ) ) && gp_sizeIdxInfo->isCuSize( gp_sizeIdxInfo->sizeFrom( height ) )
+          && gp_sizeIdxInfo->sizeFrom(width) <= m_pcEncCfg->getMaxCUWidth() && gp_sizeIdxInfo->sizeFrom(height) <= m_pcEncCfg->getMaxCUHeight())
         {
           for( uint32_t layer = 0; layer < uiNumLayersToAllocateSplit; layer++ )
           {
@@ -310,17 +311,17 @@ void IntraSearch::init( EncCfg*        pcEncCfg,
   const ChromaFormat cform = pcEncCfg->getChromaFormatIdc();
 
   IntraPrediction::init( cform, pcEncCfg->getBitDepth( CHANNEL_TYPE_LUMA ) );
-  m_tmpStorageLCU.create(UnitArea(cform, Area(0, 0, MAX_CU_SIZE, MAX_CU_SIZE)));
-  m_colorTransResiBuf.create(UnitArea(cform, Area(0, 0, MAX_CU_SIZE, MAX_CU_SIZE)));
+  m_tmpStorageLCU.create(UnitArea(cform, Area(0, 0, maxCUWidth, maxCUHeight)));
+  m_colorTransResiBuf.create(UnitArea(cform, Area(0, 0, maxCUWidth, maxCUHeight)));
 
 #if JVET_AC0119_LM_CHROMA_FUSION
   for (uint32_t i = 0; i < 2; i++)
   {
-    m_predStorage[i].create(UnitArea(cform, Area(0, 0, MAX_CU_SIZE, MAX_CU_SIZE)));
+    m_predStorage[i].create(UnitArea(cform, Area(0, 0, maxCUWidth, maxCUHeight)));
   }
   for (uint32_t i = 0; i < 6; i++)
   {
-    m_fusionStorage[i].create(UnitArea(cform, Area(0, 0, MAX_CU_SIZE, MAX_CU_SIZE)));
+    m_fusionStorage[i].create(UnitArea(cform, Area(0, 0, maxCUWidth, maxCUHeight)));
   }
 #endif
 
@@ -339,8 +340,8 @@ void IntraSearch::init( EncCfg*        pcEncCfg,
 #endif
   {
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
-    m_cccmStorage[0][cccmIdx].create(UnitArea(cform, Area(0, 0, MAX_CU_SIZE, MAX_CU_SIZE)));
-    m_cccmStorage[1][cccmIdx].create(UnitArea(cform, Area(0, 0, MAX_CU_SIZE, MAX_CU_SIZE)));
+    m_cccmStorage[0][cccmIdx].create(UnitArea(cform, Area(0, 0, maxCUWidth, maxCUHeight)));
+    m_cccmStorage[1][cccmIdx].create(UnitArea(cform, Area(0, 0, maxCUWidth, maxCUHeight)));
 #else
     m_cccmStorage[cccmIdx].create(UnitArea(cform, Area(0, 0, MAX_CU_SIZE, MAX_CU_SIZE)));
 #endif
@@ -359,7 +360,7 @@ void IntraSearch::init( EncCfg*        pcEncCfg,
 
   for( uint32_t ch = 0; ch < MAX_NUM_TBLOCKS; ch++ )
   {
-    m_pSharedPredTransformSkip[ch] = new Pel[MAX_CU_SIZE * MAX_CU_SIZE];
+    m_pSharedPredTransformSkip[ch] = new Pel[maxCUWidth * maxCUHeight];
   }
 
   uint32_t numWidths  = gp_sizeIdxInfo->numWidths();
@@ -384,7 +385,8 @@ void IntraSearch::init( EncCfg*        pcEncCfg,
 
     for( uint32_t height = 0; height < numHeights; height++ )
     {
-      if(  gp_sizeIdxInfo->isCuSize( gp_sizeIdxInfo->sizeFrom( width ) ) && gp_sizeIdxInfo->isCuSize( gp_sizeIdxInfo->sizeFrom( height ) ) )
+      if(  gp_sizeIdxInfo->isCuSize( gp_sizeIdxInfo->sizeFrom( width ) ) && gp_sizeIdxInfo->isCuSize( gp_sizeIdxInfo->sizeFrom( height ) )
+        && gp_sizeIdxInfo->sizeFrom(width) <= maxCUWidth && gp_sizeIdxInfo->sizeFrom(height) <= maxCUHeight)
       {
         m_pBestCS[width][height] = new CodingStructure( m_unitCache.cuCache, m_unitCache.puCache, m_unitCache.tuCache );
         m_pTempCS[width][height] = new CodingStructure( m_unitCache.cuCache, m_unitCache.puCache, m_unitCache.tuCache );
@@ -712,10 +714,6 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 
     CHECK(pu.cu != &cu, "PU is not contained in the CU");
 
-#if SECONDARY_MPM
-    std::memcpy( pu.intraMPM, m_mpmList, sizeof( pu.intraMPM ) );
-    std::memcpy( pu.intraNonMPM, m_nonMPMList, sizeof( pu.intraNonMPM ) );
-#endif
 
     //===== determine set of modes to be tested (using prediction signal only) =====
     int numModesAvailable = NUM_LUMA_MODE; // total number of Intra modes
@@ -1199,11 +1197,10 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
             pu.multiRefIdx    = 1;
 #if SECONDARY_MPM
             const int numMPMs = NUM_PRIMARY_MOST_PROBABLE_MODES;
-            uint8_t* multiRefMPM = m_mpmList;
 #else
             const int numMPMs = NUM_MOST_PROBABLE_MODES;
-            unsigned  multiRefMPM[numMPMs];
 #endif
+            uint8_t* multiRefMPM = m_intraMPM;
 #if !SECONDARY_MPM
             PU::getIntraMPMs(pu, multiRefMPM);
 #endif
@@ -1224,12 +1221,12 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 
                 for (auto i = 0; i < MRL_LIST_SIZE; i++)
                 {
-                  if (cu.tmrlList[i].multiRefIdx != multiRefIdx)
+                  if (m_tmrlList[i].multiRefIdx != multiRefIdx)
                   {
                     continue;
                   }
 
-                  pu.intraDir[0] = cu.tmrlList[i].intraDir;
+                  pu.intraDir[0] = m_tmrlList[i].intraDir;
                   cu.tmrlListIdx = i;
                   uint32_t uiMode = i + MAX_REF_LINE_IDX;
 
@@ -1412,10 +1409,10 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
                       continue;
                     }
 
-                    int idxNum = cu.tmpFusionFlag ? TMP_GROUP_IDX << 1 : cu.tmpNumCand;
+                    int idxNum = cu.tmpFusionFlag ? TMP_GROUP_IDX << 1 : m_tmpNumCand;
                     for (int tmpIdx = 0; tmpIdx < idxNum; tmpIdx++)
                     {
-                      if(cu.tmpFusionFlag && !cu.tmpFusionInfo[tmpIdx].bValid)
+                      if(cu.tmpFusionFlag && !m_tmpFusionInfo[tmpIdx].bValid)
                       {
                         continue;
                       }
@@ -1891,7 +1888,7 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
           {
 
 #if SECONDARY_MPM
-            auto uiPreds = m_mpmList;
+            auto uiPreds = m_intraMPM;
 #else
             const int numMPMs = NUM_MOST_PROBABLE_MODES;
             unsigned  uiPreds[numMPMs];
@@ -2389,8 +2386,8 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
       {
         int tmrlListIdx = uiOrgMode.mRefId - MAX_REF_LINE_IDX;
         cu.tmrlListIdx = tmrlListIdx;
-        pu.multiRefIdx = cu.tmrlList[tmrlListIdx].multiRefIdx;
-        pu.intraDir[0] = cu.tmrlList[tmrlListIdx].intraDir;
+        pu.multiRefIdx = m_tmrlList[tmrlListIdx].multiRefIdx;
+        pu.intraDir[0] = m_tmrlList[tmrlListIdx].intraDir;
         cu.tmrlFlag = true;
       }
 #endif
@@ -2785,8 +2782,8 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
       {
         int tmrlListIdx = uiBestPUMode.mRefId - MAX_REF_LINE_IDX;
         cu.tmrlListIdx = tmrlListIdx;
-        pu.multiRefIdx = cu.tmrlList[tmrlListIdx].multiRefIdx;
-        pu.intraDir[0] = cu.tmrlList[tmrlListIdx].intraDir;
+        pu.multiRefIdx = m_tmrlList[tmrlListIdx].multiRefIdx;
+        pu.intraDir[0] = m_tmrlList[tmrlListIdx].intraDir;
       }
 #endif
 #if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST 
@@ -6986,6 +6983,7 @@ void IntraSearch::xEncIntraHeader( CodingStructure &cs, Partitioner &partitioner
         m_CABACEstimator->pred_mode( cu );
       }
       m_CABACEstimator->bdpcm_mode( cu, COMPONENT_Y );
+      setLumaIntraPredIdx(pu);
       m_CABACEstimator->intra_luma_pred_mode( pu );
     }
   }
@@ -7338,9 +7336,9 @@ void IntraSearch::xSelectAMTForFullRD(TransformUnit &tu)
 #if JVET_AD0086_ENHANCED_INTRA_TMP
       CodingUnit *cu         = pu.cu;
       int         pX, pY;
-      int tmpIdx = cu->tmpFusionFlag ? cu->tmpFusionInfo[cu->tmpIdx].tmpFusionIdx : cu->tmpIdx;
-      pX = cu->tmpXdisp[tmpIdx];
-      pY = cu->tmpYdisp[tmpIdx];
+      int tmpIdx = cu->tmpFusionFlag ? m_tmpFusionInfo[cu->tmpIdx].tmpFusionIdx : cu->tmpIdx;
+      pX = m_tmpXdisp[tmpIdx];
+      pY = m_tmpYdisp[tmpIdx];
       pu.mv->set(pX << MV_FRACTIONAL_BITS_INTERNAL, pY << MV_FRACTIONAL_BITS_INTERNAL);
       pu.bv.set(pX, pY);
 #else
@@ -7588,9 +7586,9 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
 #if JVET_AD0086_ENHANCED_INTRA_TMP
             CodingUnit *cu = pu.cu;
             int pX, pY;
-            int tmpIdx = cu->tmpFusionFlag ? cu->tmpFusionInfo[cu->tmpIdx].tmpFusionIdx : cu->tmpIdx;
-            pX = cu->tmpXdisp[tmpIdx];
-            pY = cu->tmpYdisp[tmpIdx];
+            int tmpIdx = cu->tmpFusionFlag ? m_tmpFusionInfo[cu->tmpIdx].tmpFusionIdx : cu->tmpIdx;
+            pX = m_tmpXdisp[tmpIdx];
+            pY = m_tmpYdisp[tmpIdx];
             pu.mv->set(pX << MV_FRACTIONAL_BITS_INTERNAL, pY << MV_FRACTIONAL_BITS_INTERNAL);
             pu.bv.set(pX, pY);
 #else
@@ -10680,6 +10678,7 @@ uint64_t IntraSearch::xFracModeBitsIntra(PredictionUnit &pu, const uint32_t &uiM
     if (!pu.ciipFlag)
 #endif
     {
+      setLumaIntraPredIdx(pu);
       m_CABACEstimator->intra_luma_pred_mode(pu);
     }
   }
@@ -11544,5 +11543,69 @@ void IntraSearch::xFinishISPModes()
       }
     }
   }
+}
+void IntraSearch::setLumaIntraPredIdx(PredictionUnit& pu)
+{
+#if SECONDARY_MPM
+  const int numMPMs = NUM_PRIMARY_MOST_PROBABLE_MODES + NUM_SECONDARY_MOST_PROBABLE_MODES;
+#else
+  const int numMPMs = NUM_MOST_PROBABLE_MODES;
+#endif
+  int pred_idx = numMPMs;
+  for (int idx = 0; idx < numMPMs; idx++)
+  {
+    if (pu.intraDir[0] == m_intraMPM[idx])
+    {
+      pred_idx = idx;
+      break;
+    }
+  }
+#if SECONDARY_MPM
+  if (pred_idx < NUM_PRIMARY_MOST_PROBABLE_MODES)
+  {
+    pu.mpmFlag = true;
+    pu.secondMpmFlag = false;
+  }
+  else if (pred_idx < numMPMs)
+  {
+    pu.mpmFlag = false;
+    pu.secondMpmFlag = true;
+    pred_idx -= NUM_PRIMARY_MOST_PROBABLE_MODES;
+  }
+  else
+  {
+    pu.mpmFlag = false;
+    pu.secondMpmFlag = false;
+    pred_idx = NUM_NON_MPM_MODES;
+    for (int idx = 0; idx < NUM_NON_MPM_MODES; idx++)
+    {
+      if (pu.intraDir[0] == m_intraNonMPM[idx])
+      {
+        pred_idx = idx;
+        break;
+      }
+    }
+
+  }
+#else
+  if (mpm_idx < NUM_MOST_PROBABLE_MODES)
+  {
+    pu.mpmFlag = true;
+  }
+  else
+  {
+    std::sort(mpmPred, mpmPred + numMPMs);
+    int pred_idx = pu.intraDir[0];
+    for (int idx = numMPMs - 1; idx >= 0; idx--)
+    {
+      if (pred_idx > mpmPred[idx])
+      {
+        pred_idx--;
+      }
+    }
+    CHECK(pred_idx >= 64, "Incorrect mode");
+  }
+#endif
+  pu.ipredIdx = pred_idx;
 }
 

@@ -7181,8 +7181,8 @@ void InterPrediction::motionCompensationGeo( CodingUnit &cu, MergeCtx &geoMrgCtx
     bool isIntra1 = candIdx1 >= GEO_MAX_NUM_UNI_CANDS;
     if (isIntra0)
     {
-      PU::getGeoIntraMPMs(pu, pu.intraMPM, splitDir, g_geoTmShape[0][g_geoParams[pu.geoSplitDir][0]]);
-      pu.intraDir[0] = pu.intraMPM[candIdx0 - GEO_MAX_NUM_UNI_CANDS];
+      PU::getGeoIntraMPMs(pu, pcIntraPred->m_intraMPM, splitDir, g_geoTmShape[0][g_geoParams[pu.geoSplitDir][0]]);
+      pu.intraDir[0] = pcIntraPred->m_intraMPM[candIdx0 - GEO_MAX_NUM_UNI_CANDS];
       pcIntraPred->initIntraPatternChType(cu, pu.Y());
       pcIntraPred->predIntraAng(COMPONENT_Y, tmpGeoBuf0.Y(), pu);
       if (isChromaEnabled(pu.chromaFormat))
@@ -7266,8 +7266,8 @@ void InterPrediction::motionCompensationGeo( CodingUnit &cu, MergeCtx &geoMrgCtx
 
     if (isIntra1)
     {
-      PU::getGeoIntraMPMs(pu, pu.intraMPM+GEO_MAX_NUM_INTRA_CANDS, splitDir, g_geoTmShape[1][g_geoParams[pu.geoSplitDir][0]]);
-      pu.intraDir[0] = pu.intraMPM[candIdx1 - GEO_MAX_NUM_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS];
+      PU::getGeoIntraMPMs(pu, pcIntraPred->m_intraMPM+GEO_MAX_NUM_INTRA_CANDS, splitDir, g_geoTmShape[1][g_geoParams[pu.geoSplitDir][0]]);
+      pu.intraDir[0] = pcIntraPred->m_intraMPM[candIdx1 - GEO_MAX_NUM_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS];
       pcIntraPred->initIntraPatternChType(cu, pu.Y());
       pcIntraPred->predIntraAng(COMPONENT_Y, tmpGeoBuf1.Y(), pu);
       if (isChromaEnabled(pu.chromaFormat))
@@ -7408,8 +7408,8 @@ void InterPrediction::motionCompensationIbcGpm( CodingUnit &cu, MergeCtx &ibcGpm
     bool isIntra1 = candIdx1 >= IBC_GPM_MAX_NUM_UNI_CANDS;
     if (isIntra0)
     {
-      PU::getGeoIntraMPMs(pu, pu.intraMPM, splitDir, g_geoTmShape[0][g_geoParams[pu.ibcGpmSplitDir][0]]);
-      pu.intraDir[0] = pu.intraMPM[candIdx0 - IBC_GPM_MAX_NUM_UNI_CANDS];
+      PU::getGeoIntraMPMs(pu, pcIntraPred->m_intraMPM, splitDir, g_geoTmShape[0][g_geoParams[pu.ibcGpmSplitDir][0]]);
+      pu.intraDir[0] = pcIntraPred->m_intraMPM[candIdx0 - IBC_GPM_MAX_NUM_UNI_CANDS];
       pcIntraPred->initIntraPatternChType(cu, pu.Y());
       pcIntraPred->predIntraAng(COMPONENT_Y, tmpGeoBuf0.Y(), pu);
 #if !JVET_AE0169_GPM_IBC_IBC
@@ -7418,7 +7418,7 @@ void InterPrediction::motionCompensationIbcGpm( CodingUnit &cu, MergeCtx &ibcGpm
 #endif
       if (chroma)
       {
-        pu.intraDir[1] = pu.intraMPM[candIdx0 - IBC_GPM_MAX_NUM_UNI_CANDS];
+        pu.intraDir[1] = pcIntraPred->m_intraMPM[candIdx0 - IBC_GPM_MAX_NUM_UNI_CANDS];
         pcIntraPred->initIntraPatternChType(cu, pu.Cb());
         pcIntraPred->predIntraAng(COMPONENT_Cb, tmpGeoBuf0.Cb(), pu);
         pcIntraPred->initIntraPatternChType(cu, pu.Cr());
@@ -7450,8 +7450,8 @@ void InterPrediction::motionCompensationIbcGpm( CodingUnit &cu, MergeCtx &ibcGpm
 
     if (isIntra1)
     {
-      PU::getGeoIntraMPMs(pu, pu.intraMPM+GEO_MAX_NUM_INTRA_CANDS, splitDir, g_geoTmShape[1][g_geoParams[pu.ibcGpmSplitDir][0]]);
-      pu.intraDir[0] = pu.intraMPM[candIdx1 - IBC_GPM_MAX_NUM_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS];
+      PU::getGeoIntraMPMs(pu, pcIntraPred->m_intraMPM+GEO_MAX_NUM_INTRA_CANDS, splitDir, g_geoTmShape[1][g_geoParams[pu.ibcGpmSplitDir][0]]);
+      pu.intraDir[0] = pcIntraPred->m_intraMPM[candIdx1 - IBC_GPM_MAX_NUM_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS];
       pcIntraPred->initIntraPatternChType(cu, pu.Y());
       pcIntraPred->predIntraAng(COMPONENT_Y, tmpGeoBuf1.Y(), pu);
 #if !JVET_AE0169_GPM_IBC_IBC
@@ -7460,7 +7460,7 @@ void InterPrediction::motionCompensationIbcGpm( CodingUnit &cu, MergeCtx &ibcGpm
 #endif
       if (chroma)
       {
-        pu.intraDir[1] = pu.intraMPM[candIdx1 - IBC_GPM_MAX_NUM_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS];
+        pu.intraDir[1] = pcIntraPred->m_intraMPM[candIdx1 - IBC_GPM_MAX_NUM_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS];
         pcIntraPred->initIntraPatternChType(cu, pu.Cb());
         pcIntraPred->predIntraAng(COMPONENT_Cb, tmpGeoBuf1.Cb(), pu);
         pcIntraPred->initIntraPatternChType(cu, pu.Cr());
@@ -8799,7 +8799,7 @@ void  InterPrediction::sortIbcMergeMbvdCandidates(PredictionUnit &pu, MergeCtx& 
     PelUnitBuf pcBufPredRefTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
     PelUnitBuf pcBufPredCurTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
     PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
-    PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
+    PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], nHeight, AML_MERGE_TEMPLATE_SIZE)));
 
     getIBCAMLRefTemplate(pu, nWidth, nHeight);
 
@@ -8861,8 +8861,7 @@ bool InterPrediction::xAMLIBCGetCurBlkTemplate(PredictionUnit& pu, int nCurBlkWi
   if (m_bAMLTemplateAvailabe[0])
   {
     const Pel*    rec = recBuf.bufAt(pu.blocks[COMPONENT_Y].pos().offset(0, -AML_MERGE_TEMPLATE_SIZE));
-    PelBuf pcYBuf = PelBuf(m_acYuvCurAMLTemplate[0][0], nCurBlkWidth, AML_MERGE_TEMPLATE_SIZE);
-    Pel*   pcY = pcYBuf.bufAt(0, 0);
+    Pel*   pcY = m_acYuvCurAMLTemplate[0][0];
     for (int k = 0; k < nCurBlkWidth; k++)
     {
       for (int l = 0; l < AML_MERGE_TEMPLATE_SIZE; l++)
@@ -8875,8 +8874,7 @@ bool InterPrediction::xAMLIBCGetCurBlkTemplate(PredictionUnit& pu, int nCurBlkWi
 
   if (m_bAMLTemplateAvailabe[1])
   {
-    PelBuf pcYBuf = PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nCurBlkHeight);
-    Pel*   pcY = pcYBuf.bufAt(0, 0);
+    Pel* pcY = m_acYuvCurAMLTemplate[1][0];
     const Pel*    rec = recBuf.bufAt(pu.blocks[COMPONENT_Y].pos().offset(-AML_MERGE_TEMPLATE_SIZE, 0));
     for (int k = 0; k < nCurBlkHeight; k++)
     {
@@ -9225,7 +9223,8 @@ void InterPrediction::getIBCAMLRefTemplate(PredictionUnit &pu, int nCurBlkWidth,
 #endif
       if (numTemplate[0] + numTemplate[1] > 0)
       {
-        pcYBuf.Y().linearTransform(scale, shift, offset, true, clpRng);
+        PelUnitBuf pcYBufTranspose(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], nCurBlkHeight, AML_MERGE_TEMPLATE_SIZE));
+        pcYBufTranspose.Y().linearTransform(scale, shift, offset, true, clpRng);
       }
     }
     else
@@ -9691,7 +9690,7 @@ void  InterPrediction::sortInterMergeMMVDCandidates(PredictionUnit &pu, MergeCtx
       PelUnitBuf pcBufPredRefTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
       PelUnitBuf pcBufPredCurTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
       PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
-      PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
+      PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], nHeight, AML_MERGE_TEMPLATE_SIZE)));
       //Store
       if ((refList0 != -1) && (refList1 != -1))
       {
@@ -9886,7 +9885,7 @@ void  InterPrediction::sortInterMergeMMVDCandidates(PredictionUnit& pu, MergeCtx
     PelUnitBuf pcBufPredRefTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
     PelUnitBuf pcBufPredCurTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
     PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
-    PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
+    PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], nHeight, AML_MERGE_TEMPLATE_SIZE)));
 
     getBlkAMLRefTemplate(pu, pcBufPredRefTop, pcBufPredRefLeft);
     
@@ -10181,7 +10180,7 @@ void  InterPrediction::sortAffineMergeCandidates(PredictionUnit pu, AffineMergeC
         PelUnitBuf pcBufPredRefTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
         PelUnitBuf pcBufPredCurTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
         PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
-        PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
+        PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], nHeight, AML_MERGE_TEMPLATE_SIZE)));
         //Store
         if (pu.interDir == 3)
         {
@@ -10365,7 +10364,7 @@ void  InterPrediction::sortAffineMergeCandidates(PredictionUnit pu, AffineMergeC
     PelUnitBuf pcBufPredRefTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
     PelUnitBuf pcBufPredCurTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
     PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
-    PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
+    PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], nHeight, AML_MERGE_TEMPLATE_SIZE)));
     getAffAMLRefTemplate(pu, pcBufPredRefTop, pcBufPredRefLeft
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
       , affMrgCtx
@@ -10453,7 +10452,7 @@ void InterPrediction::adjustMergeCandidatesInOneCandidateGroupSubTMVP(Prediction
       PelUnitBuf pcBufPredRefTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
       PelUnitBuf pcBufPredCurTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
       PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
-      PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
+      PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], nHeight, AML_MERGE_TEMPLATE_SIZE)));
 
       getBlkAMLRefTemplateSubTMVP(pu, pcBufPredRefTop, pcBufPredRefLeft);
 
@@ -10537,7 +10536,7 @@ void InterPrediction::adjustMergeCandidatesInOneCandidateGroup(PredictionUnit &p
       PelUnitBuf pcBufPredRefTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
       PelUnitBuf pcBufPredCurTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
       PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
-      PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
+      PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], nHeight, AML_MERGE_TEMPLATE_SIZE)));
 
       getBlkAMLRefTemplate(pu, pcBufPredRefTop, pcBufPredRefLeft);
 
@@ -10592,7 +10591,7 @@ void InterPrediction::adjustMergeCandidatesBcwIdx(PredictionUnit& pu, MergeCtx& 
   }
 
   PelUnitBuf pcBufPredCurTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
-  PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
+  PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], nHeight, AML_MERGE_TEMPLATE_SIZE)));
   PelUnitBuf pcBufPredRefTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
   PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
 
@@ -10611,6 +10610,7 @@ void InterPrediction::adjustMergeCandidatesBcwIdx(PredictionUnit& pu, MergeCtx& 
   const int biShift = IF_INTERNAL_PREC - pu.cu->slice->clpRng(COMPONENT_Y).bd;
   const Pel biOffset = -IF_INTERNAL_OFFS;
 #endif
+  PelUnitBuf pcBufPredRefLeftTranspose = PelUnitBuf(pu.chromaFormat, PelBuf(pcBufPredRefLeft.Y().buf, pcBufPredRefLeft.Y().height, pcBufPredRefLeft.Y().width));
   for (uint32_t uiMergeCand = 0; uiMergeCand < mrgCtx.numValidMergeCand; uiMergeCand++)
   {
     if (mrgCtx.interDirNeighbours[uiMergeCand] != 3)
@@ -10701,7 +10701,8 @@ void InterPrediction::adjustMergeCandidatesBcwIdx(PredictionUnit& pu, MergeCtx& 
         if (pu.cu->licFlag)
         {
           xPredInterBlk(COMPONENT_Y, pu, picRef, mvLeft, pcMbBuf, false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, scalingRatio, 0, 0, false, NULL, 0, true, true, mvCurr);
-          pcMbBuf.bufs[0].linearTransform(1, -biShift, biOffset, false, pu.cu->slice->clpRng(COMPONENT_Y));
+          PelUnitBuf pcMbBufTranspose = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[refList][0], pcBufPredRefLeftTranspose.Y()));
+          pcMbBufTranspose.bufs[0].linearTransform(1, -biShift, biOffset, false, pu.cu->slice->clpRng(COMPONENT_Y));
         }
         else
 #endif
@@ -10751,10 +10752,10 @@ void InterPrediction::adjustMergeCandidatesBcwIdx(PredictionUnit& pu, MergeCtx& 
       }
       if (m_bAMLTemplateAvailabe[1])
       {
-        CPelUnitBuf srcPred0 = CPelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[0][0], pcBufPredRefLeft.Y()));
-        CPelUnitBuf srcPred1 = CPelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[1][0], pcBufPredRefLeft.Y()));
-        xWeightedAverageY(pu, srcPred0, srcPred1, pcBufPredRefLeft, pu.cu->slice->getSPS()->getBitDepths(), pu.cu->slice->clpRngs());
-        m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+        CPelUnitBuf srcPred0 = CPelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[0][0], pcBufPredRefLeftTranspose.Y()));
+        CPelUnitBuf srcPred1 = CPelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[1][0], pcBufPredRefLeftTranspose.Y()));
+        xWeightedAverageY(pu, srcPred0, srcPred1, pcBufPredRefLeftTranspose, pu.cu->slice->getSPS()->getBitDepths(), pu.cu->slice->clpRngs());
+        m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeftTranspose.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
         uiCost += cDistParam.distFunc(cDistParam);
       }
 
@@ -10822,7 +10823,7 @@ void InterPrediction::adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMer
   auto origMergeIdx = pu.mergeIdx;
 
   PelUnitBuf pcBufPredCurTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
-  PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
+  PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], nHeight, AML_MERGE_TEMPLATE_SIZE)));
 
   for (uint32_t uiMergeCand = 0; uiMergeCand < mvpMergeCandCtx.numValidMergeCand; uiMergeCand++)
   {
@@ -10840,10 +10841,8 @@ void InterPrediction::adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMer
 
       mvpMergeCandCtx.setMergeInfo(pu, uiMergeCand);
 
-      PelUnitBuf pcBufPredRefTop =
-        (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
-      PelUnitBuf pcBufPredRefLeft =
-        (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
+      PelUnitBuf pcBufPredRefTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
+      PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
 
 #if JVET_Z0067_RPR_ENABLE
       bool bRefIsRescaled = false;
@@ -11315,7 +11314,7 @@ void  InterPrediction::adjustInterMergeCandidates(PredictionUnit &pu, MergeCtx& 
     PelUnitBuf pcBufPredRefTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
     PelUnitBuf pcBufPredCurTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
     PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
-    PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
+    PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], nHeight, AML_MERGE_TEMPLATE_SIZE)));
 
 #if JVET_Y0128_NON_CTC
     bool bRefIsRescaled = false;
@@ -11415,7 +11414,7 @@ void InterPrediction::adjustMergeCandidatesInOneCandidateGroup(PredictionUnit &p
       PelUnitBuf pcBufPredRefTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[0][0], pu.lwidth(), AML_MERGE_TEMPLATE_SIZE)));
       PelUnitBuf pcBufPredCurTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[0][0], pu.lwidth(), AML_MERGE_TEMPLATE_SIZE)));
       PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, pu.lheight())));
-      PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, pu.lheight())));
+      PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], pu.lheight(), AML_MERGE_TEMPLATE_SIZE)));
 #if JVET_Z0067_RPR_ENABLE
       bool bRefIsRescaled = false;
       for (uint32_t refList = 0; refList < NUM_REF_PIC_LIST_01; refList++)
@@ -11541,8 +11540,7 @@ bool InterPrediction::xAMLGetCurBlkTemplate(PredictionUnit& pu, int nCurBlkWidth
   if (m_bAMLTemplateAvailabe[0])
   {
     const Pel*    rec = recBuf.bufAt(pu.blocks[COMPONENT_Y].pos().offset(0, -AML_MERGE_TEMPLATE_SIZE));
-    PelBuf pcYBuf = PelBuf(m_acYuvCurAMLTemplate[0][0], nCurBlkWidth, AML_MERGE_TEMPLATE_SIZE);
-    Pel*   pcY = pcYBuf.bufAt(0, 0);
+    Pel*   pcY = m_acYuvCurAMLTemplate[0][0];
     for (int k = 0; k < nCurBlkWidth; k++)
     {
       for (int l = 0; l < AML_MERGE_TEMPLATE_SIZE; l++)
@@ -11567,8 +11565,7 @@ bool InterPrediction::xAMLGetCurBlkTemplate(PredictionUnit& pu, int nCurBlkWidth
 #endif
   if (m_bAMLTemplateAvailabe[1])
   {
-    PelBuf pcYBuf = PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nCurBlkHeight);
-    Pel*   pcY = pcYBuf.bufAt(0, 0);
+    Pel* pcY = m_acYuvCurAMLTemplate[1][0];
     const Pel*    rec = recBuf.bufAt(pu.blocks[COMPONENT_Y].pos().offset(-AML_MERGE_TEMPLATE_SIZE, 0));
     for (int k = 0; k < nCurBlkHeight; k++)
     {
@@ -11929,9 +11926,10 @@ void InterPrediction::getBlkAMLRefTemplateSubTMVP(PredictionUnit &pu, PelUnitBuf
     }
     if (m_bAMLTemplateAvailabe[1])
     {
-      CPelUnitBuf srcPred0 = CPelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[0][0], pcBufPredRefLeft.Y()));
-      CPelUnitBuf srcPred1 = CPelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[1][0], pcBufPredRefLeft.Y()));
-      xWeightedAverageY(pu, srcPred0, srcPred1, pcBufPredRefLeft, pu.cu->slice->getSPS()->getBitDepths(),
+      PelUnitBuf pcBufPredRefLeftTranspose = PelUnitBuf(pu.chromaFormat, PelBuf(pcBufPredRefLeft.Y().buf, pcBufPredRefLeft.Y().height, pcBufPredRefLeft.Y().width));
+      CPelUnitBuf srcPred0 = CPelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[0][0], pcBufPredRefLeftTranspose.Y()));
+      CPelUnitBuf srcPred1 = CPelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[1][0], pcBufPredRefLeftTranspose.Y()));
+      xWeightedAverageY(pu, srcPred0, srcPred1, pcBufPredRefLeftTranspose, pu.cu->slice->getSPS()->getBitDepths(),
         pu.cu->slice->clpRngs());
     }
   }
@@ -12250,9 +12248,10 @@ void InterPrediction::getBlkAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBuf
       }
       if (m_bAMLTemplateAvailabe[1])
       {
-        CPelUnitBuf srcPred0 = CPelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[0][0] + offset0, pcBufPredRefLeft.Y()));  // changed
-        CPelUnitBuf srcPred1 = CPelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[1][0] + offset1, pcBufPredRefLeft.Y()));  // changed
-        xWeightedAverageY(pu, srcPred0, srcPred1, pcBufPredRefLeft, pu.cu->slice->getSPS()->getBitDepths(),
+        PelUnitBuf pcBufPredRefLeftTranspose = PelUnitBuf(pu.chromaFormat, PelBuf(pcBufPredRefLeft.Y().buf, pcBufPredRefLeft.Y().height, pcBufPredRefLeft.Y().width));
+        CPelUnitBuf srcPred0 = CPelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[0][0] + offset0, pcBufPredRefLeftTranspose.Y()));  // changed
+        CPelUnitBuf srcPred1 = CPelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[1][0] + offset1, pcBufPredRefLeftTranspose.Y()));  // changed
+        xWeightedAverageY(pu, srcPred0, srcPred1, pcBufPredRefLeftTranspose, pu.cu->slice->getSPS()->getBitDepths(),
                           pu.cu->slice->clpRngs());
       }
 
@@ -12266,9 +12265,9 @@ void InterPrediction::getBlkAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBuf
       }
       if (m_bAMLTemplateAvailabe[1])
       {
-        CPelUnitBuf srcPred0 = CPelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[0][0], pcBufPredRefLeft.Y()));
-        CPelUnitBuf srcPred1 = CPelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[1][0], pcBufPredRefLeft.Y()));
-        xWeightedAverageY(pu, srcPred0, srcPred1, pcBufPredRefLeft, pu.cu->slice->getSPS()->getBitDepths(),
+        CPelUnitBuf srcPred0 = CPelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[0][0], pcBufPredRefLeftTranspose.Y()));
+        CPelUnitBuf srcPred1 = CPelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[1][0], pcBufPredRefLeftTranspose.Y()));
+        xWeightedAverageY(pu, srcPred0, srcPred1, pcBufPredRefLeftTranspose, pu.cu->slice->getSPS()->getBitDepths(),
                           pu.cu->slice->clpRngs());
       }
 #endif
@@ -12285,6 +12284,8 @@ void InterPrediction::getBlkAMLRefTemplateAlt(PredictionUnit &pu, PelUnitBuf &pc
   const int verShift = (lumaShift + ::getComponentScaleY(COMPONENT_Y, pu.chromaFormat));
 
   CHECK(pu.refIdx[REF_PIC_LIST_0] < 0 || pu.refIdx[REF_PIC_LIST_1] < 0, "the function only deals with MMVD bi-pred reordering");
+
+  PelUnitBuf pcBufPredRefLeftTranspose = PelUnitBuf(pu.chromaFormat, PelBuf(pcBufPredRefLeft.Y().buf, pcBufPredRefLeft.Y().height, pcBufPredRefLeft.Y().width));
 
   const int biShift = IF_INTERNAL_PREC - pu.cu->slice->clpRng(COMPONENT_Y).bd;
   const Pel biOffset = -IF_INTERNAL_OFFS;
@@ -12344,7 +12345,8 @@ void InterPrediction::getBlkAMLRefTemplateAlt(PredictionUnit &pu, PelUnitBuf &pc
       if (pu.cu->licFlag)
       {
         xPredInterBlk(COMPONENT_Y, pu, picRef, mvLeft, pcMbBuf, false, pu.cu->slice->clpRng(COMPONENT_Y), false, false, scalingRatio, 0, 0, false, NULL, 0, true, true, mvCurr);
-        pcMbBuf.bufs[0].linearTransform(1, -biShift, biOffset, false, pu.cu->slice->clpRng(COMPONENT_Y));
+        PelUnitBuf pcMbBufTranspose = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[refList][0] + offsetA, pcBufPredRefLeftTranspose.Y())); // changed
+        pcMbBufTranspose.bufs[0].linearTransform(1, -biShift, biOffset, false, pu.cu->slice->clpRng(COMPONENT_Y));
       }
       else
       {
@@ -12371,9 +12373,9 @@ void InterPrediction::getBlkAMLRefTemplateAlt(PredictionUnit &pu, PelUnitBuf &pc
   }
   if (m_bAMLTemplateAvailabe[1])
   {
-    CPelUnitBuf srcPred0 = CPelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[0][0] + offset0, pcBufPredRefLeft.Y()));  // changed
-    CPelUnitBuf srcPred1 = CPelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[1][0] + offset1, pcBufPredRefLeft.Y()));  // changed
-    xWeightedAverageY(pu, srcPred0, srcPred1, pcBufPredRefLeft, pu.cu->slice->getSPS()->getBitDepths(), pu.cu->slice->clpRngs());
+    CPelUnitBuf srcPred0 = CPelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[0][0] + offset0, pcBufPredRefLeftTranspose.Y()));  // changed
+    CPelUnitBuf srcPred1 = CPelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[1][0] + offset1, pcBufPredRefLeftTranspose.Y()));  // changed
+    xWeightedAverageY(pu, srcPred0, srcPred1, pcBufPredRefLeftTranspose, pu.cu->slice->getSPS()->getBitDepths(), pu.cu->slice->clpRngs());
   }
 }
 #endif
@@ -12494,7 +12496,7 @@ void  InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMer
       PelUnitBuf pcBufPredRefTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
       PelUnitBuf pcBufPredCurTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
       PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
-      PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
+      PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], nHeight, AML_MERGE_TEMPLATE_SIZE)));
 
 #if RPR_ENABLE
       bool bRefIsRescaled = false;
@@ -12844,7 +12846,7 @@ bool InterPrediction::fillAffAMLRefTemplateCache( PredictionUnit& pu, int refLis
   }
 
   PelUnitBuf pcBufPredRefTop  = PelUnitBuf(pu.chromaFormat, PelBuf(refAboveTemplate, topSize)); 
-  PelUnitBuf pcBufPredRefLeft = PelUnitBuf(pu.chromaFormat, PelBuf(refLeftTemplate, leftSize));
+  PelUnitBuf pcBufPredRefLeftTranspose = PelUnitBuf(pu.chromaFormat, PelBuf(refLeftTemplate, leftSize.height, leftSize.width));
 
 #if INTER_LIC
   if (pu.cu->licFlag && 0)
@@ -12862,7 +12864,7 @@ bool InterPrediction::fillAffAMLRefTemplateCache( PredictionUnit& pu, int refLis
     }
     if (m_bAMLTemplateAvailabe[1])
     {
-      PelBuf& dstBuf = pcBufPredRefLeft.bufs[0];
+      PelBuf& dstBuf = pcBufPredRefLeftTranspose.bufs[0];
       const ClpRng& clpRng = pu.cu->cs->slice->clpRng(COMPONENT_Y);
       dstBuf.linearTransform(scale[0], LICshift[0], offset[0], true, clpRng);
     }
@@ -12881,12 +12883,12 @@ bool InterPrediction::fillAffAMLRefTemplateCache( PredictionUnit& pu, int refLis
 
   if (m_bAMLTemplateAvailabe[1])
   { //left
-    std::copy_n(pcBufPredRefLeft.bufs[0].buf, pcBufPredRefLeft.bufs[0].height, m_acYuvRefAMLBiPredTemplateIdMotionCache[pu.refIdx[refList]][refList][candIdx][1]);
+    std::copy_n(pcBufPredRefLeftTranspose.bufs[0].buf, pcBufPredRefLeftTranspose.bufs[0].width, m_acYuvRefAMLBiPredTemplateIdMotionCache[pu.refIdx[refList]][refList][candIdx][1]);
 
     const int biShift = IF_INTERNAL_PREC - bitDepth;
     const Pel biOffset = -IF_INTERNAL_OFFS;
     ClpRng    clpRngDummy;
-    pcBufPredRefLeft.bufs[0].linearTransform(1, -biShift, biOffset, false, clpRngDummy);
+    pcBufPredRefLeftTranspose.bufs[0].linearTransform(1, -biShift, biOffset, false, clpRngDummy);
   }
 #endif
 
@@ -12943,9 +12945,9 @@ bool InterPrediction::getAffAMLRefTemplateMvdPredUni( PredictionUnit& pu, PelUni
     }
     if ( m_bAMLTemplateAvailabe[1] && (iAbove1Left2All3 & 0x2) != 0 )
     {
-      PelUnitBuf dstBuf = PelUnitBuf(pu.chromaFormat, PelBuf(refLeftTemplate, pcBufPredRefLeft.Y())); //changed
+      PelUnitBuf dstBufTranspose = PelUnitBuf(pu.chromaFormat, PelBuf(refLeftTemplate, pcBufPredRefLeft.Y().height, pcBufPredRefLeft.Y().width)); //changed
       const ClpRng& clpRng = pu.cu->cs->slice->clpRng(COMPONENT_Y);
-      dstBuf.bufs[0].linearTransform(scale, LICshift, offset, true, clpRng);
+      dstBufTranspose.bufs[0].linearTransform(scale, LICshift, offset, true, clpRng);
     }
   }
 #endif
@@ -13209,11 +13211,12 @@ void InterPrediction::getAffAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBuf
       if (m_bAMLTemplateAvailabe[1])
       {
         PelUnitBuf srcPred[2];
+        PelUnitBuf pcBufPredRefLeftTranspose = PelUnitBuf(pu.chromaFormat, PelBuf(pcBufPredRefLeft.Y().buf, pcBufPredRefLeft.Y().height, pcBufPredRefLeft.Y().width));
 #if JVET_AA0093_ENHANCED_MMVD_EXTENSION
         int offset0 = bLoadSave ? posList0 * MAX_CU_SIZE : 0;
         int offset1 = bLoadSave ? posList1 * MAX_CU_SIZE : 0;
-        srcPred[0] = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[0][0] + offset0, pcBufPredRefLeft.Y())); //changed
-        srcPred[1] = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[1][0] + offset1, pcBufPredRefLeft.Y())); //changed
+        srcPred[0] = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[0][0] + offset0, pcBufPredRefLeftTranspose.Y())); //changed
+        srcPred[1] = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[1][0] + offset1, pcBufPredRefLeftTranspose.Y())); //changed
 #else
         srcPred[0] = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[0][0], pcBufPredRefLeft.Y()));
         srcPred[1] = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[1][0], pcBufPredRefLeft.Y()));
@@ -13255,7 +13258,7 @@ void InterPrediction::getAffAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBuf
             dstBuf.linearTransform(1, -biShift, biOffset, false, clpRngDummy);
           }
         }
-        xWeightedAverageY(pu, srcPred[0], srcPred[1], pcBufPredRefLeft, pu.cu->slice->getSPS()->getBitDepths(),
+        xWeightedAverageY(pu, srcPred[0], srcPred[1], pcBufPredRefLeftTranspose, pu.cu->slice->getSPS()->getBitDepths(),
                           pu.cu->slice->clpRngs());
       }
     }
@@ -13303,7 +13306,7 @@ void InterPrediction::getAffAMLRefTemplateAlt(PredictionUnit &pu, PelUnitBuf &pc
       refAboveTemplate += (refList == 0 ? posList0 : posList1) * MAX_CU_SIZE;// changed
     }
     PelUnitBuf srcAbovePred = PelUnitBuf(pu.chromaFormat, PelBuf(refAboveTemplate, pcBufPredRefTop.Y()));
-    PelUnitBuf srcLeftPred = PelUnitBuf(pu.chromaFormat, PelBuf(refLeftTemplate, pcBufPredRefLeft.Y()));
+    PelUnitBuf srcLeftPred = PelUnitBuf(pu.chromaFormat, PelBuf(refLeftTemplate, pcBufPredRefLeft.Y().height, pcBufPredRefLeft.Y().width));
     int  numTemplate[2] = { 0, 0 };   // 0:Above, 1:Left
 #if JVET_AD0140_MVD_PREDICTION
     xPredAffineTpl<false, 3>(pu, eRefPicList, numTemplate, refLeftTemplate, refAboveTemplate
@@ -13355,9 +13358,10 @@ void InterPrediction::getAffAMLRefTemplateAlt(PredictionUnit &pu, PelUnitBuf &pc
     PelUnitBuf srcPred[2];
     int offset0 = bLoadSave ? posList0 * MAX_CU_SIZE : 0;
     int offset1 = bLoadSave ? posList1 * MAX_CU_SIZE : 0;
-    srcPred[0] = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[0][0] + offset0, pcBufPredRefLeft.Y())); //changed
-    srcPred[1] = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[1][0] + offset1, pcBufPredRefLeft.Y())); //changed
-    xWeightedAverageY(pu, srcPred[0], srcPred[1], pcBufPredRefLeft, pu.cu->slice->getSPS()->getBitDepths(),
+    PelUnitBuf pcBufPredRefLeftTranspose = PelUnitBuf(pu.chromaFormat, PelBuf(pcBufPredRefLeft.Y().buf, pcBufPredRefLeft.Y().height, pcBufPredRefLeft.Y().width));
+    srcPred[0] = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[0][0] + offset0, pcBufPredRefLeftTranspose.Y())); //changed
+    srcPred[1] = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[1][0] + offset1, pcBufPredRefLeftTranspose.Y())); //changed
+    xWeightedAverageY(pu, srcPred[0], srcPred[1], pcBufPredRefLeftTranspose, pu.cu->slice->getSPS()->getBitDepths(),
       pu.cu->slice->clpRngs());
   }
 }
@@ -13419,7 +13423,7 @@ void  InterPrediction::adjustIBCMergeCandidates(PredictionUnit &pu, MergeCtx& mr
     PelBuf pcBufPredRefTop = PelBuf(m_acYuvRefAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE);
     PelBuf pcBufPredCurTop = PelBuf(m_acYuvCurAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE);
     PelBuf pcBufPredRefLeft = PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight);
-    PelBuf pcBufPredCurLeft = PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight);
+    PelBuf pcBufPredCurLeft = PelBuf(m_acYuvCurAMLTemplate[1][0], nHeight, AML_MERGE_TEMPLATE_SIZE);
 
     getIBCAMLRefTemplate(pu, nWidth, nHeight);
 
@@ -13580,7 +13584,7 @@ void  InterPrediction::adjustIBCMergeCandidates(PredictionUnit &pu, MergeCtx& mr
     PelBuf pcBufPredRefTop = PelBuf(m_acYuvRefAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE);
     PelBuf pcBufPredCurTop = PelBuf(m_acYuvCurAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE);
     PelBuf pcBufPredRefLeft = PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight);
-    PelBuf pcBufPredCurLeft = PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight);
+    PelBuf pcBufPredCurLeft = PelBuf(m_acYuvCurAMLTemplate[1][0], nHeight, AML_MERGE_TEMPLATE_SIZE);
 
 #if JVET_AC0112_IBC_LIC
 #if JVET_AA0061_IBC_MBVD
@@ -13692,7 +13696,7 @@ void  InterPrediction::adjustAffineMergeCandidatesOneGroup(PredictionUnit &pu, A
       PelUnitBuf pcBufPredRefTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
       PelUnitBuf pcBufPredCurTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
       PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
-      PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
+      PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], nHeight, AML_MERGE_TEMPLATE_SIZE)));
 
 #if RPR_ENABLE
       bool bRefIsRescaled = false;
@@ -14043,9 +14047,9 @@ int InterPrediction::selectOBMCmode(PredictionUnit &pu, PredictionUnit &subblock
 
   // Process left boundary
   PelUnitBuf pcBufPredCurLeftTmp =
-    (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], TM_OBMC_TEMPLATE_SIZE, pu.lumaSize().height)));
+    (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], pu.lumaSize().height, TM_OBMC_TEMPLATE_SIZE)));
   PelUnitBuf pcBufPredCurLeft =
-    pcBufPredCurLeftTmp.subBuf(UnitArea(pu.chromaFormat, Area(0, off.y, TM_OBMC_TEMPLATE_SIZE, nHeight)));
+    pcBufPredCurLeftTmp.subBuf(UnitArea(pu.chromaFormat, Area(off.y, 0, nHeight, TM_OBMC_TEMPLATE_SIZE)));
   PelUnitBuf pcBufPredRefLeft0 =
     (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplateOBMC[0][0], TM_OBMC_TEMPLATE_SIZE, nHeight)));
   PelUnitBuf pcBufPredRefLeft1 =
@@ -14392,26 +14396,24 @@ void InterPrediction::getBlkOBMCRefTemplate(PredictionUnit &subblockPu, PelUnitB
 #endif
                         , true);
 #endif
+          PelUnitBuf pcBufPredRefLeftTranspose = PelUnitBuf(subblockPu.chromaFormat, PelBuf(pcBufPredRef.Y().buf, pcBufPredRef.Y().height, pcBufPredRef.Y().width));
 #if JVET_AD0213_LIC_IMP
           if (subblockPu.cu->licFlag && !subblockPu.cs->sps->getRprEnabledFlag())
           {
             const ClpRng& clpRng = subblockPu.cu->slice->clpRng(COMPONENT_Y);
             const Pel biOffset = -IF_INTERNAL_OFFS;
             const int biShift = IF_INTERNAL_PREC - clpRng.bd;
-            pcMbBuf.bufs[COMPONENT_Y].toLast(clpRng);
-            pcMbBuf.bufs[COMPONENT_Y].linearTransform(subblockPu.cu->licScale[refList][COMPONENT_Y], m_LICShift, subblockPu.cu->licOffset[refList][COMPONENT_Y], true, clpRng);
-            pcMbBuf.bufs[COMPONENT_Y].linearTransform(1, -biShift, biOffset, false, clpRng);
+            PelUnitBuf pcMbBufTranspose = PelUnitBuf(subblockPu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[refList][0], pcBufPredRefLeftTranspose.Y()));
+            pcMbBufTranspose.bufs[COMPONENT_Y].toLast(clpRng);
+            pcMbBufTranspose.bufs[COMPONENT_Y].linearTransform(subblockPu.cu->licScale[refList][COMPONENT_Y], m_LICShift, subblockPu.cu->licOffset[refList][COMPONENT_Y], true, clpRng);
+            pcMbBufTranspose.bufs[COMPONENT_Y].linearTransform(1, -biShift, biOffset, false, clpRng);
           }
 #endif
           if (refList == 1)
           {
-            CPelUnitBuf srcPred0 =
-              CPelUnitBuf(subblockPu.chromaFormat,
-                          PelBuf(m_acYuvRefLeftTemplate[0][0], pcBufPredRef.Y()));
-            CPelUnitBuf srcPred1 =
-              CPelUnitBuf(subblockPu.chromaFormat,
-                          PelBuf(m_acYuvRefLeftTemplate[1][0], pcBufPredRef.Y()));
-            xOBMCWeightedAverageY(subblockPu, srcPred0, srcPred1, pcBufPredRef,
+            CPelUnitBuf srcPred0 = CPelUnitBuf(subblockPu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[0][0], pcBufPredRefLeftTranspose.Y()));
+            CPelUnitBuf srcPred1 = CPelUnitBuf(subblockPu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[1][0], pcBufPredRefLeftTranspose.Y()));
+            xOBMCWeightedAverageY(subblockPu, srcPred0, srcPred1, pcBufPredRefLeftTranspose,
                                   subblockPu.cu->slice->getSPS()->getBitDepths(), subblockPu.cu->slice->clpRngs(),
                                   tryMi);
           }
@@ -22787,7 +22789,7 @@ void InterPrediction::deriveMVDCandVecFromMotionInforPred(const PredictionUnit &
 #if JVET_AD0140_MVD_PREDICTION
       for (int i = 0; i < miPredList.size(); ++i)
       {
-        if (miPredList[i].refIdx[eRefPicList] == pu.refIdx[eRefPicList] && miPredList[i].interDir == pu.interDir)
+        if (miPredList[i].interDir == pu.interDir && miPredList[i].refIdx[eRefPicList] == pu.refIdx[eRefPicList])
         {
           miPredListSub.push_back(i);
         }
@@ -22875,7 +22877,7 @@ void InterPrediction::deriveAffineMVDCandVecFromMotionInforPred(const Prediction
               PelUnitBuf pcBufPredRefTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
               PelUnitBuf pcBufPredCurTop  = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
               PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
-              //PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
+              //PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], nHeight, AML_MERGE_TEMPLATE_SIZE)));
 
               PredictionUnit tmpPU = pu;
 
@@ -22914,7 +22916,7 @@ void InterPrediction::deriveAffineMVDCandVecFromMotionInforPred(const Prediction
               PelUnitBuf pcBufPredRefTop  = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
               //PelUnitBuf pcBufPredCurTop  = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
               PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
-              PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
+              PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], nHeight, AML_MERGE_TEMPLATE_SIZE)));
 
               PredictionUnit tmpPU = pu;
 
@@ -23052,7 +23054,7 @@ void InterPrediction::reorderRefCombList(PredictionUnit &pu, std::vector<RefList
   PelUnitBuf pcBufPredRefTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
   PelUnitBuf pcBufPredCurTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
   PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
-  PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
+  PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], nHeight, AML_MERGE_TEMPLATE_SIZE)));
   PredictionUnit tmpPU = pu;
 #if JVET_AD0140_MVD_PREDICTION
   tmpPU.mvdSuffixInfo = pu.mvdSuffixInfo;
@@ -23189,7 +23191,7 @@ void InterPrediction::reorderRefCombList(PredictionUnit &pu, std::vector<RefList
 
           if (res)
           {
-            if ((sideOrder[sideIdx] == 0 && uiCost < refListComb[idx].cost && m_bAMLTemplateAvailabe[0]) || pu.cu->licFlag )
+            if ((sideOrder[sideIdx] == 0 && uiCost < refListComb[idx].cost && m_bAMLTemplateAvailabe[0]) || (pu.cu->licFlag && m_bAMLTemplateAvailabe[0]))
             {
               if (!pu.cu->licFlag)
               {
@@ -23208,7 +23210,7 @@ void InterPrediction::reorderRefCombList(PredictionUnit &pu, std::vector<RefList
               bAboveCostCalculated = true;
             }
 
-            if ((sideOrder[sideIdx] == 1 && uiCost < refListComb[idx].cost && m_bAMLTemplateAvailabe[1]) || pu.cu->licFlag )
+            if ((sideOrder[sideIdx] == 1 && uiCost < refListComb[idx].cost && m_bAMLTemplateAvailabe[1]) || (pu.cu->licFlag && m_bAMLTemplateAvailabe[1]))
             {
               if (!pu.cu->licFlag)
               {
@@ -23779,7 +23781,7 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
   PelUnitBuf pcBufPredRefTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
   PelUnitBuf pcBufPredCurTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
   PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
-  PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
+  PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], nHeight, AML_MERGE_TEMPLATE_SIZE)));
   PredictionUnit tmpPU = pu;
 #if JVET_AD0140_MVD_PREDICTION
   tmpPU.mvdSuffixInfo = pu.mvdSuffixInfo;
@@ -24143,11 +24145,12 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
               }
               if (m_bAMLTemplateAvailabe[1])
               {
+                PelUnitBuf pcBufPredRefLeftTranspose = PelUnitBuf(pu.chromaFormat, PelBuf(pcBufPredRefLeft.Y().buf, pcBufPredRefLeft.Y().height, pcBufPredRefLeft.Y().width));
 #if JVET_AD0213_LIC_IMP
                 if (pu.cu->licFlag)
                 {
-                  PelBuf dstRefLeftTemplate0(m_pcLICRefLeftTemplate[0][0], pcBufPredRefLeft.Y());
-                  PelBuf dstRefLeftTemplate1(m_pcLICRefLeftTemplate[1][0], pcBufPredRefLeft.Y());
+                  PelBuf dstRefLeftTemplate0(m_pcLICRefLeftTemplate[0][0], pcBufPredRefLeftTranspose.Y());
+                  PelBuf dstRefLeftTemplate1(m_pcLICRefLeftTemplate[1][0], pcBufPredRefLeftTranspose.Y());
 
                   srcPred[0] = PelUnitBuf(pu.chromaFormat, dstRefLeftTemplate0);
                   srcPred[1] = PelUnitBuf(pu.chromaFormat, dstRefLeftTemplate1);
@@ -24168,11 +24171,11 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
                 else
 #endif
                 {
-                  srcPred[0] = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLBiPredTemplateCache[tmpPU.refIdx[0]][0][i][1], pcBufPredRefLeft.Y()));
-                  srcPred[1] = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLBiPredTemplateCache[tmpPU.refIdx[1]][1][j][1], pcBufPredRefLeft.Y()));
+                  srcPred[0] = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLBiPredTemplateCache[tmpPU.refIdx[0]][0][i][1], pcBufPredRefLeftTranspose.Y()));
+                  srcPred[1] = PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLBiPredTemplateCache[tmpPU.refIdx[1]][1][j][1], pcBufPredRefLeftTranspose.Y()));
                 }
                 CHECK(tmpPU.refIdx[0] < 0 || tmpPU.refIdx[1] < 0, "not a bipred");
-                xWeightedAverageY(pu, srcPred[0], srcPred[1], pcBufPredRefLeft, pu.cu->slice->getSPS()->getBitDepths(), pu.cu->slice->clpRngs());
+                xWeightedAverageY(pu, srcPred[0], srcPred[1], pcBufPredRefLeftTranspose, pu.cu->slice->getSPS()->getBitDepths(), pu.cu->slice->clpRngs());
               }
             }
 #else
@@ -24568,7 +24571,7 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
         {
 #if JVET_AD0140_MVD_PREDICTION
           Pel weightedLeftBuf[MAX_CU_SIZE];
-          PelUnitBuf pcBufPredRefLeft = ( PelUnitBuf(pu.chromaFormat, PelBuf(uniLIC ? uniLeftBuf : weightedLeftBuf, AML_MERGE_TEMPLATE_SIZE, nHeight)));
+          PelUnitBuf pcBufPredRefLeft = ( PelUnitBuf(pu.chromaFormat, PelBuf(uniLIC ? uniLeftBuf : weightedLeftBuf, nHeight, AML_MERGE_TEMPLATE_SIZE)));
 
           if (!pu.cu->licFlag || !uniLIC)
           {
@@ -26426,7 +26429,7 @@ void InterPrediction::defineSignHypMatchAffine(PredictionUnit& pu, const RefPicL
     PelUnitBuf pcBufPredRefTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
     PelUnitBuf pcBufPredCurTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
     PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
-    PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
+    PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], nHeight, AML_MERGE_TEMPLATE_SIZE)));
     PredictionUnit tmpPU = pu;
     AMVPInfo amvpInfo;
     PU::fillMvpCand(tmpPU, REF_PIC_LIST_0, tmpPU.refIdx[REF_PIC_LIST_0], amvpInfo
@@ -27242,8 +27245,8 @@ void InterPrediction::defineSignHypMatchAffine(PredictionUnit& pu, const RefPicL
 #if JVET_AD0213_LIC_IMP
       PelUnitBuf pcBufPredRefTop = (PelUnitBuf(pu.chromaFormat, PelBuf(refAboveTemplate, width, 1)));
       PelUnitBuf pcBufPredCurTop = (PelUnitBuf(pu.chromaFormat, PelBuf(recAboveTemplate, width, 1)));
-      PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(refLeftTemplate, 1, height)));
-      PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(recLeftTemplate, 1, height)));
+      PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(refLeftTemplate, height, 1)));
+      PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(recLeftTemplate, height, 1)));
 
       if (pu.cu->licFlag)
       {
@@ -30631,9 +30634,10 @@ std::vector<Mv> InterPrediction::deriveMVDFromMVSDIdxAffineSI(PredictionUnit& pu
       }
       if (m_bAMLTemplateAvailabe[1])
       {
-        CPelUnitBuf srcPred0 = CPelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[0][0], pcBufPredRefLeft.Y()));
-        CPelUnitBuf srcPred1 = CPelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[1][0], pcBufPredRefLeft.Y()));
-        xWeightedAverageY(pu, srcPred0, srcPred1, pcBufPredRefLeft, pu.cu->slice->getSPS()->getBitDepths(),
+        PelUnitBuf pcBufPredRefLeftTranspose = PelUnitBuf(pu.chromaFormat, PelBuf(pcBufPredRefLeft.Y().buf, pcBufPredRefLeft.Y().height, pcBufPredRefLeft.Y().width));
+        CPelUnitBuf srcPred0 = CPelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[0][0], pcBufPredRefLeftTranspose.Y()));
+        CPelUnitBuf srcPred1 = CPelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefLeftTemplate[1][0], pcBufPredRefLeftTranspose.Y()));
+        xWeightedAverageY(pu, srcPred0, srcPred1, pcBufPredRefLeftTranspose, pu.cu->slice->getSPS()->getBitDepths(),
           pu.cu->slice->clpRngs());
       }
     }
