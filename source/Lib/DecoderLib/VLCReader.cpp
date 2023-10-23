@@ -2450,6 +2450,20 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
     READ_FLAG(uiCode, "sps_affine_nontranslation_parameter_refinement");       pcSPS->setUseAffineParaRefinement(uiCode != 0);
 #endif
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+    if (pcSPS->getTMToolsEnableFlag())
+    {
+#endif
+    READ_FLAG(uiCode, "sps_tm_affine_flag");       pcSPS->setUseAffineTM(uiCode != 0);
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+    }
+    else
+    {
+      pcSPS->setUseAffineTM( false );
+    }
+#endif
+#endif
   }
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   pcSPS->setUseTMMMVD(false);

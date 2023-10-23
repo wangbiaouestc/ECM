@@ -394,6 +394,9 @@ protected:
   bool      m_sbTmvpEnableFlag;
   bool      m_Affine;
   bool      m_AffineType;
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+  bool      m_useAffineTM;
+#endif
 #if AFFINE_MMVD
   bool      m_AffineMmvdMode;
 #endif

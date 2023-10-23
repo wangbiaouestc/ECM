@@ -1031,6 +1031,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("MMVD",                                            m_MMVD,                                            true, "Enable Merge mode with Motion Vector Difference (0:off, 1:on)  [default: 1]")
   ("Affine",                                          m_Affine,                                         false, "Enable affine prediction (0:off, 1:on)  [default: off]")
   ("AffineType",                                      m_AffineType,                                      true,  "Enable affine type prediction (0:off, 1:on)  [default: on]" )
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+  ("AffineTM",                                        m_useAffineTM,                                     true, "Enable TM-based subblock motion refinement (0:off, 1:on)  [default: on]")
+#endif
 #if AFFINE_MMVD
   ("AffineMMVD",                                      m_AffineMmvdMode,                                  true, "Affine MMVD mode (0:off, 1:on)  [default: on]" )
 #endif
@@ -5435,6 +5438,9 @@ void EncAppCfg::xPrintParameter()
     m_AffineAmvrEncOpt = m_AffineAmvr ? m_AffineAmvrEncOpt : false;
     msg( VERBOSE, "AffineAmvrEncOpt:%d ", m_AffineAmvrEncOpt );
     msg(VERBOSE, "AffineAmvp:%d ", m_AffineAmvp);
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+    msg(VERBOSE, "AffineTM:%d ", m_useAffineTM);
+#endif
     msg(VERBOSE, "DMVR:%d ", m_DMVR);
 #if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
     msg(VERBOSE, "AffineParameterRefinement:%d ", m_affineParaRefinement);
