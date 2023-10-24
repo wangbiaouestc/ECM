@@ -1817,6 +1817,29 @@ static inline uint32_t getIndexMappingTableToSortedArray1D(InputValueType (&in)[
 }
 #endif
 
+#if JVET_Z0150_MEMORY_USAGE_PRINT
+#ifdef __linux
+static inline int getProcStatusValue(const char* key)
+{
+  FILE* file = fopen("/proc/self/status", "r");
+  int result = -1;
+  char line[128];
+
+  int len = strlen(key);
+  while (fgets(line, 128, file) != nullptr)
+  {
+    if (strncmp(line, key, len) == 0)
+    {
+      result = atoi(line+len);
+      break;
+    }
+  }
+  fclose(file);
+  return result;
+}
+#endif
+#endif
+
 //CASE-BREAK for breakpoints
 #if defined ( _MSC_VER ) && defined ( _DEBUG )
 #define _CASE(_x) if(_x)
