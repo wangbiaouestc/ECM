@@ -2924,6 +2924,28 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
       }
 
       pcSlice->setCheckLDC(bLowDelay);
+#if JVET_AF0128_LIC_MERGE_TM
+      bool bLowDelayB = false;
+      if (pcSlice->isInterB() && bLowDelay)
+      {
+        int min = MAX_INT;
+        for (int k = 0; k < NUM_REF_PIC_LIST_01; k++)
+        {
+          for (iRefIdx = 0; iRefIdx < pcSlice->getNumRefIdx((RefPicList)k); iRefIdx++)
+          {
+            if (pcSlice->getPOC() - pcSlice->getRefPic((RefPicList)k, iRefIdx)->getPOC() < min)
+            {
+              min = pcSlice->getPOC() - pcSlice->getRefPic((RefPicList)k, iRefIdx)->getPOC();
+            }
+          }
+        }
+        if (min == 1)
+        {
+          bLowDelayB = true;
+        }
+      }
+      pcSlice->setCheckLDB(bLowDelayB);
+#endif
     }
 #if JVET_Y0128_NON_CTC
     //---------------

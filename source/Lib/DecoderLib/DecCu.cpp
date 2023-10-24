@@ -2189,6 +2189,16 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
         PU::getInterMMVDMergeCandidates(pu, mrgCtx,
           pu.mmvdMergeIdx
         );
+#if JVET_AF0128_LIC_MERGE_TM
+        if (pu.cs->sps->getUseAML()
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+          && pu.cs->sps->getTMToolsEnableFlag()
+#endif
+          )
+        {
+          m_pcInterPred->adjustMergeCandidatesLicFlag(pu, mrgCtx, fPosBaseIdx);
+        }
+#endif
 #if JVET_AB0079_TM_BCW_MRG
         if (pu.cs->sps->getUseAML()
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
@@ -3291,6 +3301,9 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #endif
 
               PU::getInterMergeCandidates(pu, mrgCtx, 0, -1, &tmvpMergeCandCtx, &namvpMergeCandCtx);
+#if JVET_AF0128_LIC_MERGE_TM
+              m_pcInterPred->adjustMergeCandidatesLicFlag(pu, mrgCtx, pu.mergeIdx);
+#endif
 
 #if TM_MRG && JVET_AA0093_REFINED_MOTION_FOR_ARMC
               tmMergeRefinedMotion = PU::isArmcRefinedMotionEnabled(pu, 2);
@@ -3420,6 +3433,9 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
               PU::getInterMergeCandidates(pu, mrgCtx, 0, pu.cs->sps->getUseAML() && pu.cs->sps->getTMToolsEnableFlag() && (((pu.mergeIdx / ADAPTIVE_SUB_GROUP_SIZE + 1)*ADAPTIVE_SUB_GROUP_SIZE < pu.cs->sps->getMaxNumMergeCand()) || (pu.mergeIdx / ADAPTIVE_SUB_GROUP_SIZE) == 0) ? pu.mergeIdx / ADAPTIVE_SUB_GROUP_SIZE * ADAPTIVE_SUB_GROUP_SIZE + ADAPTIVE_SUB_GROUP_SIZE - 1 : pu.mergeIdx);
 #else
               PU::getInterMergeCandidates(pu, mrgCtx, 0, pu.cs->sps->getUseAML() && (((pu.mergeIdx / ADAPTIVE_SUB_GROUP_SIZE + 1)*ADAPTIVE_SUB_GROUP_SIZE < pu.cs->sps->getMaxNumMergeCand()) || (pu.mergeIdx / ADAPTIVE_SUB_GROUP_SIZE) == 0) ? pu.mergeIdx / ADAPTIVE_SUB_GROUP_SIZE * ADAPTIVE_SUB_GROUP_SIZE + ADAPTIVE_SUB_GROUP_SIZE - 1 : pu.mergeIdx);
+#endif
+#if JVET_AF0128_LIC_MERGE_TM
+              m_pcInterPred->adjustMergeCandidatesLicFlag(pu, mrgCtx, pu.mergeIdx);
 #endif
 #if TM_MRG && JVET_AA0093_REFINED_MOTION_FOR_ARMC
               tmMergeRefinedMotion = PU::isArmcRefinedMotionEnabled(pu, 2);

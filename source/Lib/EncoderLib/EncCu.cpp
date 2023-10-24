@@ -3780,6 +3780,16 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
         ) ? &namvpMergeCandCtx : NULL
 #endif
     );
+#if JVET_AF0128_LIC_MERGE_TM
+    if (pu.cs->sps->getUseAML()
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+      && pu.cs->sps->getTMToolsEnableFlag()
+#endif
+      )
+    {
+      m_pcInterSearch->adjustMergeCandidatesLicFlag(pu, mergeCtx);
+    }
+#endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
     if (sps.getUseAML()
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
@@ -3991,6 +4001,16 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
     bool flag = pu.mmvdMergeFlag;
     pu.mmvdMergeFlag = true;
+#if JVET_AF0128_LIC_MERGE_TM
+    if (pu.cs->sps->getUseAML()
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+      && pu.cs->sps->getTMToolsEnableFlag()
+#endif
+      )
+    {
+      m_pcInterSearch->adjustMergeCandidatesLicFlag(pu, mergeCtxtmp);
+    }
+#endif
 #if JVET_AB0079_TM_BCW_MRG
     if (sps.getUseAML()
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
@@ -4097,6 +4117,16 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
           ) ? &namvpTmMergeCandCtx : NULL
 #endif
       );
+#if JVET_AF0128_LIC_MERGE_TM
+      if (pu.cs->sps->getUseAML()
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+        && pu.cs->sps->getTMToolsEnableFlag()
+#endif
+        )
+      {
+        m_pcInterSearch->adjustMergeCandidatesLicFlag(pu, tmMrgCtx);
+      }
+#endif
 #if JVET_W0090_ARMC_TM
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
       bool tmMergeRefinedMotion = PU::isArmcRefinedMotionEnabled(pu, 2);
@@ -12102,6 +12132,16 @@ void EncCu::xCheckRDCostTMMerge2Nx2N(CodingStructure *&tempCS, CodingStructure *
 
     pu.tmMergeFlag = true;
     PU::getInterMergeCandidates(pu, mergeCtx, 0);
+#if JVET_AF0128_LIC_MERGE_TM
+    if (pu.cs->sps->getUseAML()
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+      && pu.cs->sps->getTMToolsEnableFlag()
+#endif
+      )
+    {
+      m_pcInterSearch->adjustMergeCandidatesLicFlag(pu, mergeCtx);
+    }
+#endif
 #if JVET_W0090_ARMC_TM
     if (sps.getUseAML()
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
