@@ -473,7 +473,11 @@ void CU::saveMotionInHMVP( const CodingUnit& cu, const bool isToBeDone )
     mi.addHypData = pu.addHypData;
 #endif
 #if JVET_AA0070_RRIBC
+#if JVET_AF0079_STORING_INTRATMP
+    if (CU::isIBC(cu) || cu.tmpFlag)
+#else
     if(CU::isIBC(cu))
+#endif
     {
       mi.centerPos.x = cu.lx() + (cu.lwidth() >> 1);
       mi.centerPos.y = cu.ly() + (cu.lheight() >> 1);
@@ -486,14 +490,22 @@ void CU::saveMotionInHMVP( const CodingUnit& cu, const bool isToBeDone )
     const unsigned xBr = pu.cu->Y().width + pu.cu->Y().x;
     const unsigned yBr = pu.cu->Y().height + pu.cu->Y().y;
     bool enableHmvp = ((xBr >> log2ParallelMergeLevel) > (pu.cu->Y().x >> log2ParallelMergeLevel)) && ((yBr >> log2ParallelMergeLevel) > (pu.cu->Y().y >> log2ParallelMergeLevel));
+#if JVET_AF0079_STORING_INTRATMP
+    bool enableInsertion = CU::isIBC(cu) || enableHmvp || cu.tmpFlag;
+#else
     bool enableInsertion = CU::isIBC(cu) || enableHmvp;
+#endif
     if (enableInsertion)
     {
 #if JVET_Z0075_IBC_HMVP_ENLARGE
 #if JVET_Z0118_GDR
       if (isClean)
       {
+#if JVET_AF0079_STORING_INTRATMP
+        if (CU::isIBC(cu) || cu.tmpFlag)
+#else
         if (CU::isIBC(cu))
+#endif
         {
           cu.cs->addMiToLutIBC(cu.cs->motionLut.lutIbc1, mi);
         }
@@ -503,7 +515,11 @@ void CU::saveMotionInHMVP( const CodingUnit& cu, const bool isToBeDone )
         }
       }
 
+#if JVET_AF0079_STORING_INTRATMP
+      if (CU::isIBC(cu) || cu.tmpFlag)
+#else
       if (CU::isIBC(cu))
+#endif
       {
         cu.cs->addMiToLutIBC(cu.cs->motionLut.lutIbc0, mi);
       }

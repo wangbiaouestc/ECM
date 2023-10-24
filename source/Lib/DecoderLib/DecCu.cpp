@@ -513,6 +513,13 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
 #endif
 #endif
         xReconIntraQT( currCU );
+#if JVET_AF0079_STORING_INTRATMP
+        if (currCU.tmpFlag)
+        {
+          bool isIbcSmallBlk = false;
+          CU::saveMotionInHMVP(currCU, isIbcSmallBlk);
+        }
+#endif
 #if JVET_AD0188_CCP_MERGE
         CU::saveModelsInHCCP(currCU);
 #endif
@@ -1725,12 +1732,17 @@ void DecCu::xReconInter(CodingUnit &cu)
       }
     }
 #endif
+#if JVET_AF0079_STORING_INTRATMP
+    bool isIbcSmallBlk = false;
+#else
     bool isIbcSmallBlk = CU::isIBC(cu) && (cu.lwidth() * cu.lheight() <= 16);
+
 #if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
     if (cu.cs->sps->getUseIbcNonAdjCand())
     {
       isIbcSmallBlk = false;
     }
+#endif
 #endif
     CU::saveMotionInHMVP( cu, isIbcSmallBlk );
   }
