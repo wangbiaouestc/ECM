@@ -1588,23 +1588,36 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
   }
 #endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+#if JVET_AF0079_STORING_INTRATMP
+  if ((!slice.isIntra() || slice.getUseIBC() || slice.getSPS()->getUseIntraTMP())
+#else
   if ((!slice.isIntra() || slice.getUseIBC())
+#endif
 #else
   if ((!slice.isIntra() || slice.getSPS()->getIBCFlag())
 #endif
     && partitioner.chType == CHANNEL_TYPE_LUMA
-    && bestCS->cus.size() == 1 && (bestCS->cus.back()->predMode == MODE_INTER || bestCS->cus.back()->predMode == MODE_IBC)
+    && bestCS->cus.size() == 1 && (bestCS->cus.back()->predMode == MODE_INTER || bestCS->cus.back()->predMode == MODE_IBC
+#if JVET_AF0079_STORING_INTRATMP
+          || bestCS->cus.back()->tmpFlag
+#endif
+      )
     && bestCS->area.Y() == (*bestCS->cus.back()).Y()
     )
   {
     const CodingUnit&     cu = *bestCS->cus.front();
 
+#if JVET_AF0079_STORING_INTRATMP
+    bool isIbcSmallBlk = false;
+#else
     bool isIbcSmallBlk = CU::isIBC(cu) && (cu.lwidth() * cu.lheight() <= 16);
+
 #if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
     if(cu.cs->sps->getUseIbcNonAdjCand())
     {
       isIbcSmallBlk = false;
     }
+#endif
 #endif
     CU::saveMotionInHMVP( cu, isIbcSmallBlk );
   }

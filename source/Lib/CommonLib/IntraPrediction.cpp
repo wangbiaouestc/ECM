@@ -12302,6 +12302,35 @@ bool IntraPrediction::generateTMPrediction(Pel *piPred, unsigned int uiStride, i
         m_if.m_filterVer[3][true][true](clpRng, tmp, tmpStride, piPred, uiStride, uiWidth, uiHeight, p, false);
       }
     }
+#if JVET_AF0079_STORING_INTRATMP
+    if (tmpIsSubPel != 0)   
+    {
+      int absDistance = (tmpIsSubPel == 1) ? 8 : (tmpIsSubPel == 2) ? 4 : 12;
+      int xDistance = 0, yDistance = 0;
+      if ((tmpSubPelIdx == LEFT_POS) || (tmpSubPelIdx == ABOVE_LEFT_POS) || (tmpSubPelIdx == LEFT_BOTTOM_POS))
+      {
+        xDistance = -absDistance;
+      }
+      if ((tmpSubPelIdx == RIGHT_POS) || (tmpSubPelIdx == ABOVE_RIGHT_POS) || (tmpSubPelIdx == RIGHT_BOTTOM_POS))
+      {
+        xDistance = absDistance;
+      }
+      if ((tmpSubPelIdx == ABOVE_POS) || (tmpSubPelIdx == ABOVE_LEFT_POS) || (tmpSubPelIdx == ABOVE_RIGHT_POS))
+      {
+        yDistance = -absDistance;
+      }
+      if ((tmpSubPelIdx == BOTTOM_POS) || (tmpSubPelIdx == LEFT_BOTTOM_POS) || (tmpSubPelIdx == RIGHT_BOTTOM_POS))
+      {
+        yDistance = absDistance;
+      }
+      const int iHor = (pX << MV_FRACTIONAL_BITS_INTERNAL) + xDistance;
+      const int iVer = (pY << MV_FRACTIONAL_BITS_INTERNAL) + yDistance;
+      pu.mv[0].set(iHor, iVer);
+
+      pu.bv = pu.mv[0];
+      pu.bv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
+    }
+#endif
   }
 #else
 #if TMP_FAST_ENC
@@ -12347,8 +12376,16 @@ bool IntraPrediction::generateTMPrediction(Pel *piPred, unsigned int uiStride, i
 
   pu.interDir               = 1;
   pu.refIdx[REF_PIC_LIST_0] = MAX_NUM_REF;
+#if JVET_AF0079_STORING_INTRATMP
+  if ((cu->tmpIsSubPel == 0) || (cu->tmpIsSubPel == -1))
+  {
+    pu.mv[0].set(pX << MV_FRACTIONAL_BITS_INTERNAL, pY << MV_FRACTIONAL_BITS_INTERNAL);
+    pu.bv.set(pX, pY);
+  }
+#else
   pu.mv->set(pX << MV_FRACTIONAL_BITS_INTERNAL, pY << MV_FRACTIONAL_BITS_INTERNAL);
   pu.bv.set(pX, pY);
+#endif
 
 #if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
 #if JVET_AD0086_ENHANCED_INTRA_TMP

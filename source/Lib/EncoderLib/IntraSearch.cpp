@@ -7336,11 +7336,21 @@ void IntraSearch::xSelectAMTForFullRD(TransformUnit &tu)
 #if JVET_AD0086_ENHANCED_INTRA_TMP
       CodingUnit *cu         = pu.cu;
       int         pX, pY;
+
       int tmpIdx = cu->tmpFusionFlag ? m_tmpFusionInfo[cu->tmpIdx].tmpFusionIdx : cu->tmpIdx;
       pX = m_tmpXdisp[tmpIdx];
       pY = m_tmpYdisp[tmpIdx];
+#if JVET_AF0079_STORING_INTRATMP
+      if (cu->tmpFusionFlag
+          && ((m_tmpFusionInfo[cu->tmpIdx].tmpFusionNumber < 1) || m_tmpFusionInfo[cu->tmpIdx].bFilter))
+      {
+        pu.mv[0].set(pX << MV_FRACTIONAL_BITS_INTERNAL, pY << MV_FRACTIONAL_BITS_INTERNAL);
+        pu.bv.set(pX, pY);
+      }
+#else
       pu.mv->set(pX << MV_FRACTIONAL_BITS_INTERNAL, pY << MV_FRACTIONAL_BITS_INTERNAL);
       pu.bv.set(pX, pY);
+#endif
 #else
       pu.mv->set(m_tempLibFast.getX() << MV_FRACTIONAL_BITS_INTERNAL, m_tempLibFast.getY() << MV_FRACTIONAL_BITS_INTERNAL);
       pu.bv.set(m_tempLibFast.getX(), m_tempLibFast.getY());
@@ -7586,11 +7596,22 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
 #if JVET_AD0086_ENHANCED_INTRA_TMP
             CodingUnit *cu = pu.cu;
             int pX, pY;
+
             int tmpIdx = cu->tmpFusionFlag ? m_tmpFusionInfo[cu->tmpIdx].tmpFusionIdx : cu->tmpIdx;
             pX = m_tmpXdisp[tmpIdx];
             pY = m_tmpYdisp[tmpIdx];
+#if JVET_AF0079_STORING_INTRATMP
+            if (cu->tmpFusionFlag
+                && ((m_tmpFusionInfo[cu->tmpIdx].tmpFusionNumber < 1) || m_tmpFusionInfo[cu->tmpIdx].bFilter))
+            {
+              pu.mv[0].set(pX << MV_FRACTIONAL_BITS_INTERNAL, pY << MV_FRACTIONAL_BITS_INTERNAL);
+              pu.bv.set(pX, pY);
+            }
+#else
+
             pu.mv->set(pX << MV_FRACTIONAL_BITS_INTERNAL, pY << MV_FRACTIONAL_BITS_INTERNAL);
             pu.bv.set(pX, pY);
+#endif
 #else
             pu.mv->set(m_tempLibFast.getX() << MV_FRACTIONAL_BITS_INTERNAL, m_tempLibFast.getY() << MV_FRACTIONAL_BITS_INTERNAL);
             pu.bv.set(m_tempLibFast.getX(), m_tempLibFast.getY());
