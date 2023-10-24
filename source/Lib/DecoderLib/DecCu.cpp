@@ -2574,6 +2574,57 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
           PU::getAffineMergeCand( pu, affineMergeCtx, pu.mergeIdx );
 #endif
 #endif
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+          int validNum = 0;
+          bool isAdditional = false;
+          int mergeIdx = pu.mergeIdx;
+          if (pu.cs->sps->getUseAffineTM()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+            && pu.cs->sps->getTMToolsEnableFlag()
+#endif
+            && PU::checkAffineTMCondition(pu))
+          {
+            for (uint32_t uiAffMergeCand = 0; uiAffMergeCand < pu.cu->slice->getPicHeader()->getMaxNumAffineMergeCand(); uiAffMergeCand++)
+            {
+              if (affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 0][0].mv == Mv(0, 0) && affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 1][0].mv == Mv(0, 0) &&
+                affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 0][1].mv == Mv(0, 0) && affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 1][1].mv == Mv(0, 0) &&
+                affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 0][2].mv == Mv(0, 0) && affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 1][2].mv == Mv(0, 0)
+                && affineMergeCtx.mergeType[uiAffMergeCand] != MRG_TYPE_SUBPU_ATMVP)
+              {
+                validNum = uiAffMergeCand;
+                break;
+              }
+              if (uiAffMergeCand == pu.cu->slice->getPicHeader()->getMaxNumAffineMergeCand() - 1)
+              {
+                validNum = pu.cu->slice->getPicHeader()->getMaxNumAffineMergeCand();
+              }
+            }
+            if (!pu.afMmvdFlag)
+            {
+              if (pu.mergeIdx > validNum - 1)
+              {
+                isAdditional = true;
+                int value = pu.mergeIdx - validNum;
+                for (uint32_t uiAffMergeCand = 0; uiAffMergeCand < validNum; uiAffMergeCand++)
+                {
+                  if (affineMergeCtx.interDirNeighbours[uiAffMergeCand] != 3 && affineMergeCtx.mergeType[uiAffMergeCand] != MRG_TYPE_SUBPU_ATMVP)
+                  {
+                    value--;
+                    if (value == -1)
+                    {
+                      pu.mergeIdx = uiAffMergeCand;
+                      break;
+                    }
+                  }
+                }
+                if (pu.mergeIdx == mergeIdx)
+                {
+                  isAdditional = false;
+                }
+              }
+            }
+          }
+#endif
           pu.interDir = affineMergeCtx.interDirNeighbours[pu.mergeIdx];
           pu.cu->affineType = affineMergeCtx.affineType[pu.mergeIdx];
           pu.cu->bcwIdx = affineMergeCtx.bcwIdx[pu.mergeIdx];
@@ -2652,11 +2703,48 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
             }
           }
 #endif
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+          if (pu.cs->sps->getUseAffineTM()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+            && pu.cs->sps->getTMToolsEnableFlag()
+#endif
+            && !pu.afMmvdFlag && pu.mergeType != MRG_TYPE_SUBPU_ATMVP && pu.interDir != 3 && !((pu.mergeIdx > validNum - 1) && !isAdditional) && PU::checkAffineTMCondition(pu))
+          {
+            for (int i = 0; i < 3; i++)
+            {
+              m_mvBufBDMVR[0][i].setZero();
+              m_mvBufBDMVR[1][i].setZero();
+            }
+            m_pcInterPred->setBdmvrSubPuMvBuf(m_mvBufBDMVR[0], m_mvBufBDMVR[1]);
+            pu.bdmvrRefine = false;
+
+            if (!affineMergeCtx.xCheckSimilarMotion(pu.mergeIdx, PU::getBDMVRMvdThreshold(pu)))
+            {
+              m_pcInterPred->processTM4Affine(pu, affineMergeCtx, isAdditional ? 0 : -1, false);
+              pu.mvAffi[0][0] += m_mvBufBDMVR[0][0];
+              pu.mvAffi[0][1] += m_mvBufBDMVR[0][0];
+              pu.mvAffi[0][2] += m_mvBufBDMVR[0][0];
+              pu.mvAffi[1][0] += m_mvBufBDMVR[1][0];
+              pu.mvAffi[1][1] += m_mvBufBDMVR[1][0];
+              pu.mvAffi[1][2] += m_mvBufBDMVR[1][0];
+            }
+          }
+#endif
           PU::spanMotionInfo(pu, mrgCtx
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
             , pu.colIdx
 #endif
           );
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+          if (pu.cs->sps->getUseAffineTM()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+            && pu.cs->sps->getTMToolsEnableFlag()
+#endif
+            && PU::checkAffineTMCondition(pu))
+          {
+            pu.mergeIdx = mergeIdx;
+          }
+#endif
         }
 #if JVET_X0141_CIIP_TIMD_TM && TM_MRG
         else if (pu.ciipFlag && pu.tmMergeFlag)

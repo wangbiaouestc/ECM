@@ -12411,7 +12411,28 @@ bool PU::checkBDMVRCpmvRefinementPuUsage(const PredictionUnit& pu)
 }
 #endif
 
-
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+bool PU::checkAffineTMCondition(const PredictionUnit& pu)
+{
+  Slice &pcSlice = *pu.cu->slice;
+  int min = 0;
+  if (pcSlice.getSliceType() == B_SLICE && pu.cu->slice->getCheckLDC())
+  {
+    min = MAX_INT;
+    for (int k = 0; k < NUM_REF_PIC_LIST_01; k++)
+    {
+      for (int iRefIdx = 0; iRefIdx < pcSlice.getNumRefIdx((RefPicList)k); iRefIdx++)
+      {
+        if (pcSlice.getPOC() - pcSlice.getRefPic((RefPicList)k, iRefIdx)->getPOC() < min)
+        {
+          min = pcSlice.getPOC() - pcSlice.getRefPic((RefPicList)k, iRefIdx)->getPOC();
+        }
+      }
+    }
+  }
+  return (min > 1) || !pu.cu->slice->getCheckLDC();
+}
+#endif
 #if MULTI_PASS_DMVR
 #if JVET_AE0046_BI_GPM
 bool PU::checkBDMVRCondition(const PredictionUnit& pu, bool disregardGpmFlag)
@@ -17020,7 +17041,9 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
         }
 #endif
 #if JVET_Z0139_NA_AFF && JVET_W0090_ARMC_TM
-#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION && JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+        isAvailableSubPu = getInterMergeSubPuMvpCand(pu, mrgCtx, tmpLICFlag, 0, false, index, mrgCtxIn[colFrameIdx], colFrameIdx);
+#elif JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
         isAvailableSubPu = getInterMergeSubPuMvpCand(pu, mrgCtx, tmpLICFlag, 0, index, mrgCtxIn[colFrameIdx], colFrameIdx);
 #else
         isAvailableSubPu = getInterMergeSubPuMvpCand(pu, mrgCtx, tmpLICFlag, pos, (!isZeroCandIdx && !cs.pcv->isEncoder) ? 1 : 0);
@@ -17070,6 +17093,63 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
             return;
           }
         }
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT && JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+        if (colFrameIdx == 0 && index == 0)
+        {
+          PredictionUnit puTemp = pu;
+
+          puTemp.cu->bcwIdx = mrgCtxIn[colFrameIdx].bcwIdx[index];
+#if INTER_LIC
+          puTemp.cu->licFlag = mrgCtxIn[colFrameIdx].licFlags[index];
+#endif
+          puTemp.mv[0] = mrgCtxIn[colFrameIdx].mvFieldNeighbours[(index << 1) + 0].mv;
+          puTemp.mv[1] = mrgCtxIn[colFrameIdx].mvFieldNeighbours[(index << 1) + 1].mv;
+          puTemp.refIdx[0] = mrgCtxIn[colFrameIdx].mvFieldNeighbours[(index << 1) + 0].refIdx;
+          puTemp.refIdx[1] = mrgCtxIn[colFrameIdx].mvFieldNeighbours[(index << 1) + 1].refIdx;
+          puTemp.interDir = mrgCtxIn[colFrameIdx].interDirNeighbours[index];
+          m_pcInterSearch->deriveSubTmvpTMMv2Pel(puTemp, 2);
+          mrgCtxIn[colFrameIdx].mvFieldNeighbours[(index << 1) + 0].mv = puTemp.mv[0];
+          mrgCtxIn[colFrameIdx].mvFieldNeighbours[(index << 1) + 1].mv = puTemp.mv[1];
+
+          isAvailableSubPu = getInterMergeSubPuMvpCand(pu, mrgCtx, tmpLICFlag, 0, true, index, mrgCtxIn[colFrameIdx], colFrameIdx);
+          if (isAvailableSubPu)
+          {
+            for (int mvNum = 0; mvNum < 3; mvNum++)
+            {
+              affMrgCtx.mvFieldNeighbours[(affMrgCtx.numValidMergeCand << 1) + 0][mvNum].setMvField(mrgCtx.mvFieldNeighbours[(pos << 1) + 0].mv, mrgCtx.mvFieldNeighbours[(pos << 1) + 0].refIdx);
+              affMrgCtx.mvFieldNeighbours[(affMrgCtx.numValidMergeCand << 1) + 1][mvNum].setMvField(mrgCtx.mvFieldNeighbours[(pos << 1) + 1].mv, mrgCtx.mvFieldNeighbours[(pos << 1) + 1].refIdx);
+            }
+            affMrgCtx.interDirNeighbours[affMrgCtx.numValidMergeCand] = mrgCtx.interDirNeighbours[pos];
+
+            affMrgCtx.affineType[affMrgCtx.numValidMergeCand] = AFFINE_MODEL_NUM;
+            affMrgCtx.mergeType[affMrgCtx.numValidMergeCand] = MRG_TYPE_SUBPU_ATMVP;
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+            affMrgCtx.colIdx[affMrgCtx.numValidMergeCand] = 3;
+#endif
+#if AFFINE_MMVD
+            mrgCandIdx += (isAfMmvd && mrgCandIdx >= 0 ? 1 : 0);
+#endif
+            if (affMrgCtx.numValidMergeCand == mrgCandIdx)
+            {
+              return;
+            }
+
+            affMrgCtx.numValidMergeCand++;
+
+#if JVET_Z0139_NA_AFF && JVET_W0090_ARMC_TM
+            if (isZeroCandIdx && !cs.pcv->isEncoder)
+            {
+              return;
+            }
+#endif
+            // early termination
+            if (affMrgCtx.numValidMergeCand == maxNumAffineMergeCand)
+            {
+              return;
+            }
+          }
+        }
+#endif
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
       }
     }
@@ -19675,6 +19755,9 @@ void PU::getTMVPCandOpt(const PredictionUnit &pu, RefPicList refList, int refIdx
     }
 #endif
 bool PU::getInterMergeSubPuMvpCand(const PredictionUnit &pu, MergeCtx& mrgCtx, bool& LICFlag, const int count
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION && JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+  , bool isRefined
+#endif
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
   , int subIdx, MergeCtx mergeCtxIn
   , int col
@@ -19818,7 +19901,19 @@ bool PU::getInterMergeSubPuMvpCand(const PredictionUnit &pu, MergeCtx& mrgCtx, b
     int yOff = (puHeight >> 1) + tempY;
 
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+    MotionBuf *mb;
+    if (isRefined)
+    {
+      mb = &(mrgCtx.subPuMvpMiBuf[3]);
+    }
+    else
+    {
+      mb = &(mrgCtx.subPuMvpMiBuf[(subIdx << 1) + col]);
+    }
+#else
     MotionBuf &mb = mrgCtx.subPuMvpMiBuf[(subIdx << 1) + col];
+#endif
 #else
     MotionBuf &mb = mrgCtx.subPuMvpMiBuf;
 #endif
@@ -19884,9 +19979,13 @@ bool PU::getInterMergeSubPuMvpCand(const PredictionUnit &pu, MergeCtx& mrgCtx, b
           mi.refIdx[1] = NOT_VALID;
         }
         mi.bcwIdx = BCW_DEFAULT;
-
-        mb.subBuf(g_miScaling.scale(Position{ x, y } - pu.lumaPos()), g_miScaling.scale(Size(puWidth, puHeight)))
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+        mb->subBuf(g_miScaling.scale(Position{ x, y } -pu.lumaPos()), g_miScaling.scale(Size(puWidth, puHeight)))
           .fill(mi);
+#else
+        mb.subBuf(g_miScaling.scale(Position{ x, y } -pu.lumaPos()), g_miScaling.scale(Size(puWidth, puHeight)))
+          .fill(mi);
+#endif
       }
     }
 #if !JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION

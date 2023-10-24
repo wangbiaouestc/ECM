@@ -795,6 +795,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setSbTmvpEnabledFlag(m_sbTmvpEnableFlag);
   m_cEncLib.setAffine                                            ( m_Affine );
   m_cEncLib.setAffineType                                        ( m_AffineType );
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+  m_cEncLib.setUseAffineTM                                       ( m_useAffineTM );
+#endif
 #if AFFINE_MMVD
   m_cEncLib.setAffineMmvdMode                                    ( m_AffineMmvdMode );
 #endif

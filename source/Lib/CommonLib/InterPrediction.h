@@ -919,7 +919,14 @@ public:
 #if JVET_AD0140_MVD_PREDICTION
   template <int iAbove1Left2All3 = 3>
 #endif
-  void    xGetSublkAMLTemplate(const CodingUnit& cu, const ComponentID compID, const Picture& refPic, const Mv& mv, const int sublkWidth, const int sublkHeight, const int posW, const int posH, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate
+  void    xGetSublkAMLTemplate(const CodingUnit& cu, const ComponentID compID, const Picture& refPic, 
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+    const Mv& mvAbove,
+    const Mv& mvLeft,
+#else
+    const Mv& mv,
+#endif
+    const int sublkWidth, const int sublkHeight, const int posW, const int posH, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
      , bool afMMVD = false
 #endif
@@ -1098,6 +1105,11 @@ public:
 #endif
 
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+  void       deriveSubTmvpTMMv(PredictionUnit& pu);
+  void       deriveSubTmvpTMMv2Pel(PredictionUnit& pu, int step);
+  Distortion deriveTMMv2Pel(const PredictionUnit& pu, int step, bool fillCurTpl, Distortion curBestCost, RefPicList eRefList, int refIdx, int maxSearchRounds, Mv& mv, const MvField* otherMvf = nullptr);
+#endif
 #if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   void       deriveTMMv         (PredictionUnit& pu, Distortion* tmCost = NULL);
@@ -1232,6 +1244,9 @@ public:
 #endif
 #if JVET_AB0112_AFFINE_DMVR
   bool      processBDMVR4Affine(PredictionUnit& pu);
+#endif
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+  bool      processTM4Affine(PredictionUnit& pu, AffineMergeCtx &affineMergeCtx, int uiAffMergeCand, bool isEncoder);
 #endif
 #if JVET_X0049_ADAPT_DMVR
   bool      processBDMVRPU2Dir        (PredictionUnit& pu, bool subPURefine[2], Mv(&finalMvDir)[2]);
@@ -1383,6 +1398,9 @@ public:
   static int getDeltaMean          (const PelBuf& bufCur, const PelBuf& bufRef, const int rowSubShift, const int bd);
 
   template <int tplSize> void deriveMvUni    ();
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+  template <int tplSize> void deriveMvUni2Pel(int step);
+#endif
   template <int tplSize> void removeHighFreq (const Picture& otherRefPic, const Mv& otherRefMv, const uint8_t curRefBcwWeight);
 #if JVET_AD0213_LIC_IMP
   template <int tplSize> void removeHighFreqLIC(const Picture& otherRefPic, const Mv& otherRefMv, const uint8_t curRefBcwWeight, int shift, int scale, int offset);

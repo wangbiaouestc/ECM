@@ -1729,6 +1729,9 @@ void EncLib::xInitSPS( SPS& sps )
 #endif
   sps.setUseAffine             ( m_Affine );
   sps.setUseAffineType         ( m_AffineType );
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+  sps.setUseAffineTM           ( m_useAffineTM );
+#endif
 #if AFFINE_MMVD
   sps.setUseAffineMmvdMode     ( m_AffineMmvdMode );
 #endif

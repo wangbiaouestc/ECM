@@ -3787,6 +3787,9 @@ SPS::SPS()
 , m_LFNST                     ( false )
 , m_Affine                    ( false )
 , m_AffineType                ( false )
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+, m_useAffineTM               ( false )
+#endif
 , m_PROF                      ( false )
 #if ENABLE_DIMD
 , m_dimd                      ( false )

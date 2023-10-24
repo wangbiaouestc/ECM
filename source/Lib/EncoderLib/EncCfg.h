@@ -409,6 +409,9 @@ protected:
   bool      m_sbTmvpEnableFlag;
   bool      m_Affine;
   bool      m_AffineType;
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+  bool      m_useAffineTM; 
+#endif
 #if AFFINE_MMVD
   bool      m_AffineMmvdMode;
 #endif
@@ -1467,6 +1470,10 @@ public:
   bool      getAffine                       ()         const { return m_Affine; }
   void      setAffineType( bool b )                          { m_AffineType = b; }
   bool      getAffineType()                            const { return m_AffineType; }
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+  void      setUseAffineTM( bool b )                         { m_useAffineTM = b; }
+  bool      getUseAffineTM()                           const { return  m_useAffineTM; }
+#endif
 #if AFFINE_MMVD
   void      setAffineMmvdMode               ( bool b )       { m_AffineMmvdMode = b; }
   bool      getAffineMmvdMode               ()         const { return m_AffineMmvdMode; }
