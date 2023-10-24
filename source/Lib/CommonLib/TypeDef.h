@@ -389,6 +389,7 @@
 #define JVET_AD0222_ADDITONAL_ALF_FIXFILTER               1 // JVET-AD0222: Additional ALF fixed filter
 #define JVET_AE0139_ALF_IMPROVED_FIXFILTER                1 // JVET-AE0139: Improved ALF fixed filter
 #define JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO      1 // JVET-AE0151: CCSAO with history offsets and extended edge classifiers
+#define JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF            1 // JVET-AF0197: Luma Residual Tap in CCALF
 
 // SIMD optimizations
 #if IF_12TAP

@@ -361,6 +361,11 @@ private:
   uint8_t*               m_bestFilterControl;     // best saved filter control
   int                    m_reuseApsId[2];
   bool                   m_limitCcAlf;
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+  bool                   m_isLumaSignalNewAps;
+  bool                   m_isLowDelayConfig;
+  double                 m_chromaFactor;
+#endif
 
 public:
   EncAdaptiveLoopFilter( int& apsIdStart );
@@ -499,18 +504,28 @@ private:
   template<bool alfWSSD>
   void   deriveStatsForCcAlfFiltering(const PelUnitBuf &orgYuv, const PelUnitBuf &recYuv, const int compIdx, CodingStructure &cs);
   template<bool m_alfWSSD>
-  void   getBlkStatsCcAlf(AlfCovariance &alfCovariance, const AlfFilterShape &shape, const PelUnitBuf &orgYuv,
-                          const PelUnitBuf &recYuv, const UnitArea &areaDst, const UnitArea &area,
-                          const ComponentID compID, const int yPos);
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+  void   getBlkStatsCcAlf(AlfCovariance &alfCovariance, const AlfFilterShape &shape, const PelUnitBuf &orgYuv, const PelUnitBuf &recYuv, const UnitArea &areaDst, const UnitArea &area, const ComponentID compID, const int yPos, PelUnitBuf &resiYuv );
+#else
+  void   getBlkStatsCcAlf(AlfCovariance &alfCovariance, const AlfFilterShape &shape, const PelUnitBuf &orgYuv, const PelUnitBuf &recYuv, const UnitArea &areaDst, const UnitArea &area, const ComponentID compID, const int yPos);
+#endif
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
 #if ALF_IMPROVEMENT
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+  void   calcCovarianceCcAlf( Pel ELocal[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const Pel* rec, const int stride, const AlfFilterShape& shape, Pel* resiPtr, int resiStride  );
+#else
   void   calcCovarianceCcAlf( Pel ELocal[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const Pel* rec, const int stride, const AlfFilterShape& shape );
+#endif
 #else
   void   calcCovarianceCcAlf(Pel ELocal[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const Pel* rec, const int stride, const AlfFilterShape& shape, int vbDistance);
 #endif
 #else
 #if ALF_IMPROVEMENT
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+  void   calcCovarianceCcAlf( int ELocal[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const Pel* rec, const int stride, const AlfFilterShape& shape. Pel* resiPtr, int resiStride );
+#else
   void   calcCovarianceCcAlf( int ELocal[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const Pel* rec, const int stride, const AlfFilterShape& shape );
+#endif
 #else
   void   calcCovarianceCcAlf(int ELocal[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const Pel* rec, const int stride, const AlfFilterShape& shape, int vbDistance);
 #endif
