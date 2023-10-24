@@ -13098,7 +13098,11 @@ void InterPrediction::xGetSublkAMLTemplate(const CodingUnit& cu,
     if (scalingRatio != NULL)
     {
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+      xGetPredBlkTpl<true>(cu, compID, refBuf, mvAbove, posW, posH, sublkWidth, refAboveTemplate, afMMVD, &refPic, scalingRatio);
+#else
       xGetPredBlkTpl<true>(cu, compID, refBuf, mv, posW, posH, sublkWidth, refAboveTemplate, afMMVD, &refPic, scalingRatio);
+#endif
 #else
       xGetPredBlkTpl<true>(cu, compID, refBuf, mv, posW, posH, sublkWidth, refAboveTemplate, &refPic, scalingRatio);
 #endif
@@ -13138,7 +13142,11 @@ void InterPrediction::xGetSublkAMLTemplate(const CodingUnit& cu,
     if (scalingRatio != NULL)
     {
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+      xGetPredBlkTpl<false>(cu, compID, refBuf, mvLeft, posW, posH, sublkHeight, refLeftTemplate, afMMVD, &refPic, scalingRatio);
+#else
       xGetPredBlkTpl<false>(cu, compID, refBuf, mv, posW, posH, sublkHeight, refLeftTemplate, afMMVD, &refPic, scalingRatio);
+#endif
 #else
       xGetPredBlkTpl<false>(cu, compID, refBuf, mv, posW, posH, sublkHeight, refLeftTemplate, &refPic, scalingRatio);
 #endif
