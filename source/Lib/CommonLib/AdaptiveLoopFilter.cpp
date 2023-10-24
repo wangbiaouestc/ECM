@@ -394,6 +394,9 @@ void AdaptiveLoopFilter::applyCcAlfFilter(CodingStructure &cs, ComponentID compI
   int  numHorVirBndry = 0, numVerVirBndry = 0;
   int  horVirBndryPos[] = { 0, 0, 0 };
   int  verVirBndryPos[] = { 0, 0, 0 };
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+  PelUnitBuf tmpYuvResi = m_tempBufResi.getBuf(UnitArea(CHROMA_400, Area(cs.area.blocks[COMPONENT_Y])));
+#endif
 
   int ctuIdx = 0;
 
@@ -464,12 +467,33 @@ void AdaptiveLoopFilter::applyCcAlfFilter(CodingStructure &cs, ComponentID compI
 #endif
               buf = buf.subBuf(UnitArea(
                 cs.area.chromaFormat, Area(clipL ? 0 : MAX_ALF_PADDING_SIZE, clipT ? 0 : MAX_ALF_PADDING_SIZE, w, h)));
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+              //Residual
+              PelUnitBuf bufResi = m_tempBufResi2.subBuf(UnitArea(CHROMA_400, Area(0, 0, wBuf, hBuf)));
+              buf.copyFrom(tmpYuvResi.subBuf( UnitArea(CHROMA_400, Area(xStart - (clipL ? 0 : MAX_ALF_PADDING_SIZE ), yStart - (clipT ? 0 : MAX_ALF_PADDING_SIZE ), wBuf, hBuf))));
+              // pad top-left unavailable samples for raster slice
+              if (xStart == xPos && yStart == yPos && (rasterSliceAlfPad & 1))
+              {
+                bufResi.padBorderPel(MAX_ALF_PADDING_SIZE, 1);
+              }
+              // pad bottom-right unavailable samples for raster slice
+              if (xEnd == xPos + width && yEnd == yPos + height && (rasterSliceAlfPad & 2))
+              {
+                bufResi.padBorderPel(MAX_ALF_PADDING_SIZE, 2);
+              }
+              mirroredPaddingForAlf(cs, bufResi, MAX_ALF_PADDING_SIZE, true, false);
+              bufResi = buf.subBuf(UnitArea( CHROMA_400, Area(clipL ? 0 : MAX_ALF_PADDING_SIZE, clipT ? 0 : MAX_ALF_PADDING_SIZE, w, h)));
+#endif
 
               const Area blkSrc(0, 0, w, h);
 
               const Area blkDst(xStart >> chromaScaleX, yStart >> chromaScaleY, w >> chromaScaleX, h >> chromaScaleY);
 #if ALF_IMPROVEMENT
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+              m_filterCcAlf( dstBuf, buf, blkDst, blkSrc, compID, filterCoeff, m_clpRngs, cs, bufResi, m_alfClippingValues[CHANNEL_TYPE_LUMA] );
+#else
               m_filterCcAlf( dstBuf, buf, blkDst, blkSrc, compID, filterCoeff, m_clpRngs, cs );
+#endif
 #else
               m_filterCcAlf(dstBuf, buf, blkDst, blkSrc, compID, filterCoeff, m_clpRngs, cs, m_alfVBLumaCTUHeight, m_alfVBLumaPos);
 #endif
@@ -487,7 +511,11 @@ void AdaptiveLoopFilter::applyCcAlfFilter(CodingStructure &cs, ComponentID compI
           Area blkDst(xPos >> chromaScaleX, yPos >> chromaScaleY, width >> chromaScaleX, height >> chromaScaleY);
           Area blkSrc(xPos, yPos, width, height);
 #if ALF_IMPROVEMENT
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+          m_filterCcAlf( dstBuf, recYuvExt, blkDst, blkSrc, compID, filterCoeff, m_clpRngs, cs, tmpYuvResi, m_alfClippingValues[CHANNEL_TYPE_LUMA] );
+#else
           m_filterCcAlf( dstBuf, recYuvExt, blkDst, blkSrc, compID, filterCoeff, m_clpRngs, cs );
+#endif
 #else
           m_filterCcAlf(dstBuf, recYuvExt, blkDst, blkSrc, compID, filterCoeff, m_clpRngs, cs, m_alfVBLumaCTUHeight, m_alfVBLumaPos);
 #endif
@@ -635,10 +663,13 @@ void AdaptiveLoopFilter::ALFProcess(CodingStructure& cs)
             buf = buf.subBuf( UnitArea( cs.area.chromaFormat, Area( clipL ? 0 : MAX_ALF_PADDING_SIZE, clipT ? 0 : MAX_ALF_PADDING_SIZE, w, h ) ) );
 
 #if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+            PelUnitBuf bufResi = m_tempBufResi2.subBuf(UnitArea(CHROMA_400, Area(0, 0, wBuf, hBuf)));
+            bufResi.copyFrom(tmpYuvResi.subBuf(UnitArea(CHROMA_400, Area(xStart - (clipL ? 0 : MAX_ALF_PADDING_SIZE), yStart - (clipT ? 0 : MAX_ALF_PADDING_SIZE), wBuf, hBuf))));
+#else
             PelUnitBuf bufResi = m_tempBufResi2.subBuf(UnitArea(cs.area.chromaFormat, Area(0, 0, wBuf, hBuf)));
-            bufResi.copyFrom(tmpYuvResi.subBuf(
-              UnitArea(cs.area.chromaFormat, Area(xStart - (clipL ? 0 : MAX_ALF_PADDING_SIZE),
-                                                  yStart - (clipT ? 0 : MAX_ALF_PADDING_SIZE), wBuf, hBuf))));
+            bufResi.copyFrom(tmpYuvResi.subBuf(UnitArea(cs.area.chromaFormat, Area(xStart - (clipL ? 0 : MAX_ALF_PADDING_SIZE), yStart - (clipT ? 0 : MAX_ALF_PADDING_SIZE), wBuf, hBuf))));
+#endif
             // pad top-left unavailable samples for raster slice
             if (xStart == xPos && yStart == yPos && (rasterSliceAlfPad & 1))
             {
@@ -915,7 +946,11 @@ void AdaptiveLoopFilter::ALFProcess(CodingStructure& cs)
 
                   const int16_t *filterCoeff = m_ccAlfFilterParam.ccAlfCoeff[compIdx - 1][filterIdx - 1];
 #if ALF_IMPROVEMENT
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+                  m_filterCcAlf( recYuv.get( compID ), buf, blkDst, blkSrc, compID, filterCoeff, m_clpRngs, cs, bufResi, m_alfClippingValues[CHANNEL_TYPE_LUMA] );
+#else
                   m_filterCcAlf( recYuv.get( compID ), buf, blkDst, blkSrc, compID, filterCoeff, m_clpRngs, cs );
+#endif
 #else
                   m_filterCcAlf(recYuv.get(compID), buf, blkDst, blkSrc, compID, filterCoeff, m_clpRngs, cs, m_alfVBLumaCTUHeight, m_alfVBLumaPos);
 #endif
@@ -1139,7 +1174,11 @@ void AdaptiveLoopFilter::ALFProcess(CodingStructure& cs)
               const int16_t *filterCoeff = m_ccAlfFilterParam.ccAlfCoeff[compIdx - 1][filterIdx - 1];
 
 #if ALF_IMPROVEMENT
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+              m_filterCcAlf( recYuv.get( compID ), tmpYuv, blkDst, blkSrc, compID, filterCoeff, m_clpRngs, cs, tmpYuvResi, m_alfClippingValues[CHANNEL_TYPE_LUMA] );
+#else
               m_filterCcAlf( recYuv.get( compID ), tmpYuv, blkDst, blkSrc, compID, filterCoeff, m_clpRngs, cs );
+#endif
 #else
               m_filterCcAlf(recYuv.get(compID), tmpYuv, blkDst, blkSrc, compID, filterCoeff, m_clpRngs, cs, m_alfVBLumaCTUHeight, m_alfVBLumaPos);
 #endif
@@ -5179,7 +5218,11 @@ void AdaptiveLoopFilter::filterBlk(AlfClassifier **classifier, const PelUnitBuf 
 
 template<AlfFilterType filtTypeCcAlf>
 #if ALF_IMPROVEMENT
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+void AdaptiveLoopFilter::filterBlkCcAlf(const PelBuf &dstBuf, const CPelUnitBuf &recSrc, const Area &blkDst, const Area &blkSrc, const ComponentID compId, const int16_t *filterCoeff, const ClpRngs &clpRngs, CodingStructure &cs, const CPelUnitBuf &resiSrc, const Pel clippingValues[4] )
+#else
 void AdaptiveLoopFilter::filterBlkCcAlf(const PelBuf &dstBuf, const CPelUnitBuf &recSrc, const Area &blkDst, const Area &blkSrc, const ComponentID compId, const int16_t *filterCoeff, const ClpRngs &clpRngs, CodingStructure &cs)
+#endif
 #else
 void AdaptiveLoopFilter::filterBlkCcAlf(const PelBuf &dstBuf, const CPelUnitBuf &recSrc, const Area &blkDst, const Area &blkSrc, const ComponentID compId, const int16_t *filterCoeff, const ClpRngs &clpRngs, CodingStructure &cs, int vbCTUHeight, int vbPos)
 #endif
@@ -5212,6 +5255,12 @@ void AdaptiveLoopFilter::filterBlkCcAlf(const PelBuf &dstBuf, const CPelUnitBuf 
 
   const int   chromaStride = dstBuf.stride;
   Pel *       chromaPtr    = dstBuf.buf + blkDst.y * chromaStride + blkDst.x;
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+  CPelBuf        srcResiBuf = resiSrc.get(COMPONENT_Y);
+  const int      resiStride = srcResiBuf.stride;
+  const Pel*     resiPtr    = srcResiBuf.buf + blkSrc.y * resiStride + blkSrc.x;
+  Pel            clipValue  = clippingValues[1];
+#endif
 
   for( int i = 0; i < endHeight - startHeight; i += clsSizeY )
   {
@@ -5237,6 +5286,9 @@ void AdaptiveLoopFilter::filterBlkCcAlf(const PelBuf &dstBuf, const CPelUnitBuf 
         row <<= scaleY;
         col <<= scaleX;
         const Pel *srcCross = lumaPtr + col + row * lumaStride;
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+        const Pel *srcResiCross = resiPtr + row * resiStride + col;
+#endif
 
 #if !ALF_IMPROVEMENT
         int pos = ((startHeight + i + ii) << scaleY) & (vbCTUHeight - 1);
@@ -5265,6 +5317,7 @@ void AdaptiveLoopFilter::filterBlkCcAlf(const PelBuf &dstBuf, const CPelUnitBuf 
           const Pel currSrcCross = srcCross[offset0 + jj2];
 
 #if JVET_X0071_LONGER_CCALF
+#if !JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
           sum += filterCoeff[0] * (srcCross[offset8 + jj2] - currSrcCross);
           sum += filterCoeff[1] * (srcCross[offset6 + jj2] - currSrcCross);
           sum += filterCoeff[2] * (srcCross[offset4 + jj2] - currSrcCross);
@@ -5292,6 +5345,40 @@ void AdaptiveLoopFilter::filterBlkCcAlf(const PelBuf &dstBuf, const CPelUnitBuf 
           sum += filterCoeff[21] * (srcCross[offset3 + jj2] - currSrcCross);
           sum += filterCoeff[22] * (srcCross[offset5 + jj2] - currSrcCross);
           sum += filterCoeff[23] * (srcCross[offset7 + jj2] - currSrcCross);
+#endif
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+          sum += filterCoeff[0] * (srcCross[offset8 + jj2] - currSrcCross + srcCross[offset7 + jj2] - currSrcCross);
+          sum += filterCoeff[1] * (srcCross[offset6 + jj2] - currSrcCross);
+          sum += filterCoeff[2] * (srcCross[offset4 + jj2] - currSrcCross);
+          sum += filterCoeff[3] * (srcCross[offset2 + jj2] - currSrcCross);
+
+          sum += filterCoeff[4] * (srcCross[offset0 + jj2 - 4] - currSrcCross);
+          sum += filterCoeff[5] * (srcCross[offset0 + jj2 - 3] - currSrcCross);
+          sum += filterCoeff[6] * (srcCross[offset0 + jj2 - 2] - currSrcCross);
+          sum += filterCoeff[7] * (srcCross[offset0 + jj2 - 1] - currSrcCross);
+          sum += filterCoeff[8] * (srcCross[offset0 + jj2 + 1] - currSrcCross);
+          sum += filterCoeff[9] * (srcCross[offset0 + jj2 + 2] - currSrcCross);
+          sum += filterCoeff[10] * (srcCross[offset0 + jj2 + 3] - currSrcCross);
+          sum += filterCoeff[11] * (srcCross[offset0 + jj2 + 4] - currSrcCross);
+
+          sum += filterCoeff[12] * (srcCross[offset1 + jj2 - 4] - currSrcCross + srcCross[offset1 + jj2 + 4] - currSrcCross);
+          sum += filterCoeff[13] * (srcCross[offset1 + jj2 - 3] - currSrcCross);
+          sum += filterCoeff[14] * (srcCross[offset1 + jj2 - 2] - currSrcCross);
+          sum += filterCoeff[15] * (srcCross[offset1 + jj2 - 1] - currSrcCross);
+          sum += filterCoeff[16] * (srcCross[offset1 + jj2 - 0] - currSrcCross);
+          sum += filterCoeff[17] * (srcCross[offset1 + jj2 + 1] - currSrcCross);
+          sum += filterCoeff[18] * (srcCross[offset1 + jj2 + 2] - currSrcCross);
+          sum += filterCoeff[19] * (srcCross[offset1 + jj2 + 3] - currSrcCross);
+
+          sum += filterCoeff[20] * (srcCross[offset3 + jj2] - currSrcCross);
+          sum += filterCoeff[21] * (srcCross[offset5 + jj2] - currSrcCross);
+
+          sum += filterCoeff[22] * clipALF(clipValue, 0, srcResiCross[-1 * resiStride + jj2 + 0]);
+          sum += filterCoeff[23] * clipALF(clipValue, 0, srcResiCross[+0 * resiStride + jj2 - 1]);
+          sum += filterCoeff[24] * clipALF(clipValue, 0, srcResiCross[+0 * resiStride + jj2 + 0]);
+          sum += filterCoeff[25] * clipALF(clipValue, 0, srcResiCross[+0 * resiStride + jj2 + 1]);
+          sum += filterCoeff[26] * clipALF(clipValue, 0, srcResiCross[+1 * resiStride + jj2 + 0]);
+#endif
 #else
           sum += filterCoeff[0] * (srcCross[offset2 + jj2    ] - currSrcCross);
           sum += filterCoeff[1] * (srcCross[offset0 + jj2 - 1] - currSrcCross);
@@ -5313,6 +5400,9 @@ void AdaptiveLoopFilter::filterBlkCcAlf(const PelBuf &dstBuf, const CPelUnitBuf 
     chromaPtr += chromaStride * clsSizeY;
 
     lumaPtr += lumaStride * clsSizeY << getComponentScaleY(compId, nChromaFormat);
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+    resiPtr += resiStride * clsSizeY << scaleY;
+#endif
   }
 }
 

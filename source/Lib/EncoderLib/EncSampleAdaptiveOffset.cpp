@@ -107,7 +107,6 @@ EncSampleAdaptiveOffset::EncSampleAdaptiveOffset()
 
 EncSampleAdaptiveOffset::~EncSampleAdaptiveOffset()
 {
-  destroyEncData();
 }
 
 void EncSampleAdaptiveOffset::createEncData(bool isPreDBFSamplesUsed, uint32_t numCTUsPic)

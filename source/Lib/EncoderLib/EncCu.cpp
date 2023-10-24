@@ -3780,6 +3780,16 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
         ) ? &namvpMergeCandCtx : NULL
 #endif
     );
+#if JVET_AF0128_LIC_MERGE_TM
+    if (pu.cs->sps->getUseAML()
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+      && pu.cs->sps->getTMToolsEnableFlag()
+#endif
+      )
+    {
+      m_pcInterSearch->adjustMergeCandidatesLicFlag(pu, mergeCtx);
+    }
+#endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
     if (sps.getUseAML()
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
@@ -3991,6 +4001,16 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
     bool flag = pu.mmvdMergeFlag;
     pu.mmvdMergeFlag = true;
+#if JVET_AF0128_LIC_MERGE_TM
+    if (pu.cs->sps->getUseAML()
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+      && pu.cs->sps->getTMToolsEnableFlag()
+#endif
+      )
+    {
+      m_pcInterSearch->adjustMergeCandidatesLicFlag(pu, mergeCtxtmp);
+    }
+#endif
 #if JVET_AB0079_TM_BCW_MRG
     if (sps.getUseAML()
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
@@ -4097,6 +4117,16 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
           ) ? &namvpTmMergeCandCtx : NULL
 #endif
       );
+#if JVET_AF0128_LIC_MERGE_TM
+      if (pu.cs->sps->getUseAML()
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+        && pu.cs->sps->getTMToolsEnableFlag()
+#endif
+        )
+      {
+        m_pcInterSearch->adjustMergeCandidatesLicFlag(pu, tmMrgCtx);
+      }
+#endif
 #if JVET_W0090_ARMC_TM
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
       bool tmMergeRefinedMotion = PU::isArmcRefinedMotionEnabled(pu, 2);
@@ -4490,6 +4520,33 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
           }
         }
       }
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+      int cnt = 0;
+      int validNum = 0;
+      if (cu.cs->sps->getUseAffineTM()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+        && sps.getTMToolsEnableFlag()
+#endif
+        && PU::checkAffineTMCondition(pu)
+        )
+      {
+        for (uint32_t uiAffMergeCand = 0; uiAffMergeCand < affineMergeCtx.numValidMergeCand; uiAffMergeCand++)
+        {
+          if (affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 0][0].mv == Mv(0, 0) && affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 1][0].mv == Mv(0, 0) &&
+            affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 0][1].mv == Mv(0, 0) && affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 1][1].mv == Mv(0, 0) &&
+            affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 0][2].mv == Mv(0, 0) && affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 1][2].mv == Mv(0, 0)
+            && affineMergeCtx.mergeType[uiAffMergeCand] != MRG_TYPE_SUBPU_ATMVP)
+          {
+            validNum = uiAffMergeCand;
+            break;
+          }
+          if (uiAffMergeCand == pu.cu->slice->getPicHeader()->getMaxNumAffineMergeCand() - 1)
+          {
+            validNum = pu.cu->slice->getPicHeader()->getMaxNumAffineMergeCand();
+          }
+        }
+      }
+#endif
 #if JVET_AB0112_AFFINE_DMVR
       if (affineMrgAvail
 #if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
@@ -4711,6 +4768,94 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
         }
       }
 #endif
+#endif
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT 
+      if (cu.cs->sps->getUseAffineTM() && affineMrgAvail
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+        && sps.getTMToolsEnableFlag()
+#endif
+        && PU::checkAffineTMCondition(pu)
+        )
+      {
+        for (uint32_t uiAffMergeCand = 0; uiAffMergeCand < validNum; uiAffMergeCand++)
+        {
+          for (int i = 0; i < 3; i++)
+          {
+            m_mvBufBDMVR4AFFINE[uiAffMergeCand << 1][i].setZero();
+            m_mvBufBDMVR4AFFINE[(uiAffMergeCand << 1) + 1][i].setZero();
+          }
+          pu.bdmvrRefine = false;
+          if (affineMergeCtx.interDirNeighbours[uiAffMergeCand] != 3 && affineMergeCtx.mergeType[uiAffMergeCand] != MRG_TYPE_SUBPU_ATMVP)
+          {
+            int index = -1;
+            if ((validNum + cnt) < affineMergeCtx.maxNumMergeCand)
+            {
+              index = validNum + cnt;
+              affineMergeCtx.interDirNeighbours[index] = affineMergeCtx.interDirNeighbours[uiAffMergeCand];
+              affineMergeCtx.mergeType[index] = affineMergeCtx.mergeType[uiAffMergeCand];
+              affineMergeCtx.affineType[index] = affineMergeCtx.affineType[uiAffMergeCand];
+              affineMergeCtx.bcwIdx[index] = affineMergeCtx.bcwIdx[uiAffMergeCand];
+#if INTER_LIC
+              affineMergeCtx.licFlags[index] = affineMergeCtx.licFlags[uiAffMergeCand];
+#endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+              affineMergeCtx.obmcFlags[index] = affineMergeCtx.obmcFlags[uiAffMergeCand];
+#endif
+              for (int i = 0; i < 2; i++)
+              {
+                for (int mvNum = 0; mvNum < 3; mvNum++)
+                {
+                  affineMergeCtx.mvFieldNeighbours[(index << 1) + i][mvNum].refIdx = affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + i][mvNum].refIdx;
+                  affineMergeCtx.mvFieldNeighbours[(index << 1) + i][mvNum].mv = affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + i][mvNum].mv;
+                }
+              }
+              cnt++;
+            }
+            pu.regularMergeFlag = false;
+            pu.mergeFlag = true;
+            pu.mmvdMergeFlag = false;
+            pu.cu->affine = true;
+            pu.interDir = affineMergeCtx.interDirNeighbours[uiAffMergeCand];
+            pu.cu->imv = 0;
+            pu.mergeType = affineMergeCtx.mergeType[uiAffMergeCand];
+            pu.mv[0].setZero();
+            pu.mv[1].setZero();
+            pu.mergeIdx = uiAffMergeCand;
+            cu.affineType = affineMergeCtx.affineType[uiAffMergeCand];
+            cu.bcwIdx = affineMergeCtx.bcwIdx[uiAffMergeCand];
+            pu.mmvdEncOptMode = 0;
+#if INTER_LIC
+            cu.licFlag = affineMergeCtx.licFlags[uiAffMergeCand];
+#endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+            cu.obmcFlag = affineMergeCtx.obmcFlags[uiAffMergeCand];
+#endif
+            pu.refIdx[0] = affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 0][0].refIdx;
+            pu.refIdx[1] = affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 1][0].refIdx;
+            pu.mvAffi[REF_PIC_LIST_0][0] = affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 0][0].mv;
+            pu.mvAffi[REF_PIC_LIST_0][1] = affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 0][1].mv;
+            pu.mvAffi[REF_PIC_LIST_0][2] = affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 0][2].mv;
+            pu.mvAffi[REF_PIC_LIST_1][0] = affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 1][0].mv;
+            pu.mvAffi[REF_PIC_LIST_1][1] = affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 1][1].mv;
+            pu.mvAffi[REF_PIC_LIST_1][2] = affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 1][2].mv;
+
+            m_pcInterSearch->setBdmvrSubPuMvBuf(m_mvBufBDMVR4AFFINE[uiAffMergeCand << 1], m_mvBufBDMVR4AFFINE[(uiAffMergeCand << 1) + 1]);
+            if (!affineMergeCtx.xCheckSimilarMotion(pu.mergeIdx, PU::getBDMVRMvdThreshold(pu)))
+            {
+              m_pcInterSearch->processTM4Affine(pu, affineMergeCtx, index, true);
+            }
+          }
+        }
+        for (uint32_t uiAffMergeCand = 0; uiAffMergeCand < validNum; uiAffMergeCand++)
+        {
+          affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 0][0].mv += m_mvBufBDMVR4AFFINE[(uiAffMergeCand << 1) + 0][0];
+          affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 0][1].mv += m_mvBufBDMVR4AFFINE[(uiAffMergeCand << 1) + 0][0];
+          affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 0][2].mv += m_mvBufBDMVR4AFFINE[(uiAffMergeCand << 1) + 0][0];
+          affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 1][0].mv += m_mvBufBDMVR4AFFINE[(uiAffMergeCand << 1) + 1][0];
+          affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 1][1].mv += m_mvBufBDMVR4AFFINE[(uiAffMergeCand << 1) + 1][0];
+          affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 1][2].mv += m_mvBufBDMVR4AFFINE[(uiAffMergeCand << 1) + 1][0];
+        }
+      }
 #endif
 #if JVET_X0049_ADAPT_DMVR
       checkBmMrg = PU::isBMMergeFlagCoded(pu);
@@ -11987,6 +12132,16 @@ void EncCu::xCheckRDCostTMMerge2Nx2N(CodingStructure *&tempCS, CodingStructure *
 
     pu.tmMergeFlag = true;
     PU::getInterMergeCandidates(pu, mergeCtx, 0);
+#if JVET_AF0128_LIC_MERGE_TM
+    if (pu.cs->sps->getUseAML()
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+      && pu.cs->sps->getTMToolsEnableFlag()
+#endif
+      )
+    {
+      m_pcInterSearch->adjustMergeCandidatesLicFlag(pu, mergeCtx);
+    }
+#endif
 #if JVET_W0090_ARMC_TM
     if (sps.getUseAML()
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
@@ -15837,7 +15992,7 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
       isEqualUni = true;
     }
   }
-#if JVET_Y0128_NON_CTC && INTER_LIC
+#if JVET_Y0128_NON_CTC && INTER_LIC && !JVET_AF0190_RPR_TMP_REORDER_LIC
   if (cu.licFlag)
   {
     if (!PU::checkRprLicCondition(*cu.firstPU)) // To check whether LIC actually performs in MC
@@ -16266,7 +16421,7 @@ bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bes
       isEqualUni = true;
     }
   }
-#if JVET_Y0128_NON_CTC && INTER_LIC
+#if JVET_Y0128_NON_CTC && INTER_LIC && !JVET_AF0190_RPR_TMP_REORDER_LIC
   if (cu.licFlag)
   {
     if (!PU::checkRprLicCondition(*cu.firstPU)) // To check whether LIC actually performs in MC
@@ -17820,7 +17975,7 @@ void EncCu::xCheckRDCostInterMultiHyp2Nx2N(CodingStructure *&tempCS, CodingStruc
 
     pu = mhResults[i].pu;
     cu = mhResults[i].cu;
-#if JVET_AD0213_LIC_IMP
+#if JVET_AD0213_LIC_IMP && !JVET_AF0190_RPR_TMP_REORDER_LIC
     if (cu.licFlag && !PU::checkRprLicCondition(pu))
     {
       tempCS->initStructData(encTestMode.qp);

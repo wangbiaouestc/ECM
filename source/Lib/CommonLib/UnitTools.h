@@ -580,6 +580,9 @@ namespace PU
   void setAllAffineMvField            (      PredictionUnit &pu, MvField *mvField, RefPicList eRefList );
   void setAllAffineMv                 (      PredictionUnit &pu, Mv affLT, Mv affRT, Mv affLB, RefPicList eRefList, bool clipCPMVs = false );
   bool getInterMergeSubPuMvpCand      (const PredictionUnit &pu, MergeCtx& mrgCtx, bool& LICFlag, const int count
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION && JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+    , bool isRefined
+#endif
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
     , int subIdx, MergeCtx mergeCtxIn
     , int col = 0
@@ -714,7 +717,9 @@ namespace PU
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   bool checkRprRefExistingInGpm(const PredictionUnit& pu, const MergeCtx& geoMrgCtx0, uint8_t candIdx0, const MergeCtx& geoMrgCtx1, uint8_t candIdx1);
 #endif
-
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+  bool checkAffineTMCondition(const PredictionUnit& pu);
+#endif
 #if INTER_LIC
   void spanLicFlags(PredictionUnit &pu, const bool LICFlag);
 #endif

@@ -113,6 +113,9 @@
 #define NULL              0
 #endif
 
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+static const double REFINE_THRESHOLD_AFFINE_MERGE = 0.75;
+#endif
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
 static const int SUB_TMVP_CANDIDATE_NUM = 10;
 static const int SUB_TMVP_INDEX = 3;  // 1: 2 subtmvp; 2: 4 subtmvp
@@ -199,13 +202,21 @@ static const int AFF_NON_ADJACENT_DIST    =                          4;
 #endif
 
 #if JVET_Z0139_HIST_AFF || JVET_Z0139_NA_AFF
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+static const int AFFINE_MRG_MAX_NUM_CANDS =                         16; ///< AFFINE MERGE
+#else
 static const int AFFINE_MRG_MAX_NUM_CANDS =                         15; ///< AFFINE MERGE
+#endif
 #else
 static const int AFFINE_MRG_MAX_NUM_CANDS =                         5; ///< AFFINE MERGE
 #endif
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
 static const int AFF_MAX_NON_ADJACENT_INHERITED_CANDS = 6;
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+static const int RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE = 31;
+#else
 static const int RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE = 30;
+#endif
 static const int ADDITIONAL_AFFINE_CAND_NUM = 15;
 #if JVET_AB0189_RMVF_BITLENGTH_CONTROL
 static const int RMVF_MV_RANGE = (1 << 12);
@@ -416,7 +427,11 @@ static const int       MAX_ALF_PADDING_SIZE           =             4;
 #endif
 #if JVET_X0071_LONGER_CCALF
 #define MAX_NUM_CC_ALF_FILTERS                                      16
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+static constexpr int MAX_NUM_CC_ALF_CHROMA_COEFF    =               23 + 5;
+#else
 static constexpr int MAX_NUM_CC_ALF_CHROMA_COEFF    =               25;
+#endif
 #else
 #define MAX_NUM_CC_ALF_FILTERS                                      4
 static constexpr int MAX_NUM_CC_ALF_CHROMA_COEFF    =               8;
@@ -1815,6 +1830,29 @@ static inline uint32_t getIndexMappingTableToSortedArray1D(InputValueType (&in)[
 
   return numValidInList;
 }
+#endif
+
+#if JVET_Z0150_MEMORY_USAGE_PRINT
+#ifdef __linux
+static inline int getProcStatusValue(const char* key)
+{
+  FILE* file = fopen("/proc/self/status", "r");
+  int result = -1;
+  char line[128];
+
+  int len = strlen(key);
+  while (fgets(line, 128, file) != nullptr)
+  {
+    if (strncmp(line, key, len) == 0)
+    {
+      result = atoi(line+len);
+      break;
+    }
+  }
+  fclose(file);
+  return result;
+}
+#endif
 #endif
 
 //CASE-BREAK for breakpoints

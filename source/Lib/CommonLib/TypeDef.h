@@ -238,6 +238,7 @@
 #define INTER_LIC                                         1 // Add LIC to non-subblock inter
 #if INTER_LIC
 #define JVET_AD0213_LIC_IMP                               1 // JVET-AD0213: bi-predictive LIC and the combination of LIC and OBMC
+#define JVET_AF0128_LIC_MERGE_TM                          1 // JVET-AF0128: LIC flag derivation for merge candidates with template costs
 #endif
 #define NON_ADJACENT_MRG_CAND                             1 // Add non-adjacent merge candidates
 #define MULTI_HYP_PRED                                    1 // Multiple hypothesis prediction
@@ -298,6 +299,7 @@
 #if IF_12TAP && JVET_AA0042_RPR_FILTERS && JVET_Z0117_CHROMA_IF
 #define JVET_AE0150_SMALL_SCALE_RPR_FILTERS               1 // RPR filters and thresholds for scale factors 1.1x to 1.35x
 #endif
+#define JVET_AF0190_RPR_TMP_REORDER_LIC                   1 // JVET-AF0190: enabling template-based reordering tools and LIC for scaled pictures in the RPR
 
 // Inter template matching tools
 #define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction
@@ -314,6 +316,7 @@
 #define JVET_W0097_GPM_MMVD_TM                            1 // JVET-W0097: GPM-MMVD and GPM-TM, GPM-TM part is controlled by TM_MRG
 #define JVET_X0141_CIIP_TIMD_TM                           1 // JVET-X0141: CIIP with TIMD and TM merge, CIIP-TM part is controlled by TM_MRG, and CIIP-TIMD part is controlled by JVET_W0123_TIMD_FUSION
 #define JVET_Y0134_TMVP_NAMVP_CAND_REORDERING             1 // JVET-Y0134: MV candidate reordering for TMVP and NAMVP types (controlled by JVET_W0090_ARMC_TM), and reference picture selection for TMVP 
+#define JVET_AF0163_TM_SUBBLOCK_REFINEMENT                1 // JVET-AF0163: TM based subblock motion refinement
 #if JVET_W0090_ARMC_TM
 #define JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED            1 // JVET-Y0067: TM based reordering for MMVD and affine MMVD and MVD sign prediction
 #define JVET_AD0140_MVD_PREDICTION                        1 // JVET-AD0140: MVD (sign and suffix) prediction
@@ -364,6 +367,7 @@
 #define SLICE_TYPE_WIN_SIZE                               1 // Context window initialization based on slice type
 #define JVET_Z0135_TEMP_CABAC_WIN_WEIGHT                  1 // JVET-Z0135 Test 4.3b: Temporal CABAC, weighted states, windows adjustment
 #define JVET_AD0206_CABAC_INIT_AT_GDR                     1 // JVET-AD0206: Cabac initialization at GDR picture
+#define JVET_AF0133_RETRAINING_ISLICE_CTX                 1 // JVET-AF0133: retrained I-slice context model
 
 // Loop filters
 #define ALF_IMPROVEMENT                                   1 // ALF improvement
@@ -385,6 +389,7 @@
 #define JVET_AD0222_ADDITONAL_ALF_FIXFILTER               1 // JVET-AD0222: Additional ALF fixed filter
 #define JVET_AE0139_ALF_IMPROVED_FIXFILTER                1 // JVET-AE0139: Improved ALF fixed filter
 #define JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO      1 // JVET-AE0151: CCSAO with history offsets and extended edge classifiers
+#define JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF            1 // JVET-AF0197: Luma Residual Tap in CCALF
 
 // SIMD optimizations
 #if IF_12TAP
@@ -593,6 +598,10 @@ typedef std::pair<int, int>  TrCost;
 
 #ifndef EXTENSION_HDRTOOLS
 #define EXTENSION_HDRTOOLS                                0 //< extension for HDRTools/Metrics support; this macro should be controlled by makefile, as it would be used to control whether the library is built and linked
+#endif
+
+#ifndef EXTENSION_CABAC_TRAINING
+#define EXTENSION_CABAC_TRAINING                          0 //< JVET-AF0133: extension for CABAC context model training; this macro should be controlled by makefile, as it would be used to control whether the library is built and linked
 #endif
 
 #define JVET_O0756_CONFIG_HDRMETRICS                      1
