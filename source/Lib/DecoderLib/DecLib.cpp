@@ -459,6 +459,9 @@ DecLib::DecLib()
   , m_parameterSetManager()
   , m_apcSlicePilot(NULL)
   , m_SEIs()
+#if EXTENSION_CABAC_TRAINING
+  , m_binFileByteOffset(0)
+#endif
   , m_cIntraPred()
   , m_cInterPred()
   , m_cTrQuant()
@@ -3210,6 +3213,10 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
 
   //  Decode a picture
   m_cSliceDecoder.decompressSlice( pcSlice, &( nalu.getBitstream() ), ( m_pcPic->poc == getDebugPOC() ? getDebugCTU() : -1 ) );
+#if EXTENSION_CABAC_TRAINING
+  CABACReader&   cabacReader = *(m_CABACDecoder.getCABACReader(0));
+  cabacReader.traceStoredCabacBits(pcSlice, getBinFileByteOffset());
+#endif
 
   m_bFirstSliceInPicture = false;
   m_uiSliceSegmentIdx++;

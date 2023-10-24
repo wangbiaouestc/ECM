@@ -364,6 +364,7 @@
 #define SLICE_TYPE_WIN_SIZE                               1 // Context window initialization based on slice type
 #define JVET_Z0135_TEMP_CABAC_WIN_WEIGHT                  1 // JVET-Z0135 Test 4.3b: Temporal CABAC, weighted states, windows adjustment
 #define JVET_AD0206_CABAC_INIT_AT_GDR                     1 // JVET-AD0206: Cabac initialization at GDR picture
+#define JVET_AF0133_RETRAINING_ISLICE_CTX                 1 // JVET-AF0133: retrained I-slice context model
 
 // Loop filters
 #define ALF_IMPROVEMENT                                   1 // ALF improvement
@@ -593,6 +594,10 @@ typedef std::pair<int, int>  TrCost;
 
 #ifndef EXTENSION_HDRTOOLS
 #define EXTENSION_HDRTOOLS                                0 //< extension for HDRTools/Metrics support; this macro should be controlled by makefile, as it would be used to control whether the library is built and linked
+#endif
+
+#ifndef EXTENSION_CABAC_TRAINING
+#define EXTENSION_CABAC_TRAINING                          0 //< JVET-AF0133: extension for CABAC context model training; this macro should be controlled by makefile, as it would be used to control whether the library is built and linked
 #endif
 
 #define JVET_O0756_CONFIG_HDRMETRICS                      1

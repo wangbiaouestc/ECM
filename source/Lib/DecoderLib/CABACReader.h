@@ -63,6 +63,9 @@ public:
   void        initBitstream             ( InputBitstream*               bitstream )           { m_Bitstream = bitstream; m_BinDecoder.init( m_Bitstream ); }
   const Ctx&  getCtx                    ()                                            const   { return m_BinDecoder.getCtx();  }
   Ctx&        getCtx                    ()                                                    { return m_BinDecoder.getCtx();  }
+#if EXTENSION_CABAC_TRAINING
+  void        traceStoredCabacBits      ( Slice* pcSlice, uint64_t& binFileByteOffset );
+#endif
 
 public:
   // slice segment data (clause 7.3.8.1)
