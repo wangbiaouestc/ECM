@@ -15837,7 +15837,7 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
       isEqualUni = true;
     }
   }
-#if JVET_Y0128_NON_CTC && INTER_LIC
+#if JVET_Y0128_NON_CTC && INTER_LIC && !JVET_AF0190_RPR_TMP_REORDER_LIC
   if (cu.licFlag)
   {
     if (!PU::checkRprLicCondition(*cu.firstPU)) // To check whether LIC actually performs in MC
@@ -16266,7 +16266,7 @@ bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bes
       isEqualUni = true;
     }
   }
-#if JVET_Y0128_NON_CTC && INTER_LIC
+#if JVET_Y0128_NON_CTC && INTER_LIC && !JVET_AF0190_RPR_TMP_REORDER_LIC
   if (cu.licFlag)
   {
     if (!PU::checkRprLicCondition(*cu.firstPU)) // To check whether LIC actually performs in MC
@@ -17820,7 +17820,7 @@ void EncCu::xCheckRDCostInterMultiHyp2Nx2N(CodingStructure *&tempCS, CodingStruc
 
     pu = mhResults[i].pu;
     cu = mhResults[i].cu;
-#if JVET_AD0213_LIC_IMP
+#if JVET_AD0213_LIC_IMP && !JVET_AF0190_RPR_TMP_REORDER_LIC
     if (cu.licFlag && !PU::checkRprLicCondition(pu))
     {
       tempCS->initStructData(encTestMode.qp);

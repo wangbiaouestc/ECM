@@ -12570,6 +12570,7 @@ bool PU::checkTmEnableCondition(const SPS* sps, const PPS* pps, const Picture* r
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
 bool PU::checkRprRefExistingInGpm(const PredictionUnit& pu, const MergeCtx& geoMrgCtx0, uint8_t candIdx0, const MergeCtx& geoMrgCtx1, uint8_t candIdx1)
 {
+#if !JVET_AF0190_RPR_TMP_REORDER_LIC
   if (pu.cs->sps->getRprEnabledFlag())
   {
     auto xCheckUseRprPerPart = [&pu](const MergeCtx& mrgCtx, uint8_t candIdx)
@@ -12595,6 +12596,7 @@ bool PU::checkRprRefExistingInGpm(const PredictionUnit& pu, const MergeCtx& geoM
 
     return xCheckUseRprPerPart(geoMrgCtx0, candIdx0) || xCheckUseRprPerPart(geoMrgCtx1, candIdx1);
   }
+#endif
 
   return false;
 }
@@ -22806,7 +22808,11 @@ unsigned int PU::getSameNeigMotion(PredictionUnit &pu, MotionInfo& mi, Position 
 
     bool bIsSimilarMV = PU::identicalMvOBMC(currMi, mi, pu.cs->slice->getCheckLDC());
 #if JVET_AD0213_LIC_IMP
+#if JVET_AF0190_RPR_TMP_REORDER_LIC
+    if (bIsSimilarMV)
+#else
     if (bIsSimilarMV && !tmpPu->cs->sps->getRprEnabledFlag())
+#endif
     {
       if (mi.interDir == 3 && mi.bcwIdx != currMi.bcwIdx)
       {
@@ -22888,7 +22894,11 @@ unsigned int PU::getSameNeigMotion(PredictionUnit &pu, MotionInfo& mi, Position 
           {
             bSameMv = false;
           }
+#if JVET_AF0190_RPR_TMP_REORDER_LIC
+          if (bSameMv)
+#else
           if (bSameMv && !tmpPu->cs->sps->getRprEnabledFlag())
+#endif
           {
             if (tmpPu1->cu->licFlag != tmpPu->cu->licFlag)
             {
@@ -23282,7 +23292,7 @@ bool CU::isLICFlagPresent(const CodingUnit& cu)
     return false;
   }
 #endif
-#if JVET_Z0054_BLK_REF_PIC_REORDER
+#if JVET_Z0054_BLK_REF_PIC_REORDER && !JVET_AF0190_RPR_TMP_REORDER_LIC
   if (!cu.cs->pcv->isEncoder)
   {
     if (PU::useRefCombList(*cu.firstPU))
@@ -23299,7 +23309,7 @@ bool CU::isLICFlagPresent(const CodingUnit& cu)
 #endif
   }
 #endif
-#if JVET_Y0128_NON_CTC
+#if JVET_Y0128_NON_CTC && !JVET_AF0190_RPR_TMP_REORDER_LIC
   if (!PU::checkRprLicCondition(*cu.firstPU))
   {
     return false;
