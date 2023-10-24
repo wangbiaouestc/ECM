@@ -10786,6 +10786,126 @@ void InterPrediction::adjustMergeCandidatesBcwIdx(PredictionUnit& pu, MergeCtx& 
 }
 #endif
 
+#if JVET_AF0128_LIC_MERGE_TM
+void InterPrediction::adjustMergeCandidatesLicFlag(PredictionUnit& pu, MergeCtx& mrgCtx, const int mergeIdx)
+{
+  if (pu.cu->geoFlag || !pu.cs->sps->getTMToolsEnableFlag() || !pu.cs->slice->getUseLIC())
+  {
+    return;
+  }
+  int nWidth = pu.lumaSize().width;
+  int nHeight = pu.lumaSize().height;
+  if (!xAMLGetCurBlkTemplate(pu, nWidth, nHeight))
+  {
+    return;
+  }
+  if (!pu.cu->slice->getCheckLDB())
+  {
+    int tplSize = 0;
+    if (m_bAMLTemplateAvailabe[0])
+    {
+      tplSize += nWidth;
+    }
+
+    if (m_bAMLTemplateAvailabe[1])
+    {
+      tplSize += nHeight;
+    }
+    int   ctuSize = pu.cs->slice->getSPS()->getCTUSize();
+    int thres = (256 == ctuSize)? 32 : 16;
+    if (tplSize < thres)
+    {
+      return;
+    }
+  }
+  PelUnitBuf pcBufPredCurTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
+  PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
+  PelUnitBuf pcBufPredRefTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
+  PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvRefAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
+
+  DistParam cDistParam;
+  cDistParam.applyWeight = false;
+  bool origLICFlag = false, bestLICFlag = false;
+  Distortion uiBestCost = MAX_UINT64;
+  Distortion uiCost = 0;
+  for (uint32_t uiMergeCand = 0; uiMergeCand < mrgCtx.numValidMergeCand; uiMergeCand++)
+  {
+    if (mrgCtx.interDirNeighbours[uiMergeCand] == 0)
+    {
+      break;
+    }
+    if (mrgCtx.interDirNeighbours[uiMergeCand] == 3)
+    {
+      continue;
+    }
+    mrgCtx.setMergeInfo(pu, uiMergeCand);
+    origLICFlag = pu.cu->licFlag;
+    pu.cu->licFlag = false;
+#if JVET_Z0067_RPR_ENABLE
+    bool bRefIsRescaled = false;
+    for (uint32_t refList = 0; refList < NUM_REF_PIC_LIST_01; refList++)
+    {
+      const RefPicList eRefPicList = refList ? REF_PIC_LIST_1 : REF_PIC_LIST_0;
+      bRefIsRescaled |= (pu.refIdx[refList] >= 0) ? pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList])->isRefScaled(pu.cs->pps) : false;
+    }
+    if (bRefIsRescaled)
+    {
+      continue;
+    }
+#endif
+
+    // perform interpolation for template
+    getBlkAMLRefTemplate(pu, pcBufPredRefTop, pcBufPredRefLeft);
+
+    uiBestCost = MAX_UINT64;
+    uiCost = 0;
+
+    for (int idx = 0; idx < 2; idx++)
+    {
+      bool licFlag = (idx == 0)? false : true;
+#if INTER_LIC
+      cDistParam.useMR = licFlag;
+#endif
+      uiCost = 0;
+      if (m_bAMLTemplateAvailabe[0])
+      {
+        m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+
+        uiCost += cDistParam.distFunc(cDistParam);
+      }
+
+      if (m_bAMLTemplateAvailabe[1])
+      {
+        m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+
+        uiCost += cDistParam.distFunc(cDistParam);
+      }
+
+      if (origLICFlag == licFlag)
+      {
+        if (pu.cu->slice->getCheckLDB())
+        {
+          uiCost = (uiCost >> 1)+(uiCost >> 4);
+        }
+        else
+        {
+          uiCost = (uiCost >> 1);
+        }
+      }
+
+      if (uiCost < uiBestCost)
+      {
+        uiBestCost = uiCost;
+        bestLICFlag = licFlag;
+      }
+    } //for (int licFlag = 0; licFlag < 2; licFlag++)
+    pu.cu->licFlag = bestLICFlag;
+    mrgCtx.licFlags[uiMergeCand] = bestLICFlag;
+  } // for (uint32_t uiMergeCand = 0; uiMergeCand < mrgCtx.numValidMergeCand; uiMergeCand++)
+  pu.mergeIdx = mergeIdx;
+}
+#endif
+
 #if JVET_Z0102_NO_ARMC_FOR_ZERO_CAND
 void InterPrediction::adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMergeCandCtx, int numRetrievedMergeCand)
 {

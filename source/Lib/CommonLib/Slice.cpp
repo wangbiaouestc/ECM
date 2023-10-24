@@ -93,6 +93,9 @@ Slice::Slice()
 , m_tsResidualCodingDisabledFlag  ( false )
 , m_pendingRasInit                ( false )
 , m_bCheckLDC                     ( false )
+#if JVET_AF0128_LIC_MERGE_TM
+, m_bCheckLDB                     ( false )
+#endif
 , m_biDirPred                    ( false )
 , m_iSliceQpDelta                 ( 0 )
 , m_iDepth                        ( 0 )
@@ -208,6 +211,9 @@ void Slice::initSlice()
 #endif
 
   m_bCheckLDC = false;
+#if JVET_AF0128_LIC_MERGE_TM
+  m_bCheckLDB = false;
+#endif
 
   m_biDirPred = false;
   m_symRefIdx[0] = -1;
@@ -1612,6 +1618,9 @@ void Slice::copySliceInfo(Slice *pSrc, bool cpyAlmostAll)
   }
 
   m_bCheckLDC             = pSrc->m_bCheckLDC;
+#if JVET_AF0128_LIC_MERGE_TM
+  m_bCheckLDB             = pSrc->m_bCheckLDB;
+#endif
   m_iSliceQpDelta        = pSrc->m_iSliceQpDelta;
 
   m_biDirPred = pSrc->m_biDirPred;
