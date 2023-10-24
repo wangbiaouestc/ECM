@@ -3499,9 +3499,11 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
       }
 #endif
 
-#if RPR_ENABLE
       // create SAO object based on the picture size
       if( pcSlice->getSPS()->getSAOEnabledFlag()
+#if JVET_W0066_CCSAO
+          || pcSlice->getSPS()->getCCSAOEnabledFlag()
+#endif
 #if JVET_V0094_BILATERAL_FILTER
           || pcSlice->getPPS()->getUseBIF()
 #endif
@@ -3511,20 +3513,21 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
           )
       {
         Size saoSize = m_pcSAO->getSaoSize();
-        if ( saoSize.width != picWidth || saoSize.height != picHeight ) {
-          const uint32_t widthInCtus = (picWidth + maxCUWidth - 1) / maxCUWidth;
-          const uint32_t heightInCtus = (picHeight + maxCUHeight - 1) / maxCUHeight;
-          const uint32_t numCtuInFrame = widthInCtus * heightInCtus;
-          const uint32_t  log2SaoOffsetScaleLuma = (uint32_t)std::max(0, pcSlice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA) - MAX_SAO_TRUNCATED_BITDEPTH);
-          const uint32_t  log2SaoOffsetScaleChroma = (uint32_t)std::max(0, pcSlice->getSPS()->getBitDepth(CHANNEL_TYPE_CHROMA) - MAX_SAO_TRUNCATED_BITDEPTH);
+        const uint32_t widthInCtus = (picWidth + maxCUWidth - 1) / maxCUWidth;
+        const uint32_t heightInCtus = (picHeight + maxCUHeight - 1) / maxCUHeight;
+        const uint32_t numCtuInFrame = widthInCtus * heightInCtus;
+        const uint32_t  log2SaoOffsetScaleLuma = (uint32_t)std::max(0, pcSlice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA) - MAX_SAO_TRUNCATED_BITDEPTH);
+        const uint32_t  log2SaoOffsetScaleChroma = (uint32_t)std::max(0, pcSlice->getSPS()->getBitDepth(CHANNEL_TYPE_CHROMA) - MAX_SAO_TRUNCATED_BITDEPTH);
 
+        m_pcSAO->destroyEncData();
+        m_pcSAO->createEncData(m_pcCfg->getSaoCtuBoundary(), numCtuInFrame);
+
+        if ( saoSize.width != picWidth || saoSize.height != picHeight ) 
+        {
           m_pcSAO->create(picWidth, picHeight, chromaFormatIDC, maxCUWidth, maxCUHeight, maxTotalCUDepth, log2SaoOffsetScaleLuma, log2SaoOffsetScaleChroma);
-          m_pcSAO->destroyEncData();
-          m_pcSAO->createEncData(m_pcCfg->getSaoCtuBoundary(), numCtuInFrame);
           m_pcSAO->setReshaper(m_pcReshaper);
         }
       }
-#endif
 
       if( pcSlice->getSPS()->getScalingListFlag() && m_pcCfg->getUseScalingListId() == SCALING_LIST_FILE_READ )
       {
@@ -3679,6 +3682,15 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
       m_pcSAO->jointClipSaoBifCcSao( cs );
 #endif
 
+      if( pcSlice->getSPS()->getSAOEnabledFlag()
+#if JVET_W0066_CCSAO
+       || pcSlice->getSPS()->getCCSAOEnabledFlag()
+#endif
+        )
+      {
+        m_pcSAO->destroyEncData();
+      }
+
 #if RPR_ENABLE && !JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
       // create ALF object based on the picture size
       if ( pcSlice->getSPS()->getALFEnabledFlag() )
@@ -3691,6 +3703,12 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
         }
       }
 #endif
+
+      if ( pcSlice->getSPS()->getALFEnabledFlag() )
+      {
+        // create ALF object based on the picture size
+        m_pcALF->create(m_pcCfg, picWidth, picHeight, chromaFormatIDC, maxCUWidth, maxCUHeight, maxTotalCUDepth, m_pcCfg->getBitDepth(), m_pcCfg->getInputBitDepth(), true);
+      }
 
       if( pcSlice->getSPS()->getALFEnabledFlag() )
       {
@@ -3751,6 +3769,7 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
           pcPic->slices[s]->m_ccAlfFilterControl[0] = m_pcALF->getCcAlfControlIdc(COMPONENT_Cb);
           pcPic->slices[s]->m_ccAlfFilterControl[1] = m_pcALF->getCcAlfControlIdc(COMPONENT_Cr);
         }
+        m_pcALF->destroy(true);
       }
       DTRACE_UPDATE( g_trace_ctx, ( std::make_pair( "final", 1 ) ) );
       if (m_pcCfg->getUseCompositeRef() && getPrepareLTRef())
