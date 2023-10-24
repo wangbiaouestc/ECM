@@ -427,7 +427,11 @@ static const int       MAX_ALF_PADDING_SIZE           =             4;
 #endif
 #if JVET_X0071_LONGER_CCALF
 #define MAX_NUM_CC_ALF_FILTERS                                      16
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+static constexpr int MAX_NUM_CC_ALF_CHROMA_COEFF    =               23 + 5;
+#else
 static constexpr int MAX_NUM_CC_ALF_CHROMA_COEFF    =               25;
+#endif
 #else
 #define MAX_NUM_CC_ALF_FILTERS                                      4
 static constexpr int MAX_NUM_CC_ALF_CHROMA_COEFF    =               8;
