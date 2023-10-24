@@ -51,6 +51,11 @@
 int main(int argc, char* argv[])
 {
   int returnCode = EXIT_SUCCESS;
+#if EXTENSION_CABAC_TRAINING
+  std::ofstream out("CabacBits_data.xml", std::ios::trunc);
+  out << "<CabacBits>" << std::endl;
+  std::ofstream out2("CabacBits_data.bin", std::ios::trunc | std::ios::binary);
+#endif
 
   // print information
   fprintf( stdout, "\n" );
