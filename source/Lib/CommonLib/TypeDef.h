@@ -66,6 +66,7 @@
 #define REMOVE_PCM                                        1 // Remove PCM related code for memory reduction and speedup
 #define JVET_Y0152_TT_ENC_SPEEDUP                         1 // TT encoding speedup
 #define JVET_AE0057_MTT_ET                                1 // JVET-AE0057: MTT early termination of 64x64 luma CU based on no-split RD cost 
+#define JVET_AF0177_ALF_COV_FLOAT                         1 // JVET-AF0177: Use float for ALF and CCALF covariance matrix
 
 
 // Software optimization

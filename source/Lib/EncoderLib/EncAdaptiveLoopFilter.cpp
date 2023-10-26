@@ -102,15 +102,24 @@ void AlfCovariance::reduceClipCost(const AlfFilterShape& alfShape, int *clip) co
 }
 
 #if JVET_AD0222_ALF_RESI_CLASS
+#if JVET_AF0177_ALF_COV_FLOAT
+double AlfCovariance::optimizeFilter(const AlfFilterShape& alfShape, int* clip, Ty f, bool optimize_clip, bool enableLessClip) const
+#else
 double AlfCovariance::optimizeFilter(const AlfFilterShape& alfShape, int* clip, double *f, bool optimize_clip, bool enableLessClip) const
+#endif
 #else
 double AlfCovariance::optimizeFilter(const AlfFilterShape& alfShape, int* clip, double *f, bool optimize_clip) const
 #endif
 {
   const int size = alfShape.numCoeff;
   int clip_max[MAX_NUM_ALF_LUMA_COEFF];
+#if JVET_AF0177_ALF_COV_FLOAT
+  Ty fBest;
+  int copySize = sizeof( float ) * size;
+#else
   double fBest[MAX_NUM_ALF_LUMA_COEFF];
   int copySize = sizeof( double ) * size;
+#endif
   double err_best, err_last;
 
   TE kE;
@@ -305,7 +314,11 @@ double AlfCovariance::calcErrorForCcAlfCoeffs(const int16_t *coeff, const int nu
   return error / factor;
 }
 
+#if JVET_AF0177_ALF_COV_FLOAT
+double AlfCovariance::calculateError( const int *clip, const Ty coeff, const int numCoeff ) const
+#else
 double AlfCovariance::calculateError( const int *clip, const double *coeff, const int numCoeff ) const
+#endif
 {
   double sum = 0;
   for( int i = 0; i < numCoeff; i++ )
@@ -327,17 +340,28 @@ double AlfCovariance::calculateError( const int *clip ) const
 //********************************
 
 #define ROUND(a)  (((a) < 0)? (int)((a) - 0.5) : (int)((a) + 0.5))
+#if JVET_AF0177_ALF_COV_FLOAT
+#define REG              (0.0001f)
+#define REG_SQR          (0.0000001f)
+#else
 #define REG              0.0001
 #define REG_SQR          0.0000001
+#endif
 
 //Find filter coeff related
 int AlfCovariance::gnsCholeskyDec( TE inpMatr, TE outMatr, int numEq ) const
 {
   for( int i = 0; i < numEq; i++ )
   {
+#if JVET_AF0177_ALF_COV_FLOAT
+    float* inputM = inpMatr[i];
+    float* outputM = outMatr[i];
+    float scale = inputM[i];
+#else
     double* inputM  = inpMatr[i];
     double* outputM = outMatr[i];
     double scale    = inputM[i];
+#endif
 
     for( int k = i - 1; k >= 0; k-- )
     {
@@ -350,7 +374,11 @@ int AlfCovariance::gnsCholeskyDec( TE inpMatr, TE outMatr, int numEq ) const
     }
 
     outputM[i] = sqrt( scale );
+#if JVET_AF0177_ALF_COV_FLOAT
+    float tmp = 1 / outputM[i];
+#else
     double tmp = 1 / outputM[i];
+#endif
 
     for( int j = i + 1; j < numEq; j++ )
     {
@@ -368,14 +396,22 @@ int AlfCovariance::gnsCholeskyDec( TE inpMatr, TE outMatr, int numEq ) const
   return 1; // Signal that Cholesky factorization is successfully performed
 }
 
+#if JVET_AF0177_ALF_COV_FLOAT
+void AlfCovariance::gnsTransposeBacksubstitution( TE U, Ty rhs, Ty x, int order ) const
+#else
 void AlfCovariance::gnsTransposeBacksubstitution( TE U, double* rhs, double* x, int order ) const
+#endif
 {
   /* Backsubstitution starts */
   x[0] = rhs[0] / U[0][0];               /* First row of U'                   */
   for( int i = 1; i < order; i++ )
   {         /* For the rows 1..order-1           */
 
+#if JVET_AF0177_ALF_COV_FLOAT
+    float sum = 0; //Holds backsubstitution from already handled rows
+#else
     double sum = 0; //Holds backsubstitution from already handled rows
+#endif
 
     for( int j = 0; j < i; j++ ) /* Backsubst already solved unknowns */
     {
@@ -386,14 +422,22 @@ void AlfCovariance::gnsTransposeBacksubstitution( TE U, double* rhs, double* x, 
   }
 }
 
+#if JVET_AF0177_ALF_COV_FLOAT
+void AlfCovariance::gnsBacksubstitution( TE R, Ty z, int size, Ty A ) const
+#else
 void AlfCovariance::gnsBacksubstitution( TE R, double* z, int size, double* A ) const
+#endif
 {
   size--;
   A[size] = z[size] / R[size][size];
 
   for( int i = size - 1; i >= 0; i-- )
   {
+#if JVET_AF0177_ALF_COV_FLOAT
+    float sum = 0;
+#else
     double sum = 0;
+#endif
 
     for( int j = i + 1; j <= size; j++ )
     {
@@ -404,7 +448,11 @@ void AlfCovariance::gnsBacksubstitution( TE R, double* z, int size, double* A ) 
   }
 }
 
+#if JVET_AF0177_ALF_COV_FLOAT
+int AlfCovariance::gnsSolveByChol( const int *clip, Ty x, int numEq ) const
+#else
 int AlfCovariance::gnsSolveByChol( const int *clip, double *x, int numEq ) const
+#endif
 {
   TE LHS;
   Ty rhs;
@@ -413,7 +461,11 @@ int AlfCovariance::gnsSolveByChol( const int *clip, double *x, int numEq ) const
   return gnsSolveByChol( LHS, rhs, x, numEq );
 }
 
+#if JVET_AF0177_ALF_COV_FLOAT
+int AlfCovariance::gnsSolveByChol( TE LHS, Ty rhs, Ty x, int numEq ) const
+#else
 int AlfCovariance::gnsSolveByChol( TE LHS, double* rhs, double *x, int numEq ) const
+#endif
 {
   Ty aux;     /* Auxiliary vector */
   TE U;    /* Upper triangular Cholesky factor of LHS */
@@ -450,7 +502,11 @@ int AlfCovariance::gnsSolveByChol( TE LHS, double* rhs, double *x, int numEq ) c
 
     if( !res )
     {
+#if JVET_AF0177_ALF_COV_FLOAT
+      std::memset( x, 0, sizeof( float )*numEq );
+#else
       std::memset( x, 0, sizeof( double )*numEq );
+#endif
       return 0;
     }
 
@@ -3007,7 +3063,11 @@ double EncAdaptiveLoopFilter::deriveCoeffQuant( int *filterClipp, int *filterCoe
   const int min_value = -factor + 1;
 
   const int numCoeff = shape.numCoeff;
+#if JVET_AF0177_ALF_COV_FLOAT
+  float     filterCoeff[MAX_NUM_ALF_LUMA_COEFF];
+#else
   double    filterCoeff[MAX_NUM_ALF_LUMA_COEFF];
+#endif
 
 #if JVET_AD0222_ALF_RESI_CLASS
   cov.optimizeFilter( shape, filterClipp, filterCoeff, optimizeClip, m_enableLessClip );
@@ -3062,7 +3122,11 @@ double EncAdaptiveLoopFilter::deriveCoeffQuant( int *filterClipp, int *filterCoe
   return errRef;
 }
 
+#if JVET_AF0177_ALF_COV_FLOAT
+void EncAdaptiveLoopFilter::roundFiltCoeff( int *filterCoeffQuant, float *filterCoeff, const int numCoeff, const int factor )
+#else
 void EncAdaptiveLoopFilter::roundFiltCoeff( int *filterCoeffQuant, double *filterCoeff, const int numCoeff, const int factor )
+#endif
 {
   for( int i = 0; i < numCoeff; i++ )
   {
@@ -3071,8 +3135,11 @@ void EncAdaptiveLoopFilter::roundFiltCoeff( int *filterCoeffQuant, double *filte
   }
 }
 
-void EncAdaptiveLoopFilter::roundFiltCoeffCCALF(int16_t *filterCoeffQuant, double *filterCoeff, const int numCoeff,
-                                                const int factor)
+#if JVET_AF0177_ALF_COV_FLOAT
+void EncAdaptiveLoopFilter::roundFiltCoeffCCALF(int16_t *filterCoeffQuant, float *filterCoeff, const int numCoeff, const int factor)
+#else
+void EncAdaptiveLoopFilter::roundFiltCoeffCCALF(int16_t *filterCoeffQuant, double *filterCoeff, const int numCoeff, const int factor)
+#endif
 {
   for( int i = 0; i < numCoeff; i++ )
   {
@@ -3946,7 +4013,11 @@ void EncAdaptiveLoopFilter::getBlkStats( AlfCovariance* alfCovariance, const Alf
   int classIdx = 0;
 #if JVET_AD0222_ALF_RESI_CLASS
   int classIdxNext = 0;
+#if JVET_AF0177_ALF_COV_FLOAT
+  float curY, curP;
+#else
   double curY, curP;
+#endif
 #endif
 
   for( int i = 0; i < area.height; i++ )
@@ -3983,10 +4054,18 @@ void EncAdaptiveLoopFilter::getBlkStats( AlfCovariance* alfCovariance, const Alf
         CHECK(!alfCovariance[classIdx].sameSizeAs(alfCovarianceNext[classIdxNext]), "Covariance size mismatch");
       }
 #endif
+#if JVET_AF0177_ALF_COV_FLOAT
+      float weight = 1.0;
+#else
       double weight = 1.0;
+#endif
       if( m_alfWSSD )
       {
+#if JVET_AF0177_ALF_COV_FLOAT
+        weight = (float)m_lumaLevelToWeightPLUT[org[j]];
+#else
         weight = m_lumaLevelToWeightPLUT[org[j]];
+#endif
       }
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
       Intermediate_Int yLocal = org[j] - rec[j];
@@ -4047,7 +4126,11 @@ calcCovariance( ELocal, rec + j, recStride, recBeforeDb + j, recBeforeDbStride, 
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
 #if JVET_AD0222_ALF_RESI_CLASS
               const ptrdiff_t oe   = alfCovariance[classIdx].getOffsetEfast(b0, b1, k, l);
+#if JVET_AF0177_ALF_COV_FLOAT
+              const float     curE = weight * (ELocal[k][b0] * (float)ELocal[l][b1]);
+#else
               const double    curE = weight * (ELocal[k][b0] * (double) ELocal[l][b1]);
+#endif
               alfCovariance[classIdx].data[oe] += curE;
               if (reuse)
               {
@@ -4065,7 +4148,11 @@ calcCovariance( ELocal, rec + j, recStride, recBeforeDb + j, recBeforeDbStride, 
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
 #if JVET_AD0222_ALF_RESI_CLASS
               const ptrdiff_t oe   = alfCovariance[classIdx].getOffsetEfast(b0, b1, k, l);
+#if JVET_AF0177_ALF_COV_FLOAT
+              const float     curE = ELocal[k][b0] * (float)ELocal[l][b1];
+#else
               const double    curE = ELocal[k][b0] * (double) ELocal[l][b1];
+#endif
               alfCovariance[classIdx].data[oe] += curE;
               if (reuse)
               {
@@ -4095,13 +4182,21 @@ calcCovariance( ELocal, rec + j, recStride, recBeforeDb + j, recBeforeDbStride, 
             const ptrdiff_t oy = alfCovariance[classIdx].getOffsetY(b, k);
             if (reuse)
             {
+#if JVET_AF0177_ALF_COV_FLOAT
+              curY = weight * (ELocal[k][b] * (float)yLocal);
+#else
               curY = weight * (ELocal[k][b] * (double)yLocal);
+#endif
               alfCovariance[classIdx].data[oy] += curY;
               alfCovarianceNext[classIdxNext].data[oy] += curY;
             }
             else
             {
+#if JVET_AF0177_ALF_COV_FLOAT
+              alfCovariance[classIdx].data[oy] += weight * (ELocal[k][b] * (float)yLocal);
+#else
               alfCovariance[classIdx].data[oy] += weight * (ELocal[k][b] * (double) yLocal);
+#endif
             }
 #else
             alfCovariance[classIdx].y[b][k] += weight * (ELocal[k][b] * (double)yLocal);
@@ -4117,13 +4212,21 @@ calcCovariance( ELocal, rec + j, recStride, recBeforeDb + j, recBeforeDbStride, 
             const ptrdiff_t oy = alfCovariance[classIdx].getOffsetY(b, k);
             if( reuse )
             {
+#if JVET_AF0177_ALF_COV_FLOAT
+              curY = ELocal[k][b] * (float)yLocal;
+#else
               curY = ELocal[k][b] * (double)yLocal;
+#endif
               alfCovariance[classIdx].data[oy] += curY;
               alfCovarianceNext[classIdxNext].data[oy] += curY;
             }
             else
             {
+#if JVET_AF0177_ALF_COV_FLOAT
+              alfCovariance[classIdx].data[oy] += ELocal[k][b] * (float)yLocal;
+#else
               alfCovariance[classIdx].data[oy] += ELocal[k][b] * (double) yLocal;
+#endif
             }           
 #else
             alfCovariance[classIdx].y[b][k] += ELocal[k][b] * (double)yLocal;
@@ -4140,13 +4243,21 @@ calcCovariance( ELocal, rec + j, recStride, recBeforeDb + j, recBeforeDbStride, 
 #if JVET_AD0222_ALF_RESI_CLASS
         if( reuse )
         {
+#if JVET_AF0177_ALF_COV_FLOAT
+          curP = weight * (yLocal * (float)yLocal);
+#else
          curP = weight * (yLocal * (double)yLocal);
+#endif
          alfCovariance[classIdx].pixAcc += curP;
          alfCovarianceNext[classIdxNext].pixAcc += curP;
         }
         else
         {
+#if JVET_AF0177_ALF_COV_FLOAT
+          alfCovariance[classIdx].pixAcc += weight * (yLocal * (float)yLocal);
+#else
           alfCovariance[classIdx].pixAcc += weight * (yLocal * (double)yLocal);
+#endif
         }
 #else
         alfCovariance[classIdx].pixAcc += weight * (yLocal * (double)yLocal);
@@ -4161,13 +4272,21 @@ calcCovariance( ELocal, rec + j, recStride, recBeforeDb + j, recBeforeDbStride, 
 #if JVET_AD0222_ALF_RESI_CLASS
         if( reuse )
         {
+#if JVET_AF0177_ALF_COV_FLOAT
+          curP = yLocal * (float)yLocal;
+#else
           curP = yLocal * (double)yLocal;
+#endif
           alfCovariance[classIdx].pixAcc += curP;
           alfCovarianceNext[classIdxNext].pixAcc += curP;
         }
         else
         {
+#if JVET_AF0177_ALF_COV_FLOAT
+          alfCovariance[classIdx].pixAcc += yLocal * (float)yLocal;
+#else
           alfCovariance[classIdx].pixAcc += yLocal * (double)yLocal;
+#endif
         }
 #else
         alfCovariance[classIdx].pixAcc += yLocal * (double)yLocal;
@@ -6675,14 +6794,27 @@ void EncAdaptiveLoopFilter::deriveCcAlfFilterCoeff( ComponentID compID, const Pe
   }
 
 #if JVET_X0071_LONGER_CCALF && !JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF && !JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS && !JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+#if JVET_AF0177_ALF_COV_FLOAT
+  using TE = float[MAX_NUM_CC_ALF_CHROMA_COEFF][MAX_NUM_CC_ALF_CHROMA_COEFF];
+  using Ty = float[MAX_NUM_CC_ALF_CHROMA_COEFF];
+#else
   using TE = double[MAX_NUM_CC_ALF_CHROMA_COEFF][MAX_NUM_CC_ALF_CHROMA_COEFF];
   using Ty = double[MAX_NUM_CC_ALF_CHROMA_COEFF];
+#endif
+#else
+#if JVET_AF0177_ALF_COV_FLOAT
+  using TE = float[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF];
+  using Ty = float[MAX_NUM_ALF_LUMA_COEFF];
 #else
   using TE = double[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF];
   using Ty = double[MAX_NUM_ALF_LUMA_COEFF];
 #endif
-
+#endif
+#if JVET_AF0177_ALF_COV_FLOAT
+  Ty filterCoeffDbl;
+#else
   double filterCoeffDbl[MAX_NUM_CC_ALF_CHROMA_COEFF];
+#endif
   int16_t filterCoeffInt[MAX_NUM_CC_ALF_CHROMA_COEFF];
 
   std::fill_n(filterCoeffInt, MAX_NUM_CC_ALF_CHROMA_COEFF, 0);
@@ -7490,12 +7622,19 @@ void EncAdaptiveLoopFilter::getBlkStatsCcAlf(AlfCovariance &alfCovariance, const
 #endif
     {
       std::memset(ELocal, 0, sizeof(ELocal));
-
+#if JVET_AF0177_ALF_COV_FLOAT
+      float weight = 1.0;
+      if (m_alfWSSD)
+      {
+        weight = (float)m_lumaLevelToWeightPLUT[org[j]];
+      }
+#else
       double weight = 1.0;
       if (m_alfWSSD)
       {
         weight = m_lumaLevelToWeightPLUT[org[j]];
       }
+#endif
 
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
       Intermediate_Int yLocal = org[j] - rec[compID][j];
@@ -7524,7 +7663,11 @@ void EncAdaptiveLoopFilter::getBlkStatsCcAlf(AlfCovariance &alfCovariance, const
               if (m_alfWSSD)
               {
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+#if JVET_AF0177_ALF_COV_FLOAT
+                alfCovariance.E(b0, b1, k, l) += weight * (ELocal[k][b0] * (float)ELocal[l][b1]);
+#else
                 alfCovariance.E(b0,b1,k,l) += weight * (ELocal[k][b0] * (double)ELocal[l][b1]);
+#endif
 #else
                 alfCovariance.E(b0,b1,k,l) += weight * (double) (ELocal[k][b0] * ELocal[l][b1]);
 #endif
@@ -7532,7 +7675,11 @@ void EncAdaptiveLoopFilter::getBlkStatsCcAlf(AlfCovariance &alfCovariance, const
               else
               {
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+#if JVET_AF0177_ALF_COV_FLOAT
+                alfCovariance.E(b0, b1, k, l) += ELocal[k][b0] * (float)ELocal[l][b1];
+#else
                 alfCovariance.E(b0,b1,k,l) += ELocal[k][b0] * (double)ELocal[l][b1];
+#endif
 #else
                 alfCovariance.E(b0,b1,k,l) += ELocal[k][b0] * ELocal[l][b1];
 #endif
@@ -7545,7 +7692,11 @@ void EncAdaptiveLoopFilter::getBlkStatsCcAlf(AlfCovariance &alfCovariance, const
           if (m_alfWSSD)
           {
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+#if JVET_AF0177_ALF_COV_FLOAT
+            alfCovariance.y(b,k) += weight * (ELocal[k][b] * (float)yLocal);
+#else
             alfCovariance.y(b,k) += weight * (ELocal[k][b] * (double)yLocal);
+#endif
 #else
             alfCovariance.y[b][k] += weight * (double) (ELocal[k][b] * yLocal);
 #endif
@@ -7553,7 +7704,11 @@ void EncAdaptiveLoopFilter::getBlkStatsCcAlf(AlfCovariance &alfCovariance, const
           else
           {
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+#if JVET_AF0177_ALF_COV_FLOAT
+            alfCovariance.y(b,k) += ELocal[k][b] * (float)yLocal;
+#else
             alfCovariance.y(b,k) += ELocal[k][b] * (double)yLocal;
+#endif
 #else
             alfCovariance.y[b][k] += ELocal[k][b] * yLocal;
 #endif
@@ -7563,7 +7718,11 @@ void EncAdaptiveLoopFilter::getBlkStatsCcAlf(AlfCovariance &alfCovariance, const
       if (m_alfWSSD)
       {
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+#if JVET_AF0177_ALF_COV_FLOAT
+        alfCovariance.pixAcc += weight * (yLocal * (float)yLocal);
+#else
         alfCovariance.pixAcc += weight * (yLocal * (double)yLocal);
+#endif
 #else
         alfCovariance.pixAcc += weight * (double) (yLocal * yLocal);
 #endif
@@ -7571,7 +7730,11 @@ void EncAdaptiveLoopFilter::getBlkStatsCcAlf(AlfCovariance &alfCovariance, const
       else
       {
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+#if JVET_AF0177_ALF_COV_FLOAT
+        alfCovariance.pixAcc += yLocal * (float)yLocal;
+#else
         alfCovariance.pixAcc += yLocal * (double)yLocal;
+#endif
 #else
         alfCovariance.pixAcc += yLocal * yLocal;
 #endif

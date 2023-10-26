@@ -49,15 +49,29 @@ struct AlfCovariance
   static constexpr int MaxAlfNumClippingValues = AdaptiveLoopFilter::MaxAlfNumClippingValues;
 
 #if JVET_X0071_LONGER_CCALF && !JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF && !JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AF0177_ALF_COV_FLOAT
+  using TE = float[MAX_NUM_CC_ALF_CHROMA_COEFF][MAX_NUM_CC_ALF_CHROMA_COEFF];
+  using Ty = float[MAX_NUM_CC_ALF_CHROMA_COEFF];
+#else
   using TE = double[MAX_NUM_CC_ALF_CHROMA_COEFF][MAX_NUM_CC_ALF_CHROMA_COEFF];
   using Ty = double[MAX_NUM_CC_ALF_CHROMA_COEFF];
+#endif
+#else
+#if JVET_AF0177_ALF_COV_FLOAT
+  using TE = float[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF];
+  using Ty = float[MAX_NUM_ALF_LUMA_COEFF];
+  using DTy = double[MAX_NUM_ALF_LUMA_COEFF];
 #else
   using TE = double[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF];
   using Ty = double[MAX_NUM_ALF_LUMA_COEFF];
 #endif
+#endif
 
-
+#if JVET_AF0177_ALF_COV_FLOAT
+  std::vector<float> data;
+#else
   std::vector<double> data;
+#endif
 
   ptrdiff_t                offsetE;
   ptrdiff_t                stridey;
@@ -84,16 +98,26 @@ struct AlfCovariance
 
     return offsetE + (v1 <= v0 ? (v0 * (v0 + 1) >> 1) + v1 : (v1 * (v1 + 1) >> 1) + v0);
   }
+#if JVET_AF0177_ALF_COV_FLOAT
+  float       &y(ptrdiff_t i, ptrdiff_t j) { return data[getOffsetY(i, j)]; }
+  const float &y(ptrdiff_t i, ptrdiff_t j) const { return data[getOffsetY(i, j)]; }
 
+  float       &E(ptrdiff_t i, ptrdiff_t j, ptrdiff_t k, ptrdiff_t l) { return data[getOffsetE(i, j, k, l)]; }
+  const float &E(ptrdiff_t i, ptrdiff_t j, ptrdiff_t k, ptrdiff_t l) const { return data[getOffsetE(i, j, k, l)]; }
+#else
   double       &y(ptrdiff_t i, ptrdiff_t j) { return data[getOffsetY(i, j)]; }
   const double &y(ptrdiff_t i, ptrdiff_t j) const { return data[getOffsetY(i, j)]; }
 
   double       &E(ptrdiff_t i, ptrdiff_t j, ptrdiff_t k, ptrdiff_t l) { return data[getOffsetE(i, j, k, l)]; }
   const double &E(ptrdiff_t i, ptrdiff_t j, ptrdiff_t k, ptrdiff_t l) const { return data[getOffsetE(i, j, k, l)]; }
-
+#endif
   int numCoeff;
   int numBins;
+#if JVET_AF0177_ALF_COV_FLOAT
+  float pixAcc;
+#else
   double pixAcc;
+#endif
 
   AlfCovariance() {}
   ~AlfCovariance() {}
@@ -106,7 +130,11 @@ struct AlfCovariance
     stridey    = numCoeff;
     offsetE    = stridey * numBins;
     data.resize(offsetE + (numCols * (numCols + 1) >> 1));
+#if JVET_AF0177_ALF_COV_FLOAT
+    std::fill(data.begin(), data.end(), 0.0f);
+#else
     std::fill(data.begin(), data.end(), 0.0);
+#endif
   }
 
   void destroy()
@@ -116,7 +144,11 @@ struct AlfCovariance
   void reset()
   {
     pixAcc = 0;
+#if JVET_AF0177_ALF_COV_FLOAT
+    std::fill(data.begin(), data.end(), 0.0f);
+#else
     std::fill(data.begin(), data.end(), 0.0);
+#endif
   }
 
   void reset(int _numBins)
@@ -236,15 +268,22 @@ struct AlfCovariance
       }
     }
   }
-
+#if JVET_AF0177_ALF_COV_FLOAT
+  double optimizeFilter(const int* clip, Ty f, int size) const
+#else
   double optimizeFilter(const int* clip, double *f, int size) const
+#endif
   {
     gnsSolveByChol( clip, f, size );
     return calculateError( clip, f );
   }
 
 #if JVET_AD0222_ALF_RESI_CLASS
+#if JVET_AF0177_ALF_COV_FLOAT
+  double optimizeFilter(const AlfFilterShape& alfShape, int* clip, Ty f, bool optimize_clip, bool enableLessClip) const;
+#else
   double optimizeFilter(const AlfFilterShape& alfShape, int* clip, double *f, bool optimize_clip, bool enableLessClip) const;
+#endif
   double optimizeFilterClip(const AlfFilterShape& alfShape, int* clip, bool enableLessClip) const
   {
     Ty f;
@@ -260,22 +299,34 @@ struct AlfCovariance
 #endif
 
   double calculateError( const int *clip ) const;
+#if JVET_AF0177_ALF_COV_FLOAT
+  double calculateError( const int *clip, const Ty coeff ) const { return calculateError(clip, coeff, numCoeff); }
+  double calculateError( const int *clip, const Ty coeff, const int numCoeff ) const;
+#else
   double calculateError( const int *clip, const double *coeff ) const { return calculateError(clip, coeff, numCoeff); }
   double calculateError( const int *clip, const double *coeff, const int numCoeff ) const;
+#endif
   double calcErrorForCoeffs( const int *clip, const int *coeff, const int numCoeff, const int bitDepth ) const;
   double calcErrorForCcAlfCoeffs(const int16_t *coeff, const int numCoeff, const int bitDepth) const;
 
   void getClipMax(const AlfFilterShape& alfShape, int *clip_max) const;
   void reduceClipCost(const AlfFilterShape& alfShape, int *clip) const;
-
+#if JVET_AF0177_ALF_COV_FLOAT
+  int  gnsSolveByChol( TE LHS, Ty rhs, Ty x, int numEq ) const;
+#else
   int  gnsSolveByChol( TE LHS, double* rhs, double *x, int numEq ) const;
-
+#endif
 private:
   // Cholesky decomposition
-
+#if JVET_AF0177_ALF_COV_FLOAT
+  int  gnsSolveByChol( const int *clip, Ty x, int numEq ) const;
+  void gnsTransposeBacksubstitution( TE U, Ty rhs, Ty x, int order ) const;
+  void gnsBacksubstitution( TE R, Ty z, int size, Ty A ) const;
+#else
   int  gnsSolveByChol( const int *clip, double *x, int numEq ) const;
   void gnsBacksubstitution( TE R, double* z, int size, double* A ) const;
   void gnsTransposeBacksubstitution( TE U, double* rhs, double* x, int order ) const;
+#endif
   int  gnsCholeskyDec( TE inpMatr, TE outMatr, int numEq ) const;
 };
 
@@ -569,9 +620,13 @@ private:
                                 , int fixedFilterSetIdx
 #endif
                                 );
+#if JVET_AF0177_ALF_COV_FLOAT
+  void   roundFiltCoeff( int *filterCoeffQuant, float *filterCoeff, const int numCoeff, const int factor );
+  void   roundFiltCoeffCCALF( int16_t *filterCoeffQuant, float *filterCoeff, const int numCoeff, const int factor );
+#else
   void   roundFiltCoeff( int *filterCoeffQuant, double *filterCoeff, const int numCoeff, const int factor );
   void   roundFiltCoeffCCALF(int16_t *filterCoeffQuant, double *filterCoeff, const int numCoeff, const int factor);
-
+#endif
   double getDistCoeffForce0( bool* codedVarBins, double errorForce0CoeffTab[MAX_NUM_ALF_CLASSES][2], int* bitsVarBin, int zeroBitsVarBin, const int numFilters);
   int    lengthUvlc( int uiCode );
 #if ALF_IMPROVEMENT
