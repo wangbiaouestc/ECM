@@ -768,6 +768,9 @@ private:
 #if JVET_AE0059_INTER_CCCM
   Pel             **m_interCccmStorage;
 #endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  Pel             **m_interCcpMergeStorage;
+#endif
 #if JVET_AE0169_BIPREDICTIVE_IBC
   Distortion      m_bestBvpSADHADCost;
 #endif
@@ -829,6 +832,11 @@ protected:
 #if INTER_LIC
 public:
   EncFastLICCtrl  m_fastLicCtrl;
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  bool m_isInterCcpModelReady;
+  int  m_validNum;
+  CCPModelCandidate m_interCcpMergeList[MAX_CCP_CAND_LIST_SIZE];
 #endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
 public:

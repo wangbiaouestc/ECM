@@ -1084,6 +1084,15 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
   m_pcInterSearch->m_fastLicCtrl.init();
 #endif
 
+#if JVET_AF0073_INTER_CCP_MERGE
+  m_pcInterSearch->m_isInterCcpModelReady = false;
+  m_pcInterSearch->m_validNum = 0;
+  for (int i = 0; i < MAX_CCP_CAND_LIST_SIZE; i++)
+  {
+    m_pcInterSearch->m_interCcpMergeList[i] = {};
+  }
+#endif
+
 #if MULTI_HYP_PRED
   const UnitArea localUnitArea(tempCS->area.chromaFormat, Area(0, 0, tempCS->area.Y().width, tempCS->area.Y().height));
 #if JVET_AD0213_LIC_IMP
@@ -1631,6 +1640,21 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
         && bestCS->area.Cb() == (*bestCS->cus.back()).Cb())
     {
       CU::saveModelsInHCCP(cu);
+    }
+  }
+#endif
+
+#if JVET_AF0073_INTER_CCP_MERGE
+  {
+    CodingUnit& cu = *bestCS->cus.front();
+    if ((!slice.isIntra()) && !(cu.chromaFormat == CHROMA_400 || CS::isDualITree(*bestCS))
+      && partitioner.chType == CHANNEL_TYPE_LUMA
+      && (!CU::isIntra(cu)) && bestCS->cus.size() == 1
+      && bestCS->area.Cb() == (*bestCS->cus.back()).Cb()
+      )
+    {
+      CU::saveModelsInHCCP(cu);
+      CU::saveProCcpInfo(cu);
     }
   }
 #endif

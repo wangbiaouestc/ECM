@@ -3803,6 +3803,23 @@ const CtxSet ContextSetCfg::InterCccmFlag = ContextSetCfg::addCtxSet
   });
 #endif
 
+#if JVET_AF0073_INTER_CCP_MERGE
+const CtxSet ContextSetCfg::InterCcpMergeFlag = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  { DWE, },
+  { DWE, },
+  { DWE, },
+  { DWO, },
+  { DWO, },
+  });
+#endif
+
 #else
 const CtxSet ContextSetCfg::SplitFlag = ContextSetCfg::addCtxSet
 ({
@@ -6870,6 +6887,23 @@ const CtxSet ContextSetCfg::nonLocalCCP = ContextSetCfg::addCtxSet
 
 #if JVET_AE0059_INTER_CCCM
 const CtxSet ContextSetCfg::InterCccmFlag = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  { DWE, },
+  { DWE, },
+  { DWE, },
+  { DWO, },
+  { DWO, },
+  });
+#endif
+
+#if JVET_AF0073_INTER_CCP_MERGE
+const CtxSet ContextSetCfg::InterCcpMergeFlag = ContextSetCfg::addCtxSet
 ({
   { CNU, },
   { CNU, },

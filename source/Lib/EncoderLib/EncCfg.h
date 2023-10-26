@@ -996,6 +996,10 @@ protected:
 #if JVET_AE0059_INTER_CCCM
   bool m_interCccm;
 #endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  bool m_interCcpMerge;
+  int  m_interCcpMergeFastMode;
+#endif
 #if JVET_AE0100_BVGCCCM
   bool m_bvgCccm;
 #endif
@@ -1754,6 +1758,12 @@ public:
 #if JVET_AE0059_INTER_CCCM
   void setUseInterCccm(bool b) { m_interCccm = b; }
   bool getUseInterCccm() const { return m_interCccm; }
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  void setUseInterCcpMerge(bool b) { m_interCcpMerge = b; }
+  bool getUseInterCcpMerge() const { return m_interCcpMerge; }
+  void setInterCcpMergeFastMode(int currMode) { m_interCcpMergeFastMode = currMode; }
+  int  getInterCcpMergeFastMode() const { return m_interCcpMergeFastMode; }
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   void      setUseBIF                       ( bool b )       { m_BIF = b; }

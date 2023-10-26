@@ -1617,6 +1617,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if JVET_AE0059_INTER_CCCM
   WRITE_FLAG( pcSPS->getUseInterCccm() ? 1 : 0,                                        "sps_inter_cccm");
 #endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  WRITE_FLAG( pcSPS->getUseInterCcpMerge() ? 1 : 0,                                    "sps_inter_ccp_merge");
+#endif
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
   if (pcSPS->getTMnoninterToolsEnableFlag())
   {

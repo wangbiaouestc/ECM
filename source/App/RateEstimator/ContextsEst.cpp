@@ -3737,4 +3737,21 @@ const CtxSet ContextSetCfg::InterCccmFlag = ContextSetCfg::addCtxSet
   });
 #endif
 
+#if JVET_AF0073_INTER_CCP_MERGE
+const CtxSet ContextSetCfg::InterCcpMergeFlag = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  { DWE, },
+  { DWE, },
+  { DWE, },
+  { DWO, },
+  { DWO, },
+  });
+#endif
+
 #endif

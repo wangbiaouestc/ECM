@@ -1015,6 +1015,11 @@ void EncApp::xInitLibCfg()
 #if JVET_AE0059_INTER_CCCM
   m_cEncLib.setUseInterCccm                                      ( m_interCccm );
 #endif
+
+#if JVET_AF0073_INTER_CCP_MERGE
+  m_cEncLib.setUseInterCcpMerge                                  ( m_interCcpMerge );
+  m_cEncLib.setInterCcpMergeFastMode                             ( m_interCcpMergeFastMode );
+#endif
   // ADD_NEW_TOOL : (encoder app) add setting of tool enabling flags and associated parameters here
   m_cEncLib.setVirtualBoundariesEnabledFlag                      ( m_virtualBoundariesEnabledFlag );
   if( m_cEncLib.getVirtualBoundariesEnabledFlag() )
