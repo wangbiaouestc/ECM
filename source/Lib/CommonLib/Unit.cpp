@@ -1634,6 +1634,11 @@ void TransformUnit::initData()
 #if JVET_AE0059_INTER_CCCM
   interCccm          = 0;
 #endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  interCcpMerge      = 0;
+  curCand            = {};
+  curCand.type       = CCP_TYPE_NONE;
+#endif
 }
 #if REMOVE_PCM
 #if SIGN_PREDICTION
@@ -1721,6 +1726,10 @@ TransformUnit& TransformUnit::operator=(const TransformUnit& other)
 #if JVET_AE0059_INTER_CCCM
   interCccm          = other.interCccm;
 #endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  interCcpMerge      = other.interCcpMerge;
+  curCand            = other.curCand;
+#endif
   return *this;
 }
 
@@ -1759,6 +1768,10 @@ void TransformUnit::copyComponentFrom(const TransformUnit& other, const Componen
 #if JVET_AE0059_INTER_CCCM
   interCccm        = other.interCccm;
 #endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  interCcpMerge    = other.interCcpMerge;
+  curCand          = other.curCand;
+#endif
 }
 
        CoeffBuf TransformUnit::getCoeffs(const ComponentID id)       { return  CoeffBuf(m_coeffs[id], blocks[id]); }
@@ -1773,6 +1786,30 @@ AreaBuf<SIGN_PRED_TYPE> TransformUnit::getCoeffSigns(const ComponentID id)
       IdxBuf    TransformUnit::getCoeffSignsScanIdx(const ComponentID id) { return  IdxBuf(m_coeffSignsIdx[id], blocks[id]); }
 const CIdxBuf   TransformUnit::getCoeffSignsScanIdx(const ComponentID id) const { return CIdxBuf(m_coeffSignsIdx[id], blocks[id]); }
 #endif
+#endif
+
+#if JVET_AF0073_INTER_CCP_MERGE
+const MotionInfo& TransformUnit::getMotionInfo() const
+{
+  return cs->getMotionInfo( lumaPos() );
+}
+
+const MotionInfo& TransformUnit::getMotionInfo( const Position& pos ) const
+{
+  CHECKD( !Y().contains( pos ), "Trying to access motion info outside of TU" );
+  return cs->getMotionInfo( pos );
+}
+
+const int& TransformUnit::getCcpmIdxInfo() const
+{
+  return cs->getCcpmIdxInfo( chromaPos() );
+}
+
+const int& TransformUnit::getCcpmIdxInfo( const Position& pos ) const
+{
+  CHECKD( !Y().contains( pos ), "Trying to access motion info outside of TU" );
+  return cs->getCcpmIdxInfo( pos );
+}
 #endif
 
 #if REMOVE_PCM

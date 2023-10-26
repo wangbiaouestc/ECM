@@ -119,7 +119,7 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
   }
 #endif
 
-#if JVET_AE0159_FIBC || JVET_AE0059_INTER_CCCM || JVET_AE0078_IBC_LIC_EXTENSION
+#if JVET_AE0159_FIBC || JVET_AE0059_INTER_CCCM || JVET_AE0078_IBC_LIC_EXTENSION || JVET_AF0073_INTER_CCP_MERGE
   m_pcInterPred->setIntraPrediction( m_pcIntraPred );
 #endif
 #if JVET_Z0118_GDR
@@ -306,6 +306,10 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
         }
 #endif
         xReconInter( currCU );
+#if JVET_AF0073_INTER_CCP_MERGE
+        CU::saveModelsInHCCP(currCU);
+        CU::saveProCcpInfo(currCU);
+#endif
         break;
       case MODE_PLT:
       case MODE_INTRA:
@@ -702,8 +706,12 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
           }
         }
 #endif
-#if JVET_AC0147_CCCM_NO_SUBSAMPLING
-        else if (candList[i].type & CCP_TYPE_NSCCCM)
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING || JVET_AF0073_INTER_CCP_MERGE
+        else if (candList[i].type & CCP_TYPE_NSCCCM
+#if JVET_AF0073_INTER_CCP_MERGE
+          || (candList[i].type & CCP_TYPE_INTER_CCCM)
+#endif
+          )
         {
           if (!hasFilteredNSCCCM)
           {
@@ -2107,6 +2115,25 @@ void DecCu::xDecodeInterTexture(CodingUnit &cu)
         const bool valid = m_pcInterPred->deriveInterCccmPrediction(&currTU, tmpInterCccmStorage.getBuf(COMPONENT_Y), cs.getRecoBuf(currTU.blocks[COMPONENT_Y]), bufCb, bufCr, bufCb, bufCr );
 
         CHECK( !valid, "invalid inter cccm" );
+
+#if SIGN_PREDICTION
+        cs.getRecoBuf(currTU.blocks[COMPONENT_Cb]).copyClip(cs.getPredBuf(currTU.blocks[COMPONENT_Cb]), cs.slice->clpRng(COMPONENT_Cb));
+        cs.getRecoBuf(currTU.blocks[COMPONENT_Cr]).copyClip(cs.getPredBuf(currTU.blocks[COMPONENT_Cr]), cs.slice->clpRng(COMPONENT_Cr));
+#endif
+      }
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+      if (currTU.interCcpMerge && compID == COMPONENT_Cb && currTU.blocks[COMPONENT_Cb].valid())
+      {
+        PelBuf bufCb = cs.getPredBuf( currTU.blocks[COMPONENT_Cb] );
+        PelBuf bufCr = cs.getPredBuf( currTU.blocks[COMPONENT_Cr] );
+
+        CCPModelCandidate interCcpMergeList[MAX_CCP_CAND_LIST_SIZE];
+        int validNum = 0;
+        m_pcIntraPred->xAddOnTheFlyCalcCCPCands4InterBlk(*currTU.cu->firstPU, currTU.blocks[COMPONENT_Cb], interCcpMergeList, validNum);
+        const bool valid = m_pcInterPred->deriveInterCcpMergePrediction(&currTU, cs.getRecoBuf(currTU.blocks[COMPONENT_Y]), bufCb, bufCr, bufCb, bufCr, interCcpMergeList, validNum);
+
+        CHECK( !valid, "invalid inter ccp merge" );
 
 #if SIGN_PREDICTION
         cs.getRecoBuf(currTU.blocks[COMPONENT_Cb]).copyClip(cs.getPredBuf(currTU.blocks[COMPONENT_Cb]), cs.slice->clpRng(COMPONENT_Cb));

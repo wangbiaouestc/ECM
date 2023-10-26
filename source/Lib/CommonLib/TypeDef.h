@@ -301,6 +301,7 @@
 #define JVET_AE0150_SMALL_SCALE_RPR_FILTERS               1 // RPR filters and thresholds for scale factors 1.1x to 1.35x
 #endif
 #define JVET_AF0190_RPR_TMP_REORDER_LIC                   1 // JVET-AF0190: enabling template-based reordering tools and LIC for scaled pictures in the RPR
+#define JVET_AF0073_INTER_CCP_MERGE                       1 // JVET-AF0073: Cross-component prediction merge mode for inter prediction
 
 // Inter template matching tools
 #define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction

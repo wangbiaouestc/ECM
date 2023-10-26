@@ -762,6 +762,10 @@ struct TransformUnit : public UnitArea
 #if JVET_AE0059_INTER_CCCM
   int8_t         interCccm;
 #endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  int8_t         interCcpMerge;
+  CCPModelCandidate curCand;
+#endif
   TransformUnit() : chType( CH_L ) { }
   TransformUnit(const UnitArea& unit);
   TransformUnit(const ChromaFormat _chromaFormat, const Area &area);
@@ -811,6 +815,13 @@ struct TransformUnit : public UnitArea
   IdxBuf          getCoeffSignsScanIdx(const ComponentID id);
   const CIdxBuf   getCoeffSignsScanIdx(const ComponentID id) const;
 #endif
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  const MotionInfo& getMotionInfo() const;
+  const MotionInfo& getMotionInfo( const Position& pos ) const;
+  
+  const int& getCcpmIdxInfo() const;
+  const int& getCcpmIdxInfo( const Position& pos ) const;
 #endif
 #if !REMOVE_PCM
          PelBuf   getPcmbuf(const ComponentID id);

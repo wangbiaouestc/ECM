@@ -7698,6 +7698,12 @@ void CABACReader::transform_unit(TransformUnit& tu, CUCtx& cuCtx, Partitioner& p
     }
   }
 
+#if JVET_AF0073_INTER_CCP_MERGE
+  if ( !lumaOnly )
+  {
+    interCcpMerge( tu );
+  }
+#endif
 #if JVET_AE0059_INTER_CCCM
   if ( !lumaOnly )
   {
@@ -9274,6 +9280,17 @@ void CABACReader::interCccm(TransformUnit& tu)
 }
 #endif
 
+#if JVET_AF0073_INTER_CCP_MERGE
+void CABACReader::interCcpMerge(TransformUnit& tu)
+{
+  if (TU::interCcpMergeAllowed(tu))
+  {
+    tu.interCcpMerge = m_BinDecoder.decodeBin(Ctx::InterCcpMergeFlag(0));
+    DTRACE(g_trace_ctx, D_SYNTAX, "inter_ccp_merge() pos=(%d,%d) inter_ccp_merge_flag=%d\n", tu.blocks[tu.chType].x, tu.blocks[tu.chType].y, tu.interCcpMerge);
+  }
+}
+#endif
+
 #if EXTENSION_CABAC_TRAINING
 // The strings in array "ctxNames" must be in the same order as the calls of "ContextSetCfg::addCtxSet" in Contexts.cpp
 const char* ctxNames[] =
@@ -9565,6 +9582,9 @@ const char* ctxNames[] =
 #endif
 #if JVET_AE0059_INTER_CCCM
   "InterCccmFlag",
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  "InterCcpMergeFlag",
 #endif
 };
 

@@ -306,6 +306,9 @@ enum CCPType
   CCP_TYPE_GLCCCM  = (1 << 5),
   CCP_TYPE_NSCCCM  = (1 << 6),
   CCP_TYPE_MDFCCCM = (1 << 7),
+#if JVET_AF0073_INTER_CCP_MERGE
+  CCP_TYPE_INTER_CCCM = (1 << 8),
+#endif
   NUM_CCP_TYPE
 };
 
@@ -534,6 +537,36 @@ struct CCPModelCandidate
           {
             return true;
           }
+        }
+      }
+      return false;
+    }
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+    else if (type & CCP_TYPE_INTER_CCCM)
+    {
+#if JVET_AB0174_CCCM_DIV_FREE
+      if (lumaOffset != cand.lumaOffset)
+      {
+        return false;
+      }
+#endif
+      if (type & CCP_TYPE_MMLM)
+      {
+        if (yThres != cand.yThres)
+        {
+          return false;
+        }
+        if (isTheSameParams<INTER_CCCM_NUM_PARAMS>(cand) && isTheSameParams2<INTER_CCCM_NUM_PARAMS>(cand))
+        {
+          return true;
+        }
+      }
+      else
+      {
+        if (isTheSameParams<INTER_CCCM_NUM_PARAMS>(cand))
+        {
+          return true;
         }
       }
       return false;

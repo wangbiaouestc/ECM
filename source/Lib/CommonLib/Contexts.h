@@ -625,6 +625,9 @@ public:
 #if JVET_AE0059_INTER_CCCM
   static const CtxSet   InterCccmFlag;
 #endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  static const CtxSet   InterCcpMergeFlag;
+#endif
   static const unsigned NumberOfContexts;
 
   // combined sets for less complex copying

@@ -316,7 +316,7 @@ InterPrediction::InterPrediction()
     }
   }
 #endif
-#if JVET_AE0159_FIBC || JVET_AE0078_IBC_LIC_EXTENSION || JVET_AE0059_INTER_CCCM
+#if JVET_AE0159_FIBC || JVET_AE0078_IBC_LIC_EXTENSION || JVET_AE0059_INTER_CCCM || JVET_AF0073_INTER_CCP_MERGE
   m_pcIntraPred     = nullptr;
 #endif
 #if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
@@ -509,7 +509,7 @@ void InterPrediction::destroy()
     }
   }
 #endif
-#if JVET_AE0159_FIBC || JVET_AE0078_IBC_LIC_EXTENSION || JVET_AE0059_INTER_CCCM
+#if JVET_AE0159_FIBC || JVET_AE0078_IBC_LIC_EXTENSION || JVET_AE0059_INTER_CCCM || JVET_AF0073_INTER_CCP_MERGE
   m_pcIntraPred     = nullptr;
 #endif
 #if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
@@ -16338,7 +16338,7 @@ void InterPrediction::xGetLICParamGeneral(const CodingUnit& cu,
 }
 #endif
 
-#if JVET_AE0159_FIBC || JVET_AE0059_INTER_CCCM || JVET_AE0078_IBC_LIC_EXTENSION
+#if JVET_AE0159_FIBC || JVET_AE0059_INTER_CCCM || JVET_AE0078_IBC_LIC_EXTENSION || JVET_AF0073_INTER_CCP_MERGE
 void InterPrediction::setIntraPrediction(IntraPrediction* intra)
 {
   m_pcIntraPred     = intra;
@@ -31726,7 +31726,11 @@ std::vector<Mv> InterPrediction::deriveMVDFromMVSDIdxAffineSI(PredictionUnit& pu
     return ((sum + 2) >> 2);
   }
 
+#if JVET_AF0073_INTER_CCP_MERGE
+  bool InterPrediction::deriveInterCccmPrediction( TransformUnit* tu, const PelBuf& lumaPrediction, const PelBuf& lumaReconstruction, const PelBuf& inBufCb, const PelBuf& inBufCr, PelBuf& outBufCb, PelBuf& outBufCr )
+#else
   bool InterPrediction::deriveInterCccmPrediction( const TransformUnit* tu, const PelBuf& lumaPrediction, const PelBuf& lumaReconstruction, const PelBuf& inBufCb, const PelBuf& inBufCr, PelBuf& outBufCb, PelBuf& outBufCr )
+#endif
   {
     const int subSampleX[7][7] =
     { { 1,1,1,1,1,1,1 },
@@ -31810,6 +31814,14 @@ std::vector<Mv> InterPrediction::deriveMVDFromMVSDIdxAffineSI(PredictionUnit& pu
     const ClpRng& clpRngCb = tu->cs->slice->clpRng( COMPONENT_Cb );
     const ClpRng& clpRngCr = tu->cs->slice->clpRng( COMPONENT_Cr );
 
+#if JVET_AF0073_INTER_CCP_MERGE
+    {
+      CCPModelCandidate *cand = &(tu->curCand);
+      cand->type = CCP_TYPE_INTER_CCCM;
+      PU::cccmModelToCcpParams(*cand, interCccmModels[0], interCccmModels[1], offset[COMPONENT_Y]);
+    }
+#endif
+
     // apply models
     for( int y = 0; y < chromaSize.height; y++ )
     {
@@ -31831,6 +31843,147 @@ std::vector<Mv> InterPrediction::deriveMVDFromMVSDIdxAffineSI(PredictionUnit& pu
       }
     }
 
+    return true;
+  }
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  bool InterPrediction::deriveInterCcpMergePrediction( TransformUnit* tu, const PelBuf& lumaReconstruction, PelBuf& inBufCb, PelBuf& inBufCr, PelBuf& outBufCb, PelBuf& outBufCr, CCPModelCandidate interCcpMergeList[], int validNum)
+  {
+    PredictionUnit* pu = tu->cu->firstPU;
+    const CompArea    &area      = tu->blocks[COMPONENT_Cb];
+    CCPModelCandidate candList[MAX_CCP_CAND_LIST_SIZE];
+    tu->cu->firstPU->idxNonLocalCCP = 1;
+    const int candIdx = tu->cu->firstPU->idxNonLocalCCP - 1;
+    const int candNum = PU::getCCPModelCandidateList(*pu, candList, true, validNum, interCcpMergeList);
+
+    CompArea lumaArea = CompArea(COMPONENT_Y, tu->cu->firstPU->chromaFormat, area.lumaPos(), recalcSize(tu->cu->firstPU->chromaFormat, CHANNEL_TYPE_CHROMA, CHANNEL_TYPE_LUMA, area.size()));
+    PelBuf picLumaReco = tu->cu->firstPU->cs->picture->getRecoBuf(lumaArea);
+    picLumaReco.copyFrom(lumaReconstruction);
+    {
+      bool hasFilteredCCCM   = false;
+      bool hasFilteredCCLM   = false;
+      bool hasFilteredNSCCCM = false;
+      bool hasFilteredGLM[8] = { false, false, false, false, false, false, false, false};
+#if JVET_AD0202_CCCM_MDF
+      bool hasFilteredMFCCCM = false;
+#endif
+      for (int i = 0; i < candNum; i++)
+      {
+        if (candList[i].type & (CCP_TYPE_CCCM | CCP_TYPE_GLCCCM))
+        {
+          if (!hasFilteredCCCM)
+          {
+            m_pcIntraPred->xCccmCreateLumaRef(*pu, area, 0, true);
+            hasFilteredCCCM = true;
+          }
+        }
+#if JVET_AD0202_CCCM_MDF
+        else if (candList[i].type & CCP_TYPE_MDFCCCM)
+        {
+          if (!hasFilteredMFCCCM)
+          {
+            pu->cccmMultiFilterIdx = candList[i].cccmMultiFilterIdx;
+            if (!hasFilteredCCCM)
+            {
+              m_pcIntraPred->xCccmCreateLumaRef(*pu, area, 0, true);
+              hasFilteredCCCM = true;
+            }
+            m_pcIntraPred->xCccmCreateLumaRef(*pu, area, 1, true);
+            m_pcIntraPred->xCccmCreateLumaRef(*pu, area, 2, true);
+            m_pcIntraPred->xCccmCreateLumaRef(*pu, area, 3, true);
+
+            pu->cccmMultiFilterIdx = 0;
+            hasFilteredMFCCCM = true;
+          }
+        }
+#endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING 
+        else if (candList[i].type & CCP_TYPE_NSCCCM || (candList[i].type & CCP_TYPE_INTER_CCCM)
+          )
+        {
+          if (!hasFilteredNSCCCM)
+          {
+            pu->cccmNoSubFlag = 1;
+            m_pcIntraPred->xCccmCreateLumaNoSubRef(*pu, area, true);
+            pu->cccmNoSubFlag = 0;
+            hasFilteredNSCCCM  = true;
+          }
+        }
+#endif
+        else if (candList[i].type & CCP_TYPE_CCLM)
+        {
+          if (!hasFilteredCCLM)
+          {
+            m_pcIntraPred->xGetLumaRecPixels(*pu, area, 0, true);
+            hasFilteredCCLM = true;
+          }
+        }
+        else if (candList[i].type & (CCP_TYPE_GLM0123 | CCP_TYPE_GLM4567))
+        {
+          int filtertype = candList[i].glmIdc - 1;
+          if (!hasFilteredGLM[filtertype])
+          {
+            pu->glmIdc.cr0 = pu->glmIdc.cb0 = filtertype + 1;
+            m_pcIntraPred->xGetLumaRecPixels(*pu, area, 0, true);
+            pu->glmIdc.cr0 = pu->glmIdc.cb0 = 0;
+            hasFilteredGLM[filtertype] = true;
+          }
+        }
+        else
+        {
+          THROW("Invalid type");
+        }
+      }
+      CHECK(pu->idxNonLocalCCP < 1 || pu->idxNonLocalCCP > MAX_CCP_CAND_LIST_SIZE, " Invalid idxNonLocalCCP index");
+
+      m_pcIntraPred->selectCcpMergeCand(*pu, candList, candNum);
+
+      // redo for the selected candidate
+      if (candList[candIdx].type & (CCP_TYPE_CCCM | CCP_TYPE_GLCCCM))
+      {
+        m_pcIntraPred->xCccmCreateLumaRef(*pu, area);
+      }
+#if JVET_AD0202_CCCM_MDF
+      else if (candList[candIdx].type & CCP_TYPE_MDFCCCM)
+      {
+        pu->cccmMultiFilterIdx = candList[candIdx].cccmMultiFilterIdx;
+        m_pcIntraPred->xCccmCreateLumaRef(*pu, area, 0);
+        m_pcIntraPred->xCccmCreateLumaRef(*pu, area, 1);
+        m_pcIntraPred->xCccmCreateLumaRef(*pu, area, 2);
+        m_pcIntraPred->xCccmCreateLumaRef(*pu, area, 3);
+        pu->cccmMultiFilterIdx = 0;
+      }
+#endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING 
+      else if (candList[candIdx].type & CCP_TYPE_NSCCCM || (candList[candIdx].type & CCP_TYPE_INTER_CCCM))
+      {
+        pu->cccmNoSubFlag = 1;
+        m_pcIntraPred->xCccmCreateLumaNoSubRef(*pu, area);
+        pu->cccmNoSubFlag = 0;
+      }
+#endif
+      else if (candList[candIdx].type & CCP_TYPE_CCLM)
+      {
+        m_pcIntraPred->xGetLumaRecPixels(*pu, area);
+      }
+      else if (candList[candIdx].type & (CCP_TYPE_GLM0123 | CCP_TYPE_GLM4567))
+      {
+        int filtertype = candList[candIdx].glmIdc - 1;
+        pu->glmIdc.cr0 = pu->glmIdc.cb0 = filtertype + 1;
+        m_pcIntraPred->xGetLumaRecPixels(*pu, area);
+        pu->glmIdc.cr0 = pu->glmIdc.cb0 = 0;
+      }
+      else
+      {
+        THROW("Invalid type");
+      }
+
+      pu->curCand = candList[candIdx];
+      m_pcIntraPred->combineCcpAndInter(*pu, inBufCb, inBufCr, outBufCb, outBufCr);
+    }
+    tu->curCand = candList[candIdx];
+    tu->cu->firstPU->curCand.type = 0;
+    tu->cu->firstPU->idxNonLocalCCP = 0;
     return true;
   }
 #endif

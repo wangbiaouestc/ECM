@@ -7299,6 +7299,12 @@ void CABACWriter::transform_unit(const TransformUnit& tu, CUCtx& cuCtx, Partitio
       }
     }
 
+#if JVET_AF0073_INTER_CCP_MERGE
+  if ( !lumaOnly )
+  {
+    interCcpMerge( tu );
+  }
+#endif
 #if JVET_AE0059_INTER_CCCM
   if ( !lumaOnly )
   {
@@ -9143,6 +9149,16 @@ void CABACWriter::interCccm(const TransformUnit& tu)
   {
     m_BinEncoder.encodeBin(tu.interCccm > 0 ? 1 : 0, Ctx::InterCccmFlag(0));
     DTRACE(g_trace_ctx, D_SYNTAX, "inter_cccm() pos=(%d,%d) inter_cccm_flag=%d\n", tu.blocks[tu.chType].x, tu.blocks[tu.chType].y, tu.interCccm > 0 ? 1 : 0);
+  }
+}
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+void CABACWriter::interCcpMerge(const TransformUnit& tu)
+{
+  if (TU::interCcpMergeAllowed(tu))
+  {
+    m_BinEncoder.encodeBin(tu.interCcpMerge > 0 ? 1 : 0, Ctx::InterCcpMergeFlag(0));
+    DTRACE(g_trace_ctx, D_SYNTAX, "inter_ccp_merge() pos=(%d,%d) inter_ccp_merge_flag=%d\n", tu.blocks[tu.chType].x, tu.blocks[tu.chType].y, tu.interCcpMerge > 0 ? 1 : 0);
   }
 }
 #endif
