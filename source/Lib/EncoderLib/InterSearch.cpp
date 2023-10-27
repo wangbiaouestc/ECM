@@ -6481,7 +6481,11 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
               {
 #endif
               PelUnitBuf predBufTmp = m_tmpPredStorage[1 - iRefList].getBuf( UnitAreaRelative(cu, pu) );
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+              motionCompensation( pu, predBufTmp, RefPicList(1 - iRefList), true, false );
+#else
               motionCompensation( pu, predBufTmp, RefPicList(1 - iRefList) );
+#endif
 #if MULTI_HYP_PRED
               CHECK(pu.addHypData.empty() == false, "this is not possible");
 #endif
@@ -7242,7 +7246,22 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
 #if JVET_AD0213_LIC_IMP
     m_encMotionEstimation = false;
 #endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+    if (PU::checkDoAffineBdofRefine(pu, this))
+    {
+      pu.availableBdofRefinedMv = AFFINE_SUBPU_BDOF_APPLY_AND_STORE_MV;
+      setDoAffineSubPuBdof(false);
+    }
     motionCompensation( pu, predBuf, REF_PIC_LIST_X );
+    pu.availableBdofRefinedMv = AFFINE_SUBPU_BDOF_NOT_APPLY;
+    if (getDoAffineSubPuBdof() == true && (pu.amvpMergeModeFlag[0] || pu.amvpMergeModeFlag[1]))
+    {
+      PU::setAffineBdofRefinedMotion(pu, getBdofSubPuMvBuf());
+      setDoAffineSubPuBdof(false);
+    }
+#else
+    motionCompensation( pu, predBuf, REF_PIC_LIST_X );
+#endif
 #if JVET_AD0213_LIC_IMP
     if (pu.cu->licFlag)
     {
@@ -7284,6 +7303,9 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
   {
     checkEncLicOff(cu, mergeCtx);
   }
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+  else
+#endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   if ((cu.slice->getUseLIC() && (cu.Y().area() >= LIC_MIN_CU_PIXELS)) && !pu.cu->licFlag && !amvpMergeModeFlag && pu.interDir != MAX_UCHAR)
 #else
@@ -7292,6 +7314,16 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
   {
     checkEncLicOn(cu, mergeCtx);
   }
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+  else
+  {
+    if (getDoAffineSubPuBdof())
+    {
+      setDoAffineSubPuBdof(false);
+      PU::setAffineBdofRefinedMotion(pu, getBdofSubPuMvBuf());
+    }
+  }
+#endif
 #else
 #if !TM_AMVP || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && TM_AMVP) // This LIC optimization must be off; otherwise, enc/dec mismatching will result. Because the cost metrics (MRSAD or SAD) of TM mode is adaptive to LIC flag, refined MVs would change when LIC flag is 1 or 0.
   if (cu.licFlag && pu.interDir != MAX_UCHAR
@@ -7582,9 +7614,24 @@ void InterSearch::predInterSearchAdditionalHypothesis(PredictionUnit& pu, const 
   }
   else
   {
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+    if (PU::checkDoAffineBdofRefine(pu, this))
+    {
+      pu.availableBdofRefinedMv = AFFINE_SUBPU_BDOF_APPLY_WITHOUT_STORE_MV;
+      m_doAffineSubPuBdof = false;
+      if (pu.mergeType != MRG_TYPE_SUBPU_ATMVP)
+      {
+        PU::spanMotionInfo(pu);
+      }
+    }
+#endif
     tempPredBuf = pu.cs->getPredBuf(pu);
     pu.mvRefine = true;
     motionCompensation(pu, REF_PIC_LIST_X, true, false);
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+    pu.availableBdofRefinedMv = AFFINE_SUBPU_BDOF_NOT_APPLY;
+    m_doAffineSubPuBdof = false;
+#endif
     pu.mvRefine = false;
   }
   const auto &MHRefPics = pu.cs->slice->getMultiHypRefPicList();
@@ -15319,6 +15366,22 @@ void InterSearch::checkEncLicOff(CodingUnit& cu, MergeCtx& mergeCtx)
     }
   }
 
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+  if (PU::checkDoAffineBdofRefine(pu, this))
+  {
+    pu.availableBdofRefinedMv = AFFINE_SUBPU_BDOF_APPLY_AND_STORE_MV;
+    setDoAffineSubPuBdof(false);
+  }
+#if JVET_AC0158_PIXEL_AFFINE_MC && !JVET_AD0213_LIC_IMP
+  if (updateMvNeeded || !isBDOFNotNeeded || pu.cu->affine)
+#else
+  if (updateMvNeeded || !isBDOFNotNeeded || pu.availableBdofRefinedMv == AFFINE_SUBPU_BDOF_APPLY_AND_STORE_MV)
+#endif
+  {
+    motionCompensation(pu, m_predictionBeforeLIC, REF_PIC_LIST_X);
+    pu.availableBdofRefinedMv = AFFINE_SUBPU_BDOF_NOT_APPLY;
+  }
+#else
 #if JVET_AC0158_PIXEL_AFFINE_MC && !JVET_AD0213_LIC_IMP
   if (updateMvNeeded || !isBDOFNotNeeded || pu.cu->affine)
 #else
@@ -15327,6 +15390,7 @@ void InterSearch::checkEncLicOff(CodingUnit& cu, MergeCtx& mergeCtx)
   {
     motionCompensation(pu, m_predictionBeforeLIC, REF_PIC_LIST_X);
   }
+#endif
   m_pcRdCost->setDistParam(distParam, cs.getOrgBuf().Y(), m_predictionBeforeLIC.Y(), cs.sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
   Distortion distLicOff = distParam.distFunc(distParam);
   m_CABACEstimator->getCtx() = ctxStart;
@@ -15357,6 +15421,13 @@ void InterSearch::checkEncLicOff(CodingUnit& cu, MergeCtx& mergeCtx)
 #endif
     PU::spanMotionInfo(pu, mergeCtx);
     predBuf.copyFrom(m_predictionBeforeLIC);
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+    if (getDoAffineSubPuBdof() == true)
+    {
+      PU::setAffineBdofRefinedMotion(pu, getBdofSubPuMvBuf());
+      setDoAffineSubPuBdof(false);
+    }
+#endif
   }
   else
   {
@@ -15378,6 +15449,9 @@ void InterSearch::checkEncLicOff(CodingUnit& cu, MergeCtx& mergeCtx)
     pu.mv[REF_PIC_LIST_1] = orgMv1;
     pu.mvd[REF_PIC_LIST_0] = orgMvd0;
     pu.mvd[REF_PIC_LIST_1] = orgMvd1;
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+    setDoAffineSubPuBdof(false);
+#endif
   }
   m_CABACEstimator->getCtx() = ctxStart;
 }
@@ -15386,6 +15460,10 @@ void InterSearch::checkEncLicOn(CodingUnit& cu, MergeCtx& mergeCtx)
 {
   CodingStructure& cs = *cu.cs;
   PredictionUnit&  pu = *cu.firstPU;
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+  const bool doAffineSubPuBdof = getDoAffineSubPuBdof();
+  setDoAffineSubPuBdof(false);
+#endif
 
   PelUnitBuf predBuf = pu.cs->getPredBuf(pu);
   DistParam distParam;
@@ -15513,6 +15591,12 @@ void InterSearch::checkEncLicOn(CodingUnit& cu, MergeCtx& mergeCtx)
     pu.mv[REF_PIC_LIST_1] = orgMv1;
     pu.mvd[REF_PIC_LIST_0] = orgMvd0;
     pu.mvd[REF_PIC_LIST_1] = orgMvd1;
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+    if (doAffineSubPuBdof == true)
+    {
+      PU::setAffineBdofRefinedMotion(pu, getBdofSubPuMvBuf());
+    }
+#endif
   }
   m_CABACEstimator->getCtx() = ctxStart;
 }

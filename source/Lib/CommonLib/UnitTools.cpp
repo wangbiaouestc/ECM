@@ -10443,7 +10443,7 @@ void PU::getRMVFAffineGuideCand(const PredictionUnit &pu, const PredictionUnit &
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
       affMrgCtx.obmcFlags[i] = abovePU.cu->affine ? abovePU.cu->obmcFlag : true;
-#endif      
+#endif
       if (affMrgCtx.numValidMergeCand == mrgCandIdx)
       {
         affMrgCtx.numValidMergeCand++;
@@ -19911,7 +19911,11 @@ void PU::setAllAffineMv(PredictionUnit& pu, Mv affLT, Mv affRT, Mv affLB, RefPic
 {
   int width  = pu.Y().width;
   int shift = MAX_CU_DEPTH;
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+  const bool isTranslational = (pu.cu->affineType == AFFINEMODEL_6PARAM) ? (affLT == affRT && affLT == affLB) : (affLT == affRT);
+#else
   const bool isTranslational = (affLT == affRT && affLT == affLB);
+#endif
 
   if (clipCPMVs)
   {
@@ -20029,6 +20033,67 @@ void PU::setAllAffineMv(PredictionUnit& pu, Mv affLT, Mv affRT, Mv affLB, RefPic
   pu.mvAffi[eRefList][1] = affRT;
   pu.mvAffi[eRefList][2] = affLB;
 }
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+void PU::setAffineBdofRefinedMotion(PredictionUnit &pu, Mv* mvBufDecAffineBDOF)
+{
+  MotionInfo *mi = pu.getMotionBuf().buf;
+  const int mbStride = pu.getMotionBuf().stride;
+  const int bioSubPuIdxInc = BDOF_SUBPU_STRIDE - (pu.lwidth() >> BDOF_SUBPU_DIM_LOG2);
+  int bioSubPuIdx = 0;
+  for (int mbBufPosY = 0; mbBufPosY < (pu.lheight() >> 2); mbBufPosY++)
+  {
+    for (int mbBufPosX = 0; mbBufPosX < (pu.lwidth() >> 2); mbBufPosX++)
+    {
+      mi[mbBufPosX].mv[0] += mvBufDecAffineBDOF[bioSubPuIdx];
+      mi[mbBufPosX].mv[1] -= mvBufDecAffineBDOF[bioSubPuIdx];
+      bioSubPuIdx++;
+    }
+    bioSubPuIdx += bioSubPuIdxInc;
+    mi += mbStride;
+  }
+}
+bool PU::checkDoAffineBdofRefine(const PredictionUnit &pu, InterPrediction *interPred)
+{
+  if (pu.mergeType == MRG_TYPE_SUBPU_ATMVP)
+  {
+    return true;
+  }
+  if (pu.cu->affine == false || pu.cu->bcwIdx != BCW_DEFAULT || pu.cu->licFlag == true)
+  {
+    return false;
+  }
+  const WPScalingParam *wp0 = pu.cu->slice->getWpScaling( REF_PIC_LIST_0, pu.refIdx[0] );
+  const WPScalingParam *wp1 = pu.cu->slice->getWpScaling( REF_PIC_LIST_1, pu.refIdx[1] );
+  const bool isResamplingPossible = pu.cs->sps->getRprEnabledFlag();
+  const bool ref0IsScaled = pu.refIdx[0] < 0 || pu.refIdx[0] >= MAX_NUM_REF
+    ? false
+    : isResamplingPossible && pu.cu->slice->getRefPic( REF_PIC_LIST_0, pu.refIdx[0] )->isRefScaled( pu.cs->pps );
+  const bool ref1IsScaled = pu.refIdx[1] < 0 || pu.refIdx[1] >= MAX_NUM_REF
+    ? false
+    : isResamplingPossible && pu.cu->slice->getRefPic( REF_PIC_LIST_1, pu.refIdx[1] )->isRefScaled( pu.cs->pps );
+  if (WPScalingParam::isWeighted( wp0 ) || WPScalingParam::isWeighted( wp1 ) || ref0IsScaled || ref1IsScaled)
+  {
+    return false;
+  }
+  if (pu.affBMMergeFlag)
+  {
+    return true;
+  }
+  if (pu.mergeFlag == false)
+  {
+    if (pu.interDir == 3)
+    {
+      return (pu.cu->slice->getPairEqualPocDist(pu.refIdx[0], pu.refIdx[1]) == true);
+    }
+    return false;
+  }
+  if (pu.interDir != 3 || pu.afMmvdFlag)
+  {
+    return false;
+  }
+  return (pu.cu->slice->getPairEqualPocDist(pu.refIdx[0], pu.refIdx[1]) == true);
+}
+#endif
 
 void clipColPos(int& posX, int& posY, const PredictionUnit& pu)
 {

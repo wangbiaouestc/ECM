@@ -3455,6 +3455,9 @@ private:
   bool                       m_amvpMergeModeValidCandPair[MAX_NUM_REF][MAX_NUM_REF];
 #endif
 
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+  bool                       m_pairEqualPocDist[MAX_NUM_REF][MAX_NUM_REF];
+#endif
   //  Data
   int                        m_iSliceQpDelta;
   int                        m_iSliceChromaQpDelta[MAX_NUM_COMPONENT+1];
@@ -3772,6 +3775,10 @@ public:
   int8_t                      getRefPicPairIdx(int i, int j) { return m_iRefPicPairIdx[i][j]; }
   int8_t                      getNumNonScaledRefPicPair() { return m_numNonScaledRefPicPair; }
   const std::vector<RefPicPair> &getRefPicPairList() const { return m_refPicPairList; }
+#endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+  void                        generateEqualPocDist();
+  bool                        getPairEqualPocDist(int refIdx0, int refIdx1) const { return m_pairEqualPocDist[refIdx0][refIdx1]; };
 #endif
 #if MULTI_HYP_PRED
   void                        setMultiHypRefPicList();

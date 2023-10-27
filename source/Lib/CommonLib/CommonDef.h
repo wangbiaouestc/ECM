@@ -846,6 +846,16 @@ static const int BDOF_SUBPU_DIM_LOG2          =                     2;
 #if JVET_AE0091_ITERATIVE_BDOF
 static const int BDOF_SUBPU_AREA_THRESHOLD0   =                     0;
 static const int BDOF_SUBPU_AREA_THRESHOLD1   =                  1024;
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+static const int BDOF_SUBPU_AREA_THRESHOLD2   =                   256;
+enum AFFINE_SUBPU_BDOF_USAGE
+{
+  AFFINE_SUBPU_BDOF_NOT_APPLY = 0,
+  AFFINE_SUBPU_BDOF_APPLY_AND_STORE_MV = 1,
+  AFFINE_SUBPU_BDOF_APPLY_WITHOUT_STORE_MV = 2,
+  AFFINE_SUBPU_BDOF_APPLY_RESERVE
+};
+#endif
 #else
 static const int BDOF_SUBPU_AREA_THRESHOLD    =                   256;
 #endif

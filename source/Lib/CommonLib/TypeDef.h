@@ -303,6 +303,7 @@
 #endif
 #define JVET_AF0190_RPR_TMP_REORDER_LIC                   1 // JVET-AF0190: enabling template-based reordering tools and LIC for scaled pictures in the RPR
 #define JVET_AF0073_INTER_CCP_MERGE                       1 // JVET-AF0073: Cross-component prediction merge mode for inter prediction
+#define JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT          1 // JVET-AF0159: Affine subblock BDOF refinement
 
 // Inter template matching tools
 #define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction

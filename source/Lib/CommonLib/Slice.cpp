@@ -933,6 +933,28 @@ void Slice::generateRefPicPairList()
   }
 }
 #endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+void Slice::generateEqualPocDist()
+{
+  const int curPoc = getPOC();
+  for (int refIdxInList0 = 0; refIdxInList0 < getNumRefIdx(REF_PIC_LIST_0); refIdxInList0++)
+  {
+    const int ref0Poc = getRefPOC(REF_PIC_LIST_0, refIdxInList0);
+    for (int refIdxInList1 = 0; refIdxInList1 < getNumRefIdx(REF_PIC_LIST_1); refIdxInList1++)
+    {
+      const int ref1Poc = getRefPOC(REF_PIC_LIST_1, refIdxInList1);
+      if (ref0Poc - curPoc == curPoc - ref1Poc)
+      {
+        m_pairEqualPocDist[refIdxInList0][refIdxInList1] = true;
+      }
+      else
+      {
+        m_pairEqualPocDist[refIdxInList0][refIdxInList1] = false;
+      }
+    }
+  }
+}
+#endif
 
 void Slice::constructRefPicList(PicList& rcListPic)
 {

@@ -285,6 +285,11 @@ protected:
   Mv                   m_bdofSubPuMvOffse2[BDOF_SUBPU_MAX_NUM];
 #endif
 #endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+  uint8_t              m_sbtmvpSubPuDerived[BDOF_SUBPU_MAX_NUM];
+  bool                 m_doAffineSubPuBdof;
+  bool                 m_skipAffineFirstIterBdof;
+#endif
 #if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
   int32_t*             m_piDotProduct1;
   int32_t*             m_piDotProduct2;
@@ -468,6 +473,11 @@ protected:
   static bool xCheckIdenticalMotion( const PredictionUnit& pu );
 
   void xSubPuMC(PredictionUnit& pu, PelUnitBuf& predBuf, const RefPicList &eRefPicList = REF_PIC_LIST_X, const bool luma = true, const bool chroma = true);
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+  bool xGetSubPuGroupArea2D(PredictionUnit& pu, PredictionUnit& subPu, uint8_t* sbtmvpSubPuDerivedPtr, Position& subPuStartPos);
+  bool xGetSubPuGroupAreaStartPos(PredictionUnit& pu, Position& subPuStartPos, uint8_t* sbtmvpSubPuDerivedPtr);
+  bool xCheckIdenticalMotionInfo(MotionInfo orgMotionInfo, MotionInfo targetMotionInfo, MergeType puMergeType);
+#endif
 #if ENABLE_OBMC
   void xSubblockOBMC(const ComponentID eComp, PredictionUnit &pu, PelUnitBuf &pcYuvPredDst, PelUnitBuf &pcYuvPredSrc, int iDir, bool bSubMotion = false);
   void xSubBlockMotionCompensation(PredictionUnit &pu, PelUnitBuf &pcYuvPred);
@@ -1274,6 +1284,15 @@ public:
   bool      processBDMVRPU2Dir        (PredictionUnit& pu, bool subPURefine[2], Mv(&finalMvDir)[2]);
   void      processBDMVRSubPU         (PredictionUnit& pu, bool subPURefine);
 #endif
+#endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+private:
+  Mv*       m_bdofSubPuMvBuf;
+public:
+  void      setBdofSubPuMvBuf(Mv* bdofMvBuf)       { m_bdofSubPuMvBuf   = bdofMvBuf;   }
+  Mv*       getBdofSubPuMvBuf()                    { return m_bdofSubPuMvBuf;          }
+  void      setDoAffineSubPuBdof(bool doAffineSubPuBdof)  { m_doAffineSubPuBdof = doAffineSubPuBdof; }
+  bool      getDoAffineSubPuBdof()                        { return m_doAffineSubPuBdof; }
 #endif
   void xFillIBCBuffer(CodingUnit &cu);
 #if JVET_Z0118_GDR

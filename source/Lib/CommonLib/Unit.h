@@ -630,6 +630,9 @@ struct InterPredictionData
 #else
   Mv        mvdL0SubPu[MAX_NUM_SUBCU_DMVR];
 #endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+  int       availableBdofRefinedMv;
+#endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   bool      reduceTplSize;
 #endif
