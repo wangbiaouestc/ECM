@@ -433,7 +433,7 @@ public:
   EncModeCtrl* getModeCtrl  () { return m_modeCtrl; }
 
 #if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
-  BilateralFilter *m_bilateralFilter = new BilateralFilter();
+  BilateralFilter *m_bilateralFilter;
 #endif
 
   void   setMergeBestSATDCost(double cost) { m_mergeBestSATDCost = cost; }

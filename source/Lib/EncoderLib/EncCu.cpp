@@ -103,6 +103,11 @@ EncCu::EncCu() : m_GeoModeTest
 
 void EncCu::create( EncCfg* encCfg )
 {
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
+  m_bilateralFilter = new BilateralFilter();;
+  m_bilateralFilter->create();
+#endif
+
   unsigned      uiMaxWidth    = encCfg->getMaxCUWidth();
   unsigned      uiMaxHeight   = encCfg->getMaxCUHeight();
   ChromaFormat  chromaFormat  = encCfg->getChromaFormatIdc();
@@ -296,6 +301,7 @@ void EncCu::destroy()
   unsigned numHeights = gp_sizeIdxInfo->numHeights();
 
 #if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
+  m_bilateralFilter->destroy();
   delete m_bilateralFilter;
 #endif
 
@@ -16993,17 +16999,19 @@ void EncCu::xCalDebCost( CodingStructure &cs, Partitioner &partitioner, bool cal
 
       for (auto &currTU : CU::traverseTUs(*cu))
       {
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+        bool applyBIF = m_bilateralFilter->getApplyBIF(currTU, COMPONENT_Y);
+#else
         bool isInter = (cu->predMode == MODE_INTER) ? true : false;
-        if ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)))
+        bool applyBIF = ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height)));
+#endif
+        if (applyBIF)
         {
-          if ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height)))
-          {
-            CompArea &compArea = currTU.block(COMPONENT_Y);
-            PelBuf    recBuf = picDbBuf.getBuf(compArea);
-            PelBuf recIPredBuf = recBuf;
-            std::vector<Pel> invLUT;
-            m_bilateralFilter->bilateralFilterRDOdiamond5x5( COMPONENT_Y, recBuf, recBuf, recBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(COMPONENT_Y), currTU, true, false, &invLUT );
-          }
+          CompArea& compArea = currTU.block(COMPONENT_Y);
+          PelBuf    recBuf = picDbBuf.getBuf(compArea);
+          PelBuf recIPredBuf = recBuf;
+          std::vector<Pel> invLUT;
+          m_bilateralFilter->bilateralFilterRDOdiamond5x5(COMPONENT_Y, recBuf, recBuf, recBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(COMPONENT_Y), currTU, true, false, &invLUT);
         }
       }
     }
@@ -17011,10 +17019,6 @@ void EncCu::xCalDebCost( CodingStructure &cs, Partitioner &partitioner, bool cal
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
     if(cs.pps->getUseChromaBIF())
     {
-      bool tuValid = false;
-      bool tuCBF = false;
-      bool isDualTree = CS::isDualITree(cs);
-      bool chromaValid = cu->Cb().valid() && cu->Cr().valid();
       bool applyChromaBIF = false;
 
       if (leftEdgeAvai && topEdgeAvai)
@@ -17030,10 +17034,17 @@ void EncCu::xCalDebCost( CodingStructure &cs, Partitioner &partitioner, bool cal
 
       for (auto &currTU : CU::traverseTUs(*cu))
       {
-        bool isInter = (cu->predMode == MODE_INTER) ? true : false;
         for(int compIdx = COMPONENT_Cb; compIdx < MAX_NUM_COMPONENT; compIdx++)
         {
           ComponentID compID = ComponentID( compIdx );
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+          applyChromaBIF = m_bilateralFilter->getApplyBIF(currTU, compID);
+#else
+          bool tuValid = false;
+          bool tuCBF = false;
+          bool isInter = (cu->predMode == MODE_INTER) ? true : false;
+          bool isDualTree = CS::isDualITree(cs);
+          bool chromaValid = cu->Cb().valid() && cu->Cr().valid();
           applyChromaBIF = false;
           if(!isDualTree && chromaValid)
           {
@@ -17051,6 +17062,7 @@ void EncCu::xCalDebCost( CodingStructure &cs, Partitioner &partitioner, bool cal
             tuCBF = TU::getCbf(currTU, compID);
             applyChromaBIF = ((tuCBF || isInter == false) && (currTU.cu->qp > 17));
           }
+#endif
           if (applyChromaBIF)
           {
             CompArea &compArea = currTU.block(compID);
@@ -17799,17 +17811,20 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
             tmpRecLuma.rspSignal(m_pcReshape->getInvLUT());
           }
         }
-        if(tempCS->pps->getUseBIF() && isLuma(compID) && cu.qp > 17)
+        if(tempCS->pps->getUseBIF() && isLuma(compID))
         {
           for (auto &currTU : CU::traverseTUs(cu))
           {
-            Position tuPosInCu = currTU.lumaPos() - cu.lumaPos();
-            PelBuf tmpSubBuf = tmpRecLuma.subBuf(tuPosInCu, currTU.lumaSize());
-
-            bool isInter = (cu.predMode == MODE_INTRA) ? false : true;
-            
-            if ((TU::getCbf(currTU, compID ) || isInter == false) && (currTU.cu->qp > 17) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+            bool applyBIF = m_bilateralFilter->getApplyBIF(currTU, compID);
+#else
+            bool isInter = (cu.predMode == MODE_INTER) ? true : false;
+            bool applyBIF = ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height)));
+#endif
+            if (applyBIF)
             {
+              Position tuPosInCu = currTU.lumaPos() - cu.lumaPos();
+              PelBuf tmpSubBuf = tmpRecLuma.subBuf(tuPosInCu, currTU.lumaSize());
               CompArea compArea = currTU.blocks[compID];
               PelBuf recIPredBuf = tempCS->slice->getPic()->getRecoBuf(compArea);
               // Do we need to use clipArea?
@@ -17837,18 +17852,19 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
           tmpRecChroma.copyFrom(reco);
         }
 
-        if(tempCS->pps->getUseChromaBIF() && isChroma(compID) && (cu.qp > 17))
+        if(tempCS->pps->getUseChromaBIF() && isChroma(compID))
         {
-          bool tuValid = false;
-          bool tuCBF = false;
-          bool isDualTree = CS::isDualITree(*tempCS);
-          bool chromaValid = cu.Cb().valid() && cu.Cr().valid();
           bool applyChromaBIF = false;
           for (auto &currTU : CU::traverseTUs(cu))
           {
-            Position tuPosInCu = currTU.chromaPos() - cu.chromaPos();
-            PelBuf tmpSubBuf = tmpRecChroma.subBuf(tuPosInCu, currTU.chromaSize());
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+            applyChromaBIF = m_bilateralFilter->getApplyBIF(currTU, compID);
+#else
+            bool tuValid = false;
+            bool tuCBF = false;
             bool isInter = (cu.predMode == MODE_INTER) ? true : false;
+            bool isDualTree = CS::isDualITree(*tempCS);
+            bool chromaValid = cu.Cb().valid() && cu.Cr().valid();
             applyChromaBIF = false;
             if(!isDualTree && chromaValid)
             {
@@ -17865,9 +17881,12 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
             {
               applyChromaBIF = ((TU::getCbf(currTU, compID) || isInter == false) && (currTU.cu->qp > 17));
             }
+#endif
 
             if(applyChromaBIF)
             {
+              Position tuPosInCu = currTU.chromaPos() - cu.chromaPos();
+              PelBuf tmpSubBuf = tmpRecChroma.subBuf(tuPosInCu, currTU.chromaSize());
               CompArea compArea = currTU.blocks[compID];
               PelBuf recIPredBuf = tempCS->slice->getPic()->getRecoBuf(compArea);
               m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, tempCS->slice->clpRng(compID), currTU, true );
@@ -17917,7 +17936,7 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
           tmpRecChroma.copyFrom(reco);
         }
 
-        if(tempCS->pps->getUseChromaBIF() && isChroma(compID) && (cu.qp > 17))
+        if(tempCS->pps->getUseChromaBIF() && isChroma(compID))
         {
           bool tuValid = false;
           bool tuCBF = false;
@@ -17927,9 +17946,9 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
 
           for (auto &currTU : CU::traverseTUs(cu))
           {
-            Position tuPosInCu = currTU.chromaPos() - cu.chromaPos();
-            PelBuf tmpSubBuf = tmpRecChroma.subBuf(tuPosInCu, currTU.chromaSize());
-
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+            applyChromaBIF = m_bilateralFilter->getApplyBIF(currTU, compID);
+#else
             bool isInter = (cu.predMode == MODE_INTER) ? true : false;
             applyChromaBIF = false;
             if(!isDualTree && chromaValid)
@@ -17946,8 +17965,11 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
             {
               applyChromaBIF = ((TU::getCbf(currTU, compID) || isInter == false) && (currTU.cu->qp > 17));
             }
+#endif
             if(applyChromaBIF)
             {
+              Position tuPosInCu = currTU.chromaPos() - cu.chromaPos();
+              PelBuf tmpSubBuf = tmpRecChroma.subBuf(tuPosInCu, currTU.chromaSize());
               CompArea compArea = currTU.blocks[compID];
               PelBuf recIPredBuf = tempCS->slice->getPic()->getRecoBuf(compArea);
               m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, tempCS->slice->clpRng(compID), currTU, true );
