@@ -52,7 +52,6 @@
 #include <cassert>
 
 
-
 #define BASE_ENCODER                                      1
 #define BASE_NORMATIVE                                    1
 #define TOOLS                                             1
@@ -230,6 +229,10 @@
 
 #define JVET_AE0174_NONINTER_TM_TOOLS_CONTROL             1 // JVET-AE0174: Add non-inter TM sps flag to control whether template matching is used for non-inter (Intra and IBC) tools
 #define JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES    1 // JVET-AE0094: IBC with non-adjacent spatial candidates
+
+#if JVET_AC0071_DBV && JVET_V0130_INTRA_TMP
+#define JVET_AF0066_ENABLE_DBV_4_SINGLE_TREE              1 // JVET-AF0066: Enable DBV mode in single tree configuration
+#endif
 
 // Inter
 #define CIIP_PDPC                                         1 // Apply pdpc to megre prediction as a new CIIP mode (CIIP_PDPC) additional to CIIP mode

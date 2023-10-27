@@ -591,7 +591,7 @@ public:
   void    motionCompensation  (CodingUnit &cu,     const RefPicList &eRefPicList = REF_PIC_LIST_X
     , const bool luma = true, const bool chroma = true
   );
-#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS || JVET_AF0066_ENABLE_DBV_4_SINGLE_TREE
   inline void getPredIBCBlk(const PredictionUnit& pu, ComponentID comp, const Picture* refPic, const Mv& _mv, PelUnitBuf& dstPic, bool bilinearMC = false
 #if JVET_AC0112_IBC_LIC
                           , bool bypassIBCLic = false

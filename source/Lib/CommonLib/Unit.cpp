@@ -518,7 +518,7 @@ void CodingUnit::initData()
   tmpIdx        = 0;
   tmpFusionFlag = false;
   tmpFlmFlag    = false;
-  tmpIsSubPel  = -1;
+  tmpIsSubPel  = 0;
   tmpSubPelIdx = -1;
 #endif
 #endif

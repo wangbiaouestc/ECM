@@ -2889,6 +2889,9 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
 #endif
   PartSplit ispType       = lumaUsesISP ? CU::getISPType( cu, COMPONENT_Y ) : TU_NO_ISP;
   CHECK( cu.ispMode && bestCostSoFar < 0, "bestCostSoFar must be positive!" );
+#if JVET_AF0066_ENABLE_DBV_4_SINGLE_TREE
+  bool singleTreeLumaIntraTmp = !CS::isDualITree(*cu.cs) && cu.tmpFlag;
+#endif
 
 #if JVET_AD0120_LBCCP
   int  bestCCInsideFilter = 0;
@@ -4144,6 +4147,12 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
         fusionStorage[i] = m_fusionStorage[i].getBuf(localArea);
       }
 #endif
+#if JVET_AF0066_ENABLE_DBV_4_SINGLE_TREE
+      if (singleTreeLumaIntraTmp)
+      {
+        modeIsEnable[DBV_CHROMA_IDX] = 1;
+      }
+#endif
       for (int32_t uiMode = uiMinMode - (2 * int(testBDPCM)); uiMode < uiMaxMode; uiMode++)
       {
         int chromaIntraMode;
@@ -4880,7 +4889,11 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
           const int cccmBufferIdx = filterIdx * CCCM_NUM_MODES + uiMode;
 #endif
 #if JVET_AD0188_CCP_MERGE
+#if JVET_AF0066_ENABLE_DBV_4_SINGLE_TREE
+          if (pu.cs->slice->isIntra())
+#else
           if (pu.cs->slice->isIntra() && CS::isDualITree(cs))
+#endif
           {
 #if JVET_AD0202_CCCM_MDF
             pu.curCand = m_ccmParamsStorage[sub][cccmBufferIdx];
