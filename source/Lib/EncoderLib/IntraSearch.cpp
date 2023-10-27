@@ -8032,7 +8032,12 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
           tmpRecLuma.rspSignal(m_pcReshape->getInvLUT());
         }
 
-        if( pps.getUseBIF() /*&& (uiAbsSum > 0)*/ && tu.cu->qp > 17 && 128 > std::max( tu.lumaSize().width, tu.lumaSize().height ) )
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+        bool applyBIF = pps.getUseBIF() && m_bilateralFilter->getApplyBIF(tu, compID);
+#else
+        bool applyBIF = pps.getUseBIF() /*&& (uiAbsSum > 0)*/ && tu.cu->qp > 17 && 128 > std::max(tu.lumaSize().width, tu.lumaSize().height);
+#endif
+        if(applyBIF)
         {
           CompArea compArea = tu.blocks[compID];
           PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
@@ -8052,7 +8057,12 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
       else
       {
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-        if(pps.getUseChromaBIF() && isChroma(compID) && tu.cu->qp > 17)
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+        bool applyChromaBIF = pps.getUseChromaBIF() && m_bilateralFilter->getApplyBIF(tu, compID);
+#else
+        bool applyChromaBIF = pps.getUseChromaBIF() && tu.cu->qp > 17;
+#endif
+        if(applyChromaBIF)
         {
           CompArea compArea = tu.blocks[compID];
           PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
@@ -8084,7 +8094,12 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
     {
       if(isLuma(compID))
       {
-        if( pps.getUseBIF() /*&& (uiAbsSum > 0)*/ && tu.cu->qp > 17 && 128 > std::max( tu.lumaSize().width, tu.lumaSize().height ) )
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+        bool applyBIF = pps.getUseBIF() && m_bilateralFilter->getApplyBIF(tu, compID);
+#else
+        bool applyBIF = pps.getUseBIF() /*&& (uiAbsSum > 0)*/ && tu.cu->qp > 17 && 128 > std::max(tu.lumaSize().width, tu.lumaSize().height);
+#endif
+        if(applyBIF)
         {
           CompArea compArea = tu.blocks[compID];
           PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
@@ -8097,7 +8112,12 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
       else
       {
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-        if (pps.getUseChromaBIF() && isChroma(compID) && (tu.cu->qp > 17))
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+        bool applyChromaBIF = pps.getUseChromaBIF() && m_bilateralFilter->getApplyBIF(tu, compID);
+#else
+        bool applyChromaBIF = pps.getUseChromaBIF() && isChroma(compID) && (tu.cu->qp > 17);
+#endif
+        if (applyChromaBIF)
         {
           CompArea compArea = tu.blocks[compID];
           PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
@@ -8159,7 +8179,12 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
       }
       else
       {
-        if(pps.getUseChromaBIF() && isChroma(compID) && (tu.cu->qp > 17))
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+        bool applyChromaBIF = pps.getUseChromaBIF() && m_bilateralFilter->getApplyBIF(tu, compID);
+#else
+        bool applyChromaBIF = pps.getUseChromaBIF() && tu.cu->qp > 17;
+#endif
+        if (applyChromaBIF)
         {
           CompArea compArea = tu.blocks[compID];
           PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
@@ -8188,7 +8213,12 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
       }
       else
       {
-        if (pps.getUseChromaBIF() && isChroma(compID) && (tu.cu->qp > 17))
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+        bool applyChromaBIF = pps.getUseChromaBIF() && m_bilateralFilter->getApplyBIF(tu, compID);
+#else
+        bool applyChromaBIF = pps.getUseChromaBIF() && tu.cu->qp > 17;
+#endif
+        if (applyChromaBIF)
         {
           CompArea compArea = tu.blocks[compID];
           PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
