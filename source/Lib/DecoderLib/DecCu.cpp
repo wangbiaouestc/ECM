@@ -1686,6 +1686,14 @@ void DecCu::xReconInter(CodingUnit &cu)
       m_pcInterPred->motionCompensation(cu, REF_PIC_LIST_0, luma, chroma);
 #endif
     }
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+    cu.firstPU->availableBdofRefinedMv = AFFINE_SUBPU_BDOF_NOT_APPLY;
+    if (m_pcInterPred->getDoAffineSubPuBdof() == true)
+    {
+      PU::setAffineBdofRefinedMotion(*cu.firstPU, m_mvBufDecAffineBDOF);
+      m_pcInterPred->setDoAffineSubPuBdof(false);
+    }
+#endif
 #if JVET_AD0213_LIC_IMP
     if (cu.licFlag)
     {
@@ -2173,6 +2181,14 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #if JVET_AC0144_AFFINE_DMVR_REGRESSION
     if (cu.cs->pcv->isEncoder && !cu.geoFlag && !(!pu.cu->affine && PU::checkBDMVRCondition(pu)) && pu.mergeType != MRG_TYPE_SUBPU_ATMVP)
     {
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+      if (PU::checkDoAffineBdofRefine(pu, m_pcInterPred))
+      {
+        pu.availableBdofRefinedMv = AFFINE_SUBPU_BDOF_APPLY_AND_STORE_MV;
+        m_pcInterPred->setDoAffineSubPuBdof(false);
+        m_pcInterPred->setBdofSubPuMvBuf(m_mvBufDecAffineBDOF);
+      }
+#endif
       PU::spanMotionInfo(pu);
       continue;
     }
@@ -2776,6 +2792,28 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
               pu.mvAffi[1][0] += m_mvBufBDMVR[1][0];
               pu.mvAffi[1][1] += m_mvBufBDMVR[1][0];
               pu.mvAffi[1][2] += m_mvBufBDMVR[1][0];
+            }
+          }
+#endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+          if (PU::checkDoAffineBdofRefine(pu, m_pcInterPred))
+          {
+            pu.availableBdofRefinedMv = AFFINE_SUBPU_BDOF_APPLY_AND_STORE_MV;
+            m_pcInterPred->setDoAffineSubPuBdof(false);
+            m_pcInterPred->setBdofSubPuMvBuf(m_mvBufDecAffineBDOF);
+            if (pu.mergeType == MRG_TYPE_SUBPU_ATMVP)
+            {
+              int bioSubPuIdx = 0;
+              const int bioSubPuStrideIncr = BDOF_SUBPU_STRIDE - (int)(pu.lumaSize().width >> BDOF_SUBPU_DIM_LOG2);
+              for (int yy = 0; yy < pu.lumaSize().height; yy += 4)
+              {
+                for (int xx = 0; xx < pu.lumaSize().width; xx += 4)
+                {
+                  m_mvBufDecAffineBDOF[bioSubPuIdx].setZero();
+                  bioSubPuIdx++;
+                }
+                bioSubPuIdx += bioSubPuStrideIncr;
+              }
             }
           }
 #endif
@@ -3936,6 +3974,14 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
               pu.mvAffi[eRefList][2] = mvLB;
             }
           }
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+          if (PU::checkDoAffineBdofRefine(pu, m_pcInterPred))
+          {
+            pu.availableBdofRefinedMv = AFFINE_SUBPU_BDOF_APPLY_AND_STORE_MV;
+            m_pcInterPred->setDoAffineSubPuBdof(false);
+            m_pcInterPred->setBdofSubPuMvBuf(m_mvBufDecAffineBDOF);
+          }
+#endif
         }
 #if JVET_AE0169_BIPREDICTIVE_IBC
         else if (CU::isIBC(*pu.cu))

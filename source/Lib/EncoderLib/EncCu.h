@@ -371,6 +371,13 @@ private:
 #endif
 #endif
 #endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+  Mv                    m_mvBufEncAffineBDOF[AFFINE_MRG_MAX_NUM_CANDS][BDOF_SUBPU_MAX_NUM];
+  Mv                    m_mvBufEncAffineBmBDOF[AFFINE_ADAPTIVE_DMVR_INIT_SIZE << 1][BDOF_SUBPU_MAX_NUM];
+  bool                  m_doEncAffineBDOF[AFFINE_MRG_MAX_NUM_CANDS];
+  bool                  m_doEncAffineBmBDOF[AFFINE_ADAPTIVE_DMVR_INIT_SIZE << 1];
+  Mv                    m_mvBufEncMhpAffineBDOF[BDOF_SUBPU_MAX_NUM];
+#endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE || JVET_AE0046_BI_GPM
   Mv                    m_mvBufEncAmBDMVR[2][MAX_NUM_SUBCU_DMVR];
 #endif

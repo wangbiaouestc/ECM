@@ -3173,6 +3173,9 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
       pcSlice->generateRefPicPairList();
     }
 #endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+    pcSlice->generateEqualPocDist();
+#endif
 
     double lambda            = 0.0;
     int actualHeadBits       = 0;

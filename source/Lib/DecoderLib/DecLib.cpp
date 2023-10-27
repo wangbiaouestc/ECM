@@ -3054,6 +3054,9 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
       pcSlice->generateRefPicPairList();
     }
 #endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+    pcSlice->generateEqualPocDist();
+#endif
 
     NalUnitInfo naluInfo;
     naluInfo.m_nalUnitType = nalu.m_nalUnitType;
