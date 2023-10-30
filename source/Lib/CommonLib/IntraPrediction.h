@@ -377,6 +377,11 @@ protected:
 #if JVET_AB0155_SGPM
   std::vector<PelStorage>   m_sgpmBuffer;
 #endif
+  // used in timd tmrl sortedMPM
+  std::vector<PelStorage>   m_intraPredBuffer;
+  Pel tempRefAbove[(MAX_CU_SIZE << 3) + 5 + 33 * MAX_REF_LINE_IDX];
+  Pel tempRefLeft[(MAX_CU_SIZE << 3) + 5 + 33 * MAX_REF_LINE_IDX];
+
 #if JVET_V0130_INTRA_TMP
   int          m_uiPartLibSize;
 #if JVET_AD0086_ENHANCED_INTRA_TMP

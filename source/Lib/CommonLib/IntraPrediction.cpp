@@ -204,6 +204,11 @@ void IntraPrediction::destroy()
   }
   m_sgpmBuffer.clear();
 #endif
+  for (auto &buffer: m_intraPredBuffer)
+  {
+    buffer.destroy();
+  }
+  m_intraPredBuffer.clear();
 
 #if JVET_AD0120_LBCCP
   delete[] m_pCCFilterTemp;
@@ -383,6 +388,21 @@ void IntraPrediction::init(ChromaFormat chromaFormatIDC, const unsigned bitDepth
     buffer.create(CHROMA_400, Area(0, 0, MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE, MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE));
   }
 #endif
+  for (auto &buffer: m_intraPredBuffer)
+  {
+    buffer.destroy();
+  }
+
+  // the number of total temporal buffers can be adjusted by changing the number here
+  m_intraPredBuffer.resize(1);
+
+  for (auto &buffer: m_intraPredBuffer)
+  {
+    buffer.create(CHROMA_400, Area(0, 0, MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE, MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE));
+  }
+
+  memset(tempRefAbove, 0, ((MAX_CU_SIZE << 3) + 5 + 33 * MAX_REF_LINE_IDX) * sizeof(Pel));
+  memset(tempRefLeft, 0, ((MAX_CU_SIZE << 3) + 5 + 33 * MAX_REF_LINE_IDX) * sizeof(Pel));
 
 #if JVET_AD0120_LBCCP
   if (m_pCCFilterTemp == nullptr)
@@ -5201,10 +5221,8 @@ void IntraPrediction::xPredTimdIntraAng( const CPelBuf &pSrc, const ClpRng& clpR
   Pel* refMain;
   Pel* refSide;
 #if JVET_AC0094_REF_SAMPLES_OPT
-  Pel refAbove[(MAX_CU_SIZE << 3) + 5 + 33 * MAX_REF_LINE_IDX];
-  Pel refLeft[(MAX_CU_SIZE << 3) + 5 + 33 * MAX_REF_LINE_IDX];
-  ::memset(refAbove, 0, sizeof(refAbove));
-  ::memset(refLeft, 0, sizeof(refLeft));
+  Pel * refAbove = tempRefAbove;
+  Pel * refLeft  = tempRefLeft;
 #else
   static Pel  refAbove[2 * MAX_CU_SIZE + 5 + 33 * MAX_REF_LINE_IDX];
   static Pel  refLeft[2 * MAX_CU_SIZE + 5 + 33 * MAX_REF_LINE_IDX];
@@ -5997,11 +6015,6 @@ void IntraPrediction::deriveMPMSorted(const PredictionUnit& pu, uint8_t* mpm, in
   const CompArea area = pu.Y();
   int channelBitDepth = pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA);
 
-  static Pel predLuma[(MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE) * (MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE)];
-  memset(predLuma, 0, (MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE) * (MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE) * sizeof(Pel));
-  Pel* piPred = predLuma;
-  uint32_t uiPredStride = MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE;
-
   int      iCurX = pu.lx();
   int      iCurY = pu.ly();
   int      iRefX = -1, iRefY = -1;
@@ -6018,6 +6031,12 @@ void IntraPrediction::deriveMPMSorted(const PredictionUnit& pu, uint8_t* mpm, in
 
   TemplateType eTempType = CU::deriveTimdRefType(iCurX, iCurY, uiWidth, uiHeight, iTempWidth, iTempHeight, iRefX,
     iRefY, uiRefWidth, uiRefHeight);
+
+  uint32_t      uiRealW2   = uiRefWidth + (eTempType == LEFT_NEIGHBOR ? iTempWidth : 0);
+  uint32_t      uiRealH2   = uiRefHeight + (eTempType == ABOVE_NEIGHBOR ? iTempHeight : 0);
+  const UnitArea localUnitArea(pu.chromaFormat, Area(0, 0, uiRealW2, uiRealH2));
+  uint32_t       uiPredStride = m_intraPredBuffer[0].getBuf(localUnitArea.Y()).stride;
+  Pel *piPred = m_intraPredBuffer[0].getBuf(localUnitArea.Y()).buf;
 
   if (eTempType == NO_NEIGHBOR)
   {
@@ -6109,11 +6128,6 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
   SizeType uiWidth         = cu.lwidth();
   SizeType uiHeight        = cu.lheight();
 
-  static Pel predLuma[(MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE) * (MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE)];
-  memset(predLuma, 0, (MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE) * (MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE) * sizeof(Pel));
-  Pel *    piPred       = predLuma;
-  uint32_t uiPredStride = MAX_CU_SIZE + DIMD_MAX_TEMP_SIZE;
-
   int      iCurX = cu.lx();
   int      iCurY = cu.ly();
   int      iRefX = -1, iRefY = -1;
@@ -6131,6 +6145,12 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
 
   TemplateType eTempType = CU::deriveTimdRefType(iCurX, iCurY, uiWidth, uiHeight, iTempWidth, iTempHeight, iRefX,
                                                   iRefY, uiRefWidth, uiRefHeight);
+  auto &        pu        = *cu.firstPU;
+  uint32_t      uiRealW   = uiRefWidth + (eTempType == LEFT_NEIGHBOR ? iTempWidth : 0);
+  uint32_t      uiRealH   = uiRefHeight + (eTempType == ABOVE_NEIGHBOR ? iTempHeight : 0);
+  const UnitArea localUnitArea(pu.chromaFormat, Area(0, 0, uiRealW, uiRealH));
+  uint32_t       uiPredStride = m_intraPredBuffer[0].getBuf(localUnitArea.Y()).stride;
+  Pel *piPred = m_intraPredBuffer[0].getBuf(localUnitArea.Y()).buf;
 
   if (eTempType != NO_NEIGHBOR)
   {
@@ -18481,15 +18501,12 @@ void IntraPrediction::xPredTmrlIntraAng(const CPelBuf& pSrc, const ClpRng& clpRn
   Pel* refSide;
 
 #if JVET_AC0094_REF_SAMPLES_OPT
-  Pel  refAbove[(MAX_CU_SIZE << 3)+ 3 + 33 * MAX_REF_LINE_IDX];
-  Pel  refLeft[(MAX_CU_SIZE << 3) + 3 + 33 * MAX_REF_LINE_IDX];
+  Pel * refAbove = tempRefAbove;
+  Pel * refLeft  = tempRefLeft;
 #else
   Pel  refAbove[2 * MAX_CU_SIZE + 3 + 33 * MAX_REF_LINE_IDX];
   Pel  refLeft[2 * MAX_CU_SIZE + 3 + 33 * MAX_REF_LINE_IDX];
 #endif
-  // initializing for safeguard.
-  ::memset(refAbove, 0, sizeof(refAbove));
-  ::memset(refLeft, 0, sizeof(refLeft));
 
   // Initialize the Main and Left reference array.
   if (intraPredAngle < 0)
@@ -18961,16 +18978,17 @@ void IntraPrediction::getTmrlList(CodingUnit& cu)
   int channelBitDepth = cu.slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA);
   SizeType uiWidth = cu.lwidth();
   SizeType uiHeight = cu.lheight();
-  static Pel predLuma[(MAX_CU_SIZE + TMRL_TPL_SIZE) * (MAX_CU_SIZE + TMRL_TPL_SIZE)];
-  memset(predLuma, 0, (MAX_CU_SIZE + TMRL_TPL_SIZE) * (MAX_CU_SIZE + TMRL_TPL_SIZE) * sizeof(Pel));
-  Pel* piPred = predLuma;
-  uint32_t uiPredStride = MAX_CU_SIZE + TMRL_TPL_SIZE;
   tmrlInfo.uiWidth = uiWidth;
   tmrlInfo.uiHeight = uiHeight;
   tmrlInfo.uiTemplateAbove = TMRL_TPL_SIZE;
   tmrlInfo.uiTemplateLeft = TMRL_TPL_SIZE;
   tmrlInfo.uiRefWidth = uiWidth + TMRL_TPL_SIZE;
   tmrlInfo.uiRefHeight = uiHeight + TMRL_TPL_SIZE;
+  uint32_t      uiRealW   = tmrlInfo.uiRefWidth + TMRL_TPL_SIZE;
+  uint32_t      uiRealH   = tmrlInfo.uiRefHeight + TMRL_TPL_SIZE;
+  const UnitArea localUnitArea(pu.chromaFormat, Area(0, 0, uiRealW, uiRealH));
+  uint32_t       uiPredStride = m_intraPredBuffer[0].getBuf(localUnitArea.Y()).stride;
+  Pel *piPred = m_intraPredBuffer[0].getBuf(localUnitArea.Y()).buf;
   const CodingStructure& cs = *cu.cs;
   Pel* piOrg = cs.picture->getRecoBuf(area).buf;
   int iOrgStride = cs.picture->getRecoBuf(area).stride;
