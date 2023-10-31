@@ -4889,11 +4889,7 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
           const int cccmBufferIdx = filterIdx * CCCM_NUM_MODES + uiMode;
 #endif
 #if JVET_AD0188_CCP_MERGE
-#if JVET_AF0066_ENABLE_DBV_4_SINGLE_TREE
           if (pu.cs->slice->isIntra())
-#else
-          if (pu.cs->slice->isIntra() && CS::isDualITree(cs))
-#endif
           {
 #if JVET_AD0202_CCCM_MDF
             pu.curCand = m_ccmParamsStorage[sub][cccmBufferIdx];
