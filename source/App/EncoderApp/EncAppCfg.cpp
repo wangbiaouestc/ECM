@@ -1203,6 +1203,11 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #else
   ( "IBCFastMethod",                                  m_IBCFastMethod,                                     6u, "Fast methods for IBC")
 #endif
+#if JVET_AF0057
+    ("DMVREncMvSelect",                               m_dmvrEncSelect,                                   false, "Enable method for avoiding select MVs that are more likely to give subjective artifacts")
+    ("DMVREncMvSelectBaseQpTh",                       m_dmvrEncSelectBaseQpTh,                              33,"Base QP Threshold for enabling the DMVR MV selection")
+    ("DMVREncMvSelectDisableHighestTemporalLayer",    m_dmvrEncSelectDisableHighestTemporalLayer,         true,"Disable DMVR encoder control for highest temporal layer unless frame rate is less or equal to 30Hz")
+#endif
 #if JVET_AA0061_IBC_MBVD
   ("IBCMBVD",                                         m_ibcMbvd,                                         true, "IBC MMVD mode (0:off, 1:on)  [default: on]" )
 #if JVET_AE0169_IBC_MBVD_LIST_DERIVATION

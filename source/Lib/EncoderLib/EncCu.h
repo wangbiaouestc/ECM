@@ -495,6 +495,10 @@ protected:
 #if MULTI_PASS_DMVR
                                 , bool* applyBDMVR
 #endif
+#if JVET_AF0057
+                                , bool* dmvrImpreciseMv
+#endif
+
                               );
 #if JVET_X0049_ADAPT_DMVR
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
@@ -557,6 +561,9 @@ protected:
                                 , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &rdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart
 #if MULTI_PASS_DMVR
                                 , bool* applyBDMVR
+#endif
+#if JVET_AF0057
+                                , bool dmvr4TMImpreciseMv
 #endif
                               );
 #endif

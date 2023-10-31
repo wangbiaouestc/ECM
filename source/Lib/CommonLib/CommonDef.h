@@ -920,6 +920,10 @@ static const int MAX_NUM_SUBCU_DMVR = ((MAX_CU_SIZE * MAX_CU_SIZE) >> (DMVR_SUBC
 static const int MAX_NUM_SUBCU_DMVR_LOG2 = MAX_CU_DEPTH + MAX_CU_DEPTH - DMVR_SUBCU_WIDTH_LOG2 - DMVR_SUBCU_HEIGHT_LOG2;
 #endif
 static const int DMVR_NUM_ITERATION = 2;
+#if JVET_AF0057
+static constexpr int DMVR_ENC_SELECT_SIZE_THR = 32;
+static constexpr double DMVR_ENC_SELECT_FRAME_RATE_THR = 30.0;
+#endif
 
 //QTBT high level parameters
 //for I slice luma CTB configuration para.

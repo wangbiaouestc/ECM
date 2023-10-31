@@ -649,6 +649,9 @@ struct InterPredictionData
   Mv        mvdAffi [NUM_REF_PIC_LIST_01][3];
   Mv        mvAffi[NUM_REF_PIC_LIST_01][3];
   bool      ciipFlag;
+#if JVET_AF0057
+  bool      dmvrImpreciseMv;
+#endif
 #if CIIP_PDPC
   bool      ciipPDPC;
 #endif
