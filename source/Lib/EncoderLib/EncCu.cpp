@@ -3693,11 +3693,17 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 
 #if MULTI_PASS_DMVR
   bool applyBDMVR[MRG_MAX_NUM_CANDS] = { false };
+#if JVET_AF0057
+  bool dmvrImpreciseMv[MRG_MAX_NUM_CANDS] = { false };
+#endif
 #if TM_MRG && MERGE_ENC_OPT
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   bool applyBDMVR4TM[TM_MRG_MAX_NUM_INIT_CANDS] = { false };
 #else
   bool applyBDMVR4TM[TM_MRG_MAX_NUM_CANDS] = { false };
+#endif
+#if JVET_AF0057
+  bool dmvr4TMImpreciseMv = false;
 #endif
 #endif
 #if JVET_X0049_ADAPT_DMVR
@@ -3728,6 +3734,16 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
     PredictionUnit pu( tempCS->area );
     pu.cu = &cu;
     pu.cs = tempCS;
+#if JVET_AF0057
+    bool enableVisualCheck = false;
+    if (((m_pcEncCfg->getFrameRate() <= DMVR_ENC_SELECT_FRAME_RATE_THR) || !(m_pcEncCfg->getDMVREncMvSelectDisableHighestTemporalLayer() && (pu.cu->slice->getTLayer() == (pu.cu->slice->getSPS()->getMaxTLayers() - 1))))
+      && m_pcEncCfg->getDMVREncMvSelection()
+      && (pu.lwidth() >= DMVR_ENC_SELECT_SIZE_THR && pu.lheight() >= DMVR_ENC_SELECT_SIZE_THR))
+    {
+      enableVisualCheck = true; // only set this to true when cfg, size, tid, framerate all fulfilled
+    }
+    m_pcInterSearch->xDmvrSetEncoderCheckFlag(enableVisualCheck);
+#endif
 #if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
     pu.tmMergeFlag = false;
 #endif
@@ -4261,6 +4277,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
       {
         tmMrgCtx.setMergeInfo( pu, uiMergeCand );
 #if MULTI_PASS_DMVR
+#if JVET_AF0057
+        pu.dmvrImpreciseMv = false;
+#endif
         applyBDMVR4TM[uiMergeCand] = PU::checkBDMVRCondition(pu);
         if (applyBDMVR4TM[uiMergeCand])
         {
@@ -4286,10 +4305,17 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #else
         m_pcInterSearch->deriveTMMv( pu );
 #endif
+#if JVET_AF0057
+        if (m_pcInterSearch->dmvrEnableEncoderCheck && pu.dmvrImpreciseMv)
+        {
+          dmvr4TMImpreciseMv = true;
+        }
+#endif
 
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
         tmMrgCtx.candCost[uiMergeCand] = tempCost[0];
 #endif
+
         // Store refined motion back to tmMrgCtx
         tmMrgCtx.interDirNeighbours[uiMergeCand] = pu.interDir;
         tmMrgCtx.bcwIdx[uiMergeCand] = pu.cu->bcwIdx;  // BCW may change, because bi may be reduced to uni by deriveTMMv(pu)
@@ -4320,17 +4346,27 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
         {
           tmMrgCtx.setMergeInfo( pu, uiMergeCand );
 #if MULTI_PASS_DMVR
+#if JVET_AF0057
+          pu.dmvrImpreciseMv = false;
+#endif
           applyBDMVR4TM[uiMergeCand] = PU::checkBDMVRCondition(pu);
           if (applyBDMVR4TM[uiMergeCand])
           {
             pu.bdmvrRefine = true;
             m_pcInterSearch->setBdmvrSubPuMvBuf(m_mvBufBDMVR4TM[uiMergeCand << 1], m_mvBufBDMVR4TM[(uiMergeCand << 1) + 1]);
+
             applyBDMVR4TM[uiMergeCand] =  m_pcInterSearch->processBDMVR(pu);
           }
           else
           {
             m_pcInterSearch->deriveTMMv(pu);
           }
+#if JVET_AF0057
+          if (m_pcInterSearch->dmvrEnableEncoderCheck && pu.dmvrImpreciseMv && PU::checkBDMVRCondition(pu))
+          {
+            dmvr4TMImpreciseMv = true;
+          }
+#endif
 
           tmMrgCtx.interDirNeighbours[uiMergeCand] = pu.interDir;
           tmMrgCtx.bcwIdx[uiMergeCand] = pu.cu->bcwIdx;  // BCW may change, because bi may be reduced to uni by deriveTMMv(pu)
@@ -4541,7 +4577,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
         {
           mergeCtx.setMergeInfo( pu, uiMergeCand );
           applyBDMVR[uiMergeCand] = PU::checkBDMVRCondition(pu);
-
+#if JVET_AF0057
+          pu.dmvrImpreciseMv = false;
+#endif
           if (applyBDMVR[uiMergeCand])
           {
             pu.bdmvrRefine = true;
@@ -4559,6 +4597,12 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
             else
             {
               m_pcInterSearch->processBDMVR(pu);
+#if JVET_AF0057
+              if (m_pcInterSearch->dmvrEnableEncoderCheck && pu.dmvrImpreciseMv)
+              {
+                dmvrImpreciseMv[uiMergeCand] = true;
+              }
+#endif
             }
           }
         }
@@ -5331,7 +5375,6 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
       pu.bdmvrRefine = false;
 #endif
 #endif
-
       DistParam distParam;
       const bool bUseHadamard = !tempCS->slice->getDisableSATDForRD();
       m_pcRdCost->setDistParam (distParam, tempCS->getOrgBuf().Y(), m_acMergeBuffer[0].Y(), sps.getBitDepth (CHANNEL_TYPE_LUMA), COMPONENT_Y, bUseHadamard);
@@ -5345,6 +5388,10 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #if MULTI_PASS_DMVR
                                , applyBDMVR
 #endif
+#if JVET_AF0057
+                               , dmvrImpreciseMv
+#endif
+
       );
 #else
       const UnitArea localUnitArea( tempCS->area.chromaFormat, Area( 0, 0, tempCS->area.Y().width, tempCS->area.Y().height) );
@@ -5696,6 +5743,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
         xCheckSATDCostTMMerge(tempCS, cu, pu, tmMrgCtx, acMergeTempBuffer, singleMergeTempBuffer, uiNumMrgSATDCand, rdModeList, candCostList, distParam, ctxStart
 #if MULTI_PASS_DMVR
           , applyBDMVR4TM
+#endif
+#if JVET_AF0057
+          , dmvr4TMImpreciseMv
 #endif
         );
       }
@@ -6804,6 +6854,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
   {
     xCalDebCost( *bestCS, partitioner );
   }
+#if JVET_AF0057
+  m_pcInterSearch->xDmvrSetEncoderCheckFlag(false);
+#endif
 }
 
 #if JVET_W0097_GPM_MMVD_TM
@@ -10230,6 +10283,10 @@ void EncCu::xCheckSATDCostRegularMerge(CodingStructure *&tempCS, CodingUnit &cu,
 #if MULTI_PASS_DMVR
   , bool* applyBDMVR
 #endif
+#if JVET_AF0057
+  , bool* dmvrImpreciseMv
+#endif
+
 )
 {
 #if INTER_LIC
@@ -10345,6 +10402,14 @@ void EncCu::xCheckSATDCostRegularMerge(CodingStructure *&tempCS, CodingUnit &cu,
     m_CABACEstimator->getCtx() = ctxStart;
     uint64_t fracBits = m_pcInterSearch->xCalcPuMeBits(pu);
     double cost = (double)uiSad + (double)fracBits * sqrtLambdaForFirstPassIntra;
+
+#if JVET_AF0057
+      if (m_pcInterSearch->dmvrEnableEncoderCheck && dmvrImpreciseMv[uiMergeCand])
+      {
+        cost = MAX_DOUBLE;
+      }
+#endif
+
 #if MULTI_HYP_PRED
     if (testMHP && pu.addHypData.size() < tempCS->sps->getMaxNumAddHyps())
     {
@@ -10357,6 +10422,12 @@ void EncCu::xCheckSATDCostRegularMerge(CodingStructure *&tempCS, CodingUnit &cu,
       mergeResult.pu = pu;
       mergeResult.bits = uiBitsCand;
       mergeResult.cost = uiSad + m_pcRdCost->getCost(uiBitsCand);
+#if JVET_AF0057
+        if (m_pcInterSearch->dmvrEnableEncoderCheck && dmvrImpreciseMv[uiMergeCand])
+        {
+          mergeResult.cost = (Distortion)MAX_UINT64;
+        }
+#endif
       m_baseResultsForMH.push_back(mergeResult);
     }
 #endif
@@ -11039,6 +11110,9 @@ void EncCu::xCheckSATDCostTMMerge(       CodingStructure*& tempCS,
 #if MULTI_PASS_DMVR
                                        , bool*             applyBDMVR
 #endif
+#if JVET_AF0057
+                                       , bool dmvr4TMImpreciseMv
+#endif
 )
 {
 #if MULTI_PASS_DMVR
@@ -11095,6 +11169,12 @@ void EncCu::xCheckSATDCostTMMerge(       CodingStructure*& tempCS,
     m_CABACEstimator->getCtx() = ctxStart;
     uint64_t fracBits = m_pcInterSearch->xCalcPuMeBits(pu);
     double cost = (double)uiSad + (double)fracBits * sqrtLambdaForFirstPassIntra;
+#if JVET_AF0057
+    if (m_pcInterSearch->dmvrEnableEncoderCheck && dmvr4TMImpreciseMv)
+    {
+      cost = MAX_DOUBLE;
+    }
+#endif
     insertPos = -1;
     updateCandList(ModeInfo(cu, pu), cost, rdModeList, candCostList, uiNumMrgSATDCand, &insertPos);
 
@@ -18694,7 +18774,9 @@ void EncCu::xCheckSATDCostBMMerge(CodingStructure*& tempCS,
 #endif
       pu.bdmvrRefine = true;
       m_pcInterSearch->setBdmvrSubPuMvBuf(m_mvBufBDMVR4BM[uiMergeCand << 1], m_mvBufBDMVR4BM[(uiMergeCand << 1) + 1]);
-      
+#if JVET_AF0057
+      pu.dmvrImpreciseMv = false;
+#endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
       if (armcRefinedMotion)
       {
@@ -18718,6 +18800,12 @@ void EncCu::xCheckSATDCostBMMerge(CodingStructure*& tempCS,
       m_CABACEstimator->getCtx() = ctxStart;
       uint64_t fracBits = m_pcInterSearch->xCalcPuMeBits(pu);
       double cost = (double)uiSad + (double)fracBits * sqrtLambdaForFirstPassIntra;
+#if JVET_AF0057
+      if (m_pcInterSearch->dmvrEnableEncoderCheck && pu.dmvrImpreciseMv)
+      {
+        cost = MAX_DOUBLE;
+      }
+#endif
       insertPos = -1;
       updateCandList(ModeInfo(cu, pu), cost, rdModeList, candCostList, uiNumMrgSATDCand, &insertPos);
       if (insertPos != -1 && insertPos < MMVD_MRG_MAX_RD_NUM)

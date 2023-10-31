@@ -139,6 +139,9 @@ InterPrediction::InterPrediction()
 #endif
 , m_subPuMC(false)
 {
+#if JVET_AF0057
+  dmvrEnableEncoderCheck = false;
+#endif
   for( uint32_t ch = 0; ch < MAX_NUM_COMPONENT; ch++ )
   {
     for( uint32_t refList = 0; refList < NUM_REF_PIC_LIST_01; refList++ )
@@ -146,7 +149,14 @@ InterPrediction::InterPrediction()
       m_acYuvPred[refList][ch] = nullptr;
     }
   }
-
+#if JVET_AF0057
+  // one vector for each subblock
+  for (uint32_t c = 0; c < 256; c++)
+  {
+    m_dmvrRightBoundary[c] = nullptr;
+    m_dmvrBottomBoundary[c] = nullptr;
+  }
+#endif
   for( uint32_t c = 0; c < MAX_NUM_COMPONENT; c++ )
   {
     for( uint32_t i = 0; i < LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS_SIGNAL; i++ )
@@ -344,6 +354,17 @@ void InterPrediction::destroy()
       m_acYuvPred[i][c] = nullptr;
     }
   }
+
+#if JVET_AF0057
+  // one vector for each subblock
+  for (uint32_t c = 0; c < 256; c++)
+  {
+      xFree(m_dmvrRightBoundary[c]);
+      m_dmvrRightBoundary[c] = nullptr;
+      xFree(m_dmvrBottomBoundary[c]);
+      m_dmvrBottomBoundary[c] = nullptr;
+  }
+#endif
 
   for( uint32_t c = 0; c < MAX_NUM_COMPONENT; c++ )
   {
@@ -569,6 +590,15 @@ void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, cons
       extWidth = extWidth > (MAX_CU_SIZE + (2 * DMVR_NUM_ITERATION) + 16) ? extWidth : MAX_CU_SIZE + (2 * DMVR_NUM_ITERATION) + 16;
       extHeight = extHeight > (MAX_CU_SIZE + (2 * DMVR_NUM_ITERATION) + 1) ? extHeight : MAX_CU_SIZE + (2 * DMVR_NUM_ITERATION) + 1;
 #endif
+#if JVET_AF0057
+      // one vector for each subblock
+      for (uint32_t c = 0; c < 256; c++)
+      {
+          m_dmvrRightBoundary[c] = (Pel*)xMalloc(Pel, 16);
+          m_dmvrBottomBoundary[c] = (Pel*)xMalloc(Pel, 16);
+      }
+#endif
+
       for( uint32_t i = 0; i < LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS_SIGNAL; i++ )
       {
 #if IF_12TAP
@@ -19782,12 +19812,18 @@ bool InterPrediction::processBDMVRPU2Dir(PredictionUnit& pu, bool subPURefine[2]
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   }
 #endif
-
   return true;
 }
+#if JVET_AF0057
+static const int ACTIVITY_TH[MAX_QP + 1] =
+{
+  0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 9, 9, 10, 10, 11, 12, 13, 13, 14, 15, 16, 17, 18, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 29, 30, 31, 32, 33, 34, 36, 36, 36, 36, 37, 37, 37, 37, 37, 37
+};
+#endif
 
 void InterPrediction::processBDMVRSubPU(PredictionUnit& pu, bool subPURefine)
 {
+
   if (!subPURefine)
   {
     // span motion to subPU
@@ -19809,7 +19845,6 @@ void InterPrediction::processBDMVRSubPU(PredictionUnit& pu, bool subPURefine)
     }
     return;
   }
-
   const int dy = std::min<int>(pu.lumaSize().height, DMVR_SUBCU_HEIGHT);
   const int dx = std::min<int>(pu.lumaSize().width, DMVR_SUBCU_WIDTH);
   Position puPos = pu.lumaPos();
@@ -19861,18 +19896,62 @@ void InterPrediction::processBDMVRSubPU(PredictionUnit& pu, bool subPURefine)
 
   Mv mvTopLeft[2] = { mvInitial[0] - Mv((BDMVR_INTME_RANGE << MV_FRACTIONAL_BITS_INTERNAL), (BDMVR_INTME_RANGE << MV_FRACTIONAL_BITS_INTERNAL)),
     mvInitial[1] - Mv((BDMVR_INTME_RANGE << MV_FRACTIONAL_BITS_INTERNAL), (BDMVR_INTME_RANGE << MV_FRACTIONAL_BITS_INTERNAL)) };
+#if JVET_AF0057
+  int xx = -1;
+  int yy = -1;
+  const int widthInSubPu = pu.lumaSize().width / DMVR_SUBCU_WIDTH;
+  const int spatActivityThreshold = ACTIVITY_TH[pu.cs->slice->getSliceQp()];
+#endif
   for (int y = puPos.y, yStart = 0; y < (puPos.y + pu.lumaSize().height); y = y + dy, yStart = yStart + dy)
   {
+#if JVET_AF0057
+    yy++;
+#endif
     for (int x = puPos.x, xStart = 0; x < (puPos.x + pu.lumaSize().width); x = x + dx, xStart = xStart + dx)
     {
+#if JVET_AF0057
+      xx++;
+      bool checkDmvr = xDmvrGetEncoderCheckFlag() && !(xStart == 0 && yStart == 0);
+#endif
       subPu.UnitArea::operator=(UnitArea(pu.chromaFormat, Area(x, y, dx, dy)));
-
       minCost = std::numeric_limits<Distortion>::max();
 
       // Pre-interpolation
       xBDMVRFillBlkPredPelBuffer(subPu, refPic0, mvTopLeft[0], predBufExt[0], pu.cs->slice->clpRng(COMPONENT_Y));
       xBDMVRFillBlkPredPelBuffer(subPu, refPic1, mvTopLeft[1], predBufExt[1], pu.cs->slice->clpRng(COMPONENT_Y));
+#if JVET_AF0057
+      if (checkDmvr)
+      {
+        checkDmvr = false;
 
+        CHECK(dx != DMVR_SUBCU_WIDTH, "bad subblock width");
+        CHECK(dy != DMVR_SUBCU_HEIGHT, "bad subblock height");
+        // measure spatial activity
+        int maxRefs = 2;
+        for (int theRef = 0; theRef < maxRefs; theRef++)
+        {
+          int blkSumAct = 0;
+          const ptrdiff_t blkStride = BDMVR_BUF_STRIDE;
+          const Pel* piOrg = pelBuffer[theRef];
+
+          piOrg += blkStride; // start from the second row
+          for (int row = 1; row < dy; row++)
+          {
+            for (int col = 1; col < dx; col++)
+            {
+              blkSumAct += std::abs(piOrg[col] - piOrg[col - 1]);
+              blkSumAct += std::abs(piOrg[col] - piOrg[col - blkStride]);
+            }
+            piOrg += blkStride;
+          }
+          if (blkSumAct / ((DMVR_SUBCU_WIDTH - 1) * (DMVR_SUBCU_HEIGHT - 1)) < spatActivityThreshold)
+          {
+            checkDmvr = true;
+            break;
+          }
+        }
+      }
+#endif
       if (adaptRange)
       {
         minCost = xBDMVRMvIntPelFullSearch<true, true>(mvOffset, minCost, mvInitial,
@@ -19891,6 +19970,18 @@ void InterPrediction::processBDMVRSubPU(PredictionUnit& pu, bool subPURefine)
           earlyTerminateTh, cDistParam,
           pelBuffer, BDMVR_BUF_STRIDE);
       }
+#if JVET_AF0057
+      if (checkDmvr)
+      {
+        bool impreciseMV = isDMVRmvReliable(pelBuffer, BDMVR_BUF_STRIDE, mvInitial, mvOffset.getHor(), mvOffset.getVer(), xx, yy, widthInSubPu, dx, dy);
+        // if risk with any subblock MV inside PU DMVR risk to have imprecise MV
+        if (impreciseMV)
+        {
+          pu.dmvrImpreciseMv = true;
+        }
+      }
+#endif
+
       if (minCost >= earlyTerminateTh)
       {
         int bestOffsetIdx = (mvOffset.getVer() + BDMVR_INTME_RANGE) * BDMVR_INTME_STRIDE + (mvOffset.getHor() + BDMVR_INTME_RANGE);
@@ -19916,8 +20007,41 @@ void InterPrediction::processBDMVRSubPU(PredictionUnit& pu, bool subPURefine)
 
       m_bdmvrSubPuMvBuf[REF_PIC_LIST_0][subPuIdx] = mvFinal[0];
       m_bdmvrSubPuMvBuf[REF_PIC_LIST_1][subPuIdx] = mvFinal[1];
+
+#if JVET_AF0057
+      if (xDmvrGetEncoderCheckFlag())
+      {
+        Mv theMvOffset0 = mvFinal[0] - mvInitial[0];
+        theMvOffset0 >>= MV_FRACTIONAL_BITS_INTERNAL;
+        int theMvOffsetHor0 = (theMvOffset0.getHor() > 8) ? 8 : (theMvOffset0.getHor() < -8 ? -8 : theMvOffset0.getHor());
+        int theMvOffsetVer0 = (theMvOffset0.getVer() > 8) ? 8 : (theMvOffset0.getVer() < -8 ? -8 : theMvOffset0.getVer());
+        Mv theMvOffset1 = mvInitial[1] - mvFinal[1];
+        theMvOffset1 >>= MV_FRACTIONAL_BITS_INTERNAL;
+        int theMvOffsetHor1 = (theMvOffset1.getHor() > 8) ? 8 : (theMvOffset1.getHor() < -8 ? -8 : theMvOffset1.getHor());
+        int theMvOffsetVer1 = (theMvOffset1.getVer() > 8) ? 8 : (theMvOffset1.getVer() < -8 ? -8 : theMvOffset1.getVer());
+        int bufOffset0 = theMvOffsetVer0 * BDMVR_BUF_STRIDE + theMvOffsetHor0;
+        int bufOffset1 = theMvOffsetVer1 * BDMVR_BUF_STRIDE + theMvOffsetHor1;
+        Pel* theBuffer0 = pelBuffer[0] + bufOffset0;
+        Pel* theBuffer1 = pelBuffer[1] - bufOffset1;
+        Pel* piBottomNb = m_dmvrBottomBoundary[xx + yy * widthInSubPu];
+        Pel* piRightNb = m_dmvrRightBoundary[xx + yy * widthInSubPu];
+
+        // store the bi-pred samples corresponding to the final motion
+        for (int i = 0; i < dx; i++)
+        {
+          piBottomNb[i] = (theBuffer0[(dy - 1) * BDMVR_BUF_STRIDE + i] + theBuffer1[(dy - 1) * BDMVR_BUF_STRIDE + i] + 1) >> 1;
+        }
+        for (int j = 0; j < dy; j++)
+        {
+          piRightNb[j] = (theBuffer0[(dx - 1) + j * BDMVR_BUF_STRIDE] + theBuffer1[(dx - 1) + j * BDMVR_BUF_STRIDE] + 1) >> 1;
+        }
+      }
+#endif
       subPuIdx++;
     }
+#if JVET_AF0057
+    xx = -1;
+#endif
     subPuIdx += dmvrSubPuStrideIncr;
   }
 }
@@ -21801,10 +21925,23 @@ bool InterPrediction::processBDMVR(PredictionUnit& pu)
   Mv mvTopLeft[2] = { mvInitial[0] - Mv((BDMVR_INTME_RANGE << MV_FRACTIONAL_BITS_INTERNAL), (BDMVR_INTME_RANGE << MV_FRACTIONAL_BITS_INTERNAL)),
                       mvInitial[1] - Mv((BDMVR_INTME_RANGE << MV_FRACTIONAL_BITS_INTERNAL), (BDMVR_INTME_RANGE << MV_FRACTIONAL_BITS_INTERNAL)) };
 #endif
+#if JVET_AF0057
+  int xx = -1;
+  int yy = -1;
+  const int widthInSubPu = pu.lumaSize().width / DMVR_SUBCU_WIDTH;
+  const int spatActivityThreshold = ACTIVITY_TH[pu.cs->slice->getSliceQp()];
+#endif
   for (int y = puPos.y, yStart = 0; y < (puPos.y + pu.lumaSize().height); y = y + dy, yStart = yStart + dy)
   {
+#if JVET_AF0057
+    yy++;
+#endif
     for (int x = puPos.x, xStart = 0; x < (puPos.x + pu.lumaSize().width); x = x + dx, xStart = xStart + dx)
     {
+#if JVET_AF0057
+      xx++;
+      bool checkDmvr = xDmvrGetEncoderCheckFlag() && !(xStart == 0 && yStart == 0);
+#endif
 #if JVET_X0049_BDMVR_SW_OPT
       subPu.UnitArea::operator=(UnitArea(pu.chromaFormat, Area(x, y, dx, dy)));
 
@@ -21813,7 +21950,37 @@ bool InterPrediction::processBDMVR(PredictionUnit& pu)
       // Pre-interpolation
       xBDMVRFillBlkPredPelBuffer(subPu, refPic0, mvTopLeft[0], predBufExt[0], pu.cs->slice->clpRng(COMPONENT_Y));
       xBDMVRFillBlkPredPelBuffer(subPu, refPic1, mvTopLeft[1], predBufExt[1], pu.cs->slice->clpRng(COMPONENT_Y));
-      
+
+#if JVET_AF0057
+      if (checkDmvr)
+      {
+        checkDmvr = false;
+        // measure spatial activity
+        int maxRefs = 2;
+        for (int theRef = 0; theRef < maxRefs; theRef++)
+        {
+          int blkSumAct = 0;
+          const ptrdiff_t blkStride = BDMVR_BUF_STRIDE;
+          const Pel* piOrg = pelBuffer[theRef];
+
+          piOrg += blkStride; // start from the second row
+          for (int row = 1; row < dy; row++)
+          {
+            for (int col = 1; col < dx; col++)
+            {
+              blkSumAct += std::abs(piOrg[col] - piOrg[col - 1]);
+              blkSumAct += std::abs(piOrg[col] - piOrg[col - blkStride]);
+            }
+            piOrg += blkStride;
+          }
+          if (blkSumAct / ((DMVR_SUBCU_WIDTH - 1) * (DMVR_SUBCU_HEIGHT - 1)) < spatActivityThreshold)
+          {
+            checkDmvr = true;
+            break;
+          }
+        }
+      }
+#endif
       if (adaptRange)
       {
         minCost = xBDMVRMvIntPelFullSearch<true, true>(mvOffset, minCost, mvInitial,
@@ -21844,6 +22011,17 @@ bool InterPrediction::processBDMVR(PredictionUnit& pu)
           earlyTerminateTh, cDistParam,
           pelBuffer, BDMVR_BUF_STRIDE);
       }
+#if JVET_AF0057
+      if (checkDmvr)
+      {
+        bool impreciseMV = isDMVRmvReliable(pelBuffer, BDMVR_BUF_STRIDE, mvInitial, mvOffset.getHor(), mvOffset.getVer(), xx, yy, widthInSubPu, dx, dy);
+        // if risk with any subblock MV inside PU DMVR risk to have imprecise MV
+        if (impreciseMV)
+        {
+          pu.dmvrImpreciseMv = true;
+        }
+      }
+#endif
       if (minCost >= earlyTerminateTh)
       {
         int bestOffsetIdx = (mvOffset.getVer() + BDMVR_INTME_RANGE) * BDMVR_INTME_STRIDE + (mvOffset.getHor() + BDMVR_INTME_RANGE);
@@ -21881,8 +22059,41 @@ bool InterPrediction::processBDMVR(PredictionUnit& pu)
 
       m_bdmvrSubPuMvBuf[REF_PIC_LIST_0][subPuIdx] = mvFinal[0];
       m_bdmvrSubPuMvBuf[REF_PIC_LIST_1][subPuIdx] = mvFinal[1];
+
+#if JVET_AF0057
+      if (xDmvrGetEncoderCheckFlag())
+      {
+        Mv theMvOffset0 = mvFinal[0] - mvInitial[0];
+        theMvOffset0 >>= MV_FRACTIONAL_BITS_INTERNAL;
+        int theMvOffsetHor0 = (theMvOffset0.getHor() > 8) ? 8 : (theMvOffset0.getHor() < -8 ? -8 : theMvOffset0.getHor());
+        int theMvOffsetVer0 = (theMvOffset0.getVer() > 8) ? 8 : (theMvOffset0.getVer() < -8 ? -8 : theMvOffset0.getVer());
+        Mv theMvOffset1 = mvInitial[1] - mvFinal[1];
+        theMvOffset1 >>= MV_FRACTIONAL_BITS_INTERNAL;
+        int theMvOffsetHor1 = (theMvOffset1.getHor() > 8) ? 8 : (theMvOffset1.getHor() < -8 ? -8 : theMvOffset1.getHor());
+        int theMvOffsetVer1 = (theMvOffset1.getVer() > 8) ? 8 : (theMvOffset1.getVer() < -8 ? -8 : theMvOffset1.getVer());
+        int bufOffset0 = theMvOffsetVer0 * BDMVR_BUF_STRIDE + theMvOffsetHor0;
+        int bufOffset1 = theMvOffsetVer1 * BDMVR_BUF_STRIDE + theMvOffsetHor1;
+        Pel* theBuffer0 = pelBuffer[0] + bufOffset0;
+        Pel* theBuffer1 = pelBuffer[1] - bufOffset1;
+        Pel* piBottomNb = m_dmvrBottomBoundary[xx + yy * widthInSubPu];
+        Pel* piRightNb = m_dmvrRightBoundary[xx + yy * widthInSubPu];
+
+        // store the samples corresponding to the final motion
+        for (int i = 0; i < dx; i++)
+        {
+          piBottomNb[i] = (theBuffer0[(dy - 1) * BDMVR_BUF_STRIDE + i] + theBuffer1[(dy - 1) * BDMVR_BUF_STRIDE + i] + 1) >> 1;
+        }
+        for (int j = 0; j < dy; j++)
+        {
+          piRightNb[j] = (theBuffer0[(dx - 1) + j * BDMVR_BUF_STRIDE] + theBuffer1[(dx - 1) + j * BDMVR_BUF_STRIDE] + 1) >> 1;
+        }
+      }
+#endif
       subPuIdx++;
     }
+#if JVET_AF0057
+    xx = -1;
+#endif
     subPuIdx += dmvrSubPuStrideIncr;
   }
 
@@ -22362,6 +22573,116 @@ void InterPrediction::xBDMVRPreInterpolation(const PredictionUnit& pu, const Mv 
   }
 }
 
+#if JVET_AF0057
+bool InterPrediction::isDMVRmvReliable(Pel* pelBuffer[2], const int stride, const Mv(&initialMv)[2], int horOffset, int verOffset, int xx, int yy, const int widthInSubPu, int theWidth, int theHeight)
+{
+  const int mvThreshold = 16;
+  const int boundaryDiffThreshold = 15;
+  bool impreciseMV = false;
+  bool motionDifferenceAboveBlock = false;
+  bool motionDifferenceLeftBlock = false;
+  Mv mvd = { horOffset, verOffset };
+  Mv mvdFullRes = mvd;
+  mvdFullRes.changePrecision(MvPrecision::MV_PRECISION_INT, MvPrecision::MV_PRECISION_INTERNAL);
+  int bufOffset = verOffset * stride + horOffset;
+  if (xx > 0)
+  {
+    Mv nbOffset0 = m_bdmvrSubPuMvBuf[REF_PIC_LIST_0][xx - 1 + yy * DMVR_SUBPU_STRIDE] - initialMv[0];
+    motionDifferenceLeftBlock = abs((mvdFullRes.getHor()) - nbOffset0.getHor()) >= mvThreshold || abs((mvdFullRes.getVer()) - nbOffset0.getVer()) >= mvThreshold;
+  }
+  if (yy > 0)
+  {
+    Mv nbOffset0 = m_bdmvrSubPuMvBuf[REF_PIC_LIST_0][xx + (yy - 1) * DMVR_SUBPU_STRIDE] - initialMv[0];
+    motionDifferenceAboveBlock = abs((mvdFullRes.getHor()) - nbOffset0.getHor()) >= mvThreshold || abs((mvdFullRes.getVer()) - nbOffset0.getVer()) >= mvThreshold;
+  }
+  if (motionDifferenceLeftBlock || motionDifferenceAboveBlock)
+  {
+    bool boundaryDistorsionAboveBlock = false;
+    bool boundaryDistorsionLeftBlock = false;
+    int boundaryDiffHorEdge = 0;
+    int boundaryDiffVerEdge = 0;
+    // check boundary diff above
+    if (yy != 0 && motionDifferenceAboveBlock) // omit check for block boundary
+    {
+      int nbHorEdge = 0;
+      if (xx != 0)
+      {
+        Pel* piNbTopLeft = m_dmvrBottomBoundary[(xx - 1) + (yy - 1) * widthInSubPu];
+        Pel* piNbLeft = m_dmvrRightBoundary[(xx - 1) + yy * widthInSubPu];
+        nbHorEdge = std::abs(piNbLeft[0] - piNbTopLeft[theWidth - 1]);
+      }
+      if (nbHorEdge > boundaryDiffThreshold)
+      {
+        boundaryDiffHorEdge = 0;
+      }
+      else
+      {
+        Pel* piCurr = pelBuffer[0] + bufOffset;
+        Pel* piCurr2 = pelBuffer[1] - bufOffset;
+        Pel* piNb = m_dmvrBottomBoundary[xx + (yy - 1) * widthInSubPu];
+        int boundaryGradientHorEdgeNb = (piNb[0] - 2 * piNb[theWidth / 2] + piNb[theWidth - 1]);
+        int boundaryGradientHorEdgeNb2 = (piNb[0] - piNb[theWidth - 1]);
+        int boundaryGradientHorEdgeCurr2 = (((piCurr[0] + piCurr2[0] + 1) >> 1) - ((piCurr[theWidth - 1] + piCurr2[theWidth - 1] + 1) >> 1));
+        int boundaryGradientHorEdgeCurr = (((piCurr[0] + piCurr2[0] + 1) >> 1) - 2 * ((piCurr[theWidth / 2] + piCurr2[theWidth / 2] + 1) >> 1) + ((piCurr[theWidth - 1] + piCurr2[theWidth - 1] + 1) >> 1));
+        int blkSumAct = 0;
+        for (int row = 0; row < 1; row++)
+        {
+          for (int col = 0; col < theWidth; col++)
+          {
+            blkSumAct += std::abs(((piCurr[col] + piCurr2[col] + 1) >> 1) - piNb[col]);
+          }
+        }
+        boundaryDiffHorEdge = (blkSumAct >> 4) + 4 * (std::abs(boundaryGradientHorEdgeCurr - boundaryGradientHorEdgeNb) + std::abs(boundaryGradientHorEdgeCurr2 - boundaryGradientHorEdgeNb2));
+        boundaryDistorsionAboveBlock = (boundaryDiffHorEdge > boundaryDiffThreshold);
+      }
+    }
+    if (xx != 0 && motionDifferenceLeftBlock) // omit check for block boundary
+    {
+      int nbVerEdge = 0;
+      if (yy != 0)
+      {
+        Pel* piNbTopLeft = m_dmvrRightBoundary[(xx - 1) + (yy - 1) * widthInSubPu];
+        Pel* piNbTop = m_dmvrBottomBoundary[xx + (yy - 1) * widthInSubPu];
+        nbVerEdge = std::abs(piNbTop[0] - piNbTopLeft[theHeight - 1]);
+      }
+      if (nbVerEdge > boundaryDiffThreshold)
+      {
+        boundaryDiffVerEdge = 0;
+      }
+      else
+      {
+        const ptrdiff_t blkStride2 = stride;
+        Pel* piCurr = pelBuffer[0] + bufOffset;
+        Pel* piCurr2 = pelBuffer[1] - bufOffset;
+        Pel* piNb = m_dmvrRightBoundary[(xx - 1) + yy * widthInSubPu];
+        int boundaryGradientVerEdgeCurr = (((piCurr[0] + piCurr2[0] + 1) >> 1) - 2 * ((piCurr[(theHeight / 2) * blkStride2] + piCurr2[(theHeight / 2) * blkStride2] + 1) >> 1) + ((piCurr[(theHeight - 1) * blkStride2] + piCurr2[(theHeight - 1) * blkStride2] + 1) >> 1));
+        int boundaryGradientVerEdgeCurr2 = (((piCurr[0] + piCurr2[0] + 1) >> 1) - ((piCurr[(theHeight - 1) * blkStride2] + piCurr2[(theHeight - 1) * blkStride2] + 1) >> 1));
+        int boundaryGradientVerEdgeNb = (piNb[0] - 2 * piNb[(theHeight / 2)] + piNb[(theHeight - 1)]);
+        int boundaryGradientVerEdgeNb2 = (piNb[0] - piNb[(theHeight - 1)]);
+        int blkSumAct = 0;
+        // check boundary diff left
+        for (int row = 0; row < theHeight; row++)
+        {
+          for (int col = 0; col < 1; col++)
+          {
+            blkSumAct += std::abs(((piCurr[col] + piCurr2[col] + 1) >> 1) - piNb[col]);
+          }
+          piCurr += blkStride2;
+          piCurr2 += blkStride2;
+        }
+        boundaryDiffVerEdge = (blkSumAct >> 4) + 4 * (std::abs(boundaryGradientVerEdgeCurr - boundaryGradientVerEdgeNb) + std::abs(boundaryGradientVerEdgeCurr2 - boundaryGradientVerEdgeNb2));
+        boundaryDistorsionLeftBlock = (boundaryDiffVerEdge > boundaryDiffThreshold);
+      }
+    }
+    if (boundaryDistorsionLeftBlock || boundaryDistorsionAboveBlock)
+    {
+      impreciseMV = true;
+    }
+  }
+  return impreciseMV;
+
+}
+#endif
 #if JVET_X0049_BDMVR_SW_OPT
 template <bool adaptRange, bool useHadamard>
 Distortion InterPrediction::xBDMVRMvIntPelFullSearch(Mv&mvOffset, Distortion curBestCost, const Mv(&initialMv)[2], const int32_t maxSearchRounds, const int maxHorOffset, const int maxVerOffset, const bool earlySkip, const Distortion earlyTerminateTh, DistParam &cDistParam, Pel* pelBuffer[2], const int stride)

@@ -533,6 +533,11 @@ protected:
   unsigned  m_IBCHashSearchMaxCand;
   unsigned  m_IBCHashSearchRange4SmallBlk;
   unsigned  m_IBCFastMethod;
+#if JVET_AF0057
+  bool      m_dmvrEncSelect;
+  int       m_dmvrEncSelectBaseQpTh;
+  bool      m_dmvrEncSelectDisableHighestTemporalLayer;
+#endif
 #if JVET_AA0061_IBC_MBVD
   bool      m_ibcMbvd;
 #if JVET_AE0169_IBC_MBVD_LIST_DERIVATION

@@ -946,6 +946,9 @@ void PredictionUnit::initData()
 #else
   ::memset(mvdL0SubPu, 0, sizeof(mvdL0SubPu));
 #endif
+#if JVET_AF0057
+  dmvrImpreciseMv = false;
+#endif
 #if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
   availableBdofRefinedMv = 0;
 #endif
@@ -1135,6 +1138,9 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
   bdmvrRefine = predData.bdmvrRefine;
 #else
   ::memcpy(mvdL0SubPu, predData.mvdL0SubPu, sizeof(mvdL0SubPu));
+#endif
+#if JVET_AF0057
+  dmvrImpreciseMv = predData.dmvrImpreciseMv;
 #endif
 #if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
   availableBdofRefinedMv = predData.availableBdofRefinedMv;
@@ -1326,6 +1332,9 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   bdmvrRefine = other.bdmvrRefine;
 #else
   ::memcpy(mvdL0SubPu, other.mvdL0SubPu, sizeof(mvdL0SubPu));
+#endif
+#if JVET_AF0057
+  dmvrImpreciseMv = other.dmvrImpreciseMv;
 #endif
 #if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
   availableBdofRefinedMv = other.availableBdofRefinedMv;

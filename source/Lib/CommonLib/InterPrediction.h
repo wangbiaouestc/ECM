@@ -193,6 +193,12 @@ protected:
   Pel*                 m_acYuvPred            [NUM_REF_PIC_LIST_01][MAX_NUM_COMPONENT];
   Pel*                 m_filteredBlock        [LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS_SIGNAL][LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS_SIGNAL][MAX_NUM_COMPONENT];
   Pel*                 m_filteredBlockTmp     [LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS_SIGNAL][MAX_NUM_COMPONENT];
+#if JVET_AF0057
+  // one vector for each subblock
+  Pel* m_dmvrRightBoundary[256];
+  Pel* m_dmvrBottomBoundary[256];
+#endif
+
 #if JVET_AB0112_AFFINE_DMVR && !JVET_AC0144_AFFINE_DMVR_REGRESSION
   Pel*                 m_affineDmvrBlockTmp[NUM_REF_PIC_LIST_01];
 #endif
@@ -736,6 +742,11 @@ public:
   template <bool trueTFalseL>
   void    weightedGeoTpl(PredictionUnit &pu, const uint8_t splitDir, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1);
 #endif
+#if JVET_AF0057
+  bool     dmvrEnableEncoderCheck;
+  void     xDmvrSetEncoderCheckFlag(bool enableFlag) { dmvrEnableEncoderCheck = enableFlag; }
+  bool     xDmvrGetEncoderCheckFlag() { return dmvrEnableEncoderCheck; }
+#endif
   void xPrefetch(PredictionUnit& pu, PelUnitBuf &pcPad, RefPicList refId, bool forLuma);
   void xPad(PredictionUnit& pu, PelUnitBuf &pcPad, RefPicList refId);
   void xFinalPaddedMCForDMVR(PredictionUnit& pu, PelUnitBuf &pcYuvSrc0, PelUnitBuf &pcYuvSrc1, PelUnitBuf &pcPad0, PelUnitBuf &pcPad1, const bool bioApplied
@@ -1204,12 +1215,15 @@ private:
                                       , const Mv(&mvInitial)[2]  // only used for full-pel MVD
                                       , int nDirect              // only used for half-pel MVD
                                         );
+#if JVET_AF0057
+  bool isDMVRmvReliable(Pel* pelBuffer[2], const int stride, const Mv(&initialMv)[2], int horOffset, int verOffset, int xx, int yy, const int widthInSubPu, int theWidth, int theHeight);
+#endif
 #if JVET_X0049_BDMVR_SW_OPT
   template <bool adaptRange, bool useHadamard>
-  Distortion xBDMVRMvIntPelFullSearch  (Mv&mvOffset, Distortion curBestCost, 
-    const Mv(&initialMv)[2], 
-    const int32_t maxSearchRounds, 
-    const int maxHorOffset, const int maxVerOffset, 
+  Distortion xBDMVRMvIntPelFullSearch  (Mv&mvOffset, Distortion curBestCost,
+    const Mv(&initialMv)[2],
+    const int32_t maxSearchRounds,
+    const int maxHorOffset, const int maxVerOffset,
     const bool earlySkip,
     const Distortion earlyTerminateTh, DistParam &cDistParam, Pel* pelBuffer[2], const int stride);
 
