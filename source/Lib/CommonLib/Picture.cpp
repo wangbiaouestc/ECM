@@ -207,6 +207,7 @@ Picture::Picture()
 }
 
 void Picture::create(
+  const bool rprEnabled,
 #if JVET_Z0118_GDR
   const bool gdrEnabled,
 #endif
@@ -216,7 +217,7 @@ void Picture::create(
 {
   layerId = _layerId;
   UnitArea::operator=( UnitArea( _chromaFormat, Area( Position{ 0, 0 }, size ) ) );
-  margin            =  MAX_SCALING_RATIO*_margin;
+  margin            =  rprEnabled?(MAX_SCALING_RATIO*_margin):_margin;
   const Area a      = Area( Position(), size );
 
 #if JVET_Z0118_GDR
