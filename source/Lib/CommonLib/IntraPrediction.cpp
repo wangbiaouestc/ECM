@@ -2108,15 +2108,21 @@ Mv IntraPrediction::refineChromaBv(const ComponentID compId, const PredictionUni
 #if JVET_AF0066_ENABLE_DBV_4_SINGLE_TREE
   if (!CS::isDualITree(cs))
   {
+#if JVET_AF0079_STORING_INTRATMP
+    if (PU::checkIsChromaBvCandidateValid(pu, pu.mv[0], 0))
+    {
+      return pu.mv[0];
+    }
+    else
+    {
+      Mv mv = pu.bv;
+      mv <<= MV_FRACTIONAL_BITS_INTERNAL;
+      return mv;
+    }
+#else
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
     if (pu.cs->sps->getIBCFracFlag() && pu.cu->tmpFlag && !pu.cu->tmpFlmFlag && !pu.cu->tmpFusionFlag && pu.cu->tmpIsSubPel)
     {
-#if JVET_AF0079_STORING_INTRATMP
-      if (PU::checkIsChromaBvCandidateValid(pu, pu.mv[0], 0))
-      {
-        return pu.mv[0];
-      }
-#else
       int pXFrac = pu.mv[0].hor;
       int pYFrac = pu.mv[0].ver;
       int fracOffset = (pu.cu->tmpIsSubPel == 1 ? 8 : (pu.cu->tmpIsSubPel == 2 ? 4 : 12));
@@ -2141,11 +2147,11 @@ Mv IntraPrediction::refineChromaBv(const ComponentID compId, const PredictionUni
       {
         return Mv(pXFrac, pYFrac);
       }
-#endif
     }
     return pu.cs->sps->getIBCFracFlag() ? pu.mv[0] : Mv((pu.mv[0].hor >> bvShiftHor) << bvShiftHor, (pu.mv[0].ver >> bvShiftVer) << bvShiftVer);
 #else
     return Mv(pu.bv.hor >> shiftSampleHor, pu.bv.ver >> shiftSampleVer);
+#endif
 #endif
   }
 #endif
@@ -3548,11 +3554,7 @@ void IntraPrediction::geneChromaFusionPred(const ComponentID compId, PelBuf &piP
   const CompArea &area = pu2.blocks[compId];
 
 #if JVET_AC0119_LM_CHROMA_FUSION
-#if JVET_AF0066_ENABLE_DBV_4_SINGLE_TREE
   if (!pu.cs->pcv->isEncoder || !pu2.cs->slice->isIntra() || !CS::isDualITree(*pu.cs))
-#else
-  if (!pu.cs->pcv->isEncoder || !pu2.cs->slice->isIntra())
-#endif
   {
 #endif
   xGetLumaRecPixels(pu2, area);
@@ -3564,11 +3566,7 @@ void IntraPrediction::geneChromaFusionPred(const ComponentID compId, PelBuf &piP
   if (pu.isChromaFusion > 1)
   {
     pu2.intraDir[1] = LM_CHROMA_IDX + pu.isChromaFusion - 2;
-#if JVET_AF0066_ENABLE_DBV_4_SINGLE_TREE
     if (!pu.cs->pcv->isEncoder || !pu2.cs->slice->isIntra() || !CS::isDualITree(*pu.cs))
-#else
-    if (!pu.cs->pcv->isEncoder || !pu2.cs->slice->isIntra())
-#endif
     {
       xCflmCreateChromaPred(pu, compId, piPred);
     }
@@ -12485,8 +12483,7 @@ bool IntraPrediction::generateTMPrediction(Pel *piPred, unsigned int uiStride, i
       const int iVer = (pY << MV_FRACTIONAL_BITS_INTERNAL) + yDistance;
       pu.mv[0].set(iHor, iVer);
 
-      pu.bv = pu.mv[0];
-      pu.bv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
+      pu.bv.set(pX, pY);
     }
 #endif
   }
