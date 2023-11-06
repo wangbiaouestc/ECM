@@ -777,6 +777,7 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
     Picture *picBg = new Picture;
 
     picBg->create(
+      sps0.getRprEnabledFlag(),
 #if JVET_Z0118_GDR
       sps0.getGDREnabledFlag(),
 #endif
@@ -795,6 +796,7 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
     Picture *picOrig = new Picture;
 
     picOrig->create(
+      sps0.getRprEnabledFlag(),
 #if JVET_Z0118_GDR
       sps0.getGDREnabledFlag(),
 #endif
@@ -1343,6 +1345,7 @@ void EncLib::xGetNewPicBuffer ( std::list<PelUnitBuf*>& rcListPicYuvRecOut, Pict
     rpcPic = new Picture;
 
     rpcPic->create(
+      isRprEnabled(),
 #if JVET_Z0118_GDR
       getGdrEnabled(),
 #endif

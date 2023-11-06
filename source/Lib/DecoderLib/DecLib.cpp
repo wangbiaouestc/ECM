@@ -634,6 +634,7 @@ Picture* DecLib::xGetNewPicBuffer( const SPS &sps, const PPS &pps, const uint32_
 
 
     pcPic->create(
+      sps.getRprEnabledFlag(),
 #if JVET_Z0118_GDR
       sps.getGDREnabledFlag(),
 #endif
@@ -677,6 +678,7 @@ Picture* DecLib::xGetNewPicBuffer( const SPS &sps, const PPS &pps, const uint32_
 
 
     pcPic->create(
+      sps.getRprEnabledFlag(),
 #if JVET_Z0118_GDR
       sps.getGDREnabledFlag(),
 #endif
@@ -691,6 +693,7 @@ Picture* DecLib::xGetNewPicBuffer( const SPS &sps, const PPS &pps, const uint32_
       pcPic->destroy();
 
       pcPic->create( 
+        sps.getRprEnabledFlag(),
 #if JVET_Z0118_GDR        
         sps.getGDREnabledFlag(),
 #endif

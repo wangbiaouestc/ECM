@@ -100,6 +100,7 @@ struct Picture : public UnitArea
   Picture();
 
 void create(
+    const bool rprEnabled,
 #if JVET_Z0118_GDR
     const bool gdrEnabled,
 #endif

@@ -5414,6 +5414,7 @@ void Slice::scaleRefPicList( Picture *scaledRefPic[ ], PicHeader *picHeader, APS
 
 
             scaledRefPic[j]->create(
+              sps->getRprEnabledFlag(),
 #if JVET_Z0118_GDR
               sps->getGDREnabledFlag(),
 #endif
