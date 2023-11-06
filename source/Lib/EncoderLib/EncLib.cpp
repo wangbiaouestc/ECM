@@ -750,7 +750,7 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
   m_cInterSearch.setTempBuffers( m_cIntraSearch.getSplitCSBuf(), m_cIntraSearch.getFullCSBuf(), m_cIntraSearch.getSaveCSBuf() );
 #endif // ENABLE_SPLIT_PARALLELISM || ENABLE_WPP_PARALLELISM
 
-#if JVET_AE0159_FIBC || JVET_AE0059_INTER_CCCM || JVET_AE0078_IBC_LIC_EXTENSION
+#if JVET_AE0159_FIBC || JVET_AE0059_INTER_CCCM || JVET_AE0078_IBC_LIC_EXTENSION || JVET_AF0073_INTER_CCP_MERGE
   m_cInterSearch.setIntraPrediction(&m_cIntraSearch);
 #endif
   m_iMaxRefPicNum = 0;
@@ -1920,6 +1920,9 @@ void EncLib::xInitSPS( SPS& sps )
 #endif
 #if JVET_AE0059_INTER_CCCM
   sps.setUseInterCccm(m_interCccm);
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  sps.setUseInterCcpMerge(m_interCcpMerge);
 #endif
   // ADD_NEW_TOOL : (encoder lib) set tool enabling flags and associated parameters here
   sps.setUseISP                             ( m_ISP );

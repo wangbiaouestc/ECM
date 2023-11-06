@@ -952,6 +952,17 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setIBCHashSearchMaxCand                              ( m_IBCHashSearchMaxCand );
   m_cEncLib.setIBCHashSearchRange4SmallBlk                       ( m_IBCHashSearchRange4SmallBlk );
   m_cEncLib.setIBCFastMethod                                     ( m_IBCFastMethod );
+#if JVET_AF0057
+  if (m_dmvrEncSelect && (m_iQP >= m_dmvrEncSelectBaseQpTh))
+  {
+    m_cEncLib.setDMVREncMvSelection                              (true);
+  }
+  else
+  {
+    m_cEncLib.setDMVREncMvSelection                              (false);
+  }
+  m_cEncLib.setDMVREncMvSelectDisableHighestTemporalLayer        (m_dmvrEncSelectDisableHighestTemporalLayer);
+#endif
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
   m_cEncLib.setTMnoninterToolsEnableFlag                         ( m_tmNoninterToolsEnableFlag );
 #endif
@@ -1014,6 +1025,11 @@ void EncApp::xInitLibCfg()
 
 #if JVET_AE0059_INTER_CCCM
   m_cEncLib.setUseInterCccm                                      ( m_interCccm );
+#endif
+
+#if JVET_AF0073_INTER_CCP_MERGE
+  m_cEncLib.setUseInterCcpMerge                                  ( m_interCcpMerge );
+  m_cEncLib.setInterCcpMergeFastMode                             ( m_interCcpMergeFastMode );
 #endif
   // ADD_NEW_TOOL : (encoder app) add setting of tool enabling flags and associated parameters here
   m_cEncLib.setVirtualBoundariesEnabledFlag                      ( m_virtualBoundariesEnabledFlag );

@@ -159,6 +159,11 @@ namespace CU
 #if JVET_AE0059_INTER_CCCM
   bool interCccmSearchAllowed(const CodingUnit& cu);
 #endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  void saveProCcpInfo                 (CodingUnit &cu);
+  void saveProCcpInfoInter            (CodingUnit &cu, TransformUnit &tu);
+  bool interCcpMergeSearchAllowed     (const CodingUnit& cu);
+#endif
 }
 // PU tools
 namespace PU
@@ -579,6 +584,10 @@ namespace PU
 #endif
   void setAllAffineMvField            (      PredictionUnit &pu, MvField *mvField, RefPicList eRefList );
   void setAllAffineMv                 (      PredictionUnit &pu, Mv affLT, Mv affRT, Mv affLB, RefPicList eRefList, bool clipCPMVs = false );
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+  void setAffineBdofRefinedMotion     (      PredictionUnit &pu, Mv* mvBufDecAffineBDOF);
+  bool checkDoAffineBdofRefine        (const PredictionUnit &pu, InterPrediction *interPred);
+#endif
   bool getInterMergeSubPuMvpCand      (const PredictionUnit &pu, MergeCtx& mrgCtx, bool& LICFlag, const int count
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION && JVET_AF0163_TM_SUBBLOCK_REFINEMENT
     , bool isRefined
@@ -780,6 +789,15 @@ namespace PU
 #endif
   void ccpParamsToCccmModel(const CCPModelCandidate& params, CccmModel cccmModelCb[2], CccmModel cccmModelCr[2]);
 
+#if JVET_AF0073_INTER_CCP_MERGE
+#if JVET_AB0174_CCCM_DIV_FREE
+  void cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel& cccmModelCb, const CccmModel& cccmModelCr, const int cccmLumaOffset = 0);
+#else
+  void cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel& cccmModelCb, const CccmModel& cccmModelCr);
+#endif
+  void ccpParamsToCccmModel(const CCPModelCandidate& params, CccmModel& cccmModelCb, CccmModel& cccmModelCr);
+#endif
+
 #if JVET_AB0092_GLM_WITH_LUMA
 #if JVET_AB0174_CCCM_DIV_FREE
   void glmModelToCcpParams(const ComponentID compId, CCPModelCandidate& params, const CccmModel& glmModel, const int lumaOffset);
@@ -791,8 +809,13 @@ namespace PU
 
   const PredictionUnit *getPUFromPos(const PredictionUnit &pu, const ChannelType &chType, const Position &refPos);
   bool  hasNonLocalCCP(const PredictionUnit &pu);
+#if JVET_AF0073_INTER_CCP_MERGE
+  int   getCCPModelCandidateList(const PredictionUnit &pu, CCPModelCandidate candList[], bool isInterCcp = false, int validNum = 0, CCPModelCandidate interCcpMergeList[] = NULL, int selIdx = -1);
+#else
   int   getCCPModelCandidateList(const PredictionUnit &pu, CCPModelCandidate candList[], int selIdx = -1);
 #endif
+#endif
+
 #if JVET_AE0100_BVGCCCM
   bool hasBvgCccmFlag(const PredictionUnit &pu);
   bool bvgCccmModeAvail(const PredictionUnit &pu);
@@ -827,6 +850,9 @@ namespace TU
 #endif
 #if JVET_AE0059_INTER_CCCM
   bool interCccmAllowed(const TransformUnit& tu);
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  bool interCcpMergeAllowed(const TransformUnit& tu);
 #endif
 }
 

@@ -120,6 +120,9 @@ private:
   bool              m_licAmListDec[MAX_NUM_AMVP_CANDS_MAX_REF << 1];
 #endif
 #endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+  Mv                m_mvBufDecAffineBDOF[BDOF_SUBPU_MAX_NUM];
+#endif
 
   MergeCtx          m_geoMrgCtx;
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG

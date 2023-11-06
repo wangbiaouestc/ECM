@@ -404,6 +404,9 @@ public:
 #if JVET_AE0059_INTER_CCCM
   void        interCccm                 ( TransformUnit& tu );
 #endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  void        interCcpMerge             ( TransformUnit& tu );
+#endif
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   CABACDataStore*         m_CABACDataStore;
 #endif

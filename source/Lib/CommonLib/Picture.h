@@ -364,7 +364,7 @@ public:
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
   BifParams        m_bifParams[MAX_NUM_COMPONENT];
 #else
-  BifParams        m_bifParams;
+  BifParams        m_bifParams[1];
 #endif
 #endif
   std::vector<uint8_t> m_alfCtuEnableFlag[MAX_NUM_COMPONENT];

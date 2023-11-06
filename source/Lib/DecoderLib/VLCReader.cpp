@@ -2560,6 +2560,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_AE0059_INTER_CCCM
   READ_FLAG(uiCode, "sps_inter_cccm");                              pcSPS->setUseInterCccm( uiCode != 0 );
 #endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  READ_FLAG(uiCode, "sps_inter_ccp_merge");                         pcSPS->setUseInterCcpMerge( uiCode != 0 );
+#endif
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
   if (pcSPS->getTMnoninterToolsEnableFlag())
   {

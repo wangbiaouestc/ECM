@@ -371,6 +371,13 @@ private:
 #endif
 #endif
 #endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+  Mv                    m_mvBufEncAffineBDOF[AFFINE_MRG_MAX_NUM_CANDS][BDOF_SUBPU_MAX_NUM];
+  Mv                    m_mvBufEncAffineBmBDOF[AFFINE_ADAPTIVE_DMVR_INIT_SIZE << 1][BDOF_SUBPU_MAX_NUM];
+  bool                  m_doEncAffineBDOF[AFFINE_MRG_MAX_NUM_CANDS];
+  bool                  m_doEncAffineBmBDOF[AFFINE_ADAPTIVE_DMVR_INIT_SIZE << 1];
+  Mv                    m_mvBufEncMhpAffineBDOF[BDOF_SUBPU_MAX_NUM];
+#endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE || JVET_AE0046_BI_GPM
   Mv                    m_mvBufEncAmBDMVR[2][MAX_NUM_SUBCU_DMVR];
 #endif
@@ -426,7 +433,7 @@ public:
   EncModeCtrl* getModeCtrl  () { return m_modeCtrl; }
 
 #if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
-  BilateralFilter *m_bilateralFilter = new BilateralFilter();
+  BilateralFilter *m_bilateralFilter;
 #endif
 
   void   setMergeBestSATDCost(double cost) { m_mergeBestSATDCost = cost; }
@@ -488,6 +495,10 @@ protected:
 #if MULTI_PASS_DMVR
                                 , bool* applyBDMVR
 #endif
+#if JVET_AF0057
+                                , bool* dmvrImpreciseMv
+#endif
+
                               );
 #if JVET_X0049_ADAPT_DMVR
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
@@ -550,6 +561,9 @@ protected:
                                 , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &rdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart
 #if MULTI_PASS_DMVR
                                 , bool* applyBDMVR
+#endif
+#if JVET_AF0057
+                                , bool dmvr4TMImpreciseMv
 #endif
                               );
 #endif

@@ -103,6 +103,11 @@ EncCu::EncCu() : m_GeoModeTest
 
 void EncCu::create( EncCfg* encCfg )
 {
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
+  m_bilateralFilter = new BilateralFilter();;
+  m_bilateralFilter->create();
+#endif
+
   unsigned      uiMaxWidth    = encCfg->getMaxCUWidth();
   unsigned      uiMaxHeight   = encCfg->getMaxCUHeight();
   ChromaFormat  chromaFormat  = encCfg->getChromaFormatIdc();
@@ -296,6 +301,7 @@ void EncCu::destroy()
   unsigned numHeights = gp_sizeIdxInfo->numHeights();
 
 #if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
+  m_bilateralFilter->destroy();
   delete m_bilateralFilter;
 #endif
 
@@ -1084,6 +1090,15 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
   m_pcInterSearch->m_fastLicCtrl.init();
 #endif
 
+#if JVET_AF0073_INTER_CCP_MERGE
+  m_pcInterSearch->m_isInterCcpModelReady = false;
+  m_pcInterSearch->m_validNum = 0;
+  for (int i = 0; i < MAX_CCP_CAND_LIST_SIZE; i++)
+  {
+    m_pcInterSearch->m_interCcpMergeList[i] = {};
+  }
+#endif
+
 #if MULTI_HYP_PRED
   const UnitArea localUnitArea(tempCS->area.chromaFormat, Area(0, 0, tempCS->area.Y().width, tempCS->area.Y().height));
 #if JVET_AD0213_LIC_IMP
@@ -1588,23 +1603,36 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
   }
 #endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+#if JVET_AF0079_STORING_INTRATMP
+  if ((!slice.isIntra() || slice.getUseIBC() || slice.getSPS()->getUseIntraTMP())
+#else
   if ((!slice.isIntra() || slice.getUseIBC())
+#endif
 #else
   if ((!slice.isIntra() || slice.getSPS()->getIBCFlag())
 #endif
     && partitioner.chType == CHANNEL_TYPE_LUMA
-    && bestCS->cus.size() == 1 && (bestCS->cus.back()->predMode == MODE_INTER || bestCS->cus.back()->predMode == MODE_IBC)
+    && bestCS->cus.size() == 1 && (bestCS->cus.back()->predMode == MODE_INTER || bestCS->cus.back()->predMode == MODE_IBC
+#if JVET_AF0079_STORING_INTRATMP
+          || bestCS->cus.back()->tmpFlag
+#endif
+      )
     && bestCS->area.Y() == (*bestCS->cus.back()).Y()
     )
   {
     const CodingUnit&     cu = *bestCS->cus.front();
 
+#if JVET_AF0079_STORING_INTRATMP
+    bool isIbcSmallBlk = false;
+#else
     bool isIbcSmallBlk = CU::isIBC(cu) && (cu.lwidth() * cu.lheight() <= 16);
+
 #if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
     if(cu.cs->sps->getUseIbcNonAdjCand())
     {
       isIbcSmallBlk = false;
     }
+#endif
 #endif
     CU::saveMotionInHMVP( cu, isIbcSmallBlk );
   }
@@ -1618,6 +1646,21 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
         && bestCS->area.Cb() == (*bestCS->cus.back()).Cb())
     {
       CU::saveModelsInHCCP(cu);
+    }
+  }
+#endif
+
+#if JVET_AF0073_INTER_CCP_MERGE
+  {
+    CodingUnit& cu = *bestCS->cus.front();
+    if ((!slice.isIntra()) && !(cu.chromaFormat == CHROMA_400 || CS::isDualITree(*bestCS))
+      && partitioner.chType == CHANNEL_TYPE_LUMA
+      && (!CU::isIntra(cu)) && bestCS->cus.size() == 1
+      && bestCS->area.Cb() == (*bestCS->cus.back()).Cb()
+      )
+    {
+      CU::saveModelsInHCCP(cu);
+      CU::saveProCcpInfo(cu);
     }
   }
 #endif
@@ -3650,11 +3693,17 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 
 #if MULTI_PASS_DMVR
   bool applyBDMVR[MRG_MAX_NUM_CANDS] = { false };
+#if JVET_AF0057
+  bool dmvrImpreciseMv[MRG_MAX_NUM_CANDS] = { false };
+#endif
 #if TM_MRG && MERGE_ENC_OPT
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   bool applyBDMVR4TM[TM_MRG_MAX_NUM_INIT_CANDS] = { false };
 #else
   bool applyBDMVR4TM[TM_MRG_MAX_NUM_CANDS] = { false };
+#endif
+#if JVET_AF0057
+  bool dmvr4TMImpreciseMv = false;
 #endif
 #endif
 #if JVET_X0049_ADAPT_DMVR
@@ -3685,6 +3734,16 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
     PredictionUnit pu( tempCS->area );
     pu.cu = &cu;
     pu.cs = tempCS;
+#if JVET_AF0057
+    bool enableVisualCheck = false;
+    if (((m_pcEncCfg->getFrameRate() <= DMVR_ENC_SELECT_FRAME_RATE_THR) || !(m_pcEncCfg->getDMVREncMvSelectDisableHighestTemporalLayer() && (pu.cu->slice->getTLayer() == (pu.cu->slice->getSPS()->getMaxTLayers() - 1))))
+      && m_pcEncCfg->getDMVREncMvSelection()
+      && (pu.lwidth() >= DMVR_ENC_SELECT_SIZE_THR && pu.lheight() >= DMVR_ENC_SELECT_SIZE_THR))
+    {
+      enableVisualCheck = true; // only set this to true when cfg, size, tid, framerate all fulfilled
+    }
+    m_pcInterSearch->xDmvrSetEncoderCheckFlag(enableVisualCheck);
+#endif
 #if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
     pu.tmMergeFlag = false;
 #endif
@@ -4218,6 +4277,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
       {
         tmMrgCtx.setMergeInfo( pu, uiMergeCand );
 #if MULTI_PASS_DMVR
+#if JVET_AF0057
+        pu.dmvrImpreciseMv = false;
+#endif
         applyBDMVR4TM[uiMergeCand] = PU::checkBDMVRCondition(pu);
         if (applyBDMVR4TM[uiMergeCand])
         {
@@ -4243,10 +4305,17 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #else
         m_pcInterSearch->deriveTMMv( pu );
 #endif
+#if JVET_AF0057
+        if (m_pcInterSearch->dmvrEnableEncoderCheck && pu.dmvrImpreciseMv)
+        {
+          dmvr4TMImpreciseMv = true;
+        }
+#endif
 
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
         tmMrgCtx.candCost[uiMergeCand] = tempCost[0];
 #endif
+
         // Store refined motion back to tmMrgCtx
         tmMrgCtx.interDirNeighbours[uiMergeCand] = pu.interDir;
         tmMrgCtx.bcwIdx[uiMergeCand] = pu.cu->bcwIdx;  // BCW may change, because bi may be reduced to uni by deriveTMMv(pu)
@@ -4277,17 +4346,27 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
         {
           tmMrgCtx.setMergeInfo( pu, uiMergeCand );
 #if MULTI_PASS_DMVR
+#if JVET_AF0057
+          pu.dmvrImpreciseMv = false;
+#endif
           applyBDMVR4TM[uiMergeCand] = PU::checkBDMVRCondition(pu);
           if (applyBDMVR4TM[uiMergeCand])
           {
             pu.bdmvrRefine = true;
             m_pcInterSearch->setBdmvrSubPuMvBuf(m_mvBufBDMVR4TM[uiMergeCand << 1], m_mvBufBDMVR4TM[(uiMergeCand << 1) + 1]);
+
             applyBDMVR4TM[uiMergeCand] =  m_pcInterSearch->processBDMVR(pu);
           }
           else
           {
             m_pcInterSearch->deriveTMMv(pu);
           }
+#if JVET_AF0057
+          if (m_pcInterSearch->dmvrEnableEncoderCheck && pu.dmvrImpreciseMv && PU::checkBDMVRCondition(pu))
+          {
+            dmvr4TMImpreciseMv = true;
+          }
+#endif
 
           tmMrgCtx.interDirNeighbours[uiMergeCand] = pu.interDir;
           tmMrgCtx.bcwIdx[uiMergeCand] = pu.cu->bcwIdx;  // BCW may change, because bi may be reduced to uni by deriveTMMv(pu)
@@ -4498,7 +4577,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
         {
           mergeCtx.setMergeInfo( pu, uiMergeCand );
           applyBDMVR[uiMergeCand] = PU::checkBDMVRCondition(pu);
-
+#if JVET_AF0057
+          pu.dmvrImpreciseMv = false;
+#endif
           if (applyBDMVR[uiMergeCand])
           {
             pu.bdmvrRefine = true;
@@ -4516,6 +4597,12 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
             else
             {
               m_pcInterSearch->processBDMVR(pu);
+#if JVET_AF0057
+              if (m_pcInterSearch->dmvrEnableEncoderCheck && pu.dmvrImpreciseMv)
+              {
+                dmvrImpreciseMv[uiMergeCand] = true;
+              }
+#endif
             }
           }
         }
@@ -5288,7 +5375,6 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
       pu.bdmvrRefine = false;
 #endif
 #endif
-
       DistParam distParam;
       const bool bUseHadamard = !tempCS->slice->getDisableSATDForRD();
       m_pcRdCost->setDistParam (distParam, tempCS->getOrgBuf().Y(), m_acMergeBuffer[0].Y(), sps.getBitDepth (CHANNEL_TYPE_LUMA), COMPONENT_Y, bUseHadamard);
@@ -5302,6 +5388,10 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #if MULTI_PASS_DMVR
                                , applyBDMVR
 #endif
+#if JVET_AF0057
+                               , dmvrImpreciseMv
+#endif
+
       );
 #else
       const UnitArea localUnitArea( tempCS->area.chromaFormat, Area( 0, 0, tempCS->area.Y().width, tempCS->area.Y().height) );
@@ -5653,6 +5743,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
         xCheckSATDCostTMMerge(tempCS, cu, pu, tmMrgCtx, acMergeTempBuffer, singleMergeTempBuffer, uiNumMrgSATDCand, rdModeList, candCostList, distParam, ctxStart
 #if MULTI_PASS_DMVR
           , applyBDMVR4TM
+#endif
+#if JVET_AF0057
+          , dmvr4TMImpreciseMv
 #endif
         );
       }
@@ -6506,10 +6599,31 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
           }
 #endif
 #if MERGE_ENC_OPT
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+          else if (rdModeList[uiMrgHADIdx].isAffBMMrg == true && m_doEncAffineBmBDOF[(uiMergeCand << 1) + rdModeList[uiMrgHADIdx].affBMDir - 1] == true)
+          {
+            tempCS->getPredBuf().copyFrom(*acMergeTempBuffer[uiMrgHADIdx]);
+            PU::setAffineBdofRefinedMotion(pu, m_mvBufEncAffineBmBDOF[(uiMergeCand << 1) + rdModeList[uiMrgHADIdx].affBMDir - 1]);
+          }
+          else if (rdModeList[uiMrgHADIdx].isAffine == true && rdModeList[uiMrgHADIdx].isAffBMMrg == false && m_doEncAffineBDOF[uiMergeCand] == true)
+          {
+            tempCS->getPredBuf().copyFrom(*acMergeTempBuffer[uiMrgHADIdx]);
+            PU::setAffineBdofRefinedMotion(pu, m_mvBufEncAffineBDOF[uiMergeCand]);
+          }
+#endif
           else if (rdModeList[uiMrgHADIdx].isAffine)
           {
+#if !JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
             tempCS->getPredBuf().copyFrom(*acMergeTempBuffer[uiMrgHADIdx], true);
+#endif
 #if JVET_Z0136_OOB
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+            if (pu.mergeType == MRG_TYPE_SUBPU_ATMVP)
+            {
+              tempCS->getPredBuf().copyFrom(*acMergeTempBuffer[uiMrgHADIdx]);
+            }
+            else
+#endif
             m_pcInterSearch->motionCompensation(pu, REF_PIC_LIST_X, true, true);
 #else
 #if JVET_AD0213_LIC_IMP
@@ -6740,6 +6854,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
   {
     xCalDebCost( *bestCS, partitioner );
   }
+#if JVET_AF0057
+  m_pcInterSearch->xDmvrSetEncoderCheckFlag(false);
+#endif
 }
 
 #if JVET_W0097_GPM_MMVD_TM
@@ -10166,6 +10283,10 @@ void EncCu::xCheckSATDCostRegularMerge(CodingStructure *&tempCS, CodingUnit &cu,
 #if MULTI_PASS_DMVR
   , bool* applyBDMVR
 #endif
+#if JVET_AF0057
+  , bool* dmvrImpreciseMv
+#endif
+
 )
 {
 #if INTER_LIC
@@ -10281,6 +10402,14 @@ void EncCu::xCheckSATDCostRegularMerge(CodingStructure *&tempCS, CodingUnit &cu,
     m_CABACEstimator->getCtx() = ctxStart;
     uint64_t fracBits = m_pcInterSearch->xCalcPuMeBits(pu);
     double cost = (double)uiSad + (double)fracBits * sqrtLambdaForFirstPassIntra;
+
+#if JVET_AF0057
+      if (m_pcInterSearch->dmvrEnableEncoderCheck && dmvrImpreciseMv[uiMergeCand])
+      {
+        cost = MAX_DOUBLE;
+      }
+#endif
+
 #if MULTI_HYP_PRED
     if (testMHP && pu.addHypData.size() < tempCS->sps->getMaxNumAddHyps())
     {
@@ -10293,6 +10422,12 @@ void EncCu::xCheckSATDCostRegularMerge(CodingStructure *&tempCS, CodingUnit &cu,
       mergeResult.pu = pu;
       mergeResult.bits = uiBitsCand;
       mergeResult.cost = uiSad + m_pcRdCost->getCost(uiBitsCand);
+#if JVET_AF0057
+        if (m_pcInterSearch->dmvrEnableEncoderCheck && dmvrImpreciseMv[uiMergeCand])
+        {
+          mergeResult.cost = (Distortion)MAX_UINT64;
+        }
+#endif
       m_baseResultsForMH.push_back(mergeResult);
     }
 #endif
@@ -10759,7 +10894,41 @@ void EncCu::xCheckSATDCostAffineMerge(CodingStructure *&tempCS, CodingUnit &cu, 
 
     distParam.cur = singleMergeTempBuffer->Y();
 
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+    if (PU::checkDoAffineBdofRefine(pu, m_pcInterSearch))
+    {
+      pu.availableBdofRefinedMv = AFFINE_SUBPU_BDOF_APPLY_AND_STORE_MV;
+      m_pcInterSearch->setDoAffineSubPuBdof(false);
+      m_pcInterSearch->setBdofSubPuMvBuf(m_mvBufEncAffineBDOF[uiAffMergeCand]);
+      if (pu.mergeType == MRG_TYPE_SUBPU_ATMVP)
+      {
+        int bioSubPuIdx = 0;
+        const int bioSubPuStrideIncr = BDOF_SUBPU_STRIDE - (int)(pu.lumaSize().width >> BDOF_SUBPU_DIM_LOG2);
+        for (int yy = 0; yy < pu.lumaSize().height; yy += 4)
+        {
+          for (int xx = 0; xx < pu.lumaSize().width; xx += 4)
+          {
+            m_mvBufEncAffineBDOF[uiAffMergeCand][bioSubPuIdx].setZero();
+            bioSubPuIdx++;
+          }
+          bioSubPuIdx += bioSubPuStrideIncr;
+        }
+      }
+      else
+      {
+        PU::spanMotionInfo(pu);
+      }
+      m_pcInterSearch->motionCompensation(pu, *singleMergeTempBuffer, REF_PIC_LIST_X);
+    }
+    else
+    {
+      m_pcInterSearch->motionCompensation(pu, *singleMergeTempBuffer, REF_PIC_LIST_X, true, false);
+    }
+    pu.availableBdofRefinedMv = AFFINE_SUBPU_BDOF_NOT_APPLY;
+    m_doEncAffineBDOF[uiAffMergeCand] = m_pcInterSearch->getDoAffineSubPuBdof();
+#else
     m_pcInterSearch->motionCompensation(pu, *singleMergeTempBuffer, REF_PIC_LIST_X, true, false);
+#endif
     Distortion uiSad = distParam.distFunc(distParam);
 
     m_CABACEstimator->getCtx() = ctxStart;
@@ -10781,6 +10950,9 @@ void EncCu::xCheckSATDCostAffineMerge(CodingStructure *&tempCS, CodingUnit &cu, 
       mergeResult.cost = uiSad + m_pcRdCost->getCost(uiBitsCand);
       m_baseResultsForMH.push_back(mergeResult);
     }
+#endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+    m_pcInterSearch->setDoAffineSubPuBdof(false);
 #endif
     insertPos = -1;
     updateCandList(ModeInfo(cu, pu), cost, rdModeList, candCostList, uiNumMrgSATDCand, &insertPos);
@@ -10859,7 +11031,24 @@ void EncCu::xCheckSATDCostBMAffineMerge(CodingStructure *&tempCS, CodingUnit &cu
 
     distParam.cur = singleMergeTempBuffer->Y();
 
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+    if (PU::checkDoAffineBdofRefine(pu, m_pcInterSearch))
+    {
+      pu.availableBdofRefinedMv = AFFINE_SUBPU_BDOF_APPLY_AND_STORE_MV;
+      m_pcInterSearch->setDoAffineSubPuBdof(false);
+      m_pcInterSearch->setBdofSubPuMvBuf(m_mvBufEncAffineBmBDOF[(uiAffMergeCand << 1) + pu.affBMDir - 1]);
+      PU::spanMotionInfo(pu);
+      m_pcInterSearch->motionCompensation(pu, *singleMergeTempBuffer, REF_PIC_LIST_X);
+    }
+    else
+    {
+      m_pcInterSearch->motionCompensation(pu, *singleMergeTempBuffer, REF_PIC_LIST_X, true, false);
+    }
+    pu.availableBdofRefinedMv = AFFINE_SUBPU_BDOF_NOT_APPLY;
+    m_doEncAffineBmBDOF[(uiAffMergeCand << 1) + pu.affBMDir - 1] = m_pcInterSearch->getDoAffineSubPuBdof();
+#else
     m_pcInterSearch->motionCompensation(pu, *singleMergeTempBuffer, REF_PIC_LIST_X, true, false);
+#endif
     Distortion uiSad = distParam.distFunc(distParam);
 
     m_CABACEstimator->getCtx() = ctxStart;
@@ -10881,6 +11070,9 @@ void EncCu::xCheckSATDCostBMAffineMerge(CodingStructure *&tempCS, CodingUnit &cu
       mergeResult.cost = uiSad + m_pcRdCost->getCost(uiBitsCand);
       m_baseResultsForMH.push_back(mergeResult);
     }
+#endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+    m_pcInterSearch->setDoAffineSubPuBdof(false);
 #endif
     insertPos = -1;
     updateCandList(ModeInfo(cu, pu), cost, rdModeList, candCostList, uiNumMrgSATDCand, &insertPos);
@@ -10917,6 +11109,9 @@ void EncCu::xCheckSATDCostTMMerge(       CodingStructure*& tempCS,
                                    const TempCtx&          ctxStart
 #if MULTI_PASS_DMVR
                                        , bool*             applyBDMVR
+#endif
+#if JVET_AF0057
+                                       , bool dmvr4TMImpreciseMv
 #endif
 )
 {
@@ -10974,6 +11169,12 @@ void EncCu::xCheckSATDCostTMMerge(       CodingStructure*& tempCS,
     m_CABACEstimator->getCtx() = ctxStart;
     uint64_t fracBits = m_pcInterSearch->xCalcPuMeBits(pu);
     double cost = (double)uiSad + (double)fracBits * sqrtLambdaForFirstPassIntra;
+#if JVET_AF0057
+    if (m_pcInterSearch->dmvrEnableEncoderCheck && dmvr4TMImpreciseMv)
+    {
+      cost = MAX_DOUBLE;
+    }
+#endif
     insertPos = -1;
     updateCandList(ModeInfo(cu, pu), cost, rdModeList, candCostList, uiNumMrgSATDCand, &insertPos);
 
@@ -15963,7 +16164,14 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
 #endif
   }
   else
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+  {
+    m_pcInterSearch->setBdofSubPuMvBuf(m_mvBufEncMhpAffineBDOF);
+    m_pcInterSearch->predInterSearch( cu, partitioner, bdmvrAmMergeNotValid );
+  }
+#else
   m_pcInterSearch->predInterSearch( cu, partitioner, bdmvrAmMergeNotValid );
+#endif
   if ((cu.firstPU->refIdx[REF_PIC_LIST_0] < 0 && cu.firstPU->refIdx[REF_PIC_LIST_1] < 0) || bdmvrAmMergeNotValid)
   {
     tempCS->initStructData(encTestMode.qp);
@@ -16058,6 +16266,14 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
     }
     else
     {
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+      PelUnitBuf tempWoOBMCBuf;
+      if (PU::checkDoAffineBdofRefine(*(cu.firstPU), m_pcInterSearch))
+      {
+        tempWoOBMCBuf = m_tempWoOBMCBuffer.subBuf(UnitAreaRelative(cu, cu));
+        tempWoOBMCBuf.copyFrom(tempCS->getPredBuf(cu));
+      }
+#endif
       CodingStructure *prevCS = tempCS;
 #if JVET_AD0213_LIC_IMP
       CHECK(!cu.obmcFlag, "obmcFlag is false for affine non-LIC");
@@ -16075,6 +16291,14 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
       {
         cu.obmcFlag = false;
         PelUnitBuf predBuf = tempCS->getPredBuf(cu);
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+        if (PU::checkDoAffineBdofRefine(*(cu.firstPU), m_pcInterSearch))
+        {
+          predBuf.copyFrom(tempWoOBMCBuf);
+        }
+        else
+        {
+#endif
         m_pcInterSearch->motionCompensation( *(cu.firstPU), predBuf, REF_PIC_LIST_X );
 #if JVET_AD0213_LIC_IMP
         if (cu.licFlag)
@@ -16091,6 +16315,9 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
           }
         }
 #endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+        }
+#endif
         xEncodeInterResidual( tempCS, bestCS, partitioner, encTestMode, 0
                               , 0
                               , &equBcwCost
@@ -16104,6 +16331,14 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
         CodingUnit * cuBest = tempCS->getCU(partitioner.chType);
         cuBest->obmcFlag = false;
         PelUnitBuf predBuf = tempCS->getPredBuf(*cuBest);
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+        if (PU::checkDoAffineBdofRefine(*(cuBest->firstPU), m_pcInterSearch))
+        {
+          predBuf.copyFrom(tempWoOBMCBuf);
+        }
+        else
+        {
+#endif
         m_pcInterSearch->motionCompensation( *(cuBest->firstPU), predBuf, REF_PIC_LIST_X );
 #if JVET_AD0213_LIC_IMP
         if (cuBest->licFlag)
@@ -16118,6 +16353,9 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
               }
             }
           }
+        }
+#endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
         }
 #endif
         xEncodeInterResidual( tempCS, bestCS, partitioner, encTestMode, 0
@@ -16382,6 +16620,9 @@ bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bes
   }
 #endif 
 #endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+  m_pcInterSearch->setBdofSubPuMvBuf(m_mvBufEncMhpAffineBDOF);
+#endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   m_pcInterSearch->predInterSearch( cu, partitioner, bdmvrAmMergeNotValid );
 #else
@@ -16509,6 +16750,14 @@ bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bes
     }
     else
     {
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+      PelUnitBuf tempWoOBMCBuf;
+      if (PU::checkDoAffineBdofRefine(*cu.firstPU, m_pcInterSearch))
+      {
+        tempWoOBMCBuf = m_tempWoOBMCBuffer.subBuf(UnitAreaRelative(cu, cu));
+        tempWoOBMCBuf.copyFrom(tempCS->getPredBuf(cu));
+      }
+#endif
       CodingStructure *prevCS = tempCS;
       cu.isobmcMC = true;
       m_pcInterSearch->subBlockOBMC(*cu.firstPU);
@@ -16521,6 +16770,14 @@ bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bes
       {
         cu.obmcFlag = false;
         PelUnitBuf predBuf = tempCS->getPredBuf(cu);
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+        if (PU::checkDoAffineBdofRefine(*cu.firstPU, m_pcInterSearch))
+        {
+          predBuf.copyFrom(tempWoOBMCBuf);
+        }
+        else
+        {
+#endif
         m_pcInterSearch->motionCompensation( *(cu.firstPU), predBuf, REF_PIC_LIST_X );
 #if JVET_AD0213_LIC_IMP
         if (cu.licFlag)
@@ -16537,6 +16794,9 @@ bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bes
           }
         }
 #endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+        }
+#endif
         xEncodeInterResidual( tempCS, bestCS, partitioner, encTestMode, 0
                               , 0
                               , &equBcwCost
@@ -16550,6 +16810,14 @@ bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bes
         CodingUnit * cuBest = tempCS->getCU(partitioner.chType);
         cuBest->obmcFlag = false;
         PelUnitBuf predBuf = tempCS->getPredBuf(*cuBest);
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+        if (PU::checkDoAffineBdofRefine(*(cuBest->firstPU), m_pcInterSearch))
+        {
+          predBuf.copyFrom(tempWoOBMCBuf);
+        }
+        else
+        {
+#endif
         m_pcInterSearch->motionCompensation( *(cuBest->firstPU), predBuf, REF_PIC_LIST_X );
 #if JVET_AD0213_LIC_IMP
         if (cuBest->licFlag)
@@ -16564,6 +16832,9 @@ bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bes
               }
             }
           }
+        }
+#endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
         }
 #endif
         xEncodeInterResidual( tempCS, bestCS, partitioner, encTestMode, 0
@@ -16808,17 +17079,19 @@ void EncCu::xCalDebCost( CodingStructure &cs, Partitioner &partitioner, bool cal
 
       for (auto &currTU : CU::traverseTUs(*cu))
       {
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+        bool applyBIF = m_bilateralFilter->getApplyBIF(currTU, COMPONENT_Y);
+#else
         bool isInter = (cu->predMode == MODE_INTER) ? true : false;
-        if ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)))
+        bool applyBIF = ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height)));
+#endif
+        if (applyBIF)
         {
-          if ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height)))
-          {
-            CompArea &compArea = currTU.block(COMPONENT_Y);
-            PelBuf    recBuf = picDbBuf.getBuf(compArea);
-            PelBuf recIPredBuf = recBuf;
-            std::vector<Pel> invLUT;
-            m_bilateralFilter->bilateralFilterRDOdiamond5x5( COMPONENT_Y, recBuf, recBuf, recBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(COMPONENT_Y), currTU, true, false, &invLUT );
-          }
+          CompArea& compArea = currTU.block(COMPONENT_Y);
+          PelBuf    recBuf = picDbBuf.getBuf(compArea);
+          PelBuf recIPredBuf = recBuf;
+          std::vector<Pel> invLUT;
+          m_bilateralFilter->bilateralFilterRDOdiamond5x5(COMPONENT_Y, recBuf, recBuf, recBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(COMPONENT_Y), currTU, true, false, &invLUT);
         }
       }
     }
@@ -16826,10 +17099,6 @@ void EncCu::xCalDebCost( CodingStructure &cs, Partitioner &partitioner, bool cal
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
     if(cs.pps->getUseChromaBIF())
     {
-      bool tuValid = false;
-      bool tuCBF = false;
-      bool isDualTree = CS::isDualITree(cs);
-      bool chromaValid = cu->Cb().valid() && cu->Cr().valid();
       bool applyChromaBIF = false;
 
       if (leftEdgeAvai && topEdgeAvai)
@@ -16845,10 +17114,17 @@ void EncCu::xCalDebCost( CodingStructure &cs, Partitioner &partitioner, bool cal
 
       for (auto &currTU : CU::traverseTUs(*cu))
       {
-        bool isInter = (cu->predMode == MODE_INTER) ? true : false;
         for(int compIdx = COMPONENT_Cb; compIdx < MAX_NUM_COMPONENT; compIdx++)
         {
           ComponentID compID = ComponentID( compIdx );
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+          applyChromaBIF = m_bilateralFilter->getApplyBIF(currTU, compID);
+#else
+          bool tuValid = false;
+          bool tuCBF = false;
+          bool isInter = (cu->predMode == MODE_INTER) ? true : false;
+          bool isDualTree = CS::isDualITree(cs);
+          bool chromaValid = cu->Cb().valid() && cu->Cr().valid();
           applyChromaBIF = false;
           if(!isDualTree && chromaValid)
           {
@@ -16866,6 +17142,7 @@ void EncCu::xCalDebCost( CodingStructure &cs, Partitioner &partitioner, bool cal
             tuCBF = TU::getCbf(currTU, compID);
             applyChromaBIF = ((tuCBF || isInter == false) && (currTU.cu->qp > 17));
           }
+#endif
           if (applyChromaBIF)
           {
             CompArea &compArea = currTU.block(compID);
@@ -17614,17 +17891,20 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
             tmpRecLuma.rspSignal(m_pcReshape->getInvLUT());
           }
         }
-        if(tempCS->pps->getUseBIF() && isLuma(compID) && cu.qp > 17)
+        if(tempCS->pps->getUseBIF() && isLuma(compID))
         {
           for (auto &currTU : CU::traverseTUs(cu))
           {
-            Position tuPosInCu = currTU.lumaPos() - cu.lumaPos();
-            PelBuf tmpSubBuf = tmpRecLuma.subBuf(tuPosInCu, currTU.lumaSize());
-
-            bool isInter = (cu.predMode == MODE_INTRA) ? false : true;
-            
-            if ((TU::getCbf(currTU, compID ) || isInter == false) && (currTU.cu->qp > 17) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+            bool applyBIF = m_bilateralFilter->getApplyBIF(currTU, compID);
+#else
+            bool isInter = (cu.predMode == MODE_INTER) ? true : false;
+            bool applyBIF = ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height)));
+#endif
+            if (applyBIF)
             {
+              Position tuPosInCu = currTU.lumaPos() - cu.lumaPos();
+              PelBuf tmpSubBuf = tmpRecLuma.subBuf(tuPosInCu, currTU.lumaSize());
               CompArea compArea = currTU.blocks[compID];
               PelBuf recIPredBuf = tempCS->slice->getPic()->getRecoBuf(compArea);
               // Do we need to use clipArea?
@@ -17652,18 +17932,19 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
           tmpRecChroma.copyFrom(reco);
         }
 
-        if(tempCS->pps->getUseChromaBIF() && isChroma(compID) && (cu.qp > 17))
+        if(tempCS->pps->getUseChromaBIF() && isChroma(compID))
         {
-          bool tuValid = false;
-          bool tuCBF = false;
-          bool isDualTree = CS::isDualITree(*tempCS);
-          bool chromaValid = cu.Cb().valid() && cu.Cr().valid();
           bool applyChromaBIF = false;
           for (auto &currTU : CU::traverseTUs(cu))
           {
-            Position tuPosInCu = currTU.chromaPos() - cu.chromaPos();
-            PelBuf tmpSubBuf = tmpRecChroma.subBuf(tuPosInCu, currTU.chromaSize());
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+            applyChromaBIF = m_bilateralFilter->getApplyBIF(currTU, compID);
+#else
+            bool tuValid = false;
+            bool tuCBF = false;
             bool isInter = (cu.predMode == MODE_INTER) ? true : false;
+            bool isDualTree = CS::isDualITree(*tempCS);
+            bool chromaValid = cu.Cb().valid() && cu.Cr().valid();
             applyChromaBIF = false;
             if(!isDualTree && chromaValid)
             {
@@ -17680,9 +17961,12 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
             {
               applyChromaBIF = ((TU::getCbf(currTU, compID) || isInter == false) && (currTU.cu->qp > 17));
             }
+#endif
 
             if(applyChromaBIF)
             {
+              Position tuPosInCu = currTU.chromaPos() - cu.chromaPos();
+              PelBuf tmpSubBuf = tmpRecChroma.subBuf(tuPosInCu, currTU.chromaSize());
               CompArea compArea = currTU.blocks[compID];
               PelBuf recIPredBuf = tempCS->slice->getPic()->getRecoBuf(compArea);
               m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, tempCS->slice->clpRng(compID), currTU, true );
@@ -17732,7 +18016,7 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
           tmpRecChroma.copyFrom(reco);
         }
 
-        if(tempCS->pps->getUseChromaBIF() && isChroma(compID) && (cu.qp > 17))
+        if(tempCS->pps->getUseChromaBIF() && isChroma(compID))
         {
           bool tuValid = false;
           bool tuCBF = false;
@@ -17742,9 +18026,9 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
 
           for (auto &currTU : CU::traverseTUs(cu))
           {
-            Position tuPosInCu = currTU.chromaPos() - cu.chromaPos();
-            PelBuf tmpSubBuf = tmpRecChroma.subBuf(tuPosInCu, currTU.chromaSize());
-
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+            applyChromaBIF = m_bilateralFilter->getApplyBIF(currTU, compID);
+#else
             bool isInter = (cu.predMode == MODE_INTER) ? true : false;
             applyChromaBIF = false;
             if(!isDualTree && chromaValid)
@@ -17761,8 +18045,11 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
             {
               applyChromaBIF = ((TU::getCbf(currTU, compID) || isInter == false) && (currTU.cu->qp > 17));
             }
+#endif
             if(applyChromaBIF)
             {
+              Position tuPosInCu = currTU.chromaPos() - cu.chromaPos();
+              PelBuf tmpSubBuf = tmpRecChroma.subBuf(tuPosInCu, currTU.chromaSize());
               CompArea compArea = currTU.blocks[compID];
               PelBuf recIPredBuf = tempCS->slice->getPic()->getRecoBuf(compArea);
               m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, tempCS->slice->clpRng(compID), currTU, true );
@@ -17897,8 +18184,10 @@ void EncCu::predInterSearchAdditionalHypothesisMulti(const MEResultVec& in, MERe
 
 void EncCu::xCheckRDCostInterMultiHyp2Nx2N(CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &partitioner, const EncTestMode& encTestMode)
 {
+#if !JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
 #if ENABLE_OBMC
   double bestOBMCCost = MAX_DOUBLE;
+#endif
 #endif
   if (tempCS->area.Y().area() <= MULTI_HYP_PRED_RESTRICT_BLOCK_SIZE || std::min(tempCS->area.Y().width, tempCS->area.Y().height) < MULTI_HYP_PRED_RESTRICT_MIN_WH)
   {
@@ -18034,7 +18323,37 @@ void EncCu::xCheckRDCostInterMultiHyp2Nx2N(CodingStructure *&tempCS, CodingStruc
     CHECK(cu.btDepth != partitioner.currBtDepth, "Mismatch");
     CHECK(cu.mtDepth != partitioner.currMtDepth, "Mismatch");
     pu.mvRefine = true;
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+    if (PU::checkDoAffineBdofRefine(pu, m_pcInterSearch))
+    {
+      pu.availableBdofRefinedMv = AFFINE_SUBPU_BDOF_APPLY_AND_STORE_MV;
+      m_pcInterSearch->setDoAffineSubPuBdof(false);
+      m_pcInterSearch->setBdofSubPuMvBuf(m_mvBufEncMhpAffineBDOF);
+      if (pu.mergeType == MRG_TYPE_SUBPU_ATMVP)
+      {
+        int bioSubPuIdx = 0;
+        const int bioSubPuStrideIncr = BDOF_SUBPU_STRIDE - (int)(pu.lumaSize().width >> BDOF_SUBPU_DIM_LOG2);
+        for (int yy = 0; yy < pu.lumaSize().height; yy += 4)
+        {
+          for (int xx = 0; xx < pu.lumaSize().width; xx += 4)
+          {
+            m_mvBufEncMhpAffineBDOF[bioSubPuIdx].setZero();
+            bioSubPuIdx++;
+          }
+          bioSubPuIdx += bioSubPuStrideIncr;
+        }
+      }
+    }
     m_pcInterSearch->motionCompensation(pu);
+    pu.availableBdofRefinedMv = AFFINE_SUBPU_BDOF_NOT_APPLY;
+    if (m_pcInterSearch->getDoAffineSubPuBdof() == true)
+    {
+      PU::setAffineBdofRefinedMotion(pu, m_mvBufEncMhpAffineBDOF);
+      m_pcInterSearch->setDoAffineSubPuBdof(false);
+    }
+#else
+    m_pcInterSearch->motionCompensation(pu);
+#endif
 #if JVET_AD0213_LIC_IMP
     if (pu.cu->licFlag)
     {
@@ -18084,6 +18403,30 @@ void EncCu::xCheckRDCostInterMultiHyp2Nx2N(CodingStructure *&tempCS, CodingStruc
 #endif
     pu.mvRefine = false;
 
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+#if ENABLE_OBMC //multi hyp inter IMV
+    cu.isobmcMC = true;
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+    if (cu.affine == false || pu.mergeType == MRG_TYPE_SUBPU_ATMVP)
+    {
+#endif
+#if JVET_AC0158_PIXEL_AFFINE_MC
+#if JVET_AD0213_LIC_IMP
+    cu.obmcFlag = (pu.lwidth() * pu.lheight() < 32) || (pu.cu->cs->sps->getUseOBMC() == false) ? false : true;
+#else
+    cu.obmcFlag = (pu.lwidth() * pu.lheight() < 32) || (pu.cu->licFlag == true || pu.cu->cs->sps->getUseOBMC() == false) ? false : true;
+#endif
+#else
+    cu.obmcFlag = true;
+#endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+    }
+#endif
+    m_pcInterSearch->subBlockOBMC(*cu.firstPU);
+    cu.isobmcMC = false;
+#endif
+    xEncodeInterResidual(tempCS, bestCS, partitioner, encTestMode);
+#else
 #if ENABLE_OBMC //multi hyp inter IMV
     CodingStructure *prevCS = tempCS;
     PelUnitBuf tempWoOBMCBuf = m_tempWoOBMCBuffer.subBuf(UnitAreaRelative(cu, cu));
@@ -18126,6 +18469,7 @@ void EncCu::xCheckRDCostInterMultiHyp2Nx2N(CodingStructure *&tempCS, CodingStruc
 
       bestOBMCCost = tempCost;
     }
+#endif
 #endif
   }
 }
@@ -18430,7 +18774,9 @@ void EncCu::xCheckSATDCostBMMerge(CodingStructure*& tempCS,
 #endif
       pu.bdmvrRefine = true;
       m_pcInterSearch->setBdmvrSubPuMvBuf(m_mvBufBDMVR4BM[uiMergeCand << 1], m_mvBufBDMVR4BM[(uiMergeCand << 1) + 1]);
-      
+#if JVET_AF0057
+      pu.dmvrImpreciseMv = false;
+#endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
       if (armcRefinedMotion)
       {
@@ -18454,6 +18800,12 @@ void EncCu::xCheckSATDCostBMMerge(CodingStructure*& tempCS,
       m_CABACEstimator->getCtx() = ctxStart;
       uint64_t fracBits = m_pcInterSearch->xCalcPuMeBits(pu);
       double cost = (double)uiSad + (double)fracBits * sqrtLambdaForFirstPassIntra;
+#if JVET_AF0057
+      if (m_pcInterSearch->dmvrEnableEncoderCheck && pu.dmvrImpreciseMv)
+      {
+        cost = MAX_DOUBLE;
+      }
+#endif
       insertPos = -1;
       updateCandList(ModeInfo(cu, pu), cost, rdModeList, candCostList, uiNumMrgSATDCand, &insertPos);
       if (insertPos != -1 && insertPos < MMVD_MRG_MAX_RD_NUM)

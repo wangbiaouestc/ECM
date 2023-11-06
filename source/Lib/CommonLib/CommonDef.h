@@ -846,6 +846,16 @@ static const int BDOF_SUBPU_DIM_LOG2          =                     2;
 #if JVET_AE0091_ITERATIVE_BDOF
 static const int BDOF_SUBPU_AREA_THRESHOLD0   =                     0;
 static const int BDOF_SUBPU_AREA_THRESHOLD1   =                  1024;
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+static const int BDOF_SUBPU_AREA_THRESHOLD2   =                   256;
+enum AFFINE_SUBPU_BDOF_USAGE
+{
+  AFFINE_SUBPU_BDOF_NOT_APPLY = 0,
+  AFFINE_SUBPU_BDOF_APPLY_AND_STORE_MV = 1,
+  AFFINE_SUBPU_BDOF_APPLY_WITHOUT_STORE_MV = 2,
+  AFFINE_SUBPU_BDOF_APPLY_RESERVE
+};
+#endif
 #else
 static const int BDOF_SUBPU_AREA_THRESHOLD    =                   256;
 #endif
@@ -910,6 +920,10 @@ static const int MAX_NUM_SUBCU_DMVR = ((MAX_CU_SIZE * MAX_CU_SIZE) >> (DMVR_SUBC
 static const int MAX_NUM_SUBCU_DMVR_LOG2 = MAX_CU_DEPTH + MAX_CU_DEPTH - DMVR_SUBCU_WIDTH_LOG2 - DMVR_SUBCU_HEIGHT_LOG2;
 #endif
 static const int DMVR_NUM_ITERATION = 2;
+#if JVET_AF0057
+static constexpr int DMVR_ENC_SELECT_SIZE_THR = 32;
+static constexpr double DMVR_ENC_SELECT_FRAME_RATE_THR = 30.0;
+#endif
 
 //QTBT high level parameters
 //for I slice luma CTB configuration para.
