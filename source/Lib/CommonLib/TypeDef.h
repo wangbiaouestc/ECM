@@ -50,7 +50,7 @@
 #include <cstring>
 #include <assert.h>
 #include <cassert>
-
+#include <cstdint>
 
 #define BASE_ENCODER                                      1
 #define BASE_NORMATIVE                                    1

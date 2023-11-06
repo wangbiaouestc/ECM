@@ -1,4 +1,4 @@
-/* The copyright in this software is being made available under the BSD
+﻿/* The copyright in this software is being made available under the BSD
  * License, included below. This software may be subject to other third party
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
@@ -1138,7 +1138,7 @@ bool InterPrediction::xGetSubPuGroupArea2D(PredictionUnit& pu, PredictionUnit& s
   const int maxSubPuHeight = pu.lheight() - (subPuStartPos.y - pu.lumaPos().y);
   const int subPuDerivedStartIdx = ((subPuStartPos.x - pu.lumaPos().x) >> BDOF_SUBPU_DIM_LOG2) + ((subPuStartPos.y - pu.lumaPos().y) >> BDOF_SUBPU_DIM_LOG2) * BDOF_SUBPU_STRIDE;
   bool incrR = true, incrB = true, incrBR = true;
-  int subPuDerivedRightDirIdx, subPuDerivedBottomDirIdx;
+  int subPuDerivedRightDirIdx = 0, subPuDerivedBottomDirIdx = 0;
   while ((subPuWidth > preWidth) || (subPuHeight > preHeight))
   {
     preWidth = subPuWidth;
