@@ -1587,7 +1587,7 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
 #if SECONDARY_MPM
         if( pu->secondMpmFlag)
         {
-          uint8_t secondaryMPMIdx = pu->ipredIdx;
+          uint8_t secondaryMPMIdx = pu->ipredIdx - NUM_PRIMARY_MOST_PROBABLE_MODES;
           m_BinEncoder.encodeBin(1, Ctx::IntraLumaSecondMpmFlag());
 #if JVET_AD0085_MPM_SORTING
           if (cu.cs->sps->getUseMpmSorting())
@@ -1653,7 +1653,7 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
 #endif
 
 #if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
-    DTRACE(g_trace_ctx, D_SYNTAX, "intra_luma_pred_modes() idx=%d pos=(%d,%d) predIdx=%d mpm=%d secondmpm=%d\n", k, pu->lumaPos().x, pu->lumaPos().y, pu->ipredIdx + (!pu->mpmFlag && pu->secondMpmFlag ? NUM_PRIMARY_MOST_PROBABLE_MODES: 0), pu->mpmFlag, pu->secondMpmFlag);
+    DTRACE(g_trace_ctx, D_SYNTAX, "intra_luma_pred_modes() idx=%d pos=(%d,%d) predIdx=%d mpm=%d secondmpm=%d\n", k, pu->lumaPos().x, pu->lumaPos().y, pu->ipredIdx, pu->mpmFlag, pu->secondMpmFlag);
 #else
     DTRACE( g_trace_ctx, D_SYNTAX, "intra_luma_pred_modes() idx=%d pos=(%d,%d) mode=%d\n", k, pu->lumaPos().x, pu->lumaPos().y, pu->intraDir[0] );
 #endif
@@ -1784,7 +1784,7 @@ void CABACWriter::intra_luma_pred_mode( const PredictionUnit& pu )
 #if SECONDARY_MPM
       if (pu.secondMpmFlag)
       {
-        unsigned secondMpmIdx = pu.ipredIdx;
+        unsigned secondMpmIdx = pu.ipredIdx - NUM_PRIMARY_MOST_PROBABLE_MODES;
         m_BinEncoder.encodeBin(1, Ctx::IntraLumaSecondMpmFlag());
 #if JVET_AD0085_MPM_SORTING
         if (pu.cs->sps->getUseMpmSorting())
