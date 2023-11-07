@@ -2166,8 +2166,46 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
 #if ENABLE_SPLIT_PARALLELISM
     pcPic->scheduler.init( pcPic->cs->pcv->heightInCtus, pcPic->cs->pcv->widthInCtus, 1                          , 0                             , m_pcCfg->getNumSplitThreads() );
 #endif
-    pcPic->createTempBuffers( pcPic->cs->pps->pcv->maxCUWidth );
-    pcPic->cs->createCoeffs((bool)pcPic->cs->sps->getPLTMode());
+#if JVET_Y0240_BIM
+    const bool isCurrentFrameFiltered = m_pcCfg->getGopBasedTemporalFilterEnabled() || m_pcCfg->getBIM();
+#else
+    const bool isCurrentFrameFiltered = m_pcCfg->getGopBasedTemporalFilterEnabled();
+#endif
+    const SPS& sps = *pcPic->cs->sps;
+    pcPic->createTempBuffers(pcPic->cs->pps->pcv->maxCUWidth, isCurrentFrameFiltered, m_pcEncLib->isResChangeInClvsEnabled(), false);
+    pcPic->getTrueOrigBuf().copyFrom(pcPic->getOrigBuf());
+    if (m_pcEncLib->isResChangeInClvsEnabled())
+    {
+      pcPic->M_BUFS(0, PIC_TRUE_ORIGINAL_INPUT).copyFrom(pcPic->M_BUFS(0, PIC_ORIGINAL_INPUT));
+    }
+    if(isCurrentFrameFiltered)
+    {
+      if (m_pcEncLib->isResChangeInClvsEnabled())
+      {
+        m_pcEncLib->getTemporalFilter().filter(pcPic->M_BUFS(0, PIC_ORIGINAL_INPUT), pocCurr);
+
+        const Window& curScalingWindow = pcPic->getScalingWindow();
+        const int curPicWidth = pcPic->M_BUFS(0, PIC_ORIGINAL).Y().width - SPS::getWinUnitX(sps.getChromaFormatIdc()) * (curScalingWindow.getWindowLeftOffset() + curScalingWindow.getWindowRightOffset());
+        const int curPicHeight = pcPic->M_BUFS(0, PIC_ORIGINAL).Y().height - SPS::getWinUnitY(sps.getChromaFormatIdc()) * (curScalingWindow.getWindowTopOffset() + curScalingWindow.getWindowBottomOffset());
+        
+        const PPS* pps = m_pcEncLib->getPPS(0);
+        const Window& refScalingWindow = pps->getScalingWindow();
+        const int refPicWidth = pcPic->M_BUFS(0, PIC_ORIGINAL_INPUT).Y().width - SPS::getWinUnitX(sps.getChromaFormatIdc()) * (refScalingWindow.getWindowLeftOffset() + refScalingWindow.getWindowRightOffset());
+        const int refPicHeight = pcPic->M_BUFS(0, PIC_ORIGINAL_INPUT).Y().height - SPS::getWinUnitY(sps.getChromaFormatIdc()) * (refScalingWindow.getWindowTopOffset() + refScalingWindow.getWindowBottomOffset());
+        const int xScale = ((refPicWidth << SCALE_RATIO_BITS) + (curPicWidth >> 1)) / curPicWidth;
+        const int yScale = ((refPicHeight << SCALE_RATIO_BITS) + (curPicHeight >> 1)) / curPicHeight;
+        std::pair<int, int> scalingRatio = std::pair<int, int>(xScale, yScale);
+
+        Picture::rescalePicture(scalingRatio, pcPic->M_BUFS(0, PIC_ORIGINAL_INPUT), curScalingWindow, pcPic->M_BUFS(0, PIC_ORIGINAL), pps->getScalingWindow(), chromaFormatIDC, sps.getBitDepths(), true, true,
+          sps.getHorCollocatedChromaFlag(), sps.getVerCollocatedChromaFlag());
+      }
+      else
+      {
+        m_pcEncLib->getTemporalFilter().filter(pcPic->M_BUFS(0, PIC_ORIGINAL), pocCurr);
+      }
+      pcPic->getFilteredOrigBuf().copyFrom(pcPic->getOrigBuf());
+    }
+    pcPic->cs->createTemporaryCsData((bool)pcPic->cs->sps->getPLTMode());
 
     //  Slice data initialization
     pcPic->clearSliceBuffer();
@@ -2600,6 +2638,28 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
       }
 
       pcSlice->setCheckLDC(bLowDelay);
+#if JVET_AF0128_LIC_MERGE_TM
+      bool bLowDelayB = false;
+      if (pcSlice->isInterB() && bLowDelay)
+      {
+        int min = MAX_INT;
+        for (int k = 0; k < NUM_REF_PIC_LIST_01; k++)
+        {
+          for (iRefIdx = 0; iRefIdx < pcSlice->getNumRefIdx((RefPicList)k); iRefIdx++)
+          {
+            if (pcSlice->getPOC() - pcSlice->getRefPic((RefPicList)k, iRefIdx)->getPOC() < min)
+            {
+              min = pcSlice->getPOC() - pcSlice->getRefPic((RefPicList)k, iRefIdx)->getPOC();
+            }
+          }
+        }
+        if (min == 1)
+        {
+          bLowDelayB = true;
+        }
+      }
+      pcSlice->setCheckLDB(bLowDelayB);
+#endif
     }
     else
     {
@@ -3113,6 +3173,9 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
       pcSlice->generateRefPicPairList();
     }
 #endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+    pcSlice->generateEqualPocDist();
+#endif
 
     double lambda            = 0.0;
     int actualHeadBits       = 0;
@@ -3461,9 +3524,11 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
       }
 #endif
 
-#if RPR_ENABLE
       // create SAO object based on the picture size
       if( pcSlice->getSPS()->getSAOEnabledFlag()
+#if JVET_W0066_CCSAO
+          || pcSlice->getSPS()->getCCSAOEnabledFlag()
+#endif
 #if JVET_V0094_BILATERAL_FILTER
           || pcSlice->getPPS()->getUseBIF()
 #endif
@@ -3473,20 +3538,21 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
           )
       {
         Size saoSize = m_pcSAO->getSaoSize();
-        if ( saoSize.width != picWidth || saoSize.height != picHeight ) {
-          const uint32_t widthInCtus = (picWidth + maxCUWidth - 1) / maxCUWidth;
-          const uint32_t heightInCtus = (picHeight + maxCUHeight - 1) / maxCUHeight;
-          const uint32_t numCtuInFrame = widthInCtus * heightInCtus;
-          const uint32_t  log2SaoOffsetScaleLuma = (uint32_t)std::max(0, pcSlice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA) - MAX_SAO_TRUNCATED_BITDEPTH);
-          const uint32_t  log2SaoOffsetScaleChroma = (uint32_t)std::max(0, pcSlice->getSPS()->getBitDepth(CHANNEL_TYPE_CHROMA) - MAX_SAO_TRUNCATED_BITDEPTH);
+        const uint32_t widthInCtus = (picWidth + maxCUWidth - 1) / maxCUWidth;
+        const uint32_t heightInCtus = (picHeight + maxCUHeight - 1) / maxCUHeight;
+        const uint32_t numCtuInFrame = widthInCtus * heightInCtus;
+        const uint32_t  log2SaoOffsetScaleLuma = (uint32_t)std::max(0, pcSlice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA) - MAX_SAO_TRUNCATED_BITDEPTH);
+        const uint32_t  log2SaoOffsetScaleChroma = (uint32_t)std::max(0, pcSlice->getSPS()->getBitDepth(CHANNEL_TYPE_CHROMA) - MAX_SAO_TRUNCATED_BITDEPTH);
 
+        m_pcSAO->destroyEncData();
+        m_pcSAO->createEncData(m_pcCfg->getSaoCtuBoundary(), numCtuInFrame);
+
+        if ( saoSize.width != picWidth || saoSize.height != picHeight ) 
+        {
           m_pcSAO->create(picWidth, picHeight, chromaFormatIDC, maxCUWidth, maxCUHeight, maxTotalCUDepth, log2SaoOffsetScaleLuma, log2SaoOffsetScaleChroma);
-          m_pcSAO->destroyEncData();
-          m_pcSAO->createEncData(m_pcCfg->getSaoCtuBoundary(), numCtuInFrame);
           m_pcSAO->setReshaper(m_pcReshaper);
         }
       }
-#endif
 
       if( pcSlice->getSPS()->getScalingListFlag() && m_pcCfg->getUseScalingListId() == SCALING_LIST_FILE_READ )
       {
@@ -3641,6 +3707,15 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
       m_pcSAO->jointClipSaoBifCcSao( cs );
 #endif
 
+      if( pcSlice->getSPS()->getSAOEnabledFlag()
+#if JVET_W0066_CCSAO
+       || pcSlice->getSPS()->getCCSAOEnabledFlag()
+#endif
+        )
+      {
+        m_pcSAO->destroyEncData();
+      }
+
 #if RPR_ENABLE && !JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
       // create ALF object based on the picture size
       if ( pcSlice->getSPS()->getALFEnabledFlag() )
@@ -3653,6 +3728,12 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
         }
       }
 #endif
+
+      if ( pcSlice->getSPS()->getALFEnabledFlag() )
+      {
+        // create ALF object based on the picture size
+        m_pcALF->create(m_pcCfg, picWidth, picHeight, chromaFormatIDC, maxCUWidth, maxCUHeight, maxTotalCUDepth, m_pcCfg->getBitDepth(), m_pcCfg->getInputBitDepth(), true);
+      }
 
       if( pcSlice->getSPS()->getALFEnabledFlag() )
       {
@@ -3713,6 +3794,7 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
           pcPic->slices[s]->m_ccAlfFilterControl[0] = m_pcALF->getCcAlfControlIdc(COMPONENT_Cb);
           pcPic->slices[s]->m_ccAlfFilterControl[1] = m_pcALF->getCcAlfControlIdc(COMPONENT_Cr);
         }
+        m_pcALF->destroy(true);
       }
       DTRACE_UPDATE( g_trace_ctx, ( std::make_pair( "final", 1 ) ) );
       if (m_pcCfg->getUseCompositeRef() && getPrepareLTRef())
@@ -4416,8 +4498,7 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
     }
 
     pcPic->destroyTempBuffers();
-    pcPic->cs->destroyCoeffs();
-    pcPic->cs->releaseIntermediateData();
+    pcPic->cs->destroyTemporaryCsData();
 #if JVET_AA0096_MC_BOUNDARY_PADDING
     m_pcFrameMcPadPrediction->init(m_pcEncLib->getRdCost(), pcSlice->getSPS()->getChromaFormatIdc(),
                                    pcSlice->getSPS()->getMaxCUHeight(), NULL, pcPic->getPicWidthInLumaSamples());

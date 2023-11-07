@@ -193,6 +193,12 @@ protected:
   Pel*                 m_acYuvPred            [NUM_REF_PIC_LIST_01][MAX_NUM_COMPONENT];
   Pel*                 m_filteredBlock        [LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS_SIGNAL][LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS_SIGNAL][MAX_NUM_COMPONENT];
   Pel*                 m_filteredBlockTmp     [LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS_SIGNAL][MAX_NUM_COMPONENT];
+#if JVET_AF0057
+  // one vector for each subblock
+  Pel* m_dmvrRightBoundary[256];
+  Pel* m_dmvrBottomBoundary[256];
+#endif
+
 #if JVET_AB0112_AFFINE_DMVR && !JVET_AC0144_AFFINE_DMVR_REGRESSION
   Pel*                 m_affineDmvrBlockTmp[NUM_REF_PIC_LIST_01];
 #endif
@@ -285,6 +291,11 @@ protected:
   Mv                   m_bdofSubPuMvOffse2[BDOF_SUBPU_MAX_NUM];
 #endif
 #endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+  uint8_t              m_sbtmvpSubPuDerived[BDOF_SUBPU_MAX_NUM];
+  bool                 m_doAffineSubPuBdof;
+  bool                 m_skipAffineFirstIterBdof;
+#endif
 #if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
   int32_t*             m_piDotProduct1;
   int32_t*             m_piDotProduct2;
@@ -313,7 +324,7 @@ protected:
   Pel m_acYuvRefAMLBiPredTemplateIdMotionCache[MAX_NUM_REFIDX][NUM_REF_PIC_LIST_01][MAX_NUM_CANDS][2][MAX_CU_SIZE];
 #endif
 
-#if JVET_AE0159_FIBC || JVET_AE0078_IBC_LIC_EXTENSION || JVET_AE0059_INTER_CCCM
+#if JVET_AE0159_FIBC || JVET_AE0078_IBC_LIC_EXTENSION || JVET_AE0059_INTER_CCCM || JVET_AF0073_INTER_CCP_MERGE
   IntraPrediction*  m_pcIntraPred;
   Area m_ibcRefArea;
 #endif
@@ -446,6 +457,9 @@ protected:
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
     , AffineMergeCtx affMrgCtx, bool isBilinear
 #endif
+#if JVET_AF0190_RPR_TMP_REORDER_LIC
+    , bool           enableRpr = false
+#endif
   );
 #endif
 #if AFFINE_ENC_OPT
@@ -465,6 +479,11 @@ protected:
   static bool xCheckIdenticalMotion( const PredictionUnit& pu );
 
   void xSubPuMC(PredictionUnit& pu, PelUnitBuf& predBuf, const RefPicList &eRefPicList = REF_PIC_LIST_X, const bool luma = true, const bool chroma = true);
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+  bool xGetSubPuGroupArea2D(PredictionUnit& pu, PredictionUnit& subPu, uint8_t* sbtmvpSubPuDerivedPtr, Position& subPuStartPos);
+  bool xGetSubPuGroupAreaStartPos(PredictionUnit& pu, Position& subPuStartPos, uint8_t* sbtmvpSubPuDerivedPtr);
+  bool xCheckIdenticalMotionInfo(MotionInfo orgMotionInfo, MotionInfo targetMotionInfo, MergeType puMergeType);
+#endif
 #if ENABLE_OBMC
   void xSubblockOBMC(const ComponentID eComp, PredictionUnit &pu, PelUnitBuf &pcYuvPredDst, PelUnitBuf &pcYuvPredSrc, int iDir, bool bSubMotion = false);
   void xSubBlockMotionCompensation(PredictionUnit &pu, PelUnitBuf &pcYuvPred);
@@ -588,7 +607,7 @@ public:
   void    motionCompensation  (CodingUnit &cu,     const RefPicList &eRefPicList = REF_PIC_LIST_X
     , const bool luma = true, const bool chroma = true
   );
-#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS || JVET_AF0066_ENABLE_DBV_4_SINGLE_TREE
   inline void getPredIBCBlk(const PredictionUnit& pu, ComponentID comp, const Picture* refPic, const Mv& _mv, PelUnitBuf& dstPic, bool bilinearMC = false
 #if JVET_AC0112_IBC_LIC
                           , bool bypassIBCLic = false
@@ -722,6 +741,11 @@ public:
   );
   template <bool trueTFalseL>
   void    weightedGeoTpl(PredictionUnit &pu, const uint8_t splitDir, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1);
+#endif
+#if JVET_AF0057
+  bool     dmvrEnableEncoderCheck;
+  void     xDmvrSetEncoderCheckFlag(bool enableFlag) { dmvrEnableEncoderCheck = enableFlag; }
+  bool     xDmvrGetEncoderCheckFlag() { return dmvrEnableEncoderCheck; }
 #endif
   void xPrefetch(PredictionUnit& pu, PelUnitBuf &pcPad, RefPicList refId, bool forLuma);
   void xPad(PredictionUnit& pu, PelUnitBuf &pcPad, RefPicList refId);
@@ -919,12 +943,22 @@ public:
 #if JVET_AD0140_MVD_PREDICTION
   template <int iAbove1Left2All3 = 3>
 #endif
-  void    xGetSublkAMLTemplate(const CodingUnit& cu, const ComponentID compID, const Picture& refPic, const Mv& mv, const int sublkWidth, const int sublkHeight, const int posW, const int posH, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate
+  void    xGetSublkAMLTemplate(const CodingUnit& cu, const ComponentID compID, const Picture& refPic, 
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+    const Mv& mvAbove,
+    const Mv& mvLeft,
+#else
+    const Mv& mv,
+#endif
+    const int sublkWidth, const int sublkHeight, const int posW, const int posH, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
      , bool afMMVD = false
 #endif
 #if JVET_AA0146_WRAP_AROUND_FIX
     , bool wrapRef = false
+#endif
+#if JVET_AF0190_RPR_TMP_REORDER_LIC
+    , const std::pair<int, int>* scalingRatio = NULL
 #endif
                                );
 
@@ -973,6 +1007,9 @@ public:
 #endif
 #if JVET_AB0079_TM_BCW_MRG
   void adjustMergeCandidatesBcwIdx(PredictionUnit& pu, MergeCtx& mrgCtx, const int mergeIdx = -1);
+#endif
+#if JVET_AF0128_LIC_MERGE_TM
+  void adjustMergeCandidatesLicFlag(PredictionUnit& pu, MergeCtx& mrgCtx, const int mergeIdx = -1);
 #endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
   void    adjustMergeCandidatesInOneCandidateGroup(PredictionUnit &pu, MergeCtx& smvpMergeCandCtx, int numRetrievedMergeCand, int mrgCandIdx = -1);
@@ -1064,19 +1101,28 @@ public:
   void xCalIbcFilterParam(PelBuf& piPred, CodingUnit* pcCU, const ComponentID compID, const Mv& mv, unsigned int uiBlkWidth, unsigned int uiBlkHeight ); 
   void xGenerateIbcFilterPred(PelBuf& piPred, unsigned int uiBlkWidth, unsigned int uiBlkHeight, const ComponentID compID, CodingUnit* pcCU);
 #endif
-#if JVET_AE0159_FIBC || JVET_AE0059_INTER_CCCM || JVET_AE0078_IBC_LIC_EXTENSION
+#if JVET_AE0159_FIBC || JVET_AE0059_INTER_CCCM || JVET_AE0078_IBC_LIC_EXTENSION || JVET_AF0073_INTER_CCP_MERGE
   void setIntraPrediction( IntraPrediction* intra );
 #endif
 #if INTER_LIC
 #if JVET_AA0146_WRAP_AROUND_FIX
+#if JVET_AF0190_RPR_TMP_REORDER_LIC
+  void xGetSublkTemplate   (const CodingUnit& cu, const ComponentID compID, const Picture& refPic, const Mv& mv, const int sublkWidth, const int sublkHeight, const int posW, const int posH, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate, bool wrapRef = false, const std::pair<int, int>* scalingRatio = NULL);
+  void xLocalIlluComp      (const PredictionUnit& pu, const ComponentID compID, const Picture& refPic, const Mv& mv, const bool biPred, PelBuf& dstBuf, bool wrapRef = false, const std::pair<int, int>* scalingRatio = NULL);
+#else
   void xGetSublkTemplate   (const CodingUnit& cu, const ComponentID compID, const Picture& refPic, const Mv& mv, const int sublkWidth, const int sublkHeight, const int posW, const int posH, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate, bool wrapRef = false);
   void xLocalIlluComp      (const PredictionUnit& pu, const ComponentID compID, const Picture& refPic, const Mv& mv, const bool biPred, PelBuf& dstBuf, bool wrapRef = false);
+#endif
 #else
   void xGetSublkTemplate   (const CodingUnit& cu, const ComponentID compID, const Picture& refPic, const Mv& mv, const int sublkWidth, const int sublkHeight, const int posW, const int posH, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate);
   void xLocalIlluComp      (const PredictionUnit& pu, const ComponentID compID, const Picture& refPic, const Mv& mv, const bool biPred, PelBuf& dstBuf);
 #endif
 #if JVET_AD0213_LIC_IMP
+#if JVET_AF0190_RPR_TMP_REORDER_LIC
+  void xGetSublkTemplateAndRef(const CodingUnit& cu, const ComponentID compID, const Picture& refPic, const Mv& mv, const int sublkWidth, const int sublkHeight, const int posW, const int posH, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate, bool recSample, bool refSample, const std::pair<int, int>* scalingRatio = NULL);
+#else
   void xGetSublkTemplateAndRef(const CodingUnit& cu, const ComponentID compID, const Picture& refPic, const Mv& mv, const int sublkWidth, const int sublkHeight, const int posW, const int posH, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate, bool recSample, bool refSample);
+#endif
   void xLicRemHighFreq(const CodingUnit& cu, int compID, int licIdx);
   void setLicParam(int refList, int compID, int& licScale, int& licOffset) { licScale = m_scale[refList][compID]; licOffset = m_offset[refList][compID]; }
   void resetFillLicTpl() { m_fillLicTpl[COMPONENT_Y] = m_fillLicTpl[COMPONENT_Cb] = m_fillLicTpl[COMPONENT_Cr] = false; }
@@ -1086,6 +1132,10 @@ public:
   void xGetPredBlkTpl(const CodingUnit& cu, const ComponentID compID, const CPelBuf& refBuf, const Mv& mv, const int posW, const int posH, const int tplSize, Pel* predBlkTpl
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
                       , bool AML = false
+#endif
+#if JVET_AF0190_RPR_TMP_REORDER_LIC
+                      , const Picture*             refPic       = NULL
+                      , const std::pair<int, int>* scalingRatio = NULL
 #endif
                       );
 #endif
@@ -1098,6 +1148,11 @@ public:
 #endif
 
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+  void       deriveSubTmvpTMMv(PredictionUnit& pu);
+  void       deriveSubTmvpTMMv2Pel(PredictionUnit& pu, int step);
+  Distortion deriveTMMv2Pel(const PredictionUnit& pu, int step, bool fillCurTpl, Distortion curBestCost, RefPicList eRefList, int refIdx, int maxSearchRounds, Mv& mv, const MvField* otherMvf = nullptr);
+#endif
 #if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   void       deriveTMMv         (PredictionUnit& pu, Distortion* tmCost = NULL);
@@ -1160,12 +1215,15 @@ private:
                                       , const Mv(&mvInitial)[2]  // only used for full-pel MVD
                                       , int nDirect              // only used for half-pel MVD
                                         );
+#if JVET_AF0057
+  bool isDMVRmvReliable(Pel* pelBuffer[2], const int stride, const Mv(&initialMv)[2], int horOffset, int verOffset, int xx, int yy, const int widthInSubPu, int theWidth, int theHeight);
+#endif
 #if JVET_X0049_BDMVR_SW_OPT
   template <bool adaptRange, bool useHadamard>
-  Distortion xBDMVRMvIntPelFullSearch  (Mv&mvOffset, Distortion curBestCost, 
-    const Mv(&initialMv)[2], 
-    const int32_t maxSearchRounds, 
-    const int maxHorOffset, const int maxVerOffset, 
+  Distortion xBDMVRMvIntPelFullSearch  (Mv&mvOffset, Distortion curBestCost,
+    const Mv(&initialMv)[2],
+    const int32_t maxSearchRounds,
+    const int maxHorOffset, const int maxVerOffset,
     const bool earlySkip,
     const Distortion earlyTerminateTh, DistParam &cDistParam, Pel* pelBuffer[2], const int stride);
 
@@ -1233,10 +1291,22 @@ public:
 #if JVET_AB0112_AFFINE_DMVR
   bool      processBDMVR4Affine(PredictionUnit& pu);
 #endif
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+  bool      processTM4Affine(PredictionUnit& pu, AffineMergeCtx &affineMergeCtx, int uiAffMergeCand, bool isEncoder);
+#endif
 #if JVET_X0049_ADAPT_DMVR
   bool      processBDMVRPU2Dir        (PredictionUnit& pu, bool subPURefine[2], Mv(&finalMvDir)[2]);
   void      processBDMVRSubPU         (PredictionUnit& pu, bool subPURefine);
 #endif
+#endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+private:
+  Mv*       m_bdofSubPuMvBuf;
+public:
+  void      setBdofSubPuMvBuf(Mv* bdofMvBuf)       { m_bdofSubPuMvBuf   = bdofMvBuf;   }
+  Mv*       getBdofSubPuMvBuf()                    { return m_bdofSubPuMvBuf;          }
+  void      setDoAffineSubPuBdof(bool doAffineSubPuBdof)  { m_doAffineSubPuBdof = doAffineSubPuBdof; }
+  bool      getDoAffineSubPuBdof()                        { return m_doAffineSubPuBdof; }
 #endif
   void xFillIBCBuffer(CodingUnit &cu);
 #if JVET_Z0118_GDR
@@ -1283,7 +1353,14 @@ public:
   inline void getNonDownSampledLumaValsOffset( const PredictionUnit* pu, const PelBuf& luma, const int x, const int y, Pel* s, const int offset, const int flipType = 0 );
   inline void getNonDownSampledLumaVals( const PredictionUnit* pu, const PelBuf& luma, const int x, const int y, Pel* s, const int flipType = 0 );
   inline int computeOffset( const PelBuf& buf );
+#if JVET_AF0073_INTER_CCP_MERGE
+  bool deriveInterCccmPrediction( TransformUnit* tu, const PelBuf& lumaPrediction, const PelBuf& lumaReconstruction, const PelBuf& inBufCb, const PelBuf& inBufCr, PelBuf& outBufCb, PelBuf& outBufCr );
+#else
   bool deriveInterCccmPrediction( const TransformUnit* tu, const PelBuf& lumaPrediction, const PelBuf& lumaReconstruction, const PelBuf& inBufCb, const PelBuf& inBufCr, PelBuf& outBufCb, PelBuf& outBufCr );
+#endif
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  bool deriveInterCcpMergePrediction( TransformUnit* tu, const PelBuf& lumaReconstruction, PelBuf& inBufCb, PelBuf& inBufCr, PelBuf& outBufCb, PelBuf& outBufCr, CCPModelCandidate interCcpMergeList[], int validNum);
 #endif
 };
 
@@ -1383,6 +1460,9 @@ public:
   static int getDeltaMean          (const PelBuf& bufCur, const PelBuf& bufRef, const int rowSubShift, const int bd);
 
   template <int tplSize> void deriveMvUni    ();
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+  template <int tplSize> void deriveMvUni2Pel(int step);
+#endif
   template <int tplSize> void removeHighFreq (const Picture& otherRefPic, const Mv& otherRefMv, const uint8_t curRefBcwWeight);
 #if JVET_AD0213_LIC_IMP
   template <int tplSize> void removeHighFreqLIC(const Picture& otherRefPic, const Mv& otherRefMv, const uint8_t curRefBcwWeight, int shift, int scale, int offset);

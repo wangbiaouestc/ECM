@@ -55,27 +55,52 @@ public:
 class BilateralFilter
 {
 private:
-#ifdef TARGET_SIMD_X86
-  __m128i tempblockSIMD[2320];
-  __m128i tempblockFilteredSIMD[2320];
-#else
-  int64_t tempblockSIMD[2 * 2320];
-  int64_t tempblockFilteredSIMD[2 * 2320];
-#endif
-  Pel *tempblock = (Pel*) tempblockSIMD;
-  Pel *tempblockFilteredTemp = (Pel*) (&tempblockFilteredSIMD[1]);
-  // SIMD method writes to tempblockFiltered + 4 so that address
-  // must be 128-aligned. Hence tempblockFilteredSIMD is a bit bigger than
-  // it otherwise would need to be and we don't use the first 14 bytes.
-  // We pad 8 bytes so required sizes is (128+8)*(128+8)*2+16 bytes = 37008 bytes
-  // = 2313 128-bit words which has been rounded up to 2320 above. 
-  Pel *tempblockFiltered = &tempblockFilteredTemp[-2];
+  // 128x128 is the max TU size, 4 is the padding for the considered neighborhood, 16 is the AVX buffer size.
+  // (128 + 4 + 16) * (128 + 4) = 19536.
+  Pel tempblockSIMD[19536];
+  Pel tempblockFilteredSIMD[19536];
 
-  void (*m_bilateralFilterDiamond5x5)( uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bifRoundAdd, int bifRoundShift, bool isRDO, const char* lutRowPtr, bool noClip);
-  static void blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bifRoundAdd, int bifRoundShift, bool isRDO, const char* lutRowPtr, bool noClip );
+  Pel *tempblock = (Pel*)tempblockSIMD;
+  Pel* tempblockFiltered = (Pel*)tempblockFilteredSIMD;
+
+  void (*m_bilateralFilterDiamond5x5)(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bifRoundAdd, int bifRoundShift, bool isRDO, const char* lutRowPtr, bool noClip, int cutBitsNum);
+  static void blockBilateralFilterDiamond5x5(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bifRoundAdd, int bifRoundShift, bool isRDO, const char* lutRowPtr, bool noClip, int cutBitsNum);
+
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+  int (*m_calcMAD)(int16_t* block, int stride, int width, int height, int whlog2);
+  static int calcMAD(int16_t* block, int stride, int width, int height, int whlog2);
+#endif
 
 #if JVET_V0094_BILATERAL_FILTER
   char m_wBIF[26][16] = {
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, }, /* 17 */
+  { 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, }, /* 18 */
+  { 0, 2, 2, 2, 2, 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, }, /* 19 */
+  { 0, 3, 4, 4, 4, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, -1, }, /* 20 */
+  { 0, 4, 5, 5, 5, 3, 2, 2, 1, 1, 1, 1, 0, 0, 0, -1, }, /* 21 */
+  { 0, 5, 6, 6, 6, 4, 3, 3, 1, 1, 1, 1, 0, 0, 0, -1, }, /* 22 */
+  { 0, 6, 7, 7, 7, 5, 4, 4, 2, 2, 1, 1, 1, 0, 0, -1, }, /* 23 */
+  { 0, 6, 8, 8, 8, 6, 5, 4, 3, 3, 2, 2, 1, 1, 0, -2, }, /* 24 */
+  { 0, 7, 8, 9, 9, 7, 7, 5, 4, 4, 2, 2, 2, 1, 1, -2, }, /* 25 */
+  { 0, 7, 9, 10, 10, 8, 8, 5, 5, 5, 3, 3, 2, 2, 1, -3, }, /* 26 */
+  { 0, 8, 10, 11, 11, 9, 9, 6, 6, 6, 3, 3, 3, 2, 1, -3, }, /* 27 */
+  { 0, 9, 11, 13, 13, 11, 11, 8, 8, 8, 5, 4, 4, 3, 2, -3, }, /* 28 */
+  { 0, 10, 12, 14, 14, 13, 13, 10, 9, 9, 6, 5, 5, 4, 3, -4, }, /* 29 */
+  { 0, 11, 13, 16, 16, 15, 15, 13, 11, 11, 8, 6, 6, 4, 4, -4, }, /* 30 */
+  { 0, 12, 14, 17, 17, 17, 17, 15, 12, 12, 9, 7, 7, 5, 5, -5, }, /* 31 */
+  { 0, 13, 15, 19, 19, 19, 19, 17, 14, 14, 11, 8, 8, 6, 6, -5, }, /* 32 */
+  { 0, 14, 17, 20, 21, 21, 21, 19, 17, 16, 13, 10, 10, 7, 7, -5, }, /* 33 */
+  { 0, 15, 19, 22, 23, 24, 23, 22, 20, 18, 15, 12, 11, 9, 7, -6, }, /* 34 */
+  { 0, 17, 20, 23, 26, 26, 26, 24, 23, 20, 18, 15, 13, 10, 8, -6, }, /* 35 */
+  { 0, 18, 22, 25, 28, 29, 28, 27, 26, 22, 20, 17, 14, 12, 8, -7, }, /* 36 */
+  { 0, 19, 24, 26, 30, 31, 30, 29, 29, 24, 22, 19, 16, 13, 9, -7, }, /* 37 */
+  { 0, 20, 26, 29, 32, 33, 32, 31, 31, 27, 24, 21, 17, 14, 11, -8, }, /* 38 */
+  { 0, 21, 28, 31, 34, 35, 35, 34, 34, 30, 26, 23, 19, 15, 13, -8, }, /* 39 */
+  { 0, 21, 30, 34, 36, 38, 37, 36, 36, 32, 29, 25, 20, 17, 15, -9, }, /* 40 */
+  { 0, 22, 32, 36, 38, 40, 40, 39, 39, 35, 31, 27, 22, 18, 17, -9, }, /* 41 */
+  { 0, 23, 34, 39, 40, 42, 42, 41, 41, 38, 33, 29, 23, 19, 19, -10, }, /* 42 */
+#else
   {  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, },
   {  0,   1,   1,   1,   1,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, },
   {  0,   2,   2,   2,   1,   1,   0,   1,   0,   0,   0,   0,   0,   0,   0,   0, },
@@ -102,10 +127,49 @@ private:
   {  0,  15,  22,  31,  35,  39,  42,  42,  43,  41,  37,  25,  21,  17,  15,  -3, },
   {  0,  16,  23,  32,  36,  40,  43,  43,  44,  42,  39,  26,  21,  17,  15,  -3, },
   {  0,  17,  23,  33,  37,  41,  44,  44,  45,  44,  42,  27,  22,  17,  15,  -3, },
+#endif
+  };
+  char m_lut[26][3 * 16];
+  char m_distFactor[3] = { 16, 12, 11, };
+  char m_tuSizeFactor[2][64] = { 
+    { 10,10,10,9,8,6,5,4,10,10,10,9,8,6,5,4,10,10,10,9,8,6,5,4,9,9,9,7,6,5,5,4,8,8,8,6,5,5,5,4,6,6,6,5,5,5,5,4,5,5,5,5,5,5,5,4,4,4,4,4,4,4,4,4, },
+    { 10,10,10,8,6,6,4,0,10,10,10,8,6,6,4,0,10,10,10,8,6,6,4,0,8,8,8,6,5,4,4,0,6,6,6,5,4,4,4,0,6,6,6,4,4,0,0,0,4,4,4,4,4,0,0,0,0,0,0,0,0,0,0,0, },
+  };
+  char m_tuMADFactor[2][16] = {
+    { 0,0,0,1,2,3,4,5,6,6,6,6,7,7,7,7, },
+    { 0,0,0,0,0,0,1,2,2,4,4,4,4,5,5,5, },
   };
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
   char m_wBIFChroma[26][16] = {
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, }, /* 17 */
+  { 0, 1, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 0, }, /* 18 */
+  { 0, 2, 3, 3, 4, 3, 3, 3, 3, 3, 3, 2, 2, 2, 2, 0, }, /* 19 */
+  { 0, 3, 5, 5, 6, 5, 5, 5, 5, 5, 4, 2, 2, 2, 2, 1, }, /* 20 */
+  { 0, 4, 6, 6, 8, 6, 6, 6, 6, 6, 6, 3, 3, 3, 3, 1, }, /* 21 */
+  { 0, 5, 8, 8, 10, 8, 8, 8, 8, 8, 7, 4, 4, 4, 4, 1, }, /* 22 */
+  { 0, 5, 8, 8, 10, 9, 9, 9, 9, 9, 8, 5, 5, 5, 4, 1, }, /* 23 */
+  { 0, 5, 8, 8, 10, 9, 10, 10, 9, 9, 9, 6, 6, 6, 4, 2, }, /* 24 */
+  { 0, 5, 8, 8, 10, 10, 10, 10, 10, 10, 9, 8, 6, 6, 5, 2, }, /* 25 */
+  { 0, 5, 8, 8, 10, 10, 11, 11, 10, 10, 10, 9, 7, 7, 5, 3, }, /* 26 */
+  { 0, 5, 8, 8, 10, 11, 12, 12, 11, 11, 11, 10, 8, 8, 5, 3, }, /* 27 */
+  { 0, 5, 8, 9, 11, 12, 13, 13, 13, 13, 13, 13, 11, 11, 8, 5, }, /* 28 */
+  { 0, 5, 8, 9, 11, 13, 14, 15, 15, 15, 16, 15, 13, 13, 11, 6, }, /* 29 */
+  { 0, 6, 9, 10, 12, 13, 16, 16, 16, 16, 18, 18, 16, 16, 15, 8, }, /* 30 */
+  { 0, 6, 9, 10, 12, 14, 17, 18, 18, 18, 21, 20, 18, 18, 18, 9, }, /* 31 */
+  { 0, 6, 9, 11, 13, 15, 18, 19, 20, 20, 23, 23, 21, 21, 21, 11, }, /* 32 */
+  { 0, 6, 9, 12, 14, 16, 18, 20, 21, 21, 24, 24, 22, 24, 21, 13, }, /* 33 */
+  { 0, 6, 9, 13, 14, 17, 19, 21, 21, 21, 25, 25, 23, 27, 22, 14, }, /* 34 */
+  { 0, 6, 10, 13, 15, 17, 19, 21, 22, 22, 25, 25, 25, 29, 22, 16, }, /* 35 */
+  { 0, 6, 10, 14, 15, 18, 20, 22, 22, 22, 26, 26, 26, 32, 23, 17, }, /* 36 */
+  { 0, 6, 10, 15, 16, 19, 20, 23, 23, 23, 27, 27, 27, 35, 23, 19, }, /* 37 */
+  { 0, 6, 11, 15, 17, 20, 21, 24, 25, 25, 28, 29, 29, 36, 26, 21, }, /* 38 */
+  { 0, 6, 11, 15, 18, 21, 22, 25, 26, 26, 29, 30, 32, 37, 29, 24, }, /* 39 */
+  { 0, 7, 12, 16, 18, 21, 22, 27, 28, 28, 29, 32, 34, 37, 33, 26, }, /* 40 */
+  { 0, 7, 12, 16, 19, 22, 23, 28, 29, 29, 30, 33, 37, 38, 36, 29, }, /* 41 */
+  { 0, 7, 13, 16, 20, 23, 24, 29, 31, 31, 31, 35, 39, 39, 39, 31, }, /* 42 */
+#else
   {   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, },
   {   0,   1,   1,   1,   1,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, },
   {   0,   2,   2,   2,   1,   1,   0,   1,   0,   0,   0,   0,   0,   0,   0,   0, },
@@ -132,6 +196,17 @@ private:
   {   0,  12,  17,  24,  27,  30,  33,  33,  34,  32,  29,  20,  16,  13,  12,   -2, },
   {   0,  12,  18,  25,  28,  31,  34,  34,  34,  33,  30,  20,  16,  13,  12,   -2, },
   {   0,  13,  18,  26,  29,  32,  34,  34,  35,  34,  33,  21,  17,  13,  12,   -2, },
+#endif
+  };
+  char m_lutChroma[26][3 * 16];
+  char m_distFactorChroma[3] = { 16, 8, 6, };
+  char m_tuSizeFactorChroma[2][64] = {
+    { 9,9,9,9,8,8,8,0,9,9,9,9,8,8,8,0,9,9,8,8,8,8,8,0,9,9,8,8,8,8,8,0,8,8,8,8,8,8,8,0,8,8,8,8,8,8,8,0,8,8,8,8,8,8,8,0,0,0,0,0,0,0,0,0, },
+    { 13,13,13,13,9,9,9,0,13,13,13,13,9,9,9,0,13,13,13,13,9,9,9,0,13,13,13,9,9,9,9,0,9,9,9,9,9,9,9,0,9,9,9,9,9,0,0,0,9,9,9,9,9,0,0,0,0,0,0,0,0,0,0,0, },
+  };
+  char m_tuMADFactorChroma[2][16] = {
+    { 0,1,3,4,5,7,9,11,11,11,11,11,11,11,11,11, },
+    { 0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1, },
   };
 #endif
 public:
@@ -142,26 +217,34 @@ public:
   void destroy();
 #if JVET_V0094_BILATERAL_FILTER
   void bilateralFilterRDOdiamond5x5(const ComponentID compID, PelBuf& resiBuf, const CPelBuf& predBuf, PelBuf& recoBuf, int32_t qp, const CPelBuf& recIPredBuf, const ClpRng& clpRng, TransformUnit & currTU, bool useReco, bool doReshape = false, std::vector<Pel>* pLUT = nullptr);
-  void bilateralFilterPicRDOperCTU( const ComponentID compID, CodingStructure& cs, PelUnitBuf& src,BIFCabacEst* bifCABACEstimator);
-  void bilateralFilterDiamond5x5( const ComponentID compID, const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit & currTU, bool noClip
+  void bilateralFilterPicRDOperCTU(const ComponentID compID, CodingStructure& cs, PelUnitBuf& src,BIFCabacEst* bifCABACEstimator);
+  void bilateralFilterDiamond5x5(const ComponentID compID, const CPelUnitBuf& src, PelUnitBuf& rec, int32_t qp, const ClpRng& clpRng, TransformUnit & currTU, bool noClip
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
     , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
     , bool clipTop, bool clipBottom, bool clipLeft, bool clipRight
 #endif
   );
 
-  const char* getFilterLutParameters( const int size, const PredMode predMode, const int qp, int& bfac );
-  void clipNotBilaterallyFilteredBlocks( const ComponentID compID, const CPelUnitBuf& src, PelUnitBuf& rec, const ClpRng& clpRng, TransformUnit & currTU);
-#if JVET_X0071_CHROMA_BILATERAL_FILTER
-  const char* getFilterLutParametersChroma( const int size, const PredMode predMode, const int qp, int& bfac, int widthForStrength, int heightForStrength, bool isLumaValid);
-#endif
+  const char* getFilterLutParameters(int16_t* block, const int stride, const int width, const int height, const PredMode predMode, const int qp, int& bfac);
+  void clipNotBilaterallyFilteredBlocks(const ComponentID compID, const CPelUnitBuf& src, PelUnitBuf& rec, const ClpRng& clpRng, TransformUnit & currTU);
 #endif
 
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+  const char* getFilterLutParametersChroma(int16_t* block, const int stride, const int width, const int height, const PredMode predMode, const int qp, int& bfac, int widthForStrength, int heightForStrength, bool isLumaValid);
+#endif
+
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+  bool getApplyBIF(const TransformUnit& currTU, ComponentID compID);
+#endif
 
 #if ENABLE_SIMD_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER_ENABLE_SIMD
 #ifdef TARGET_SIMD_X86
   template<X86_VEXT vext>
-  static void simdFilterDiamond5x5( uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bifRoundAdd, int bifRoundShift, bool isRDO, const char* lutRowPtr, bool noClip );
+  static void simdFilterDiamond5x5(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bifRoundAdd, int bifRoundShift, bool isRDO, const char* lutRowPtr, bool noClip, int cutBitsNum);
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+  template<X86_VEXT vext>
+  static int simdCalcMAD(int16_t* block, int stride, int width, int height, int whlog2);
+#endif
 
   void    initBilateralFilterX86();
   template <X86_VEXT vext>

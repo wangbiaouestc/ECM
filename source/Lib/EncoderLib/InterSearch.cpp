@@ -376,6 +376,13 @@ void InterSearch::destroy()
   }
   delete[] m_interCccmStorage;
 #endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  for (int i = 0; i < 5; i++)
+  {
+    delete[] m_interCcpMergeStorage[i];
+  }
+  delete[] m_interCcpMergeStorage;
+#endif
   m_isInitialized = false;
 }
 
@@ -528,6 +535,13 @@ void InterSearch::init( EncCfg*        pcEncCfg,
   for (int i = 0; i < 12; i++)
   {
     m_interCccmStorage[i] = new Pel[MAX_CU_SIZE * MAX_CU_SIZE];
+  }
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  m_interCcpMergeStorage = new Pel * [5];
+  for (int i = 0; i < 5; i++)
+  {
+    m_interCcpMergeStorage[i] = new Pel[MAX_CU_SIZE * MAX_CU_SIZE];
   }
 #endif
 #if JVET_AE0169_BIPREDICTIVE_IBC
@@ -4276,13 +4290,13 @@ Distortion InterSearch::xPredIBCFracPelSearch(PredictionUnit&              pu
 #endif
   for (int i = 0; i < intBvList.cnt; ++i)
   {
+    pu.cu->imv = IMV_FPEL;
+    pu.bv      = intBvList.mvList[i];
+    pu.mv[0]   = intBvList.mvList[i];
+    pu.mv[0].changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
 #if JVET_AE0159_FIBC
     if (m_pcEncCfg->getIntraPeriod() != 1) //non-AI
-    {
-      pu.cu->imv = IMV_FPEL;
-      pu.bv      = intBvList.mvList[i];
-      pu.mv[0]   = intBvList.mvList[i];
-      pu.mv[0].changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
+    {    
 #if JVET_AE0078_IBC_LIC_EXTENSION
       const int ibcLicLoopNum = pu.cu->ibcLicFlag && !pu.cu->ibcFilterFlag ? 4 : 1;
       int bestLicIdc = 0;
@@ -4457,11 +4471,6 @@ Distortion InterSearch::xPredIBCFracPelSearch(PredictionUnit&              pu
         pu.cu->ibcLicIdx = licIdc;
 #endif
 #endif
-
-    pu.cu->imv = IMV_FPEL;
-    pu.bv      = intBvList.mvList[i];
-    pu.mv[0]   = intBvList.mvList[i];
-    pu.mv[0].changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
 
 #if JVET_AC0112_IBC_LIC
     if (pu.cu->ibcLicFlag)
@@ -6472,7 +6481,11 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
               {
 #endif
               PelUnitBuf predBufTmp = m_tmpPredStorage[1 - iRefList].getBuf( UnitAreaRelative(cu, pu) );
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+              motionCompensation( pu, predBufTmp, RefPicList(1 - iRefList), true, false );
+#else
               motionCompensation( pu, predBufTmp, RefPicList(1 - iRefList) );
+#endif
 #if MULTI_HYP_PRED
               CHECK(pu.addHypData.empty() == false, "this is not possible");
 #endif
@@ -7233,7 +7246,22 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
 #if JVET_AD0213_LIC_IMP
     m_encMotionEstimation = false;
 #endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+    if (PU::checkDoAffineBdofRefine(pu, this))
+    {
+      pu.availableBdofRefinedMv = AFFINE_SUBPU_BDOF_APPLY_AND_STORE_MV;
+      setDoAffineSubPuBdof(false);
+    }
     motionCompensation( pu, predBuf, REF_PIC_LIST_X );
+    pu.availableBdofRefinedMv = AFFINE_SUBPU_BDOF_NOT_APPLY;
+    if (getDoAffineSubPuBdof() == true && (pu.amvpMergeModeFlag[0] || pu.amvpMergeModeFlag[1]))
+    {
+      PU::setAffineBdofRefinedMotion(pu, getBdofSubPuMvBuf());
+      setDoAffineSubPuBdof(false);
+    }
+#else
+    motionCompensation( pu, predBuf, REF_PIC_LIST_X );
+#endif
 #if JVET_AD0213_LIC_IMP
     if (pu.cu->licFlag)
     {
@@ -7275,6 +7303,9 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
   {
     checkEncLicOff(cu, mergeCtx);
   }
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+  else
+#endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   if ((cu.slice->getUseLIC() && (cu.Y().area() >= LIC_MIN_CU_PIXELS)) && !pu.cu->licFlag && !amvpMergeModeFlag && pu.interDir != MAX_UCHAR)
 #else
@@ -7283,6 +7314,16 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
   {
     checkEncLicOn(cu, mergeCtx);
   }
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+  else
+  {
+    if (getDoAffineSubPuBdof())
+    {
+      setDoAffineSubPuBdof(false);
+      PU::setAffineBdofRefinedMotion(pu, getBdofSubPuMvBuf());
+    }
+  }
+#endif
 #else
 #if !TM_AMVP || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && TM_AMVP) // This LIC optimization must be off; otherwise, enc/dec mismatching will result. Because the cost metrics (MRSAD or SAD) of TM mode is adaptive to LIC flag, refined MVs would change when LIC flag is 1 or 0.
   if (cu.licFlag && pu.interDir != MAX_UCHAR
@@ -7573,9 +7614,24 @@ void InterSearch::predInterSearchAdditionalHypothesis(PredictionUnit& pu, const 
   }
   else
   {
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+    if (PU::checkDoAffineBdofRefine(pu, this))
+    {
+      pu.availableBdofRefinedMv = AFFINE_SUBPU_BDOF_APPLY_WITHOUT_STORE_MV;
+      m_doAffineSubPuBdof = false;
+      if (pu.mergeType != MRG_TYPE_SUBPU_ATMVP)
+      {
+        PU::spanMotionInfo(pu);
+      }
+    }
+#endif
     tempPredBuf = pu.cs->getPredBuf(pu);
     pu.mvRefine = true;
     motionCompensation(pu, REF_PIC_LIST_X, true, false);
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+    pu.availableBdofRefinedMv = AFFINE_SUBPU_BDOF_NOT_APPLY;
+    m_doAffineSubPuBdof = false;
+#endif
     pu.mvRefine = false;
   }
   const auto &MHRefPics = pu.cs->slice->getMultiHypRefPicList();
@@ -12065,6 +12121,12 @@ void InterSearch::xEncodeInterResidualQT(CodingStructure &cs, Partitioner &parti
     {
       if( currArea.blocks[compID].valid() )
       {
+#if JVET_AF0073_INTER_CCP_MERGE
+        if ( compID == COMPONENT_Cr )
+        {
+          m_CABACEstimator->interCcpMerge(currTU);
+        }
+#endif
 #if JVET_AE0059_INTER_CCCM
         if ( compID == COMPONENT_Cr )
         {
@@ -12398,7 +12460,6 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
   uint64_t   uiSingleFracBits[3] = { 0, 0, 0 };
 
   const TempCtx ctxStart  ( m_ctxCache, m_CABACEstimator->getCtx() );
-  TempCtx       ctxBest   ( m_ctxCache );
 
   if (bCheckFull)
   {
@@ -12436,6 +12497,15 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
     }
 #endif
     double minCost            [MAX_NUM_TBLOCKS];
+#if JVET_AF0073_INTER_CCP_MERGE
+    double minCostInterCcpIdx[3][MAX_NUM_TBLOCKS];
+    for (uint32_t i = 0; i < numTBlocks; i++)
+    {
+      minCostInterCcpIdx[0][i] = MAX_DOUBLE;
+      minCostInterCcpIdx[1][i] = MAX_DOUBLE;
+      minCostInterCcpIdx[2][i] = MAX_DOUBLE;
+    }
+#endif
 
     m_CABACEstimator->resetBits();
 
@@ -12456,7 +12526,7 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
     saveCS.clearTUs();
     TransformUnit & bestTU = saveCS.addTU(CS::getArea(cs, currArea, partitioner.chType), partitioner.chType);
 
-#if JVET_AE0059_INTER_CCCM
+#if JVET_AE0059_INTER_CCCM || JVET_AF0073_INTER_CCP_MERGE
     CodingStructure &saveCS2 = *m_pSaveCS[1];
     saveCS2.pcv              = cs.pcv;
     saveCS2.picture          = cs.picture;
@@ -12486,6 +12556,53 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
     Distortion   tempUiSingleDistComp[3] = { 0, 0, 0 };
     uint64_t     tempUiSingleFracBits[3] = { 0, 0, 0 };
     bool         interCccmOk = false;
+#if JVET_AF0073_INTER_CCP_MERGE
+    PelBuf         interCcpMergePredBuf[2];      // temporary buffers to store luma-to-chroma prediction
+    PelBuf         interCcpMergeOrgResiBuf[2];   // temporary buffer to store residual for interCcpMerge predictions
+    for (int i = 1; i < MAX_NUM_COMPONENT; i++)
+    {
+      interCcpMergePredBuf[i-1] = PelBuf(m_interCcpMergeStorage[i-1], tu.blocks[ComponentID(i)]);
+    }
+    for (int i = 1; i < MAX_NUM_COMPONENT; i++)
+    {
+      interCcpMergeOrgResiBuf[i-1] = PelBuf(m_interCcpMergeStorage[i+1], tu.blocks[ComponentID(i)]);
+    }
+    const bool   interCcpMergeRdSearch = luma && chroma && !colorTransFlag && CU::interCcpMergeSearchAllowed(*tu.cu);
+    bool         interCcpMergeOk = false;
+    bool         lumaRecoReady = false;
+    bool skipInterCccm2 = false;
+
+    for (int interCccm = 0; interCccm < 3; interCccm++)
+    {
+      if (interCccm == 2 && skipInterCccm2)
+      {
+        continue;
+      }
+      if ((!interCccmRdSearch) && interCccm == 1)
+      {
+        continue;
+      }
+      if ((!interCcpMergeRdSearch) && interCccm == 2)
+      {
+        continue;
+      }
+      tu.interCccm = (interCccm == 1) ? 1 : 0;
+      tu.interCcpMerge = (interCccm == 2) ? 1 : 0;
+
+      for (uint32_t i = ((tu.interCccm || tu.interCcpMerge) ? 1 : 0); i < numTBlocks; i++)
+      {
+        minCost[i] = MAX_DOUBLE;
+      }
+      if (interCccm == 1)
+      {
+        minCostInterCcpIdx[1][0] = minCostInterCcpIdx[0][0];
+      }
+      if (interCccm == 2)
+      {
+        minCostInterCcpIdx[2][0] = minCostInterCcpIdx[0][0];
+      }
+      for (uint32_t c = ((tu.interCccm || tu.interCcpMerge) ? 1 : 0); c < numTBlocks; c++)
+#else
     for (int interCccm = 0; interCccm < (interCccmRdSearch ? 2 : 1); interCccm++)
     {
       tu.interCccm = interCccm;
@@ -12494,6 +12611,7 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
         minCost[i] = MAX_DOUBLE;
       }
       for (uint32_t c = (tu.interCccm ? 1 : 0); c < numTBlocks; c++)
+#endif
 #else
     for (uint32_t c = 0; c < numTBlocks; c++)
 #endif
@@ -12520,6 +12638,34 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
       {
         if (!interCccmOk) // determined on previous loop iteration (i.e., COMPONENT_Cb)
         {
+          break;
+        }
+#if JVET_AF0073_INTER_CCP_MERGE
+        if (tu.cu->cs->slice->getSPS()->getUseInterCcpMerge() && ((minCostInterCcpIdx[1][0] + minCostInterCcpIdx[1][1]) > bestCost))
+        {
+          if (m_pcEncCfg->getInterCcpMergeFastMode() == 1)
+          {
+            minCostInterCcpIdx[1][2] = minCost[2] = minCostInterCcpIdx[1][1];
+          }
+          break;
+        }
+#endif
+      }
+#endif
+
+#if JVET_AF0073_INTER_CCP_MERGE
+      if (tu.interCcpMerge && compID == COMPONENT_Cr)
+      {
+        if (!interCcpMergeOk) // determined on previous loop iteration (i.e., COMPONENT_Cb)
+        {
+          break;
+        }
+        if (tu.cu->cs->slice->getSPS()->getUseInterCcpMerge() && ((minCostInterCcpIdx[2][0] + minCostInterCcpIdx[2][1]) > bestCost))
+        {
+          if (m_pcEncCfg->getInterCcpMergeFastMode() == 1)
+          {
+            minCostInterCcpIdx[2][2] = minCost[2] = minCostInterCcpIdx[2][1];
+          }
           break;
         }
       }
@@ -12626,6 +12772,10 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
         {
           break;
         }
+#if JVET_AF0073_INTER_CCP_MERGE
+        if (!lumaRecoReady)
+        {
+#endif
         lumaPredBuf.copyFrom(csFull->getPredBuf(tu.blocks[COMPONENT_Y]));
         if (cs.picHeader->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !cu.firstPU->ciipFlag && !cu.firstPU->gpmIntraFlag && !CU::isIBC(cu))
         {
@@ -12636,6 +12786,10 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
         {
           lumaRecoBuf.flipSignal(cu.rribcFlipType == 1);
         }
+#if JVET_AF0073_INTER_CCP_MERGE
+          lumaRecoReady = true;
+        }
+#endif
 
         PelBuf bufCb = csFull->getPredBuf( tu.blocks[COMPONENT_Cb] );
         PelBuf bufCr = csFull->getPredBuf( tu.blocks[COMPONENT_Cr] );
@@ -12661,6 +12815,58 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
         }
       }
 #endif
+#if JVET_AF0073_INTER_CCP_MERGE
+      if (tu.interCcpMerge && compID == COMPONENT_Cb)
+      {
+        if (!TU::getCbf(tu, COMPONENT_Y))
+        {
+          break;
+        }
+        if (!lumaRecoReady)
+        {
+          lumaPredBuf.copyFrom(csFull->getPredBuf(tu.blocks[COMPONENT_Y]));
+          if (cs.picHeader->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !cu.firstPU->ciipFlag && !cu.firstPU->gpmIntraFlag && !CU::isIBC(cu))
+          {
+            lumaPredBuf.rspSignal(m_pcReshape->getFwdLUT());
+          }
+          lumaRecoBuf.reconstruct(lumaPredBuf, csFull->getResiBuf(tu.blocks[COMPONENT_Y]), cs.slice->clpRng(COMPONENT_Y));
+          if (CU::isIBC(cu) && cu.rribcFlipType)
+          {
+            lumaRecoBuf.flipSignal(cu.rribcFlipType == 1);
+          }
+          lumaRecoReady = true;
+        }
+
+        PelBuf bufCb = csFull->getPredBuf( tu.blocks[COMPONENT_Cb] );
+        PelBuf bufCr = csFull->getPredBuf( tu.blocks[COMPONENT_Cr] );
+
+        if (m_isInterCcpModelReady == false)
+        {
+          m_pcIntraPred->xAddOnTheFlyCalcCCPCands4InterBlk(*tu.cu->firstPU, tu.blocks[COMPONENT_Cb], m_interCcpMergeList, m_validNum);
+          m_isInterCcpModelReady = true;
+        }
+        const bool valid = deriveInterCcpMergePrediction(&tu, lumaRecoBuf, bufCb, bufCr, interCcpMergePredBuf[0], interCcpMergePredBuf[1], m_interCcpMergeList, m_validNum);
+
+        if( valid )
+        {
+          interCcpMergeOk = true;
+        }
+        else
+        {
+          break;
+        }
+
+        for (int y = 0; y < compArea.height; y++)
+        {
+          for (int x = 0; x < compArea.width; x++)
+          {
+            interCcpMergeOrgResiBuf[0].at(x, y) = csFull->getOrgBuf(tu.blocks[COMPONENT_Cb]).at(x, y) - interCcpMergePredBuf[0].at(x, y);
+            interCcpMergeOrgResiBuf[1].at(x, y) = csFull->getOrgBuf(tu.blocks[COMPONENT_Cr]).at(x, y) - interCcpMergePredBuf[1].at(x, y);
+          }
+        }
+      }
+#endif
+
       const int numTransformCandidates = nNumTransformCands;
       for( int transformMode = 0; transformMode < numTransformCandidates; transformMode++ )
       {
@@ -12676,6 +12882,12 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
           else if (isChroma(compID) && tu.interCccm)
           {
             csFull->getResiBuf(compArea).copyFrom(interCccmOrgResiBuf[compID]);
+          }
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+          else if (isChroma(compID) && tu.interCcpMerge)
+          {
+            csFull->getResiBuf(compArea).copyFrom(interCcpMergeOrgResiBuf[compID-1]);
           }
 #endif
           else
@@ -12759,7 +12971,11 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
             const CPelBuf zeroBuf(m_pTempPel, compArea);
 #if JVET_S0234_ACT_CRS_FIX
 #if JVET_AE0059_INTER_CCCM
+#if JVET_AF0073_INTER_CCP_MERGE
+            const CPelBuf orgResi = colorTransFlag ? colorTransResidual.bufs[compID] : ((isChroma(compID) && tu.interCccm) ? interCccmOrgResiBuf[compID] : ((isChroma(compID) && tu.interCcpMerge) ? interCcpMergeOrgResiBuf[compID-1] : csFull->getOrgResiBuf(compArea)));
+#else
             const CPelBuf orgResi = colorTransFlag ? colorTransResidual.bufs[compID] : ((isChroma(compID) && tu.interCccm) ? interCccmOrgResiBuf[compID] : csFull->getOrgResiBuf(compArea));
+#endif
 #else
             const CPelBuf orgResi = colorTransFlag ? colorTransResidual.bufs[compID] : csFull->getOrgResiBuf(compArea);
 #endif
@@ -12776,6 +12992,12 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
             const bool prevCbf = ( compID == COMPONENT_Cr ? tu.cbf[COMPONENT_Cb] : false );
             m_CABACEstimator->cbf_comp( *csFull, false, compArea, currDepth, prevCbf );
 
+#if JVET_AF0073_INTER_CCP_MERGE
+            if ( compID == COMPONENT_Cr )
+            {
+              m_CABACEstimator->interCcpMerge(tu);
+            }
+#endif
 #if JVET_AE0059_INTER_CCCM
             if ( compID == COMPONENT_Cr )
             {
@@ -12803,7 +13025,11 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
           }
 
 #if JVET_AE0059_INTER_CCCM
+#if JVET_AF0073_INTER_CCP_MERGE
+          if ((puiZeroDist != NULL) && isFirstMode && (!tu.interCccm && !tu.interCcpMerge))
+#else
           if ((puiZeroDist != NULL) && isFirstMode && !tu.interCccm)
+#endif
 #else
           if ((puiZeroDist != NULL) && isFirstMode)
 #endif
@@ -12815,6 +13041,11 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
             currAbsSum = 0;
           }
 
+#if JVET_Z0118_GDR
+          cs.updateReconMotIPM(tu.blocks[compID], cs.getPredBuf(tu.blocks[compID]));
+#else
+          cs.picture->getRecoBuf(tu.blocks[compID]).copyFrom(cs.getPredBuf(tu.blocks[compID]));
+#endif
           if (currAbsSum > 0) //if non-zero coefficients are present, a residual needs to be derived for further prediction
           {
             if (isFirstMode)
@@ -12825,6 +13056,12 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
 
             const bool prevCbf = ( compID == COMPONENT_Cr ? tu.cbf[COMPONENT_Cb] : false );
             m_CABACEstimator->cbf_comp( *csFull, true, compArea, currDepth, prevCbf );
+#if JVET_AF0073_INTER_CCP_MERGE
+            if ( compID == COMPONENT_Cr )
+            {
+              m_CABACEstimator->interCcpMerge(tu);
+            }
+#endif
 #if JVET_AE0059_INTER_CCCM
             if ( compID == COMPONENT_Cr )
             {
@@ -12872,11 +13109,6 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
                 if (isLuma(compID) && slice.getPicHeader()->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !tu.cu->firstPU->ciipFlag && !CU::isIBC(*tu.cu))
 #endif
                 {
-#if JVET_Z0118_GDR
-                  cs.updateReconMotIPM(tu.blocks[COMPONENT_Y], cs.getPredBuf(tu.blocks[COMPONENT_Y]));
-#else
-                  cs.picture->getRecoBuf(tu.blocks[COMPONENT_Y]).copyFrom(cs.getPredBuf(tu.blocks[COMPONENT_Y]));
-#endif
                   cs.getPredBuf(tu.blocks[compID]).rspSignal(m_pcReshape->getFwdLUT());
                 }
 #if JVET_AE0059_INTER_CCCM
@@ -12887,12 +13119,27 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
                   tu.cs->getPredBuf(tu.blocks[compID]).copyFrom(interCccmPredBuf[compID]);
                 }
 #endif
+#if JVET_AF0073_INTER_CCP_MERGE
+                PelBuf tmpPredSignPredCcpMerge(m_interCcpMergeStorage[4], compArea);
+                if (tu.interCcpMerge && isChroma(compID))
+                {
+                  tmpPredSignPredCcpMerge.copyFrom(tu.cs->getPredBuf(tu.blocks[compID]));
+                  tu.cs->getPredBuf(tu.blocks[compID]).copyFrom(interCcpMergePredBuf[compID-1]);
+                }
+#endif
                 m_pcTrQuant->predCoeffSigns(tu, compID, reshapeChroma);
 #if JVET_AE0059_INTER_CCCM
                 if (tu.interCccm && isChroma(compID))
                 {
                   tu.cs->getPredBuf(tu.blocks[compID]).copyFrom(tmpPredSignPred);
                 }
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+                if (tu.interCcpMerge && isChroma(compID))
+                {
+                  tu.cs->getPredBuf(tu.blocks[compID]).copyFrom(tmpPredSignPredCcpMerge);
+                }
+
 #endif
 #if JVET_Y0065_GPM_INTRA
                 if (isLuma(compID) && slice.getPicHeader()->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !tu.cu->firstPU->ciipFlag && !tu.cu->firstPU->gpmIntraFlag && !CU::isIBC(*tu.cu))
@@ -12926,7 +13173,11 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
             PelBuf resiBuf = csFull->getResiBuf(compArea);
 #if JVET_S0234_ACT_CRS_FIX
 #if JVET_AE0059_INTER_CCCM
+#if JVET_AF0073_INTER_CCP_MERGE
+            CPelBuf orgResiBuf = colorTransFlag ? colorTransResidual.bufs[compID] : ((isChroma(compID) && tu.interCccm) ? interCccmOrgResiBuf[compID] : ((isChroma(compID) && tu.interCcpMerge) ? interCcpMergeOrgResiBuf[compID-1] : csFull->getOrgResiBuf(compArea)));
+#else
             CPelBuf orgResiBuf = colorTransFlag ? colorTransResidual.bufs[compID] : ((isChroma(compID) && tu.interCccm) ? interCccmOrgResiBuf[compID] : csFull->getOrgResiBuf(compArea));
+#endif
 #else
             CPelBuf orgResiBuf = colorTransFlag ? colorTransResidual.bufs[compID] : csFull->getOrgResiBuf(compArea);
 #endif
@@ -12945,9 +13196,14 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
             }
 
 #if JVET_V0094_BILATERAL_FILTER
-            // getCbf() is going to be 1 since currAbsSum > 0 here, according to the if-statement a couple of lines up.
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+            bool applyBIF = cs.pps->getUseBIF() && isLuma(compID) && m_bilateralFilter->getApplyBIF(tu, compID);
+#else
             bool isInter = (cu.predMode == MODE_INTER) ? true : false;
-            if( cs.pps->getUseBIF() && isLuma( compID ) && tu.cu->qp > 17 && 128 > std::max( tu.lumaSize().width, tu.lumaSize().height ) && ( !isInter || 32 > std::min( tu.lumaSize().width, tu.lumaSize().height ) ) )
+            // getCbf() is going to be 1 since currAbsSum > 0 here, according to the if-statement a couple of lines up.
+            bool applyBIF = cs.pps->getUseBIF() && isLuma(compID) && tu.cu->qp > 17 && 128 > std::max(tu.lumaSize().width, tu.lumaSize().height) && (!isInter || 32 > std::min(tu.lumaSize().width, tu.lumaSize().height));
+#endif
+            if(applyBIF)
             {
               CompArea tmpArea1( compID, tu.chromaFormat, Position(0, 0), Size(resiBuf.width, resiBuf.height));
               PelBuf tmpRecLuma = m_tmpStorageLCU.getBuf(tmpArea1);
@@ -12966,7 +13222,12 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
               if(isChroma(compID))
               {
-                if (cs.pps->getUseChromaBIF() && isChroma(compID) && (tu.cu->qp > 17))
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+                bool applyChromaBIF = cs.pps->getUseChromaBIF() && m_bilateralFilter->getApplyBIF(tu, compID);
+#else
+                bool applyChromaBIF = cs.pps->getUseChromaBIF() && isChroma(compID) && (tu.cu->qp > 17);
+#endif
+                if (applyChromaBIF)
                 {
                   //chroma and bilateral
                   CompArea tmpArea1(compID, tu.chromaFormat, Position(0, 0), Size(resiBuf.width, resiBuf.height));
@@ -12974,7 +13235,11 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
                   tmpRecChroma.copyFrom(resiBuf);
 
 #if JVET_AE0059_INTER_CCCM
+#if JVET_AF0073_INTER_CCP_MERGE
+                  const CPelBuf predBuf = tu.interCccm ? interCccmPredBuf[compID] : (tu.interCcpMerge ? interCcpMergePredBuf[compID-1] : csFull->getPredBuf(compArea));
+#else
                   const CPelBuf predBuf = tu.interCccm ? interCccmPredBuf[compID] : csFull->getPredBuf(compArea);
+#endif
 #else
                   const CPelBuf predBuf = csFull->getPredBuf(compArea);
 #endif
@@ -13068,6 +13333,9 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
             CHECK( currCompFracBits > 0 || currAbsSum, "currCompFracBits > 0 when tu noResidual" );
           }
       }
+#if JVET_AF0073_INTER_CCP_MERGE
+      minCostInterCcpIdx[interCccm][c] = minCost[c] / 3.0;
+#endif
 #if JVET_AA0133_INTER_MTS_OPT
       if (compID == 0)
       {
@@ -13100,7 +13368,7 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
         m_pcRdCost->lambdaAdjustColorTrans(false, compID);
       }
 #if SIGN_PREDICTION
-      if(cs.sps->getNumPredSigns() > 0)
+      if(cs.sps->getNumPredSigns() > 0 || (cs.pps->getUseBIF() && isLuma( compID )) || (cs.pps->getUseChromaBIF() && !isLuma( compID )))
       {
 #if JVET_Z0118_GDR
 #if JVET_Y0065_GPM_INTRA
@@ -13116,11 +13384,25 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
           tu.cs->getPredBuf(tu.blocks[compID]).copyFrom(interCccmPredBuf[compID]);
         }
 #endif
+#if JVET_AF0073_INTER_CCP_MERGE
+        PelBuf tmpPredSignPredCcpMerge(m_interCcpMergeStorage[4], compArea);
+        if (tu.interCcpMerge && isChroma(compID))
+        {
+          tmpPredSignPredCcpMerge.copyFrom(tu.cs->getPredBuf(tu.blocks[compID]));
+          tu.cs->getPredBuf(tu.blocks[compID]).copyFrom(interCcpMergePredBuf[compID-1]);
+        }
+#endif
         cs.reconstructPicture(tu.blocks[compID], m_pcReshape->getFwdLUT(), csFull, lmcsEnable);
 #if JVET_AE0059_INTER_CCCM
         if (tu.interCccm && isChroma(compID))
         {
           tu.cs->getPredBuf(tu.blocks[compID]).copyFrom(tmpPredSignPred);
+        }
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+        if (tu.interCcpMerge && isChroma(compID))
+        {
+          tu.cs->getPredBuf(tu.blocks[compID]).copyFrom(tmpPredSignPredCcpMerge);
         }
 #endif
 #else
@@ -13146,13 +13428,25 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
     } // component loop
 
 #if JVET_AE0059_INTER_CCCM
+#if JVET_AF0073_INTER_CCP_MERGE
+    if (interCccmRdSearch || interCcpMergeRdSearch)
+#else
     if (interCccmRdSearch)
+#endif
     {
       const double curCost = minCost[0]/3.0 + minCost[1]/3.0 + minCost[2]/3.0;
+#if JVET_AF0073_INTER_CCP_MERGE
+      if ((curCost < bestCost && (interCccmOk || interCcpMergeOk)) || interCccm == 0)
+#else
       if ((curCost < bestCost && interCccmOk) || interCccm == 0)
+#endif
       {
         bestCost = curCost;
+#if JVET_AF0073_INTER_CCP_MERGE
+        for (int c = ((tu.interCccm || tu.interCcpMerge) ? 1 : 0); c < numTBlocks; c++)
+#else
         for (int c = 0; c < numTBlocks; c++)
+#endif
         {
           const ComponentID compID = ComponentID(c);
           interCccmTU.copyComponentFrom(tu, compID);
@@ -13162,9 +13456,23 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
           tempUiSingleFracBits[compID] = uiSingleFracBits[compID];
         }
       }
+#if JVET_AF0073_INTER_CCP_MERGE
+      if (interCccmRdSearch && interCcpMergeRdSearch && interCccm == 1)
+      {
+        const double reducedCurCost = curCost - (curCost / 2.0);
+        if (reducedCurCost > bestCost)
+        {
+          skipInterCccm2 = true;
+        }
+      }
+#endif
     }
     } // interCccm loop
+#if JVET_AF0073_INTER_CCP_MERGE
+    if (interCccmRdSearch || interCcpMergeRdSearch)
+#else
     if (interCccmRdSearch)
+#endif
     {
       for (int c = 0; c < numTBlocks; c++)
       {
@@ -13177,7 +13485,11 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
         uiSingleDistComp[compID] = tempUiSingleDistComp[compID];
         uiSingleFracBits[compID] = tempUiSingleFracBits[compID];
 #if SIGN_PREDICTION
+#if JVET_AF0073_INTER_CCP_MERGE
+        if (cs.sps->getNumPredSigns() > 0 && (interCccmOk || interCcpMergeOk) && (!tu.interCccm && !tu.interCcpMerge) && !isLuma(compID))
+#else
         if (cs.sps->getNumPredSigns() > 0 && interCccmOk && !tu.interCccm && !isLuma(compID))
+#endif
         {
           cs.reconstructPicture(tu.blocks[compID], m_pcReshape->getFwdLUT(), csFull, false);
         }
@@ -13248,6 +13560,13 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
             orgResiCb[0].copyFrom(interCccmOrgResiBuf[COMPONENT_Cb]);
             orgResiCr[0].copyFrom(interCccmOrgResiBuf[COMPONENT_Cr]);
           }
+#if JVET_AF0073_INTER_CCP_MERGE
+          else if (tu.interCcpMerge)
+          {
+            orgResiCb[0].copyFrom(interCcpMergeOrgResiBuf[0]);
+            orgResiCr[0].copyFrom(interCcpMergeOrgResiBuf[1]);
+          }
+#endif
           else
           {
             orgResiCb[0].copyFrom(cs.getOrgResiBuf(cbArea));
@@ -13394,6 +13713,9 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
         {
           m_CABACEstimator->cbf_comp(cs, codedCbfMask >> 1, cbArea, currDepth, false);
           m_CABACEstimator->cbf_comp(cs, codedCbfMask & 1, crArea, currDepth, codedCbfMask >> 1);
+#if JVET_AF0073_INTER_CCP_MERGE
+          m_CABACEstimator->interCcpMerge(tu);
+#endif
 #if JVET_AE0059_INTER_CCCM
           m_CABACEstimator->interCccm(tu);
 #endif
@@ -13436,8 +13758,13 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
           else
           {
 #if JVET_AE0059_INTER_CCCM
+#if JVET_AF0073_INTER_CCP_MERGE
+            currCompDistCb = m_pcRdCost->getDistPart(tu.interCccm ? interCccmOrgResiBuf[COMPONENT_Cb] : (tu.interCcpMerge ? interCcpMergeOrgResiBuf[0] : csFull->getOrgResiBuf(cbArea)), cbResi, channelBitDepth, COMPONENT_Cb, DF_SSE);
+            currCompDistCr = m_pcRdCost->getDistPart(tu.interCccm ? interCccmOrgResiBuf[COMPONENT_Cr] : (tu.interCcpMerge ? interCcpMergeOrgResiBuf[1] : csFull->getOrgResiBuf(crArea)), crResi, channelBitDepth, COMPONENT_Cr, DF_SSE);
+#else
             currCompDistCb = m_pcRdCost->getDistPart(tu.interCccm ? interCccmOrgResiBuf[COMPONENT_Cb] : csFull->getOrgResiBuf(cbArea), cbResi, channelBitDepth, COMPONENT_Cb, DF_SSE);
             currCompDistCr = m_pcRdCost->getDistPart(tu.interCccm ? interCccmOrgResiBuf[COMPONENT_Cr] : csFull->getOrgResiBuf(crArea), crResi, channelBitDepth, COMPONENT_Cr, DF_SSE);
+#endif
 #else
             currCompDistCb = m_pcRdCost->getDistPart(csFull->getOrgResiBuf(cbArea), cbResi, channelBitDepth, COMPONENT_Cb, DF_SSE);
             currCompDistCr = m_pcRdCost->getDistPart(csFull->getOrgResiBuf(crArea), crResi, channelBitDepth, COMPONENT_Cr, DF_SSE);
@@ -13502,11 +13829,25 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
             tu.cs->getPredBuf(tu.blocks[comp]).copyFrom(interCccmPredBuf[comp]);
           }
 #endif
+#if JVET_AF0073_INTER_CCP_MERGE
+          PelBuf tmpPredSignPredCcpMerge(m_interCcpMergeStorage[4], tu.blocks[comp]);
+          if (tu.interCcpMerge)
+          {
+            tmpPredSignPredCcpMerge.copyFrom(tu.cs->getPredBuf(tu.blocks[comp]));
+            tu.cs->getPredBuf(tu.blocks[comp]).copyFrom(interCcpMergePredBuf[comp-1]);
+          }
+#endif
           cs.reconstructPicture(tu.blocks[comp], m_pcReshape->getFwdLUT(), csFull, lmcsEnable);          
 #if JVET_AE0059_INTER_CCCM
           if (tu.interCccm)
           {
             tu.cs->getPredBuf(tu.blocks[comp]).copyFrom(tmpPredSignPred);
+          }
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+          if (tu.interCcpMerge)
+          {
+            tu.cs->getPredBuf(tu.blocks[comp]).copyFrom(tmpPredSignPredCcpMerge);
           }
 #endif
 #else
@@ -13541,11 +13882,25 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
             tu.cs->getPredBuf(tu.blocks[jccrCompId]).copyFrom(interCccmPredBuf[jccrCompId]);
           }
 #endif
+#if JVET_AF0073_INTER_CCP_MERGE
+          PelBuf tmpPredSignPredCcpMerge(m_interCcpMergeStorage[4], tu.blocks[jccrCompId]);
+          if (tu.interCcpMerge)
+          {
+            tmpPredSignPredCcpMerge.copyFrom(tu.cs->getPredBuf(tu.blocks[jccrCompId]));
+            tu.cs->getPredBuf(tu.blocks[jccrCompId]).copyFrom(interCcpMergePredBuf[jccrCompId-1]);
+          }
+#endif
           m_pcTrQuant->predCoeffSigns(tu, COMPONENT_Cb, reshapeChroma);
 #if JVET_AE0059_INTER_CCCM
           if (tu.interCccm)
           {
             tu.cs->getPredBuf(tu.blocks[jccrCompId]).copyFrom(tmpPredSignPred);
+          }
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+          if (tu.interCcpMerge)
+          {
+            tu.cs->getPredBuf(tu.blocks[jccrCompId]).copyFrom(tmpPredSignPredCcpMerge);
           }
 #endif
         }
@@ -13582,6 +13937,12 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
         continue;
       if (tu.blocks[compID].valid())
       {
+#if JVET_AF0073_INTER_CCP_MERGE
+        if ( compID == COMPONENT_Cr )
+        {
+          m_CABACEstimator->interCcpMerge(tu);
+        }
+#endif
 #if JVET_AE0059_INTER_CCCM
         if ( compID == COMPONENT_Cr )
         {
@@ -14227,7 +14588,11 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
   if (chroma && isChromaEnabled(cs.pcv->chrFormat))
   {
 #if JVET_AE0059_INTER_CCCM
+#if JVET_AF0073_INTER_CCP_MERGE
+    for (auto& tuTmp : cs.tus)
+#else
     for (const auto& tuTmp : cs.tus)
+#endif
     {
       if( tuTmp->interCccm && tuTmp->blocks[COMPONENT_Cb].valid() )
       {
@@ -14255,6 +14620,26 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
         cs.getRecoBuf( tuTmp->blocks[COMPONENT_Cb] ).reconstruct( interCccmPredBuf[COMPONENT_Cb], cs.getResiBuf( tuTmp->blocks[COMPONENT_Cb] ), cs.slice->clpRngs().comp[COMPONENT_Cb] );
         cs.getRecoBuf( tuTmp->blocks[COMPONENT_Cr] ).reconstruct( interCccmPredBuf[COMPONENT_Cr], cs.getResiBuf( tuTmp->blocks[COMPONENT_Cr] ), cs.slice->clpRngs().comp[COMPONENT_Cr] );
       }
+#if JVET_AF0073_INTER_CCP_MERGE
+      else if( tuTmp->interCcpMerge && tuTmp->blocks[COMPONENT_Cb].valid() )
+      {
+        PelBuf bufCb = cs.getPredBuf( tuTmp->blocks[COMPONENT_Cb] );
+        PelBuf bufCr = cs.getPredBuf( tuTmp->blocks[COMPONENT_Cr] );
+        PelBuf interCcpMergePredBuf[2];
+
+        for( int i = 1; i < MAX_NUM_COMPONENT; i++ )
+        {
+          interCcpMergePredBuf[i-1] = PelBuf( m_interCcpMergeStorage[i-1], tuTmp->blocks[ComponentID(i)] );
+        }
+
+        const bool valid = deriveInterCcpMergePrediction(tuTmp, cs.getRecoBuf( tuTmp->blocks[COMPONENT_Y] ), bufCb, bufCr, interCcpMergePredBuf[0], interCcpMergePredBuf[1], m_interCcpMergeList, m_validNum);
+
+        CHECK( !valid, "invalid inter ccp merge" );
+
+        cs.getRecoBuf( tuTmp->blocks[COMPONENT_Cb] ).reconstruct( interCcpMergePredBuf[0], cs.getResiBuf( tuTmp->blocks[COMPONENT_Cb] ), cs.slice->clpRngs().comp[COMPONENT_Cb] );
+        cs.getRecoBuf( tuTmp->blocks[COMPONENT_Cr] ).reconstruct( interCcpMergePredBuf[1], cs.getResiBuf( tuTmp->blocks[COMPONENT_Cr] ), cs.slice->clpRngs().comp[COMPONENT_Cr] );
+      }
+#endif
       else
       {
         cs.getRecoBuf( tuTmp->blocks[COMPONENT_Cb] ).reconstruct( cs.getPredBuf( tuTmp->blocks[COMPONENT_Cb] ), cs.getResiBuf( tuTmp->blocks[COMPONENT_Cb] ), cs.slice->clpRngs().comp[COMPONENT_Cb] );
@@ -14299,16 +14684,20 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
         tmpRecLuma.rspSignal(m_pcReshape->getInvLUT());
       }
       
-      if(cs.pps->getUseBIF() && isLuma(compID) && (cu.qp > 17))
+      if(cs.pps->getUseBIF() && isLuma(compID))
       {
         for (auto &currTU : CU::traverseTUs(cu))
-        {
-          Position tuPosInCu = currTU.lumaPos() - cu.lumaPos();
-          PelBuf tmpSubBuf = tmpRecLuma.subBuf(tuPosInCu, currTU.lumaSize());          
-          
+        { 
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+          bool applyBIF = m_bilateralFilter->getApplyBIF(currTU, compID);
+#else
           bool isInter = (cu.predMode == MODE_INTER) ? true : false;
-          if( ( TU::getCbf( currTU, compID ) || !isInter ) && currTU.cu->qp > 17 && 128 > std::max( currTU.lumaSize().width, currTU.lumaSize().height ) && ( !isInter || 32 > std::min( currTU.lumaSize().width, currTU.lumaSize().height ) ) )
+          bool applyBIF = ((TU::getCbf(currTU, compID) || !isInter) && currTU.cu->qp > 17 && 128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height) && (!isInter || 32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height)));
+#endif
+          Position tuPosInCu = currTU.lumaPos() - cu.lumaPos();
+          if(applyBIF)
           {
+            PelBuf tmpSubBuf = tmpRecLuma.subBuf(tuPosInCu, currTU.lumaSize());
             CompArea compArea = currTU.blocks[compID];
             PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
             
@@ -14323,6 +14712,12 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
               m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng( compID ), currTU, true, false, &invLUT );
             }
           }
+          else
+          {
+            CompArea compArea = currTU.blocks[compID];
+            PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
+            recIPredBuf.copyFrom(reco.subBuf(tuPosInCu, currTU.lumaSize()));
+          }
         }
       }
     }
@@ -14335,18 +14730,29 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
       tmpRecChroma = m_tmpStorageLCU.getBuf(tmpArea2);
       tmpRecChroma.copyFrom(reco);
 
-      if(cs.pps->getUseChromaBIF() && isChroma(compID) && (cu.qp > 17))
+      if(cs.pps->getUseChromaBIF() && isChroma(compID))
       {
         for (auto &currTU : CU::traverseTUs(cu))
         {
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+          bool applyChromaBIF = m_bilateralFilter->getApplyBIF(currTU, compID);
+#else
+          bool isInter = (cu.predMode == MODE_INTER) ? true : false;
+          bool applyChromaBIF = (TU::getCbf(currTU, compID) || isInter == false) && (cu.qp > 17);
+#endif
           Position tuPosInCu = currTU.chromaPos() - cu.chromaPos();
           PelBuf tmpSubBuf = tmpRecChroma.subBuf(tuPosInCu, currTU.chromaSize());
-          bool isInter = (cu.predMode == MODE_INTER) ? true : false;
-          if ((TU::getCbf(currTU, compID) || isInter == false))
+          if (applyChromaBIF)
           {
             CompArea compArea = currTU.blocks[compID];
             PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
             m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(compID), currTU, true );
+          }
+          else
+          {
+            CompArea compArea = currTU.blocks[compID];
+            PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
+            recIPredBuf.copyFrom(tmpSubBuf);
           }
         }
       }
@@ -14399,18 +14805,29 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
       CompArea      tmpArea2( compID, area.chromaFormat, Position(0, 0), area.size());
       tmpRecChroma = m_tmpStorageLCU.getBuf(tmpArea2);
       tmpRecChroma.copyFrom(reco);
-      if(cs.pps->getUseChromaBIF() && isChroma(compID) && (cu.qp > 17))
+      if(cs.pps->getUseChromaBIF() && isChroma(compID))
       {
         for (auto &currTU : CU::traverseTUs(cu))
         {
-          Position tuPosInCu = currTU.chromaPos() - cu.chromaPos();
-          PelBuf tmpSubBuf = tmpRecChroma.subBuf(tuPosInCu, currTU.chromaSize());
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+          bool applyChromaBIF = m_bilateralFilter->getApplyBIF(currTU, compID);
+#else
           bool isInter = (cu.predMode == MODE_INTER) ? true : false;
-          if ((TU::getCbf( currTU, compID ) || isInter == false))
+          bool applyChromaBIF = (TU::getCbf(currTU, compID) || isInter == false) && (cu.qp > 17);
+#endif
+          if (applyChromaBIF)
           {
+            Position tuPosInCu = currTU.chromaPos() - cu.chromaPos();
+            PelBuf tmpSubBuf = tmpRecChroma.subBuf(tuPosInCu, currTU.chromaSize());
             CompArea compArea = currTU.blocks[compID];
             PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
             m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpSubBuf, tmpSubBuf, tmpSubBuf, currTU.cu->qp, recIPredBuf, cs.slice->clpRng(compID), currTU, true );
+          }
+          else
+          {
+            CompArea compArea = currTU.blocks[compID];
+            PelBuf recIPredBuf = cs.slice->getPic()->getRecoBuf(compArea);
+            recIPredBuf.copyFrom(tmpSubBuf);
           }
         }
       }
@@ -14973,6 +15390,22 @@ void InterSearch::checkEncLicOff(CodingUnit& cu, MergeCtx& mergeCtx)
     }
   }
 
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+  if (PU::checkDoAffineBdofRefine(pu, this))
+  {
+    pu.availableBdofRefinedMv = AFFINE_SUBPU_BDOF_APPLY_AND_STORE_MV;
+    setDoAffineSubPuBdof(false);
+  }
+#if JVET_AC0158_PIXEL_AFFINE_MC && !JVET_AD0213_LIC_IMP
+  if (updateMvNeeded || !isBDOFNotNeeded || pu.cu->affine)
+#else
+  if (updateMvNeeded || !isBDOFNotNeeded || pu.availableBdofRefinedMv == AFFINE_SUBPU_BDOF_APPLY_AND_STORE_MV)
+#endif
+  {
+    motionCompensation(pu, m_predictionBeforeLIC, REF_PIC_LIST_X);
+    pu.availableBdofRefinedMv = AFFINE_SUBPU_BDOF_NOT_APPLY;
+  }
+#else
 #if JVET_AC0158_PIXEL_AFFINE_MC && !JVET_AD0213_LIC_IMP
   if (updateMvNeeded || !isBDOFNotNeeded || pu.cu->affine)
 #else
@@ -14981,6 +15414,7 @@ void InterSearch::checkEncLicOff(CodingUnit& cu, MergeCtx& mergeCtx)
   {
     motionCompensation(pu, m_predictionBeforeLIC, REF_PIC_LIST_X);
   }
+#endif
   m_pcRdCost->setDistParam(distParam, cs.getOrgBuf().Y(), m_predictionBeforeLIC.Y(), cs.sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
   Distortion distLicOff = distParam.distFunc(distParam);
   m_CABACEstimator->getCtx() = ctxStart;
@@ -15011,6 +15445,13 @@ void InterSearch::checkEncLicOff(CodingUnit& cu, MergeCtx& mergeCtx)
 #endif
     PU::spanMotionInfo(pu, mergeCtx);
     predBuf.copyFrom(m_predictionBeforeLIC);
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+    if (getDoAffineSubPuBdof() == true)
+    {
+      PU::setAffineBdofRefinedMotion(pu, getBdofSubPuMvBuf());
+      setDoAffineSubPuBdof(false);
+    }
+#endif
   }
   else
   {
@@ -15032,6 +15473,9 @@ void InterSearch::checkEncLicOff(CodingUnit& cu, MergeCtx& mergeCtx)
     pu.mv[REF_PIC_LIST_1] = orgMv1;
     pu.mvd[REF_PIC_LIST_0] = orgMvd0;
     pu.mvd[REF_PIC_LIST_1] = orgMvd1;
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+    setDoAffineSubPuBdof(false);
+#endif
   }
   m_CABACEstimator->getCtx() = ctxStart;
 }
@@ -15040,6 +15484,10 @@ void InterSearch::checkEncLicOn(CodingUnit& cu, MergeCtx& mergeCtx)
 {
   CodingStructure& cs = *cu.cs;
   PredictionUnit&  pu = *cu.firstPU;
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+  const bool doAffineSubPuBdof = getDoAffineSubPuBdof();
+  setDoAffineSubPuBdof(false);
+#endif
 
   PelUnitBuf predBuf = pu.cs->getPredBuf(pu);
   DistParam distParam;
@@ -15167,6 +15615,12 @@ void InterSearch::checkEncLicOn(CodingUnit& cu, MergeCtx& mergeCtx)
     pu.mv[REF_PIC_LIST_1] = orgMv1;
     pu.mvd[REF_PIC_LIST_0] = orgMvd0;
     pu.mvd[REF_PIC_LIST_1] = orgMvd1;
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+    if (doAffineSubPuBdof == true)
+    {
+      PU::setAffineBdofRefinedMotion(pu, getBdofSubPuMvBuf());
+    }
+#endif
   }
   m_CABACEstimator->getCtx() = ctxStart;
 }

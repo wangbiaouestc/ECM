@@ -63,6 +63,9 @@ public:
   void        initBitstream             ( InputBitstream*               bitstream )           { m_Bitstream = bitstream; m_BinDecoder.init( m_Bitstream ); }
   const Ctx&  getCtx                    ()                                            const   { return m_BinDecoder.getCtx();  }
   Ctx&        getCtx                    ()                                                    { return m_BinDecoder.getCtx();  }
+#if EXTENSION_CABAC_TRAINING
+  void        traceStoredCabacBits      ( Slice* pcSlice, uint64_t& binFileByteOffset );
+#endif
 
 public:
   // slice segment data (clause 7.3.8.1)
@@ -354,16 +357,17 @@ public:
 #if TCQ_8STATES
 #if SIGN_PREDICTION
 #if JVET_AE0102_LFNST_CTX
-  void        residual_coding_subblock(CoeffCodingContext& cctx, TCoeff* coeff, TCoeff* sign, const uint64_t stateTransTable, int& state, int lfnstIdx);
+  void        residual_coding_subblock(CoeffCodingContext& cctx, TCoeff* coeff, SIGN_PRED_TYPE* sign, const uint64_t stateTransTable, int& state, int lfnstIdx);
 #else
-  void        residual_coding_subblock(CoeffCodingContext& cctx, TCoeff* coeff, TCoeff* sign, const uint64_t stateTransTable, int& state);
+  void        residual_coding_subblock(CoeffCodingContext& cctx, TCoeff* coeff, SIGN_PRED_TYPE* sign, const uint64_t stateTransTable, int& state);
 #endif
 #else
   void        residual_coding_subblock  ( CoeffCodingContext&           cctx,   TCoeff*         coeff, const uint64_t stateTransTable, int& state );
 #endif
 #else
 #if SIGN_PREDICTION
-	void        residual_coding_subblock  ( CoeffCodingContext&           cctx,   TCoeff*         coeff,   TCoeff*         sign, const int stateTransTable, int& state );
+  void        residual_coding_subblock(CoeffCodingContext &cctx, TCoeff *coeff, SIGN_PRED_TYPE *sign,
+                                       const int stateTransTable, int &state);
 #else
 	void        residual_coding_subblock  ( CoeffCodingContext&           cctx,   TCoeff*         coeff, const int stateTransTable, int& state );
 #endif
@@ -399,6 +403,9 @@ public:
 #endif
 #if JVET_AE0059_INTER_CCCM
   void        interCccm                 ( TransformUnit& tu );
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  void        interCcpMerge             ( TransformUnit& tu );
 #endif
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   CABACDataStore*         m_CABACDataStore;

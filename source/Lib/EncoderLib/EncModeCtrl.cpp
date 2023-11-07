@@ -268,9 +268,10 @@ void EncModeCtrl::copyState( const EncModeCtrl& other, const UnitArea& area )
 }
 
 #endif
-void CacheBlkInfoCtrl::create()
+void CacheBlkInfoCtrl::create(const int maxCuSize)
 {
-  const unsigned numPos = MAX_CU_SIZE >> MIN_CU_LOG2;
+  const unsigned numPos = maxCuSize >> MIN_CU_LOG2;
+  m_maxCuSize = maxCuSize;
 
   m_numWidths  = gp_sizeIdxInfo->numWidths();
   m_numHeights = gp_sizeIdxInfo->numHeights();
@@ -283,13 +284,13 @@ void CacheBlkInfoCtrl::create()
 
       for( int wIdx = 0; wIdx < gp_sizeIdxInfo->numWidths(); wIdx++ )
       {
-        if( gp_sizeIdxInfo->isCuSize( gp_sizeIdxInfo->sizeFrom( wIdx ) ) && x + ( gp_sizeIdxInfo->sizeFrom( wIdx ) >> MIN_CU_LOG2 ) <= ( MAX_CU_SIZE >> MIN_CU_LOG2 ) )
+        if( gp_sizeIdxInfo->isCuSize( gp_sizeIdxInfo->sizeFrom( wIdx ) ) && x + ( gp_sizeIdxInfo->sizeFrom( wIdx ) >> MIN_CU_LOG2 ) <= (maxCuSize >> MIN_CU_LOG2 ) )
         {
           m_codedCUInfo[x][y][wIdx] = new CodedCUInfo*[gp_sizeIdxInfo->numHeights()];
 
           for( int hIdx = 0; hIdx < gp_sizeIdxInfo->numHeights(); hIdx++ )
           {
-            if( gp_sizeIdxInfo->isCuSize( gp_sizeIdxInfo->sizeFrom( hIdx ) ) && y + ( gp_sizeIdxInfo->sizeFrom( hIdx ) >> MIN_CU_LOG2 ) <= ( MAX_CU_SIZE >> MIN_CU_LOG2 ) )
+            if( gp_sizeIdxInfo->isCuSize( gp_sizeIdxInfo->sizeFrom( hIdx ) ) && y + ( gp_sizeIdxInfo->sizeFrom( hIdx ) >> MIN_CU_LOG2 ) <= (maxCuSize >> MIN_CU_LOG2 ) )
             {
               m_codedCUInfo[x][y][wIdx][hIdx] = new CodedCUInfo;
             }
@@ -310,7 +311,7 @@ void CacheBlkInfoCtrl::create()
 
 void CacheBlkInfoCtrl::destroy()
 {
-  const unsigned numPos = MAX_CU_SIZE >> MIN_CU_LOG2;
+  const unsigned numPos = m_maxCuSize >> MIN_CU_LOG2;
 
   for( unsigned x = 0; x < numPos; x++ )
   {
@@ -339,7 +340,7 @@ void CacheBlkInfoCtrl::destroy()
 
 void CacheBlkInfoCtrl::init( const Slice &slice )
 {
-  const unsigned numPos = MAX_CU_SIZE >> MIN_CU_LOG2;
+  const unsigned numPos = m_maxCuSize >> MIN_CU_LOG2;
 
   for( unsigned x = 0; x < numPos; x++ )
   {
@@ -495,10 +496,11 @@ void SaveLoadEncInfoSbt::init( const Slice &slice )
   m_sliceSbt = &slice;
 }
 
-void SaveLoadEncInfoSbt::create()
+void SaveLoadEncInfoSbt::create(const int maxCuSize)
 {
   int numSizeIdx = gp_sizeIdxInfo->idxFrom( SBT_MAX_SIZE ) - MIN_CU_LOG2 + 1;
-  int numPosIdx = MAX_CU_SIZE >> MIN_CU_LOG2;
+  const unsigned numPosIdx = maxCuSize >> MIN_CU_LOG2;
+  m_maxCuSize = maxCuSize;
 
   m_saveLoadSbt = new SaveLoadStructSbt***[numPosIdx];
 
@@ -519,7 +521,7 @@ void SaveLoadEncInfoSbt::create()
 void SaveLoadEncInfoSbt::destroy()
 {
   int numSizeIdx = gp_sizeIdxInfo->idxFrom( SBT_MAX_SIZE ) - MIN_CU_LOG2 + 1;
-  int numPosIdx = MAX_CU_SIZE >> MIN_CU_LOG2;
+  const int numPosIdx = m_maxCuSize >> MIN_CU_LOG2;
 
   for( int xIdx = 0; xIdx < numPosIdx; xIdx++ )
   {
@@ -581,7 +583,7 @@ void SaveLoadEncInfoSbt::copyState(const SaveLoadEncInfoSbt &other)
 void SaveLoadEncInfoSbt::resetSaveloadSbt( int maxSbtSize )
 {
   int numSizeIdx = gp_sizeIdxInfo->idxFrom( maxSbtSize ) - MIN_CU_LOG2 + 1;
-  int numPosIdx = MAX_CU_SIZE >> MIN_CU_LOG2;
+  int numPosIdx = m_maxCuSize >> MIN_CU_LOG2;
 
   for( int xIdx = 0; xIdx < numPosIdx; xIdx++ )
   {
@@ -655,7 +657,7 @@ static bool isTheSameNbHood( const CodingUnit &cu, const CodingStructure& cs, co
 }
 
 #if CONVERT_NUM_TU_SPLITS_TO_CFG
-void BestEncInfoCache::create( const ChromaFormat chFmt, const int maxNumTUs )
+void BestEncInfoCache::create( const ChromaFormat chFmt, const int maxNumTUs, const int maxCuSize )
 #else
 void BestEncInfoCache::create( const ChromaFormat chFmt )
 #endif
@@ -663,7 +665,8 @@ void BestEncInfoCache::create( const ChromaFormat chFmt )
 #if CONVERT_NUM_TU_SPLITS_TO_CFG
   m_maxNumTUs = maxNumTUs;
 #endif
-  const unsigned numPos = MAX_CU_SIZE >> MIN_CU_LOG2;
+  const unsigned numPos = maxCuSize >> MIN_CU_LOG2;
+  m_maxCuSize = maxCuSize;
 
   m_numWidths  = gp_sizeIdxInfo->numWidths();
   m_numHeights = gp_sizeIdxInfo->numHeights();
@@ -676,13 +679,13 @@ void BestEncInfoCache::create( const ChromaFormat chFmt )
 
       for( int wIdx = 0; wIdx < gp_sizeIdxInfo->numWidths(); wIdx++ )
       {
-        if( gp_sizeIdxInfo->isCuSize( gp_sizeIdxInfo->sizeFrom( wIdx ) ) && x + ( gp_sizeIdxInfo->sizeFrom( wIdx ) >> MIN_CU_LOG2 ) <= ( MAX_CU_SIZE >> MIN_CU_LOG2 ) )
+        if( gp_sizeIdxInfo->isCuSize( gp_sizeIdxInfo->sizeFrom( wIdx ) ) && x + ( gp_sizeIdxInfo->sizeFrom( wIdx ) >> MIN_CU_LOG2 ) <= (maxCuSize >> MIN_CU_LOG2 ) )
         {
           m_bestEncInfo[x][y][wIdx] = new BestEncodingInfo*[gp_sizeIdxInfo->numHeights()];
 
           for( int hIdx = 0; hIdx < gp_sizeIdxInfo->numHeights(); hIdx++ )
           {
-            if( gp_sizeIdxInfo->isCuSize( gp_sizeIdxInfo->sizeFrom( hIdx ) ) && y + ( gp_sizeIdxInfo->sizeFrom( hIdx ) >> MIN_CU_LOG2 ) <= ( MAX_CU_SIZE >> MIN_CU_LOG2 ) )
+            if( gp_sizeIdxInfo->isCuSize( gp_sizeIdxInfo->sizeFrom( hIdx ) ) && y + ( gp_sizeIdxInfo->sizeFrom( hIdx ) >> MIN_CU_LOG2 ) <= (maxCuSize >> MIN_CU_LOG2 ) )
             {
               m_bestEncInfo[x][y][wIdx][hIdx] = new BestEncodingInfo;
 
@@ -694,7 +697,6 @@ void BestEncInfoCache::create( const ChromaFormat chFmt )
               new ( &m_bestEncInfo[x][y][wIdx][hIdx]->cu ) CodingUnit    ( area );
               new ( &m_bestEncInfo[x][y][wIdx][hIdx]->pu ) PredictionUnit( area );
 #if CONVERT_NUM_TU_SPLITS_TO_CFG
-              m_bestEncInfo[x][y][wIdx][hIdx]->numTus = 0;
               m_bestEncInfo[x][y][wIdx][hIdx]->tus.clear();
 
               for( int i = 0; i < maxNumTUs; i++ )
@@ -712,7 +714,6 @@ void BestEncInfoCache::create( const ChromaFormat chFmt )
 #endif
 
               m_bestEncInfo[x][y][wIdx][hIdx]->poc      = -1;
-              m_bestEncInfo[x][y][wIdx][hIdx]->testMode = EncTestMode();
             }
             else
             {
@@ -731,7 +732,7 @@ void BestEncInfoCache::create( const ChromaFormat chFmt )
 
 void BestEncInfoCache::destroy()
 {
-  const unsigned numPos = MAX_CU_SIZE >> MIN_CU_LOG2;
+  const unsigned numPos = m_maxCuSize >> MIN_CU_LOG2;
 
   for( unsigned x = 0; x < numPos; x++ )
   {
@@ -781,7 +782,7 @@ void BestEncInfoCache::init( const Slice &slice )
 
   if( isInitialized ) return;
 
-  const unsigned numPos = MAX_CU_SIZE >> MIN_CU_LOG2;
+  const unsigned numPos = slice.getSPS()->getMaxCUWidth() >> MIN_CU_LOG2;
 
   m_numWidths  = gp_sizeIdxInfo->numWidths();
   m_numHeights = gp_sizeIdxInfo->numHeights();
@@ -811,7 +812,7 @@ void BestEncInfoCache::init( const Slice &slice )
 #if CONVERT_NUM_TU_SPLITS_TO_CFG
   m_pCoeff = new TCoeff[numCoeff*m_maxNumTUs];
 #if SIGN_PREDICTION
-  m_pCoeffSign = new TCoeff[numCoeff*m_maxNumTUs];
+  m_pCoeffSign = new SIGN_PRED_TYPE[numCoeff * m_maxNumTUs];
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   m_pCoeffSignScanIdx = new unsigned[numCoeff*m_maxNumTUs];
 #endif
@@ -824,7 +825,7 @@ void BestEncInfoCache::init( const Slice &slice )
 #elif REUSE_CU_RESULTS_WITH_MULTIPLE_TUS
   m_pCoeff  = new TCoeff[numCoeff*MAX_NUM_TUS];
 #if SIGN_PREDICTION
-  m_pCoeffSign = new TCoeff[numCoeff*MAX_NUM_TUS];
+  m_pCoeffSign = new SIGN_PRED_TYPE[numCoeff * MAX_NUM_TUS];
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   m_pCoeffSignScanIdx = new unsigned[numCoeff*MAX_NUM_TUS];
 #endif
@@ -837,7 +838,7 @@ void BestEncInfoCache::init( const Slice &slice )
 #else
   m_pCoeff  = new TCoeff[numCoeff];
 #if SIGN_PREDICTION
-  m_pCoeffSign  = new TCoeff[numCoeff];
+  m_pCoeffSign = new SIGN_PRED_TYPE[numCoeff];
 #endif
   m_pPcmBuf = new Pel   [numCoeff];
   if (slice.getSPS()->getPLTMode())
@@ -848,7 +849,7 @@ void BestEncInfoCache::init( const Slice &slice )
 
   TCoeff *coeffPtr = m_pCoeff;
 #if SIGN_PREDICTION
-  TCoeff *coeffSignPtr = m_pCoeffSign;
+  SIGN_PRED_TYPE *coeffSignPtr = m_pCoeffSign;
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   unsigned *coeffSignScanIdx = m_pCoeffSignScanIdx;
 #endif
@@ -869,7 +870,9 @@ void BestEncInfoCache::init( const Slice &slice )
           {
             TCoeff *coeff[MAX_NUM_TBLOCKS] = { 0, };
 #if SIGN_PREDICTION
-            TCoeff *sign[MAX_NUM_TBLOCKS] = { 0, };
+            SIGN_PRED_TYPE *sign[MAX_NUM_TBLOCKS] = {
+              0,
+            };
 #if JVET_Y0141_SIGN_PRED_IMPROVE
             unsigned *sign_scanIdx[MAX_NUM_TBLOCKS] = { 0, };
 #endif
@@ -1001,14 +1004,12 @@ bool BestEncInfoCache::setFromCs( const CodingStructure& cs, const Partitioner& 
   CHECKD( cs.tus.size() > MAX_NUM_TUS, "Exceeding tus array boundaries" );
 #endif
 
-  encInfo.numTus = cs.tus.size();
 #else
   for( auto &blk : cs.tus.front()->blocks )
   {
     if( blk.valid() ) encInfo.tu.copyComponentFrom( *cs.tus.front(), blk.compID );
   }
 #endif
-  encInfo.testMode       = getCSEncMode( cs );
 
   return true;
 }
@@ -1079,8 +1080,8 @@ bool BestEncInfoCache::setCsFrom( CodingStructure& cs, EncTestMode& testMode, co
   cu          = encInfo.cu;
   pu          = encInfo.pu;
 #if REUSE_CU_RESULTS_WITH_MULTIPLE_TUS || CONVERT_NUM_TU_SPLITS_TO_CFG
-  CHECKD( !( encInfo.numTus > 0 ), "Empty tus array" );
-  for( int i = 0; i < encInfo.numTus; i++ )
+  CHECKD( !( encInfo.tus.size() > 0), "Empty tus array");
+  for( int i = 0; i < encInfo.tus.size(); i++ )
   {
     TransformUnit  &tu = cs.addTU( encInfo.tus[i], partitioner.chType );
 
@@ -1096,7 +1097,6 @@ bool BestEncInfoCache::setCsFrom( CodingStructure& cs, EncTestMode& testMode, co
   }
 #endif
 
-  testMode    = encInfo.testMode;
 
   return true;
 }
@@ -1186,15 +1186,15 @@ void EncModeCtrlMTnoRQT::create( const EncCfg& cfg )
 #if JVET_Z0118_GDR
   m_encCfg = cfg;
 #endif
-  CacheBlkInfoCtrl::create();
+  CacheBlkInfoCtrl::create(cfg.getCTUSize());
 #if REUSE_CU_RESULTS
 #if CONVERT_NUM_TU_SPLITS_TO_CFG
-  BestEncInfoCache::create( cfg.getChromaFormatIdc(), cfg.getMaxNumTUs() );
+  BestEncInfoCache::create( cfg.getChromaFormatIdc(), cfg.getMaxNumTUs(), cfg.getCTUSize() );
 #else
   BestEncInfoCache::create( cfg.getChromaFormatIdc() );
 #endif
 #endif
-  SaveLoadEncInfoSbt::create();
+  SaveLoadEncInfoSbt::create(cfg.getCTUSize());
 }
 
 void EncModeCtrlMTnoRQT::destroy()
@@ -1692,7 +1692,7 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
             || encTestmode.type == ETM_SPLIT_TT_H || encTestmode.type == ETM_SPLIT_TT_V)
         && partitioner.chType == CHANNEL_TYPE_LUMA)
     {
-      int thresholdMTT = Clip3(0, MAX_INT, (120 - ((m_pcEncCfg->getBaseQP() - 22) * 4)) * 1000000);
+      int thresholdMTT = Clip3(0, MAX_INT, (120 - ((m_pcEncCfg->getBaseQP() - 22) * 3)) * 1000000);
       if (m_noSplitIntraRdCost > thresholdMTT)
       {
         const PartSplit split = getPartSplit(encTestmode);

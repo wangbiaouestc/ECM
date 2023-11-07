@@ -239,7 +239,6 @@ void EncLib::destroy ()
   {
     m_cEncALF.destroy();
   }
-  m_cEncSAO.            destroyEncData();
   m_cEncSAO.            destroy();
   m_cLoopFilter.        destroy();
   m_cRateCtrl.          destroy();
@@ -364,8 +363,8 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
     for (int idx = 0; idx < m_numQPOffset; idx++)
     {
       sps0.setQPOffsets(idx, m_qpOffsetList[idx]);
-      sps0.setLambdaVal(idx, (uint32_t)LAMBDA_DEC_SIDE[26 + pps0.getPicInitQPMinus26() + m_qpOffsetList[idx] - 4 * ((int)m_isRA)]);
-      uint32_t lambda = (uint32_t)LAMBDA_DEC_SIDE[26 + pps0.getPicInitQPMinus26() + m_qpOffsetList[idx] - 4 * ((int)m_isRA)];
+      const uint32_t lambda = (uint32_t)LAMBDA_DEC_SIDE[min(max(26 + pps0.getPicInitQPMinus26() + m_qpOffsetList[idx] - 4 * ((int)m_isRA), 0), MAX_QP)];
+      sps0.setLambdaVal(idx, lambda);
       for (int shift = 0; shift < 16; shift++)
         if (lambda >> shift == 0)
         {
@@ -751,7 +750,7 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
   m_cInterSearch.setTempBuffers( m_cIntraSearch.getSplitCSBuf(), m_cIntraSearch.getFullCSBuf(), m_cIntraSearch.getSaveCSBuf() );
 #endif // ENABLE_SPLIT_PARALLELISM || ENABLE_WPP_PARALLELISM
 
-#if JVET_AE0159_FIBC || JVET_AE0059_INTER_CCCM || JVET_AE0078_IBC_LIC_EXTENSION
+#if JVET_AE0159_FIBC || JVET_AE0059_INTER_CCCM || JVET_AE0078_IBC_LIC_EXTENSION || JVET_AF0073_INTER_CCP_MERGE
   m_cInterSearch.setIntraPrediction(&m_cIntraSearch);
 #endif
   m_iMaxRefPicNum = 0;
@@ -778,6 +777,7 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
     Picture *picBg = new Picture;
 
     picBg->create(
+      sps0.getRprEnabledFlag(),
 #if JVET_Z0118_GDR
       sps0.getGDREnabledFlag(),
 #endif
@@ -796,6 +796,7 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
     Picture *picOrig = new Picture;
 
     picOrig->create(
+      sps0.getRprEnabledFlag(),
 #if JVET_Z0118_GDR
       sps0.getGDREnabledFlag(),
 #endif
@@ -919,7 +920,7 @@ void EncLib::deletePicBuffer()
   m_cListPic.clear();
 }
 
-bool EncLib::encodePrep( bool flush, PelStorage* pcPicYuvOrg, PelStorage* cPicYuvTrueOrg, PelStorage* pcPicYuvFilteredOrg, const InputColourSpaceConversion snrCSC, std::list<PelUnitBuf*>& rcListPicYuvRecOut, int& iNumEncoded )
+bool EncLib::encodePrep( bool flush, PelStorage* pcPicYuvOrg, const InputColourSpaceConversion snrCSC, std::list<PelUnitBuf*>& rcListPicYuvRecOut, int& iNumEncoded )
 {
   if( m_compositeRefEnabled && m_cGOPEncoder.getPicBg()->getSpliceFull() && m_iPOCLast >= 10 && m_iNumPicRcvd == 0 && m_cGOPEncoder.getEncodedLTRef() == false )
   {
@@ -1054,17 +1055,6 @@ bool EncLib::encodePrep( bool flush, PelStorage* pcPicYuvOrg, PelStorage* cPicYu
       pcPicCurr->M_BUFS( 0, PIC_ORIGINAL_INPUT ).getBuf( COMPONENT_Cb ).copyFrom( pcPicYuvOrg->getBuf( COMPONENT_Cb ) );
       pcPicCurr->M_BUFS( 0, PIC_ORIGINAL_INPUT ).getBuf( COMPONENT_Cr ).copyFrom( pcPicYuvOrg->getBuf( COMPONENT_Cr ) );
 
-      pcPicCurr->M_BUFS( 0, PIC_TRUE_ORIGINAL_INPUT ).getBuf( COMPONENT_Y ).copyFrom( cPicYuvTrueOrg->getBuf( COMPONENT_Y ) );
-      pcPicCurr->M_BUFS( 0, PIC_TRUE_ORIGINAL_INPUT ).getBuf( COMPONENT_Cb ).copyFrom( cPicYuvTrueOrg->getBuf( COMPONENT_Cb ) );
-      pcPicCurr->M_BUFS( 0, PIC_TRUE_ORIGINAL_INPUT ).getBuf( COMPONENT_Cr ).copyFrom( cPicYuvTrueOrg->getBuf( COMPONENT_Cr ) );
-
-      if( getGopBasedTemporalFilterEnabled() )
-      {
-        pcPicCurr->M_BUFS( 0, PIC_FILTERED_ORIGINAL_INPUT ).getBuf( COMPONENT_Y ).copyFrom( pcPicYuvFilteredOrg->getBuf( COMPONENT_Y ) );
-        pcPicCurr->M_BUFS( 0, PIC_FILTERED_ORIGINAL_INPUT ).getBuf( COMPONENT_Cb ).copyFrom( pcPicYuvFilteredOrg->getBuf( COMPONENT_Cb ) );
-        pcPicCurr->M_BUFS( 0, PIC_FILTERED_ORIGINAL_INPUT ).getBuf( COMPONENT_Cr ).copyFrom( pcPicYuvFilteredOrg->getBuf( COMPONENT_Cr ) );
-      }
-
       const ChromaFormat chromaFormatIDC = pSPS->getChromaFormatIdc();
 
       const PPS *refPPS = m_ppsMap.getPS( 0 );
@@ -1082,26 +1072,10 @@ bool EncLib::encodePrep( bool flush, PelStorage* pcPicYuvOrg, PelStorage* cPicYu
 
       Picture::rescalePicture( scalingRatio, *pcPicYuvOrg, refPPS->getScalingWindow(), pcPicCurr->getOrigBuf(), pPPS->getScalingWindow(), chromaFormatIDC, pSPS->getBitDepths(), true, true,
         pSPS->getHorCollocatedChromaFlag(), pSPS->getVerCollocatedChromaFlag() );
-      Picture::rescalePicture( scalingRatio, *cPicYuvTrueOrg, refPPS->getScalingWindow(), pcPicCurr->getTrueOrigBuf(), pPPS->getScalingWindow(), chromaFormatIDC, pSPS->getBitDepths(), true, true,
-        pSPS->getHorCollocatedChromaFlag(), pSPS->getVerCollocatedChromaFlag() );
-
-      if( getGopBasedTemporalFilterEnabled() )
-      {
-        Picture::rescalePicture( scalingRatio, *pcPicYuvFilteredOrg, refPPS->getScalingWindow(), pcPicCurr->getFilteredOrigBuf(), pPPS->getScalingWindow(), chromaFormatIDC, pSPS->getBitDepths(), true, true,
-                                 pSPS->getHorCollocatedChromaFlag(), pSPS->getVerCollocatedChromaFlag() );
-      }
-
     }
     else
     {
       pcPicCurr->M_BUFS( 0, PIC_ORIGINAL ).swap( *pcPicYuvOrg );
-      pcPicCurr->M_BUFS( 0, PIC_TRUE_ORIGINAL ).swap( *cPicYuvTrueOrg );
-
-      if( getGopBasedTemporalFilterEnabled() )
-      {
-        pcPicCurr->M_BUFS( 0, PIC_FILTERED_ORIGINAL ).swap( *pcPicYuvFilteredOrg );
-      }
-
     }
 
     pcPicCurr->finalInit( m_vps, *pSPS, *pPPS, &m_picHeader, m_apss, m_lmcsAPS, m_scalinglistAPS );
@@ -1208,8 +1182,8 @@ void separateFields(Pel* org, Pel* dstField, uint32_t stride, uint32_t width, ui
 
 }
 
-bool EncLib::encodePrep( bool flush, PelStorage* pcPicYuvOrg, PelStorage* pcPicYuvTrueOrg, PelStorage* pcPicYuvFilteredOrg, const InputColourSpaceConversion snrCSC, std::list<PelUnitBuf*>& rcListPicYuvRecOut,
-                         int& iNumEncoded, bool isTff )
+bool EncLib::encodePrep(bool flush, PelStorage* pcPicYuvOrg, const InputColourSpaceConversion snrCSC, std::list<PelUnitBuf*>& rcListPicYuvRecOut,
+  int& iNumEncoded, bool isTff)
 {
   iNumEncoded = 0;
   bool keepDoing = true;
@@ -1235,25 +1209,6 @@ bool EncLib::encodePrep( bool flush, PelStorage* pcPicYuvOrg, PelStorage* pcPicY
             compBuf.width,
             compBuf.height,
             isTopField );
-          // to get fields of true original buffer to avoid wrong PSNR calculation in summary
-          compBuf = pcPicYuvTrueOrg->get( compID );
-          separateFields( compBuf.buf,
-            pcField->getTrueOrigBuf().get(compID).buf,
-            compBuf.stride,
-            compBuf.width,
-            compBuf.height,
-            isTopField);
-
-          if( getGopBasedTemporalFilterEnabled() )
-          {
-            compBuf = pcPicYuvFilteredOrg->get( compID );
-            separateFields( compBuf.buf,
-                            pcField->getTrueOrigBuf().get( compID ).buf,
-                            compBuf.stride,
-                            compBuf.width,
-                            compBuf.height,
-                            isTopField );
-          }
         }
       }
 
@@ -1390,6 +1345,7 @@ void EncLib::xGetNewPicBuffer ( std::list<PelUnitBuf*>& rcListPicYuvRecOut, Pict
     rpcPic = new Picture;
 
     rpcPic->create(
+      isRprEnabled(),
 #if JVET_Z0118_GDR
       getGdrEnabled(),
 #endif
@@ -1402,12 +1358,6 @@ void EncLib::xGetNewPicBuffer ( std::list<PelUnitBuf*>& rcListPicYuvRecOut, Pict
     {
       const PPS &pps0 = *m_ppsMap.getPS(0);
       rpcPic->M_BUFS(0, PIC_ORIGINAL_INPUT).create(sps.getChromaFormatIdc(), Area(Position(), Size(pps0.getPicWidthInLumaSamples(), pps0.getPicHeightInLumaSamples())));
-      rpcPic->M_BUFS(0, PIC_TRUE_ORIGINAL_INPUT).create(sps.getChromaFormatIdc(), Area(Position(), Size(pps0.getPicWidthInLumaSamples(), pps0.getPicHeightInLumaSamples())));
-
-      if( getGopBasedTemporalFilterEnabled() )
-      {
-        rpcPic->M_BUFS( 0, PIC_FILTERED_ORIGINAL_INPUT ).create( sps.getChromaFormatIdc(), Area( Position(), Size( pps0.getPicWidthInLumaSamples(), pps0.getPicHeightInLumaSamples() ) ) );
-      }
     }
     if ( getUseAdaptiveQP() )
     {
@@ -1782,6 +1732,9 @@ void EncLib::xInitSPS( SPS& sps )
 #endif
   sps.setUseAffine             ( m_Affine );
   sps.setUseAffineType         ( m_AffineType );
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+  sps.setUseAffineTM           ( m_useAffineTM );
+#endif
 #if AFFINE_MMVD
   sps.setUseAffineMmvdMode     ( m_AffineMmvdMode );
 #endif
@@ -1970,6 +1923,9 @@ void EncLib::xInitSPS( SPS& sps )
 #endif
 #if JVET_AE0059_INTER_CCCM
   sps.setUseInterCccm(m_interCccm);
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  sps.setUseInterCcpMerge(m_interCcpMerge);
 #endif
   // ADD_NEW_TOOL : (encoder lib) set tool enabling flags and associated parameters here
   sps.setUseISP                             ( m_ISP );

@@ -113,6 +113,9 @@
 #define NULL              0
 #endif
 
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+static const double REFINE_THRESHOLD_AFFINE_MERGE = 0.75;
+#endif
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
 static const int SUB_TMVP_CANDIDATE_NUM = 10;
 static const int SUB_TMVP_INDEX = 3;  // 1: 2 subtmvp; 2: 4 subtmvp
@@ -199,13 +202,21 @@ static const int AFF_NON_ADJACENT_DIST    =                          4;
 #endif
 
 #if JVET_Z0139_HIST_AFF || JVET_Z0139_NA_AFF
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+static const int AFFINE_MRG_MAX_NUM_CANDS =                         16; ///< AFFINE MERGE
+#else
 static const int AFFINE_MRG_MAX_NUM_CANDS =                         15; ///< AFFINE MERGE
+#endif
 #else
 static const int AFFINE_MRG_MAX_NUM_CANDS =                         5; ///< AFFINE MERGE
 #endif
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
 static const int AFF_MAX_NON_ADJACENT_INHERITED_CANDS = 6;
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+static const int RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE = 31;
+#else
 static const int RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE = 30;
+#endif
 static const int ADDITIONAL_AFFINE_CAND_NUM = 15;
 #if JVET_AB0189_RMVF_BITLENGTH_CONTROL
 static const int RMVF_MV_RANGE = (1 << 12);
@@ -234,7 +245,7 @@ static const int AMVP_MERGE_MODE_REDUCED_MV_REFINE_SEARCH_ROUND =   8;
 #endif
 
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
-static const double LAMBDA_DEC_SIDE[MAX_QP] = {
+static const double LAMBDA_DEC_SIDE[MAX_QP+1] = {
   0.777106,       0.872272,       0.979092,       1.098994,       1.233579,       1.384646,       1.554212,
   1.744544,       1.958185,       2.197988,       2.467158,       2.769291,       3.108425,       3.489089,
   3.916370,       4.395976,       4.934316,       5.538583,       6.216849,       6.978177,       7.832739,
@@ -243,7 +254,8 @@ static const double LAMBDA_DEC_SIDE[MAX_QP] = {
   44.308664,       49.734793,      55.825418,      62.661913,      70.335619,      78.949063,      88.617327,
   99.469587,       111.650836,     125.323826,     140.671239,     157.898127,     177.234655,     198.939174,
   223.301672,       250.647653,     281.342477,     315.796254,     354.469310,     397.878347,     446.603345,
-  501.295305,       562.684955,     631.592507,     708.938619,     795.756695,     893.206689,     1002.590610
+  501.295305,       562.684955,     631.592507,     708.938619,     795.756695,     893.206689,     1002.590610,
+  1125.369910
 };
 #endif
 
@@ -415,7 +427,11 @@ static const int       MAX_ALF_PADDING_SIZE           =             4;
 #endif
 #if JVET_X0071_LONGER_CCALF
 #define MAX_NUM_CC_ALF_FILTERS                                      16
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+static constexpr int MAX_NUM_CC_ALF_CHROMA_COEFF    =               23 + 5;
+#else
 static constexpr int MAX_NUM_CC_ALF_CHROMA_COEFF    =               25;
+#endif
 #else
 #define MAX_NUM_CC_ALF_FILTERS                                      4
 static constexpr int MAX_NUM_CC_ALF_CHROMA_COEFF    =               8;
@@ -830,6 +846,16 @@ static const int BDOF_SUBPU_DIM_LOG2          =                     2;
 #if JVET_AE0091_ITERATIVE_BDOF
 static const int BDOF_SUBPU_AREA_THRESHOLD0   =                     0;
 static const int BDOF_SUBPU_AREA_THRESHOLD1   =                  1024;
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+static const int BDOF_SUBPU_AREA_THRESHOLD2   =                   256;
+enum AFFINE_SUBPU_BDOF_USAGE
+{
+  AFFINE_SUBPU_BDOF_NOT_APPLY = 0,
+  AFFINE_SUBPU_BDOF_APPLY_AND_STORE_MV = 1,
+  AFFINE_SUBPU_BDOF_APPLY_WITHOUT_STORE_MV = 2,
+  AFFINE_SUBPU_BDOF_APPLY_RESERVE
+};
+#endif
 #else
 static const int BDOF_SUBPU_AREA_THRESHOLD    =                   256;
 #endif
@@ -894,6 +920,10 @@ static const int MAX_NUM_SUBCU_DMVR = ((MAX_CU_SIZE * MAX_CU_SIZE) >> (DMVR_SUBC
 static const int MAX_NUM_SUBCU_DMVR_LOG2 = MAX_CU_DEPTH + MAX_CU_DEPTH - DMVR_SUBCU_WIDTH_LOG2 - DMVR_SUBCU_HEIGHT_LOG2;
 #endif
 static const int DMVR_NUM_ITERATION = 2;
+#if JVET_AF0057
+static constexpr int DMVR_ENC_SELECT_SIZE_THR = 32;
+static constexpr double DMVR_ENC_SELECT_FRAME_RATE_THR = 30.0;
+#endif
 
 //QTBT high level parameters
 //for I slice luma CTB configuration para.
@@ -1814,6 +1844,29 @@ static inline uint32_t getIndexMappingTableToSortedArray1D(InputValueType (&in)[
 
   return numValidInList;
 }
+#endif
+
+#if JVET_Z0150_MEMORY_USAGE_PRINT
+#ifdef __linux
+static inline int getProcStatusValue(const char* key)
+{
+  FILE* file = fopen("/proc/self/status", "r");
+  int result = -1;
+  char line[128];
+
+  int len = strlen(key);
+  while (fgets(line, 128, file) != nullptr)
+  {
+    if (strncmp(line, key, len) == 0)
+    {
+      result = atoi(line+len);
+      break;
+    }
+  }
+  fclose(file);
+  return result;
+}
+#endif
 #endif
 
 //CASE-BREAK for breakpoints

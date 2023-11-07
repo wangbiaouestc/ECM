@@ -1889,6 +1889,12 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   pcSPS->setQpBDOffset(CHANNEL_TYPE_CHROMA, (int) (6*uiCode) );
 
   READ_FLAG( uiCode, "sps_entropy_coding_sync_enabled_flag" );       pcSPS->setEntropyCodingSyncEnabledFlag(uiCode == 1);
+#if EXTENSION_CABAC_TRAINING
+  if (pcSPS->getEntropyCodingSyncEnabledFlag())
+  {
+    CHECK(1, "Error: entropy_coding_synchro may not be enabled when EXTENSION_CABAC_TRAINING is active.");
+  }
+#endif 
   READ_FLAG(uiCode, "sps_entry_point_offsets_present_flag");   pcSPS->setEntryPointsPresentFlag(uiCode == 1);
   READ_CODE(4, uiCode, "log2_max_pic_order_cnt_lsb_minus4");     pcSPS->setBitsForPOC( 4 + uiCode );
   CHECK(uiCode > 12, "log2_max_pic_order_cnt_lsb_minus4 shall be in the range of 0 to 12");
@@ -2450,6 +2456,20 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
     READ_FLAG(uiCode, "sps_affine_nontranslation_parameter_refinement");       pcSPS->setUseAffineParaRefinement(uiCode != 0);
 #endif
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+    if (pcSPS->getTMToolsEnableFlag())
+    {
+#endif
+    READ_FLAG(uiCode, "sps_tm_affine_flag");       pcSPS->setUseAffineTM(uiCode != 0);
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+    }
+    else
+    {
+      pcSPS->setUseAffineTM( false );
+    }
+#endif
+#endif
   }
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   pcSPS->setUseTMMMVD(false);
@@ -2539,6 +2559,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #endif
 #if JVET_AE0059_INTER_CCCM
   READ_FLAG(uiCode, "sps_inter_cccm");                              pcSPS->setUseInterCccm( uiCode != 0 );
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  READ_FLAG(uiCode, "sps_inter_ccp_merge");                         pcSPS->setUseInterCcpMerge( uiCode != 0 );
 #endif
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
   if (pcSPS->getTMnoninterToolsEnableFlag())
@@ -5336,9 +5359,9 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
     if (!lambdaCanBePredicted)
     {
 #if JVET_AB0082
-      READ_CODE(10, uiCode, "lambda");
+      READ_CODE(10, uiCode, "Lambda");
 #else
-      READ_CODE(9, uiCode, "lambda");
+      READ_CODE(9, uiCode, "Lambda");
 #endif
       pcSlice->setCostForARMC((uint32_t)uiCode);
     }

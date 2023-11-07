@@ -93,6 +93,9 @@ Slice::Slice()
 , m_tsResidualCodingDisabledFlag  ( false )
 , m_pendingRasInit                ( false )
 , m_bCheckLDC                     ( false )
+#if JVET_AF0128_LIC_MERGE_TM
+, m_bCheckLDB                     ( false )
+#endif
 , m_biDirPred                    ( false )
 , m_iSliceQpDelta                 ( 0 )
 , m_iDepth                        ( 0 )
@@ -208,6 +211,9 @@ void Slice::initSlice()
 #endif
 
   m_bCheckLDC = false;
+#if JVET_AF0128_LIC_MERGE_TM
+  m_bCheckLDB = false;
+#endif
 
   m_biDirPred = false;
   m_symRefIdx[0] = -1;
@@ -927,6 +933,28 @@ void Slice::generateRefPicPairList()
   }
 }
 #endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+void Slice::generateEqualPocDist()
+{
+  const int curPoc = getPOC();
+  for (int refIdxInList0 = 0; refIdxInList0 < getNumRefIdx(REF_PIC_LIST_0); refIdxInList0++)
+  {
+    const int ref0Poc = getRefPOC(REF_PIC_LIST_0, refIdxInList0);
+    for (int refIdxInList1 = 0; refIdxInList1 < getNumRefIdx(REF_PIC_LIST_1); refIdxInList1++)
+    {
+      const int ref1Poc = getRefPOC(REF_PIC_LIST_1, refIdxInList1);
+      if (ref0Poc - curPoc == curPoc - ref1Poc)
+      {
+        m_pairEqualPocDist[refIdxInList0][refIdxInList1] = true;
+      }
+      else
+      {
+        m_pairEqualPocDist[refIdxInList0][refIdxInList1] = false;
+      }
+    }
+  }
+}
+#endif
 
 void Slice::constructRefPicList(PicList& rcListPic)
 {
@@ -1612,6 +1640,9 @@ void Slice::copySliceInfo(Slice *pSrc, bool cpyAlmostAll)
   }
 
   m_bCheckLDC             = pSrc->m_bCheckLDC;
+#if JVET_AF0128_LIC_MERGE_TM
+  m_bCheckLDB             = pSrc->m_bCheckLDB;
+#endif
   m_iSliceQpDelta        = pSrc->m_iSliceQpDelta;
 
   m_biDirPred = pSrc->m_biDirPred;
@@ -3787,6 +3818,9 @@ SPS::SPS()
 , m_LFNST                     ( false )
 , m_Affine                    ( false )
 , m_AffineType                ( false )
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+, m_useAffineTM               ( false )
+#endif
 , m_PROF                      ( false )
 #if ENABLE_DIMD
 , m_dimd                      ( false )
@@ -5380,6 +5414,7 @@ void Slice::scaleRefPicList( Picture *scaledRefPic[ ], PicHeader *picHeader, APS
 
 
             scaledRefPic[j]->create(
+              sps->getRprEnabledFlag(),
 #if JVET_Z0118_GDR
               sps->getGDREnabledFlag(),
 #endif

@@ -102,15 +102,24 @@ void AlfCovariance::reduceClipCost(const AlfFilterShape& alfShape, int *clip) co
 }
 
 #if JVET_AD0222_ALF_RESI_CLASS
+#if JVET_AF0177_ALF_COV_FLOAT
+double AlfCovariance::optimizeFilter(const AlfFilterShape& alfShape, int* clip, Ty f, bool optimize_clip, bool enableLessClip) const
+#else
 double AlfCovariance::optimizeFilter(const AlfFilterShape& alfShape, int* clip, double *f, bool optimize_clip, bool enableLessClip) const
+#endif
 #else
 double AlfCovariance::optimizeFilter(const AlfFilterShape& alfShape, int* clip, double *f, bool optimize_clip) const
 #endif
 {
   const int size = alfShape.numCoeff;
   int clip_max[MAX_NUM_ALF_LUMA_COEFF];
+#if JVET_AF0177_ALF_COV_FLOAT
+  Ty fBest;
+  int copySize = sizeof( float ) * size;
+#else
   double fBest[MAX_NUM_ALF_LUMA_COEFF];
   int copySize = sizeof( double ) * size;
+#endif
   double err_best, err_last;
 
   TE kE;
@@ -153,10 +162,14 @@ double AlfCovariance::optimizeFilter(const AlfFilterShape& alfShape, int* clip, 
       {
         clip[k] -= step;
         ky[k] = y(clip[k],k);
-        for( int l = 0; l < size; l++ )
+        // Upper triangular
+        for( int l = 0; l < k; l++ )
+        {
+          kE[l][k] = E(clip[l],clip[k],l,k);
+        }
+        for( int l = k; l < size; l++ )
         {
           kE[k][l] = E(clip[k],clip[l],k,l);
-          kE[l][k] = E(clip[l],clip[k],l,k);
         }
 
         gnsSolveByChol( kE, ky, f, size );
@@ -175,10 +188,14 @@ double AlfCovariance::optimizeFilter(const AlfFilterShape& alfShape, int* clip, 
       {
         clip[k] += step;
         ky[k] = y(clip[k],k);
-        for( int l = 0; l < size; l++ )
+        // Upper triangular
+        for (int l = 0; l < k; l++)
         {
-          kE[k][l] = E(clip[k],clip[l],k,l);
-          kE[l][k] = E(clip[l],clip[k],l,k);
+          kE[l][k] = E(clip[l], clip[k], l, k);
+        }
+        for (int l = k; l < size; l++)
+        {
+          kE[k][l] = E(clip[k], clip[l], k, l);
         }
 
         gnsSolveByChol( kE, ky, f, size );
@@ -195,10 +212,14 @@ double AlfCovariance::optimizeFilter(const AlfFilterShape& alfShape, int* clip, 
 
       }
       ky[k] = y(clip[k],k);
-      for( int l = 0; l < size; l++ )
+      // Upper triangular
+      for (int l = 0; l < k; l++)
       {
-        kE[k][l] = E(clip[k],clip[l],k,l);
-        kE[l][k] = E(clip[l],clip[k],l,k);
+        kE[l][k] = E(clip[l], clip[k], l, k);
+      }
+      for (int l = k; l < size; l++)
+      {
+        kE[k][l] = E(clip[k], clip[l], k, l);
       }
     }
 
@@ -207,10 +228,14 @@ double AlfCovariance::optimizeFilter(const AlfFilterShape& alfShape, int* clip, 
       err_best = err_min;
       clip[idx_min] += inc_min;
       ky[idx_min] = y(clip[idx_min],idx_min);
-      for( int l = 0; l < size; l++ )
+      // Upper triangular
+      for (int l = 0; l < idx_min; l++)
+      {
+        kE[l][idx_min] = E(clip[l],clip[idx_min],l,idx_min);
+      }
+      for (int l = idx_min; l < size; l++)
       {
         kE[idx_min][l] = E(clip[idx_min],clip[l],idx_min,l);
-        kE[l][idx_min] = E(clip[l],clip[idx_min],l,idx_min);
       }
     }
     else
@@ -289,7 +314,11 @@ double AlfCovariance::calcErrorForCcAlfCoeffs(const int16_t *coeff, const int nu
   return error / factor;
 }
 
+#if JVET_AF0177_ALF_COV_FLOAT
+double AlfCovariance::calculateError( const int *clip, const Ty coeff, const int numCoeff ) const
+#else
 double AlfCovariance::calculateError( const int *clip, const double *coeff, const int numCoeff ) const
+#endif
 {
   double sum = 0;
   for( int i = 0; i < numCoeff; i++ )
@@ -311,17 +340,28 @@ double AlfCovariance::calculateError( const int *clip ) const
 //********************************
 
 #define ROUND(a)  (((a) < 0)? (int)((a) - 0.5) : (int)((a) + 0.5))
+#if JVET_AF0177_ALF_COV_FLOAT
+#define REG              (0.0001f)
+#define REG_SQR          (0.0000001f)
+#else
 #define REG              0.0001
 #define REG_SQR          0.0000001
+#endif
 
 //Find filter coeff related
 int AlfCovariance::gnsCholeskyDec( TE inpMatr, TE outMatr, int numEq ) const
 {
   for( int i = 0; i < numEq; i++ )
   {
+#if JVET_AF0177_ALF_COV_FLOAT
+    float* inputM = inpMatr[i];
+    float* outputM = outMatr[i];
+    float scale = inputM[i];
+#else
     double* inputM  = inpMatr[i];
     double* outputM = outMatr[i];
     double scale    = inputM[i];
+#endif
 
     for( int k = i - 1; k >= 0; k-- )
     {
@@ -334,7 +374,11 @@ int AlfCovariance::gnsCholeskyDec( TE inpMatr, TE outMatr, int numEq ) const
     }
 
     outputM[i] = sqrt( scale );
+#if JVET_AF0177_ALF_COV_FLOAT
+    float tmp = 1 / outputM[i];
+#else
     double tmp = 1 / outputM[i];
+#endif
 
     for( int j = i + 1; j < numEq; j++ )
     {
@@ -352,14 +396,22 @@ int AlfCovariance::gnsCholeskyDec( TE inpMatr, TE outMatr, int numEq ) const
   return 1; // Signal that Cholesky factorization is successfully performed
 }
 
+#if JVET_AF0177_ALF_COV_FLOAT
+void AlfCovariance::gnsTransposeBacksubstitution( TE U, Ty rhs, Ty x, int order ) const
+#else
 void AlfCovariance::gnsTransposeBacksubstitution( TE U, double* rhs, double* x, int order ) const
+#endif
 {
   /* Backsubstitution starts */
   x[0] = rhs[0] / U[0][0];               /* First row of U'                   */
   for( int i = 1; i < order; i++ )
   {         /* For the rows 1..order-1           */
 
+#if JVET_AF0177_ALF_COV_FLOAT
+    float sum = 0; //Holds backsubstitution from already handled rows
+#else
     double sum = 0; //Holds backsubstitution from already handled rows
+#endif
 
     for( int j = 0; j < i; j++ ) /* Backsubst already solved unknowns */
     {
@@ -370,14 +422,22 @@ void AlfCovariance::gnsTransposeBacksubstitution( TE U, double* rhs, double* x, 
   }
 }
 
+#if JVET_AF0177_ALF_COV_FLOAT
+void AlfCovariance::gnsBacksubstitution( TE R, Ty z, int size, Ty A ) const
+#else
 void AlfCovariance::gnsBacksubstitution( TE R, double* z, int size, double* A ) const
+#endif
 {
   size--;
   A[size] = z[size] / R[size][size];
 
   for( int i = size - 1; i >= 0; i-- )
   {
+#if JVET_AF0177_ALF_COV_FLOAT
+    float sum = 0;
+#else
     double sum = 0;
+#endif
 
     for( int j = i + 1; j <= size; j++ )
     {
@@ -388,7 +448,11 @@ void AlfCovariance::gnsBacksubstitution( TE R, double* z, int size, double* A ) 
   }
 }
 
+#if JVET_AF0177_ALF_COV_FLOAT
+int AlfCovariance::gnsSolveByChol( const int *clip, Ty x, int numEq ) const
+#else
 int AlfCovariance::gnsSolveByChol( const int *clip, double *x, int numEq ) const
+#endif
 {
   TE LHS;
   Ty rhs;
@@ -397,7 +461,11 @@ int AlfCovariance::gnsSolveByChol( const int *clip, double *x, int numEq ) const
   return gnsSolveByChol( LHS, rhs, x, numEq );
 }
 
+#if JVET_AF0177_ALF_COV_FLOAT
+int AlfCovariance::gnsSolveByChol( TE LHS, Ty rhs, Ty x, int numEq ) const
+#else
 int AlfCovariance::gnsSolveByChol( TE LHS, double* rhs, double *x, int numEq ) const
+#endif
 {
   Ty aux;     /* Auxiliary vector */
   TE U;    /* Upper triangular Cholesky factor of LHS */
@@ -434,7 +502,11 @@ int AlfCovariance::gnsSolveByChol( TE LHS, double* rhs, double *x, int numEq ) c
 
     if( !res )
     {
+#if JVET_AF0177_ALF_COV_FLOAT
+      std::memset( x, 0, sizeof( float )*numEq );
+#else
       std::memset( x, 0, sizeof( double )*numEq );
+#endif
       return 0;
     }
 
@@ -471,9 +543,14 @@ EncAdaptiveLoopFilter::EncAdaptiveLoopFilter( int& apsIdStart )
 
 }
 
-void EncAdaptiveLoopFilter::create( const EncCfg* encCfg, const int picWidth, const int picHeight, const ChromaFormat chromaFormatIDC, const int maxCUWidth, const int maxCUHeight, const int maxCUDepth, const int inputBitDepth[MAX_NUM_CHANNEL_TYPE], const int internalBitDepth[MAX_NUM_CHANNEL_TYPE] )
+void EncAdaptiveLoopFilter::create( const EncCfg* encCfg, const int picWidth, const int picHeight, const ChromaFormat chromaFormatIDC, const int maxCUWidth, const int maxCUHeight, const int maxCUDepth, const int inputBitDepth[MAX_NUM_CHANNEL_TYPE], const int internalBitDepth[MAX_NUM_CHANNEL_TYPE], bool createEncData )
 {
-  AdaptiveLoopFilter::create( picWidth, picHeight, chromaFormatIDC, maxCUWidth, maxCUHeight, maxCUDepth, inputBitDepth );
+  if( !createEncData )
+  {
+    AdaptiveLoopFilter::create( picWidth, picHeight, chromaFormatIDC, maxCUWidth, maxCUHeight, maxCUDepth, inputBitDepth );
+    return;
+  }
+
   CHECK( encCfg == nullptr, "encCfg must not be null" );
   m_encCfg = encCfg;
 
@@ -502,6 +579,10 @@ void EncAdaptiveLoopFilter::create( const EncCfg* encCfg, const int picWidth, co
     m_enableLessClip = true;
 #endif
   }
+#endif
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+  m_isLowDelayConfig = encCfg->getIntraPeriod() == -1 ? true : false;
+  m_chromaFactor = m_isLowDelayConfig ? ( m_picWidth > 1280 && m_picHeight > 720 ? 0.60 : 0.40 ) : 1.00;
 #endif
   const int numBinsLuma = m_encCfg->getUseNonLinearAlfLuma() ? MaxAlfNumClippingValues : 1;
   const int numBinsChroma = m_encCfg->getUseNonLinearAlfChroma() ? MaxAlfNumClippingValues : 1;
@@ -739,12 +820,20 @@ void EncAdaptiveLoopFilter::create( const EncCfg* encCfg, const int picWidth, co
   m_chromaSampleCountNearMidPoint = new uint64_t[m_numCTUsInPic];
 }
 
-void EncAdaptiveLoopFilter::destroy()
+void EncAdaptiveLoopFilter::destroy( bool destroyEncData )
 {
   if (!m_created)
   {
     return;
   }
+
+  // !m_created guarantees common data, encoder data is guaranteed by create/destroy before/after ALFProcess
+  if (!destroyEncData)
+  {
+    AdaptiveLoopFilter::destroy();
+    return;
+  }
+
   for( int channelIdx = 0; channelIdx < MAX_NUM_CHANNEL_TYPE; channelIdx++ )
   {
     if( m_alfCovarianceFrame[channelIdx] )
@@ -1053,8 +1142,6 @@ void EncAdaptiveLoopFilter::destroy()
     delete[] m_chromaSampleCountNearMidPoint;
     m_chromaSampleCountNearMidPoint = nullptr;
   }
-
-  AdaptiveLoopFilter::destroy();
 }
 
 void EncAdaptiveLoopFilter::initCABACEstimator( CABACEncoder* cabacEncoder, CtxCache* ctxCache, Slice* pcSlice
@@ -1236,8 +1323,13 @@ void EncAdaptiveLoopFilter::ALFProcess( CodingStructure& cs, const double *lambd
 #endif
 #endif
 #if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+  PelUnitBuf resiYuv = m_tempBufResi.getBuf( UnitArea( CHROMA_400, cs.area.blocks[COMPONENT_Y] ) );
+  mirroredPaddingForAlf(cs, resiYuv, MAX_FILTER_LENGTH_FIXED >> 1, true, false);
+#else
   PelUnitBuf resiYuv = m_tempBufResi.getBuf(cs.area);
   mirroredPaddingForAlf(cs, resiYuv, MAX_FILTER_LENGTH_FIXED, true, false);
+#endif
   const CPelBuf &resiLuma = resiYuv.get(COMPONENT_Y);
 #endif
   // derive classification
@@ -2971,7 +3063,11 @@ double EncAdaptiveLoopFilter::deriveCoeffQuant( int *filterClipp, int *filterCoe
   const int min_value = -factor + 1;
 
   const int numCoeff = shape.numCoeff;
+#if JVET_AF0177_ALF_COV_FLOAT
+  float     filterCoeff[MAX_NUM_ALF_LUMA_COEFF];
+#else
   double    filterCoeff[MAX_NUM_ALF_LUMA_COEFF];
+#endif
 
 #if JVET_AD0222_ALF_RESI_CLASS
   cov.optimizeFilter( shape, filterClipp, filterCoeff, optimizeClip, m_enableLessClip );
@@ -3026,7 +3122,11 @@ double EncAdaptiveLoopFilter::deriveCoeffQuant( int *filterClipp, int *filterCoe
   return errRef;
 }
 
+#if JVET_AF0177_ALF_COV_FLOAT
+void EncAdaptiveLoopFilter::roundFiltCoeff( int *filterCoeffQuant, float *filterCoeff, const int numCoeff, const int factor )
+#else
 void EncAdaptiveLoopFilter::roundFiltCoeff( int *filterCoeffQuant, double *filterCoeff, const int numCoeff, const int factor )
+#endif
 {
   for( int i = 0; i < numCoeff; i++ )
   {
@@ -3035,13 +3135,20 @@ void EncAdaptiveLoopFilter::roundFiltCoeff( int *filterCoeffQuant, double *filte
   }
 }
 
-void EncAdaptiveLoopFilter::roundFiltCoeffCCALF(int16_t *filterCoeffQuant, double *filterCoeff, const int numCoeff,
-                                                const int factor)
+#if JVET_AF0177_ALF_COV_FLOAT
+void EncAdaptiveLoopFilter::roundFiltCoeffCCALF(int16_t *filterCoeffQuant, float *filterCoeff, const int numCoeff, const int factor)
+#else
+void EncAdaptiveLoopFilter::roundFiltCoeffCCALF(int16_t *filterCoeffQuant, double *filterCoeff, const int numCoeff, const int factor)
+#endif
 {
   for( int i = 0; i < numCoeff; i++ )
   {
     int sign = filterCoeff[i] > 0 ? 1 : -1;
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+    double best_err = MAX_DOUBLE;
+#else
     double best_err = 128.0*128.0;
+#endif
     int best_index = 0;
     for(int k = 0; k < CCALF_CANDS_COEFF_NR; k++)
     {
@@ -3906,7 +4013,11 @@ void EncAdaptiveLoopFilter::getBlkStats( AlfCovariance* alfCovariance, const Alf
   int classIdx = 0;
 #if JVET_AD0222_ALF_RESI_CLASS
   int classIdxNext = 0;
+#if JVET_AF0177_ALF_COV_FLOAT
+  float curY, curP;
+#else
   double curY, curP;
+#endif
 #endif
 
   for( int i = 0; i < area.height; i++ )
@@ -3943,10 +4054,18 @@ void EncAdaptiveLoopFilter::getBlkStats( AlfCovariance* alfCovariance, const Alf
         CHECK(!alfCovariance[classIdx].sameSizeAs(alfCovarianceNext[classIdxNext]), "Covariance size mismatch");
       }
 #endif
+#if JVET_AF0177_ALF_COV_FLOAT
+      float weight = 1.0;
+#else
       double weight = 1.0;
+#endif
       if( m_alfWSSD )
       {
+#if JVET_AF0177_ALF_COV_FLOAT
+        weight = (float)m_lumaLevelToWeightPLUT[org[j]];
+#else
         weight = m_lumaLevelToWeightPLUT[org[j]];
+#endif
       }
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
       Intermediate_Int yLocal = org[j] - rec[j];
@@ -4007,7 +4126,11 @@ calcCovariance( ELocal, rec + j, recStride, recBeforeDb + j, recBeforeDbStride, 
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
 #if JVET_AD0222_ALF_RESI_CLASS
               const ptrdiff_t oe   = alfCovariance[classIdx].getOffsetEfast(b0, b1, k, l);
+#if JVET_AF0177_ALF_COV_FLOAT
+              const float     curE = weight * (ELocal[k][b0] * (float)ELocal[l][b1]);
+#else
               const double    curE = weight * (ELocal[k][b0] * (double) ELocal[l][b1]);
+#endif
               alfCovariance[classIdx].data[oe] += curE;
               if (reuse)
               {
@@ -4025,7 +4148,11 @@ calcCovariance( ELocal, rec + j, recStride, recBeforeDb + j, recBeforeDbStride, 
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
 #if JVET_AD0222_ALF_RESI_CLASS
               const ptrdiff_t oe   = alfCovariance[classIdx].getOffsetEfast(b0, b1, k, l);
+#if JVET_AF0177_ALF_COV_FLOAT
+              const float     curE = ELocal[k][b0] * (float)ELocal[l][b1];
+#else
               const double    curE = ELocal[k][b0] * (double) ELocal[l][b1];
+#endif
               alfCovariance[classIdx].data[oe] += curE;
               if (reuse)
               {
@@ -4055,13 +4182,21 @@ calcCovariance( ELocal, rec + j, recStride, recBeforeDb + j, recBeforeDbStride, 
             const ptrdiff_t oy = alfCovariance[classIdx].getOffsetY(b, k);
             if (reuse)
             {
+#if JVET_AF0177_ALF_COV_FLOAT
+              curY = weight * (ELocal[k][b] * (float)yLocal);
+#else
               curY = weight * (ELocal[k][b] * (double)yLocal);
+#endif
               alfCovariance[classIdx].data[oy] += curY;
               alfCovarianceNext[classIdxNext].data[oy] += curY;
             }
             else
             {
+#if JVET_AF0177_ALF_COV_FLOAT
+              alfCovariance[classIdx].data[oy] += weight * (ELocal[k][b] * (float)yLocal);
+#else
               alfCovariance[classIdx].data[oy] += weight * (ELocal[k][b] * (double) yLocal);
+#endif
             }
 #else
             alfCovariance[classIdx].y[b][k] += weight * (ELocal[k][b] * (double)yLocal);
@@ -4077,13 +4212,21 @@ calcCovariance( ELocal, rec + j, recStride, recBeforeDb + j, recBeforeDbStride, 
             const ptrdiff_t oy = alfCovariance[classIdx].getOffsetY(b, k);
             if( reuse )
             {
+#if JVET_AF0177_ALF_COV_FLOAT
+              curY = ELocal[k][b] * (float)yLocal;
+#else
               curY = ELocal[k][b] * (double)yLocal;
+#endif
               alfCovariance[classIdx].data[oy] += curY;
               alfCovarianceNext[classIdxNext].data[oy] += curY;
             }
             else
             {
+#if JVET_AF0177_ALF_COV_FLOAT
+              alfCovariance[classIdx].data[oy] += ELocal[k][b] * (float)yLocal;
+#else
               alfCovariance[classIdx].data[oy] += ELocal[k][b] * (double) yLocal;
+#endif
             }           
 #else
             alfCovariance[classIdx].y[b][k] += ELocal[k][b] * (double)yLocal;
@@ -4100,13 +4243,21 @@ calcCovariance( ELocal, rec + j, recStride, recBeforeDb + j, recBeforeDbStride, 
 #if JVET_AD0222_ALF_RESI_CLASS
         if( reuse )
         {
+#if JVET_AF0177_ALF_COV_FLOAT
+          curP = weight * (yLocal * (float)yLocal);
+#else
          curP = weight * (yLocal * (double)yLocal);
+#endif
          alfCovariance[classIdx].pixAcc += curP;
          alfCovarianceNext[classIdxNext].pixAcc += curP;
         }
         else
         {
+#if JVET_AF0177_ALF_COV_FLOAT
+          alfCovariance[classIdx].pixAcc += weight * (yLocal * (float)yLocal);
+#else
           alfCovariance[classIdx].pixAcc += weight * (yLocal * (double)yLocal);
+#endif
         }
 #else
         alfCovariance[classIdx].pixAcc += weight * (yLocal * (double)yLocal);
@@ -4121,13 +4272,21 @@ calcCovariance( ELocal, rec + j, recStride, recBeforeDb + j, recBeforeDbStride, 
 #if JVET_AD0222_ALF_RESI_CLASS
         if( reuse )
         {
+#if JVET_AF0177_ALF_COV_FLOAT
+          curP = yLocal * (float)yLocal;
+#else
           curP = yLocal * (double)yLocal;
+#endif
           alfCovariance[classIdx].pixAcc += curP;
           alfCovarianceNext[classIdxNext].pixAcc += curP;
         }
         else
         {
+#if JVET_AF0177_ALF_COV_FLOAT
+          alfCovariance[classIdx].pixAcc += yLocal * (float)yLocal;
+#else
           alfCovariance[classIdx].pixAcc += yLocal * (double)yLocal;
+#endif
         }
 #else
         alfCovariance[classIdx].pixAcc += yLocal * (double)yLocal;
@@ -5813,6 +5972,9 @@ void  EncAdaptiveLoopFilter::alfEncoderCtb(CodingStructure& cs, AlfParam& alfPar
 
   cs.slice->setTileGroupCcAlfCbApsId(newApsId);
   cs.slice->setTileGroupCcAlfCrApsId(newApsId);
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+  m_isLumaSignalNewAps = false;
+#endif
 
   if (costOff <= costMin)
   {
@@ -5840,6 +6002,9 @@ void  EncAdaptiveLoopFilter::alfEncoderCtb(CodingStructure& cs, AlfParam& alfPar
     }
     if (alfParamNewFiltersBest.newFilterFlag[CHANNEL_TYPE_LUMA])
     {
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+      m_isLumaSignalNewAps = true;
+#endif
       APS* newAPS = m_apsMap->getPS((newApsId << NUM_APS_TYPE_LEN) + ALF_APS);
       if (newAPS == NULL)
       {
@@ -6629,14 +6794,27 @@ void EncAdaptiveLoopFilter::deriveCcAlfFilterCoeff( ComponentID compID, const Pe
   }
 
 #if JVET_X0071_LONGER_CCALF && !JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF && !JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS && !JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
+#if JVET_AF0177_ALF_COV_FLOAT
+  using TE = float[MAX_NUM_CC_ALF_CHROMA_COEFF][MAX_NUM_CC_ALF_CHROMA_COEFF];
+  using Ty = float[MAX_NUM_CC_ALF_CHROMA_COEFF];
+#else
   using TE = double[MAX_NUM_CC_ALF_CHROMA_COEFF][MAX_NUM_CC_ALF_CHROMA_COEFF];
   using Ty = double[MAX_NUM_CC_ALF_CHROMA_COEFF];
+#endif
+#else
+#if JVET_AF0177_ALF_COV_FLOAT
+  using TE = float[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF];
+  using Ty = float[MAX_NUM_ALF_LUMA_COEFF];
 #else
   using TE = double[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF];
   using Ty = double[MAX_NUM_ALF_LUMA_COEFF];
 #endif
-
+#endif
+#if JVET_AF0177_ALF_COV_FLOAT
+  Ty filterCoeffDbl;
+#else
   double filterCoeffDbl[MAX_NUM_CC_ALF_CHROMA_COEFF];
+#endif
   int16_t filterCoeffInt[MAX_NUM_CC_ALF_CHROMA_COEFF];
 
   std::fill_n(filterCoeffInt, MAX_NUM_CC_ALF_CHROMA_COEFF, 0);
@@ -6648,7 +6826,8 @@ void EncAdaptiveLoopFilter::deriveCcAlfFilterCoeff( ComponentID compID, const Pe
   for (int k = 0; k < size; k++)
   {
     ky[k] = m_alfCovarianceFrameCcAlf[0].y(0,k);
-    for (int l = 0; l < size; l++)
+    // Upper triangular
+    for (int l = k; l < size; l++)
     {
       kE[k][l] = m_alfCovarianceFrameCcAlf[0].E(0,0,k,l);
     }
@@ -6751,6 +6930,9 @@ void EncAdaptiveLoopFilter::determineControlIdcValues(CodingStructure &cs, const
   TempCtx ctxStart(m_ctxCache);
   ctxInitial = SubCtx(Ctx::CcAlfFilterControlFlag, m_CABACEstimator->getCtx());
   ctxBest    = SubCtx(Ctx::CcAlfFilterControlFlag, m_CABACEstimator->getCtx());
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+  double chromaFactor = ( m_isLowDelayConfig && m_isLumaSignalNewAps && (getAvailableCcAlfApsIds(cs, compID).size() < 4)) ? m_chromaFactor : 1.00;
+#endif
 
   int ctuIdx = 0;
   for (int yCtu = 0; yCtu < buf->height; yCtu += ctuHeightC)
@@ -6796,7 +6978,11 @@ void EncAdaptiveLoopFilter::determineControlIdcValues(CodingStructure &cs, const
         m_CABACEstimator->codeCcAlfFilterControlIdc(filterIdc, cs, compID, ctuIdx, filterControl, lumaPos,
                                                     ccAlfFilterCount);
         rate = FRAC_BITS_SCALE * m_CABACEstimator->getEstFracBits();
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+        cost = rate * m_lambda[compID] * chromaFactor + ssd;
+#else
         cost = rate * m_lambda[compID] + ssd;
+#endif
 
         bool limitationExceeded = false;
         if (m_limitCcAlf && filterIdx < MAX_NUM_CC_ALF_FILTERS)
@@ -6956,6 +7142,9 @@ void EncAdaptiveLoopFilter::deriveCcAlfFilter( CodingStructure& cs, ComponentID 
     deriveStatsForCcAlfFiltering<false>(orgYuv, tempDecYuvBuf, compID, cs);
   }
   initDistortionCcalf(compID);
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+  double chromaFactor = ( m_isLowDelayConfig && m_isLumaSignalNewAps && (getAvailableCcAlfApsIds(cs, compID).size() < 4)) ? m_chromaFactor : 1.00 ;
+#endif
 
   uint8_t bestMapFilterIdxToFilterIdc[MAX_NUM_CC_ALF_FILTERS+1];
   const int scaleX               = getComponentScaleX(compID, cs.pcv->chrFormat);
@@ -7134,8 +7323,11 @@ void EncAdaptiveLoopFilter::deriveCcAlfFilter( CodingStructure& cs, ComponentID 
             // new filter flags (ignore shared cost such as other new-filter flags/NALU header/RBSP
             // terminating bit/byte alignment bits)
           }
-
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+          double curTotalCost = curTotalRate * m_lambda[compID] * chromaFactor + curTotalDistortion;
+#else
           double curTotalCost = curTotalRate * m_lambda[compID] + curTotalDistortion;
+#endif
           if (curTotalCost < prevTotalCost)
           {
             prevTotalCost = curTotalCost;
@@ -7259,7 +7451,9 @@ void EncAdaptiveLoopFilter::deriveStatsForCcAlfFiltering( const PelUnitBuf &orgY
   {
     m_alfCovarianceFrameCcAlf[shape].reset();
   }
-
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+  PelUnitBuf resiYuv = m_tempBufResi.getBuf(UnitArea(CHROMA_400, Area(cs.area.blocks[COMPONENT_Y])));
+#endif
   int                  ctuRsAddr = 0;
   const PreCalcValues &pcv = *cs.pcv;
   bool                 clipTop = false, clipBottom = false, clipLeft = false, clipRight = false;
@@ -7316,6 +7510,22 @@ void EncAdaptiveLoopFilter::deriveStatsForCcAlfFiltering( const PelUnitBuf &orgY
 #endif
             recBuf = recBuf.subBuf( UnitArea(
               cs.area.chromaFormat, Area( clipL ? 0 : MAX_ALF_PADDING_SIZE, clipT ? 0 : MAX_ALF_PADDING_SIZE, w, h ) ) );
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+            PelUnitBuf resiBuf = m_tempBufResi2.subBuf( UnitArea( CHROMA_400, Area( 0, 0, wBuf, hBuf ) ) );
+            resiBuf.copyFrom( resiYuv.subBuf( UnitArea( CHROMA_400, Area( xStart - ( clipL ? 0 : MAX_ALF_PADDING_SIZE ), yStart - ( clipT ? 0 : MAX_ALF_PADDING_SIZE ), wBuf, hBuf ) ) ) );
+            // pad top-left unavailable samples for raster slice
+            if( xStart == xPos && yStart == yPos && ( rasterSliceAlfPad & 1 ) )
+            {
+              resiBuf.padBorderPel( MAX_ALF_PADDING_SIZE, 1 );
+            }
+            // pad bottom-right unavailable samples for raster slice
+            if( xEnd == xPos + width && yEnd == yPos + height && ( rasterSliceAlfPad & 2 ) )
+            {
+              resiBuf.padBorderPel( MAX_ALF_PADDING_SIZE, 2 );
+            }
+            mirroredPaddingForAlf(cs, resiBuf, MAX_ALF_PADDING_SIZE, true, false);
+            resiBuf = resiBuf.subBuf( UnitArea( CHROMA_400, Area( clipL ? 0 : MAX_ALF_PADDING_SIZE, clipT ? 0 : MAX_ALF_PADDING_SIZE, w, h ) ) );
+#endif
 
             const UnitArea area( m_chromaFormat, Area( 0, 0, w, h ) );
             const UnitArea areaDst( m_chromaFormat, Area( xStart, yStart, w, h ) );
@@ -7324,7 +7534,11 @@ void EncAdaptiveLoopFilter::deriveStatsForCcAlfFiltering( const PelUnitBuf &orgY
 
             for( int shape = 0; shape != m_filterShapesCcAlf.size(); shape++ )
             {
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+              getBlkStatsCcAlf<alfWSSD>( m_alfCovarianceCcAlf[shape][ctuRsAddr], m_filterShapesCcAlf[shape], orgYuv, recBuf, areaDst, area, compID, yPos, resiBuf );
+#else
               getBlkStatsCcAlf<alfWSSD>(m_alfCovarianceCcAlf[shape][ctuRsAddr], m_filterShapesCcAlf[shape], orgYuv, recBuf, areaDst, area, compID, yPos);
+#endif
               m_alfCovarianceFrameCcAlf[shape] += m_alfCovarianceCcAlf[shape][ctuRsAddr];
             }
 
@@ -7342,7 +7556,11 @@ void EncAdaptiveLoopFilter::deriveStatsForCcAlfFiltering( const PelUnitBuf &orgY
 
         for( int shape = 0; shape != m_filterShapesCcAlf.size(); shape++ )
         {
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+          getBlkStatsCcAlf<alfWSSD>( m_alfCovarianceCcAlf[shape][ctuRsAddr], m_filterShapesCcAlf[shape], orgYuv, recYuv, area, area, compID, yPos, resiYuv );
+#else
           getBlkStatsCcAlf<alfWSSD>(m_alfCovarianceCcAlf[0][ctuRsAddr], m_filterShapesCcAlf[shape], orgYuv, recYuv, area, area, compID, yPos);
+#endif
           m_alfCovarianceFrameCcAlf[shape] += m_alfCovarianceCcAlf[shape][ctuRsAddr];
         }
       }
@@ -7352,7 +7570,11 @@ void EncAdaptiveLoopFilter::deriveStatsForCcAlfFiltering( const PelUnitBuf &orgY
 }
 
 template<bool m_alfWSSD>
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+void EncAdaptiveLoopFilter::getBlkStatsCcAlf(AlfCovariance &alfCovariance, const AlfFilterShape &shape, const PelUnitBuf &orgYuv, const PelUnitBuf &recYuv, const UnitArea &areaDst, const UnitArea &area, const ComponentID compID, const int yPos, PelUnitBuf &resiYuv )
+#else
 void EncAdaptiveLoopFilter::getBlkStatsCcAlf(AlfCovariance &alfCovariance, const AlfFilterShape &shape, const PelUnitBuf &orgYuv, const PelUnitBuf &recYuv, const UnitArea &areaDst, const UnitArea &area, const ComponentID compID, const int yPos)
+#endif
 {
   const int numberOfComponents = getNumberValidComponents( m_chromaFormat );
   const CompArea &compArea           = areaDst.block(compID);
@@ -7366,6 +7588,12 @@ void EncAdaptiveLoopFilter::getBlkStatsCcAlf(AlfCovariance &alfCovariance, const
 
   int        orgStride = orgYuv.get(compID).stride;
   const Pel *org       = orgYuv.get(compID).bufAt(compArea);
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+  int resiStride = resiYuv.get(COMPONENT_Y).stride;
+  Pel* resiPtr   = resiYuv.get(COMPONENT_Y).bufAt( area.lumaPos());
+  int scaleX = getComponentScaleX( compID, m_chromaFormat );
+  int scaleY = getComponentScaleY( compID, m_chromaFormat );
+#endif
   const int  numBins   = 1;
 
 #if !ALF_IMPROVEMENT
@@ -7394,12 +7622,19 @@ void EncAdaptiveLoopFilter::getBlkStatsCcAlf(AlfCovariance &alfCovariance, const
 #endif
     {
       std::memset(ELocal, 0, sizeof(ELocal));
-
+#if JVET_AF0177_ALF_COV_FLOAT
+      float weight = 1.0;
+      if (m_alfWSSD)
+      {
+        weight = (float)m_lumaLevelToWeightPLUT[org[j]];
+      }
+#else
       double weight = 1.0;
       if (m_alfWSSD)
       {
         weight = m_lumaLevelToWeightPLUT[org[j]];
       }
+#endif
 
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
       Intermediate_Int yLocal = org[j] - rec[compID][j];
@@ -7408,7 +7643,11 @@ void EncAdaptiveLoopFilter::getBlkStatsCcAlf(AlfCovariance &alfCovariance, const
 #endif
 
 #if ALF_IMPROVEMENT
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+      calcCovarianceCcAlf( ELocal, rec[COMPONENT_Y] + ( j << scaleX ), recStride[COMPONENT_Y], shape, resiPtr + (j << scaleX), resiStride );
+#else
       calcCovarianceCcAlf( ELocal, rec[COMPONENT_Y] + ( j << getComponentScaleX( compID, m_chromaFormat ) ), recStride[COMPONENT_Y], shape );
+#endif
 #else
       calcCovarianceCcAlf( ELocal, rec[COMPONENT_Y] + ( j << getComponentScaleX(compID, m_chromaFormat)), recStride[COMPONENT_Y], shape, vbDistance );
 #endif
@@ -7424,7 +7663,11 @@ void EncAdaptiveLoopFilter::getBlkStatsCcAlf(AlfCovariance &alfCovariance, const
               if (m_alfWSSD)
               {
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+#if JVET_AF0177_ALF_COV_FLOAT
+                alfCovariance.E(b0, b1, k, l) += weight * (ELocal[k][b0] * (float)ELocal[l][b1]);
+#else
                 alfCovariance.E(b0,b1,k,l) += weight * (ELocal[k][b0] * (double)ELocal[l][b1]);
+#endif
 #else
                 alfCovariance.E(b0,b1,k,l) += weight * (double) (ELocal[k][b0] * ELocal[l][b1]);
 #endif
@@ -7432,7 +7675,11 @@ void EncAdaptiveLoopFilter::getBlkStatsCcAlf(AlfCovariance &alfCovariance, const
               else
               {
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+#if JVET_AF0177_ALF_COV_FLOAT
+                alfCovariance.E(b0, b1, k, l) += ELocal[k][b0] * (float)ELocal[l][b1];
+#else
                 alfCovariance.E(b0,b1,k,l) += ELocal[k][b0] * (double)ELocal[l][b1];
+#endif
 #else
                 alfCovariance.E(b0,b1,k,l) += ELocal[k][b0] * ELocal[l][b1];
 #endif
@@ -7445,7 +7692,11 @@ void EncAdaptiveLoopFilter::getBlkStatsCcAlf(AlfCovariance &alfCovariance, const
           if (m_alfWSSD)
           {
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+#if JVET_AF0177_ALF_COV_FLOAT
+            alfCovariance.y(b,k) += weight * (ELocal[k][b] * (float)yLocal);
+#else
             alfCovariance.y(b,k) += weight * (ELocal[k][b] * (double)yLocal);
+#endif
 #else
             alfCovariance.y[b][k] += weight * (double) (ELocal[k][b] * yLocal);
 #endif
@@ -7453,7 +7704,11 @@ void EncAdaptiveLoopFilter::getBlkStatsCcAlf(AlfCovariance &alfCovariance, const
           else
           {
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+#if JVET_AF0177_ALF_COV_FLOAT
+            alfCovariance.y(b,k) += ELocal[k][b] * (float)yLocal;
+#else
             alfCovariance.y(b,k) += ELocal[k][b] * (double)yLocal;
+#endif
 #else
             alfCovariance.y[b][k] += ELocal[k][b] * yLocal;
 #endif
@@ -7463,7 +7718,11 @@ void EncAdaptiveLoopFilter::getBlkStatsCcAlf(AlfCovariance &alfCovariance, const
       if (m_alfWSSD)
       {
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+#if JVET_AF0177_ALF_COV_FLOAT
+        alfCovariance.pixAcc += weight * (yLocal * (float)yLocal);
+#else
         alfCovariance.pixAcc += weight * (yLocal * (double)yLocal);
+#endif
 #else
         alfCovariance.pixAcc += weight * (double) (yLocal * yLocal);
 #endif
@@ -7471,7 +7730,11 @@ void EncAdaptiveLoopFilter::getBlkStatsCcAlf(AlfCovariance &alfCovariance, const
       else
       {
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+#if JVET_AF0177_ALF_COV_FLOAT
+        alfCovariance.pixAcc += yLocal * (float)yLocal;
+#else
         alfCovariance.pixAcc += yLocal * (double)yLocal;
+#endif
 #else
         alfCovariance.pixAcc += yLocal * yLocal;
 #endif
@@ -7497,23 +7760,38 @@ void EncAdaptiveLoopFilter::getBlkStatsCcAlf(AlfCovariance &alfCovariance, const
         }
       }
     }
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+    resiPtr += resiStride << scaleY;
+#endif
   }
 }
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
 #if ALF_IMPROVEMENT
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+void EncAdaptiveLoopFilter::calcCovarianceCcAlf( Pel ELocal[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const Pel *rec, const int stride, const AlfFilterShape& shape, Pel* resiPtr, int resiStride )
+#else
 void EncAdaptiveLoopFilter::calcCovarianceCcAlf( Pel ELocal[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const Pel *rec, const int stride, const AlfFilterShape& shape )
+#endif
 #else
 void EncAdaptiveLoopFilter::calcCovarianceCcAlf(Pel ELocal[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const Pel *rec, const int stride, const AlfFilterShape& shape, int vbDistance)
 #endif
 #else
 #if ALF_IMPROVEMENT
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+void EncAdaptiveLoopFilter::calcCovarianceCcAlf( int ELocal[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const Pel *rec, const int stride, const AlfFilterShape& shape, Pel* resiPtr, int resiStride )
+#else
 void EncAdaptiveLoopFilter::calcCovarianceCcAlf( int ELocal[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const Pel *rec, const int stride, const AlfFilterShape& shape )
+#endif
 #else
 void EncAdaptiveLoopFilter::calcCovarianceCcAlf(int ELocal[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const Pel *rec, const int stride, const AlfFilterShape& shape, int vbDistance)
 #endif
 #endif
 {
   CHECK(shape.filterType != CC_ALF, "Bad CC ALF shape");
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+  bool isHighRes = m_picWidth > 1280 && m_picHeight > 720 ? true : false;
+  Pel  clipValue = m_alfClippingValues[CHANNEL_TYPE_LUMA][1];
+#endif
 
   const Pel *recYM1 = rec - 1 * stride;
   const Pel *recY0  = rec;
@@ -7544,6 +7822,7 @@ void EncAdaptiveLoopFilter::calcCovarianceCcAlf(int ELocal[MAX_NUM_CC_ALF_CHROMA
     const Pel centerValue = recY0[+0];
 
 #if JVET_X0071_LONGER_CCALF
+#if !JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
     ELocal[0][b] += recYM4[+0] - centerValue;
     ELocal[1][b] += recYM3[+0] - centerValue;
     ELocal[2][b] += recYM2[+0] - centerValue;
@@ -7571,6 +7850,40 @@ void EncAdaptiveLoopFilter::calcCovarianceCcAlf(int ELocal[MAX_NUM_CC_ALF_CHROMA
     ELocal[21][b] += recYP2[+0] - centerValue;
     ELocal[22][b] += recYP3[+0] - centerValue;
     ELocal[23][b] += recYP4[+0] - centerValue;
+#endif
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+    ELocal[0][b] += recYM4[+0] - centerValue + recYP4[+0] - centerValue;
+    ELocal[1][b] += recYM3[+0] - centerValue;
+    ELocal[2][b] += recYM2[+0] - centerValue;
+    ELocal[3][b] += recYM1[+0] - centerValue;
+
+    ELocal[4][b] += recY0[-4] - centerValue;
+    ELocal[5][b] += recY0[-3] - centerValue;
+    ELocal[6][b] += recY0[-2] - centerValue;
+    ELocal[7][b] += recY0[-1] - centerValue;
+    ELocal[8][b] += recY0[+1] - centerValue;
+    ELocal[9][b] += recY0[+2] - centerValue;
+    ELocal[10][b] += recY0[+3] - centerValue;
+    ELocal[11][b] += recY0[+4] - centerValue;
+
+    ELocal[12][b] += recYP1[-4] - centerValue + recYP1[+4] - centerValue;
+    ELocal[13][b] += recYP1[-3] - centerValue;
+    ELocal[14][b] += recYP1[-2] - centerValue;
+    ELocal[15][b] += recYP1[-1] - centerValue;
+    ELocal[16][b] += recYP1[+0] - centerValue;
+    ELocal[17][b] += recYP1[+1] - centerValue;
+    ELocal[18][b] += recYP1[+2] - centerValue;
+    ELocal[19][b] += recYP1[+3] - centerValue;
+
+    ELocal[20][b] += recYP2[+0] - centerValue;
+    ELocal[21][b] += recYP3[+0] - centerValue;
+
+    ELocal[22][b] += (isHighRes ) ? clipALF(clipValue, 0, resiPtr[-1 * resiStride + 0]) : 0;
+    ELocal[23][b] += (isHighRes ) ? clipALF(clipValue, 0, resiPtr[+0 * resiStride - 1]) : 0;
+    ELocal[24][b] +=                clipALF(clipValue, 0, resiPtr[+0 * resiStride + 0])    ;
+    ELocal[25][b] += (isHighRes ) ? clipALF(clipValue, 0, resiPtr[+0 * resiStride + 1]) : 0;
+    ELocal[26][b] += (isHighRes ) ? clipALF(clipValue, 0, resiPtr[+1 * resiStride + 0]) : 0;
+#endif
 #else
     ELocal[0][b] += recYM1[+0] - centerValue;
     ELocal[1][b] += recY0[-1] - centerValue;
@@ -7597,6 +7910,9 @@ void EncAdaptiveLoopFilter::countLumaSwingGreaterThanThreshold(const Pel* luma, 
   int xSupport[] = {  0, -1, 0, 1, -1, 0, 1, 0 };
   int ySupport[] = { -1,  0, 0, 0,  1, 1, 1, 2 };
 #endif
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+  int numSpatialTap = JVET_X0071_LONGER_CCALF ? 25 : 8;
+#endif
 
   for (int y = 0; y < height; y += (1 << log2BlockHeight))
   {
@@ -7620,7 +7936,11 @@ void EncAdaptiveLoopFilter::countLumaSwingGreaterThanThreshold(const Pel* luma, 
           int minVal = ((1 << lumaBitDepth) - 1);
           int maxVal = 0;
 #if JVET_X0071_LONGER_CCALF
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+          for (int i = 0; i < numSpatialTap; i++)
+#else
           for (int i = 0; i < MAX_NUM_CC_ALF_CHROMA_COEFF; i++)
+#endif
 #else
           for (int i = 0; i < 8; i++)
 #endif

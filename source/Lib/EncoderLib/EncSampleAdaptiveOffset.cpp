@@ -107,7 +107,6 @@ EncSampleAdaptiveOffset::EncSampleAdaptiveOffset()
 
 EncSampleAdaptiveOffset::~EncSampleAdaptiveOffset()
 {
-  destroyEncData();
 }
 
 void EncSampleAdaptiveOffset::createEncData(bool isPreDBFSamplesUsed, uint32_t numCTUsPic)
@@ -1424,9 +1423,13 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
         {
           for (auto& currTU : CU::traverseTUs(currCU))
           {
-
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+            bool applyBIF = bifParams.ctuOn[ctuRsAddr] && m_bilateralFilter.getApplyBIF(currTU, COMPONENT_Y);
+#else
             bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
-            if (bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
+            bool applyBIF = bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height)));
+#endif
+            if (applyBIF)
             {
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
               bool clipTop = false, clipBottom = false, clipLeft = false, clipRight = false;
@@ -1450,8 +1453,6 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
       if(cs.pps->getUseChromaBIF())
       {
-        bool tuValid = false;
-        bool tuCBF = false;
         bool isDualTree = CS::isDualITree(cs);
         ChannelType chType = isDualTree ? CH_C : CH_L;
         bool applyChromaBIF = false;
@@ -1470,13 +1471,18 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
           }
           for (auto &currTU : CU::traverseTUs(currCU))
           {
-            bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
             for(int compIdx = COMPONENT_Cb ; compIdx < MAX_NUM_COMPONENT; compIdx++)
             {
               ComponentID compID = ComponentID( compIdx );
               BifParams& chromaBifParams = cs.picture->getBifParam( compID );
               bool ctuEnableChromaBIF = chromaBifParams.ctuOn[ctuRsAddr];
 
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+              applyChromaBIF = ctuEnableChromaBIF && m_bilateralFilter.getApplyBIF(currTU, compID);
+#else
+              bool tuValid = false;
+              bool tuCBF = false;
+              bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
               applyChromaBIF = false;
               if(!isDualTree)
               {
@@ -1493,6 +1499,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                 tuCBF = TU::getCbf(currTU, compID);
                 applyChromaBIF = (ctuEnableChromaBIF && ((tuCBF || isInter == false) && (currTU.cu->qp > 17)));
               }
+#endif
               if(applyChromaBIF)
               {
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
@@ -1535,7 +1542,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
           // We don't need to clip if SAO was not performed on luma.
           SAOBlkParam mySAOblkParam = cs.picture->getSAO()[ctuRsAddr];
           SAOOffset& myCtbOffset     = mySAOblkParam[0];
-          BifParams& bifParams = cs.picture->getBifParam();
+          BifParams& bifParams = cs.picture->getBifParam(COMPONENT_Y);
           
           bool clipLumaIfNoBilat = false;
           if(myCtbOffset.modeIdc != SAO_MODE_OFF)
@@ -1562,9 +1569,14 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
           {
             for (auto &currTU : CU::traverseTUs(currCU))
             {
-              
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+              bool applyBIF = bifParams.ctuOn[ctuRsAddr] && m_bilateralFilter.getApplyBIF(currTU, COMPONENT_Y);
+#else
               bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
-              if ( bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
+              bool applyBIF = bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height)));
+#endif
+              
+              if (applyBIF)
               {
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                 bool clipTop = false, clipBottom = false, clipLeft = false, clipRight = false;
@@ -1575,7 +1587,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                   cs, currTU.Y().x, currTU.Y().y, currTU.lumaSize().width, currTU.lumaSize().height, clipTop,
                   clipBottom, clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
 #endif
-                bilateralFilter.bilateralFilterDiamond5x5( COMPONENT_Y, srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU
+                bilateralFilter.bilateralFilterDiamond5x5( COMPONENT_Y, srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU, false
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                   , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
                   , clipTop, clipBottom, clipLeft, clipRight
@@ -1609,8 +1621,6 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
           }
           if(cs.pps->getUseChromaBIF())
           {
-            bool tuValid = false;
-            bool tuCBF = false;
             bool isDualTree = CS::isDualITree(cs);
             ChannelType chType = isDualTree ? CH_C : CH_L;
             bool applyChromaBIF = false;
@@ -1624,12 +1634,17 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
               }
               for (auto &currTU : CU::traverseTUs(currCU))
               {
-                bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
                 for(int compIdx = COMPONENT_Cb; compIdx < MAX_NUM_COMPONENT; compIdx++)
                 {
                   ComponentID compID = ComponentID( compIdx );
                   BifParams& chromaBifParams = cs.picture->getBifParam( compID );
                   bool ctuEnableChromaBIF = chromaBifParams.ctuOn[ctuRsAddr];
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+                  applyChromaBIF = ctuEnableChromaBIF && m_bilateralFilter.getApplyBIF(currTU, compID);
+#else
+                  bool tuValid = false;
+                  bool tuCBF = false;
+                  bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
                   applyChromaBIF = false;
                   if(!isDualTree)
                   {
@@ -1646,6 +1661,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                     tuCBF = TU::getCbf(currTU, compID);
                     applyChromaBIF = (ctuEnableChromaBIF && ((tuCBF || isInter == false) && (currTU.cu->qp > 17)));
                   }
+#endif
                   if(applyChromaBIF)
                   {
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
@@ -1663,7 +1679,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                       clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
 
 #endif
-                    m_bilateralFilter.bilateralFilterDiamond5x5(compID, srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(compID), currTU, false,
+                    m_bilateralFilter.bilateralFilterDiamond5x5(compID, srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(compID), currTU, false
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                     , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry, clipTop, clipBottom, clipLeft, clipRight
 #endif
@@ -1772,6 +1788,9 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                 ComponentID compID = ComponentID( compIdx );
                 BifParams& chromaBifParams = cs.picture->getBifParam( compID );
                 bool ctuEnableChromaBIF = chromaBifParams.ctuOn[ctuRsAddr];
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+                applyChromaBIF = ctuEnableChromaBIF && m_bilateralFilter.getApplyBIF(currTU, compID);
+#else
                 applyChromaBIF = false;
                 if(!isDualTree)
                 {
@@ -1788,6 +1807,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                   tuCBF = TU::getCbf(currTU, compID);
                   applyChromaBIF = (ctuEnableChromaBIF && ((tuCBF || isInter == false) && (currTU.cu->qp > 17)));
                 }
+#endif
                 if(applyChromaBIF)
                 {
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
@@ -1893,9 +1913,13 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
           {
             for (auto& currTU : CU::traverseTUs(currCU))
             {
-
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+              bool applyBIF = bifParams.ctuOn[ctuRsAddr] && m_bilateralFilter.getApplyBIF(currTU, COMPONENT_Y);
+#else
               bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
-              if (bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
+              bool applyBIF = bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height)));
+#endif
+              if (applyBIF)
               {
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                 bool clipTop = false, clipBottom = false, clipLeft = false, clipRight = false;
@@ -1920,8 +1944,6 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
         if(cs.pps->getUseChromaBIF())
         {
-          bool tuValid = false;
-          bool tuCBF = false;
           bool isDualTree = CS::isDualITree(cs);
           ChannelType chType = isDualTree ? CH_C : CH_L;
           bool applyChromaBIF = false;
@@ -1940,13 +1962,18 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
 
             for (auto &currTU : CU::traverseTUs(currCU))
             {
-              bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
               for(int compIdx = COMPONENT_Cb; compIdx < MAX_NUM_COMPONENT; compIdx++)
               {
                 ComponentID compID = ComponentID( compIdx );
                 BifParams& chromaBifParams = cs.picture->getBifParam( compID );
                 bool ctuEnableChromaBIF = chromaBifParams.ctuOn[ctuRsAddr];
 
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+                applyChromaBIF = ctuEnableChromaBIF && m_bilateralFilter.getApplyBIF(currTU, compID);
+#else
+                bool tuValid = false;
+                bool tuCBF = false;
+                bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
                 applyChromaBIF = false;
                 if(!isDualTree)
                 {
@@ -1963,6 +1990,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                   tuCBF = TU::getCbf(currTU, compID);
                   applyChromaBIF = (ctuEnableChromaBIF && ((tuCBF || isInter == false) && (currTU.cu->qp > 17)));
                 }
+#endif
                 if(applyChromaBIF)
                 {
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
@@ -2023,8 +2051,13 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
             {
               for (auto &currTU : CU::traverseTUs(currCU))
               {
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+                bool applyBIF = bifParams.ctuOn[ctuRsAddr] && m_bilateralFilter.getApplyBIF(currTU, COMPONENT_Y);
+#else
                 bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
-                if ( bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
+                bool applyBIF = bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height)));
+#endif
+                if (applyBIF)
                 {
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                   bool clipTop = false, clipBottom = false, clipLeft = false, clipRight = false;
@@ -2035,7 +2068,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                     cs, currTU.Y().x, currTU.Y().y, currTU.lumaSize().width, currTU.lumaSize().height, clipTop,
                     clipBottom, clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
 #endif
-                  bilateralFilter.bilateralFilterDiamond5x5( COMPONENT_Y, srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU
+                  bilateralFilter.bilateralFilterDiamond5x5( COMPONENT_Y, srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU, false
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                   , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
                   , clipTop, clipBottom, clipLeft, clipRight
@@ -2069,8 +2102,6 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
 
           if(cs.pps->getUseChromaBIF())
           {
-            bool tuValid = false;
-            bool tuCBF = false;
             bool isDualTree = CS::isDualITree(cs);
             ChannelType chType = isDualTree ? CH_C : CH_L;
             bool applyChromaBIF = false;
@@ -2084,13 +2115,18 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
               }
               for (auto &currTU : CU::traverseTUs(currCU))
               {
-                bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
                 for(int compIdx = COMPONENT_Cb; compIdx < MAX_NUM_COMPONENT; compIdx++)
                 {
                   ComponentID compID = ComponentID( compIdx );
                   BifParams& chromaBifParams = cs.picture->getBifParam( compID );
                   bool ctuEnableChromaBIF = chromaBifParams.ctuOn[ctuRsAddr];
 
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+                  applyChromaBIF = ctuEnableChromaBIF && m_bilateralFilter.getApplyBIF(currTU, compID);
+#else
+                  bool tuValid = false;
+                  bool tuCBF = false;
+                  bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
                   applyChromaBIF = false;
                   if(!isDualTree)
                   {
@@ -2107,6 +2143,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                     tuCBF = TU::getCbf(currTU, compID);
                     applyChromaBIF = (ctuEnableChromaBIF && ((tuCBF || isInter == false) && (currTU.cu->qp > 17)));
                   }
+#endif
                   if(applyChromaBIF)
                   {
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
@@ -2124,7 +2161,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                       clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
 
 #endif
-                    bilateralFilter.bilateralFilterDiamond5x5(compID, srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(compID), currTU, false,
+                    bilateralFilter.bilateralFilterDiamond5x5(compID, srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(compID), currTU, false
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                       ,isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry, clipTop, clipBottom, clipLeft, clipRight
 #endif
@@ -2196,9 +2233,13 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
           {
             for (auto &currTU : CU::traverseTUs(currCU))
             {
-              
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+              bool applyBIF = bifParams.ctuOn[ctuRsAddr] && m_bilateralFilter.getApplyBIF(currTU, COMPONENT_Y);
+#else
               bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
-              if ( bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
+              bool applyBIF = bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height)));
+#endif
+              if (applyBIF)
               {
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                 bool clipTop = false, clipBottom = false, clipLeft = false, clipRight = false;
@@ -2210,7 +2251,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                   clipBottom, clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
 #endif
 
-                bilateralFilter.bilateralFilterDiamond5x5( COMPONENT_Y, srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU
+                bilateralFilter.bilateralFilterDiamond5x5( COMPONENT_Y, srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU, false
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                   , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
                   , clipTop, clipBottom, clipLeft, clipRight
@@ -2293,6 +2334,9 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                 ComponentID compID = ComponentID( compIdx );
                 BifParams& chromaBifParams = cs.picture->getBifParam( compID );
                 bool ctuEnableChromaBIF = chromaBifParams.ctuOn[ctuRsAddr];
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+                applyChromaBIF = ctuEnableChromaBIF && m_bilateralFilter.getApplyBIF(currTU, compID);
+#else
                 applyChromaBIF = false;
                 if(!isDualTree)
                 {
@@ -2309,6 +2353,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                   tuCBF = TU::getCbf(currTU, compID);
                   applyChromaBIF = (ctuEnableChromaBIF && ((tuCBF || isInter == false) && (currTU.cu->qp > 17)));
                 }
+#endif
                 if(applyChromaBIF)
                 {
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY

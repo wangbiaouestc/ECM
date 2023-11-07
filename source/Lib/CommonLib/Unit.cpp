@@ -324,32 +324,12 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #endif
 #if TMP_FAST_ENC
 #if JVET_AD0086_ENHANCED_INTRA_TMP
-  for (int i = 0; i < MTMP_NUM; i++)
-  {
-    tmpXdisp[i] = other.tmpXdisp[i];
-    tmpYdisp[i] = other.tmpYdisp[i];
-  }
-  for (int i = 0; i < TMP_GROUP_IDX << 1; i++)
-  {
-    tmpFusionInfo[i] = other.tmpFusionInfo[i];
-  }
   tmpIdx        = other.tmpIdx;
   tmpFusionFlag = other.tmpFusionFlag;
   tmpFlmFlag    = other.tmpFlmFlag;
-  for (int j = 0; j < MTMP_NUM; j++)
-  {
-    for (int i = 0; i < TMP_FLM_PARAMS; i++)
-    {
-      tmpFlmParams[i][j] = other.tmpFlmParams[i][j];
-    }
-  }
   tmpIsSubPel  = other.tmpIsSubPel;
   tmpSubPelIdx = other.tmpSubPelIdx;
-#else
-  tmpXdisp = other.tmpXdisp;
-  tmpYdisp = other.tmpYdisp;
 #endif
-  tmpNumCand = other.tmpNumCand;
 #endif
 #if JVET_W0123_TIMD_FUSION
   timd              = other.timd;
@@ -430,10 +410,6 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #if JVET_AB0157_TMRL
   tmrlFlag = other.tmrlFlag;
   tmrlListIdx = other.tmrlListIdx;
-  for (auto i = 0; i < MRL_LIST_SIZE; i++)
-  {
-    tmrlList[i] = other.tmrlList[i];
-  }
 #endif
 #if JVET_AC0094_REF_SAMPLES_OPT
   areAboveRightUnavail = other.areAboveRightUnavail;
@@ -539,32 +515,12 @@ void CodingUnit::initData()
 #endif
 #if TMP_FAST_ENC
 #if JVET_AD0086_ENHANCED_INTRA_TMP
-  for (int i = 0; i < MTMP_NUM; i++)
-  {
-    tmpXdisp[i] = 0;
-    tmpYdisp[i] = 0;
-  }
-  for (int i = 0; i < TMP_GROUP_IDX << 1; i++)
-  {
-    tmpFusionInfo[i] = IntraTMPFusionInfo{ false, false, 0, 1 };
-  }
   tmpIdx        = 0;
   tmpFusionFlag = false;
   tmpFlmFlag    = false;
-  for (int j = 0; j < MTMP_NUM; j++)
-  {
-    for (int i = 0; i < TMP_FLM_PARAMS; i++)
-    {
-      tmpFlmParams[i][j] = -1;
-    }
-  }
-  tmpIsSubPel  = -1;
+  tmpIsSubPel  = 0;
   tmpSubPelIdx = -1;
-#else  
-  tmpXdisp = 0;
-  tmpYdisp = 0;
-#endif 
-  tmpNumCand = 0;
+#endif
 #endif
 #if JVET_W0123_TIMD_FUSION
   timd                     = false;
@@ -863,10 +819,6 @@ PredictionUnit::PredictionUnit(const ChromaFormat _chromaFormat, const Area &_ar
 void PredictionUnit::initData()
 {
   // intra data - need this default initialization for PCM
-#if SECONDARY_MPM
-  ::memset(intraMPM, 0, sizeof(intraMPM));
-  ::memset(intraNonMPM, 0, sizeof(intraNonMPM));
-#endif
 
   intraDir[0] = DC_IDX;
   intraDir[1] = PLANAR_IDX;
@@ -887,9 +839,10 @@ void PredictionUnit::initData()
   parseLumaMode = false;
   candId = -1;
   parseChromaMode = false;
+#endif
   mpmFlag = false;
   ipredIdx = -1;
-#endif
+  secondMpmFlag = false;
 #if JVET_Z0050_CCLM_SLOPE
   cclmOffsets = {};
 #endif
@@ -993,6 +946,12 @@ void PredictionUnit::initData()
 #else
   ::memset(mvdL0SubPu, 0, sizeof(mvdL0SubPu));
 #endif
+#if JVET_AF0057
+  dmvrImpreciseMv = false;
+#endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+  availableBdofRefinedMv = 0;
+#endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   reduceTplSize = false;
 #endif
@@ -1053,10 +1012,6 @@ void PredictionUnit::initData()
 
 PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
 {
-#if SECONDARY_MPM
-  ::memcpy(intraMPM, predData.intraMPM, sizeof(intraMPM));
-  ::memcpy(intraNonMPM, predData.intraNonMPM, sizeof(intraNonMPM));
-#endif
 
   for (uint32_t i = 0; i < MAX_NUM_CHANNEL_TYPE; i++)
   {
@@ -1074,9 +1029,10 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
   parseLumaMode = predData.parseLumaMode;
   candId = predData.candId;
   parseChromaMode = predData.parseChromaMode;
+#endif
   mpmFlag = predData.mpmFlag;
   ipredIdx = predData.ipredIdx;
-#endif
+  secondMpmFlag = predData.secondMpmFlag;
 #if JVET_Z0050_CCLM_SLOPE
   cclmOffsets = predData.cclmOffsets;
 #endif
@@ -1183,6 +1139,12 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
 #else
   ::memcpy(mvdL0SubPu, predData.mvdL0SubPu, sizeof(mvdL0SubPu));
 #endif
+#if JVET_AF0057
+  dmvrImpreciseMv = predData.dmvrImpreciseMv;
+#endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+  availableBdofRefinedMv = predData.availableBdofRefinedMv;
+#endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   reduceTplSize = predData.reduceTplSize;
 #endif
@@ -1248,10 +1210,6 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
 
 PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 {
-#if SECONDARY_MPM
-  ::memcpy(intraMPM, other.intraMPM, sizeof(intraMPM));
-  ::memcpy(intraNonMPM, other.intraNonMPM, sizeof(intraNonMPM));
-#endif
 
   for( uint32_t i = 0; i < MAX_NUM_CHANNEL_TYPE; i++ )
   {
@@ -1310,9 +1268,10 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   parseLumaMode = other.parseLumaMode;
   candId = other.candId;
   parseChromaMode = other.parseChromaMode;
+#endif
   mpmFlag = other.mpmFlag;
   ipredIdx = other.ipredIdx;
-#endif
+  secondMpmFlag = other.secondMpmFlag;
   geoSplitDir  = other.geoSplitDir;
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   geoSyntaxMode = other.geoSyntaxMode;
@@ -1373,6 +1332,12 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   bdmvrRefine = other.bdmvrRefine;
 #else
   ::memcpy(mvdL0SubPu, other.mvdL0SubPu, sizeof(mvdL0SubPu));
+#endif
+#if JVET_AF0057
+  dmvrImpreciseMv = other.dmvrImpreciseMv;
+#endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+  availableBdofRefinedMv = other.availableBdofRefinedMv;
 #endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   reduceTplSize = other.reduceTplSize;
@@ -1687,13 +1652,18 @@ void TransformUnit::initData()
 #if JVET_AE0059_INTER_CCCM
   interCccm          = 0;
 #endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  interCcpMerge      = 0;
+  curCand            = {};
+  curCand.type       = CCP_TYPE_NONE;
+#endif
 }
 #if REMOVE_PCM
 #if SIGN_PREDICTION
 #if JVET_Y0141_SIGN_PRED_IMPROVE
-void TransformUnit::init(TCoeff **coeffs, TCoeff **signs, unsigned **signsScanIdx, Pel **pltIdx, bool **runType)
+void TransformUnit::init(TCoeff **coeffs, SIGN_PRED_TYPE **signs, unsigned **signsScanIdx, Pel **pltIdx, bool **runType)
 #else
-void TransformUnit::init(TCoeff **coeffs, TCoeff **signs, Pel **pltIdx, bool **runType)
+void TransformUnit::init(TCoeff **coeffs, SIGN_PRED_TYPE **signs, Pel **pltIdx, bool **runType)
 #endif
 #else
 void TransformUnit::init(TCoeff **coeffs, Pel **pltIdx, bool **runType)
@@ -1701,9 +1671,9 @@ void TransformUnit::init(TCoeff **coeffs, Pel **pltIdx, bool **runType)
 #else
 #if SIGN_PREDICTION
 #if JVET_Y0141_SIGN_PRED_IMPROVE
-void TransformUnit::init(TCoeff **coeffs, TCoeff **signs, unsigned **signsScanIdx, Pel **pcmbuf, bool **runType)
+void TransformUnit::init(TCoeff **coeffs, SIGN_PRED_TYPE **signs, unsigned **signsScanIdx, Pel **pcmbuf, bool **runType)
 #else
-void TransformUnit::init(TCoeff **coeffs, TCoeff **signs, Pel **pcmbuf, bool **runType)
+void TransformUnit::init(TCoeff **coeffs, SIGN_PRED_TYPE **signs, Pel **pcmbuf, bool **runType)
 #endif
 #else
 void TransformUnit::init(TCoeff **coeffs, Pel **pcmbuf, bool **runType)
@@ -1749,7 +1719,8 @@ TransformUnit& TransformUnit::operator=(const TransformUnit& other)
 
     if (m_coeffs[i] && other.m_coeffs[i] && m_coeffs[i] != other.m_coeffs[i]) memcpy(m_coeffs[i], other.m_coeffs[i], sizeof(TCoeff) * area);
 #if SIGN_PREDICTION
-    if (m_coeffSigns[i] && other.m_coeffSigns[i] && m_coeffSigns[i] != other.m_coeffSigns[i]) memcpy(m_coeffSigns[i], other.m_coeffSigns[i], sizeof(TCoeff) * area);
+    if (m_coeffSigns[i] && other.m_coeffSigns[i] && m_coeffSigns[i] != other.m_coeffSigns[i])
+      std::copy_n(other.m_coeffSigns[i], area, m_coeffSigns[i]);
 #if JVET_Y0141_SIGN_PRED_IMPROVE
     if (m_coeffSignsIdx[i] && other.m_coeffSignsIdx[i] && m_coeffSignsIdx[i] != other.m_coeffSignsIdx[i]) memcpy(m_coeffSignsIdx[i], other.m_coeffSignsIdx[i], sizeof(unsigned) * area);
 #endif
@@ -1773,6 +1744,10 @@ TransformUnit& TransformUnit::operator=(const TransformUnit& other)
 #if JVET_AE0059_INTER_CCCM
   interCccm          = other.interCccm;
 #endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  interCcpMerge      = other.interCcpMerge;
+  curCand            = other.curCand;
+#endif
   return *this;
 }
 
@@ -1786,7 +1761,8 @@ void TransformUnit::copyComponentFrom(const TransformUnit& other, const Componen
 
   if (m_coeffs[i] && other.m_coeffs[i] && m_coeffs[i] != other.m_coeffs[i]) memcpy(m_coeffs[i], other.m_coeffs[i], sizeof(TCoeff) * area);
 #if SIGN_PREDICTION
-  if (m_coeffSigns[i] && other.m_coeffSigns[i] && m_coeffSigns[i] != other.m_coeffSigns[i]) memcpy(m_coeffSigns[i], other.m_coeffSigns[i], sizeof(TCoeff) * area);
+  if (m_coeffSigns[i] && other.m_coeffSigns[i] && m_coeffSigns[i] != other.m_coeffSigns[i])
+    std::copy_n(other.m_coeffSigns[i], area, m_coeffSigns[i]);
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   if (m_coeffSignsIdx[i] && other.m_coeffSignsIdx[i] && m_coeffSignsIdx[i] != other.m_coeffSignsIdx[i]) memcpy(m_coeffSignsIdx[i], other.m_coeffSignsIdx[i], sizeof(unsigned) * area);
 #endif
@@ -1810,18 +1786,48 @@ void TransformUnit::copyComponentFrom(const TransformUnit& other, const Componen
 #if JVET_AE0059_INTER_CCCM
   interCccm        = other.interCccm;
 #endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  interCcpMerge    = other.interCcpMerge;
+  curCand          = other.curCand;
+#endif
 }
 
        CoeffBuf TransformUnit::getCoeffs(const ComponentID id)       { return  CoeffBuf(m_coeffs[id], blocks[id]); }
 const CCoeffBuf TransformUnit::getCoeffs(const ComponentID id) const { return CCoeffBuf(m_coeffs[id], blocks[id]); }
 
 #if SIGN_PREDICTION
-       CoeffBuf TransformUnit::getCoeffSigns(const ComponentID id)       { return  CoeffBuf(m_coeffSigns[id], blocks[id]); }
-const CCoeffBuf TransformUnit::getCoeffSigns(const ComponentID id) const { return CCoeffBuf(m_coeffSigns[id], blocks[id]); }
+AreaBuf<SIGN_PRED_TYPE> TransformUnit::getCoeffSigns(const ComponentID id)
+{
+  return AreaBuf<SIGN_PRED_TYPE>(m_coeffSigns[id], blocks[id]);
+}
 #if JVET_Y0141_SIGN_PRED_IMPROVE
       IdxBuf    TransformUnit::getCoeffSignsScanIdx(const ComponentID id) { return  IdxBuf(m_coeffSignsIdx[id], blocks[id]); }
 const CIdxBuf   TransformUnit::getCoeffSignsScanIdx(const ComponentID id) const { return CIdxBuf(m_coeffSignsIdx[id], blocks[id]); }
 #endif
+#endif
+
+#if JVET_AF0073_INTER_CCP_MERGE
+const MotionInfo& TransformUnit::getMotionInfo() const
+{
+  return cs->getMotionInfo( lumaPos() );
+}
+
+const MotionInfo& TransformUnit::getMotionInfo( const Position& pos ) const
+{
+  CHECKD( !Y().contains( pos ), "Trying to access motion info outside of TU" );
+  return cs->getMotionInfo( pos );
+}
+
+const int& TransformUnit::getCcpmIdxInfo() const
+{
+  return cs->getCcpmIdxInfo( chromaPos() );
+}
+
+const int& TransformUnit::getCcpmIdxInfo( const Position& pos ) const
+{
+  CHECKD( !Y().contains( pos ), "Trying to access motion info outside of TU" );
+  return cs->getCcpmIdxInfo( pos );
+}
 #endif
 
 #if REMOVE_PCM
@@ -1923,15 +1929,15 @@ void TransformUnit::initSignBuffers( const ComponentID compID )
 
   if( cs->sps->getNumPredSigns() > 0 && uiHeight >= 4 && uiWidth >= 4 )
   {
-    CoeffBuf signBuff = getCoeffSigns( compID );
-    TCoeff *coeff = signBuff.buf;
+    AreaBuf<SIGN_PRED_TYPE> signBuff = getCoeffSigns(compID);
+    SIGN_PRED_TYPE         *coeff    = signBuff.buf;
 #if JVET_Y0141_SIGN_PRED_IMPROVE
     IdxBuf signScanIdxBuff = getCoeffSignsScanIdx( compID );
     uint32_t spArea = std::max( cs->sps->getSignPredArea(), SIGN_PRED_FREQ_RANGE );
     unsigned int *coeffIdx = signScanIdxBuff.buf;
     uint32_t spWidth = std::min( uiWidth, spArea );
     uint32_t spHeight = std::min( uiHeight, spArea );
-    CHECK( TrQuant::SIGN_PRED_BYPASS, "SIGN_PRED_BYPASS should be equal to 0" );
+    CHECK(SIGN_PRED_BYPASS, "SIGN_PRED_BYPASS should be equal to 0");
 
     for( uint32_t y = 0; y < spHeight; y++ )
 #else
@@ -1939,14 +1945,14 @@ void TransformUnit::initSignBuffers( const ComponentID compID )
 #endif
     {
 #if JVET_Y0141_SIGN_PRED_IMPROVE
-      memset( coeff, 0, sizeof( TCoeff ) * spWidth );
+      std::fill_n(coeff, spWidth, SIGN_PRED_BYPASS);
       memset( coeffIdx, MAX_UINT, sizeof( unsigned int ) * spWidth );
       coeffIdx += signScanIdxBuff.stride;
 #else
-      coeff[0] = TrQuant::SIGN_PRED_BYPASS;
-      coeff[1] = TrQuant::SIGN_PRED_BYPASS;
-      coeff[2] = TrQuant::SIGN_PRED_BYPASS;
-      coeff[3] = TrQuant::SIGN_PRED_BYPASS;
+      coeff[0] = SIGN_PRED_BYPASS;
+      coeff[1] = SIGN_PRED_BYPASS;
+      coeff[2] = SIGN_PRED_BYPASS;
+      coeff[3] = SIGN_PRED_BYPASS;
 #endif
       coeff += signBuff.stride;
     }

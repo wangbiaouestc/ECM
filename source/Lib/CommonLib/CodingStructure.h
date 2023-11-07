@@ -114,6 +114,9 @@ public:
 
   void destroy();
   void releaseIntermediateData();
+  bool m_isTopLayer;
+  void destroyTemporaryCsData();
+  void createTemporaryCsData(const bool isPLTused);
 #if JVET_Z0118_GDR
   bool isCuCrossIRA(int begX) const;
   bool isCuCrossVB(int endX) const;
@@ -159,7 +162,6 @@ public:
   void destroyTMBuf();
 #endif
 
-  void createCoeffs(const bool isPLTused);
   void destroyCoeffs();
 
   void allocateVectorsAtPicLevel();
@@ -253,6 +255,7 @@ public:
 #endif
 
 private:
+  void createCoeffs(const bool isPLTused);
   void createInternals(const UnitArea& _unit, const bool isTopLayer, const bool isPLTused);
 
 public:
@@ -335,7 +338,7 @@ private:
 
   TCoeff *m_coeffs [ MAX_NUM_COMPONENT ];
 #if SIGN_PREDICTION
-  TCoeff *m_coeffSigns [ MAX_NUM_COMPONENT ];
+  SIGN_PRED_TYPE *m_coeffSigns[MAX_NUM_COMPONENT];
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   unsigned *m_coeffSignsIdx[MAX_NUM_COMPONENT];
 #endif

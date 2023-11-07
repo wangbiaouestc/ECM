@@ -53,6 +53,9 @@
 BilateralFilter::BilateralFilter()
 {
   m_bilateralFilterDiamond5x5 = blockBilateralFilterDiamond5x5;
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+  m_calcMAD = calcMAD;
+#endif
 
 #if ENABLE_SIMD_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER_ENABLE_SIMD
 #ifdef TARGET_SIMD_X86
@@ -67,14 +70,53 @@ BilateralFilter::~BilateralFilter()
 
 void BilateralFilter::create()
 {
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+  for (int qp = 0; qp < 26; qp++)
+  {
+    for (int i = 0; i < 16; i++)
+    {
+#if JVET_V0094_BILATERAL_FILTER
+      m_lut[qp][i] = ((int)m_wBIF[qp][i] * m_distFactor[0] + 4) >> 3;
+      m_lut[qp][16 + i] = ((int)m_wBIF[qp][i] * m_distFactor[1] + 4) >> 3;
+      m_lut[qp][32 + i] = ((int)m_wBIF[qp][i] * m_distFactor[2] + 4) >> 3;
+#endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+      m_lutChroma[qp][i] = ((int)m_wBIFChroma[qp][i] * m_distFactorChroma[0] + 4) >> 3;
+      m_lutChroma[qp][16 + i] = ((int)m_wBIFChroma[qp][i] * m_distFactorChroma[1] + 4) >> 3;
+      m_lutChroma[qp][32 + i] = ((int)m_wBIFChroma[qp][i] * m_distFactorChroma[2] + 4) >> 3;
+#endif
+    }
+  }
+#endif
 }
 
 void BilateralFilter::destroy()
 {
 }
 #if JVET_V0094_BILATERAL_FILTER
-const char* BilateralFilter::getFilterLutParameters( const int size, const PredMode predMode, const int32_t qp, int& bfac )
+const char* BilateralFilter::getFilterLutParameters(int16_t* block, const int stride, const int width, const int height, const PredMode predMode, const int32_t qp, int& bfac)
 {
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+  int w = floorLog2(width);
+  int h = floorLog2(height);
+  int mad = m_calcMAD(block, stride, width, height, w + h);
+
+  w = std::min(w, 7);
+  h = std::min(h, 7);
+  mad = std::min(mad >> 4, 15);
+
+  bfac = m_tuSizeFactor[predMode == MODE_INTER][w * 8 + h];
+  if (bfac) // BIF is not applied if tuSizeFactor[(w, h)] = 0
+  {
+    bfac += m_tuMADFactor[predMode == MODE_INTER][mad];
+  }
+
+  int sqp = qp - 17;
+  sqp = std::min(sqp, 25);
+  sqp = std::max(sqp, 0);
+  return m_lut[sqp];
+#else
+  const int size = std::min(width, height);
   if( size <= 4 )
   {
     bfac = 3;
@@ -117,99 +159,81 @@ const char* BilateralFilter::getFilterLutParameters( const int size, const PredM
   }
 
   return m_wBIF[sqp - 17];
+#endif
 }
 #endif
 
-void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bifRoundAdd, int bifRoundShift, bool isRDO, const char* lutRowPtr, bool noClip )
+inline void bifApplyLut(int diff, int& res, int cutBitsNum, int bitsRound, int bitsRound2, int shift, const char* lutRowPtr, int lutShift)
 {
-  int pad = 2;
+  int sg0 = diff >> shift;
+  int v0 = (diff + sg0) ^ sg0;
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+  int idx = (v0 + bitsRound) >> cutBitsNum;
+  idx = 15 + ((idx - 15) & ((idx - 15) >> shift));
+  int idx2 = (v0 + bitsRound2) >> cutBitsNum;
+  idx2 = 15 + ((idx2 - 15) & ((idx2 - 15) >> shift));
+  int w0 = (lutRowPtr[lutShift + idx] + lutRowPtr[lutShift + idx2] + 1) >> 1;
+#else
+  int idx = (v0 + 4) >> 3;
+  idx = 15 + ((idx - 15) & ((idx - 15) >> shift));
+  int w0 = lutRowPtr[idx] >> lutShift;
+#endif
+  res = (w0 + sg0) ^ sg0;
+}
+
+void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bifRoundAdd, int bifRoundShift, bool isRDO, const char* lutRowPtr, bool noClip, int cutBitsNum)
+{
+  int pad = NUMBER_PADDED_SAMPLES;
 
   int padwidth = iWidthExtSIMD;
-  int downbuffer[64];
-  int downleftbuffer[65];
-  int downrightbuffer[2][65];
-  int shift, sg0, v0, idx, w0;
-  shift = sizeof( int ) * 8 - 1;
-  downbuffer[0] = 0;
+  int downbuffer[128];
+  int downleftbuffer[129];
+  int downrightbuffer[2][129];
+  int shift = sizeof( int ) * 8 - 1;
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+  int lutShift1 = 0, lutShift2 = 16, lutShift3 = 32;
+  int bitsRound = 1 << (cutBitsNum - 2);
+  int bitsRound2 = bitsRound + (1 << (cutBitsNum - 1));
+#else
+  int lutShift1 = 0, lutShift2 = 1, lutShift3 = 1;
+  int bitsRound = 4;
+  int bitsRound2 = 4;
+#endif
 
   for( int x = 0; x < uiWidth; x++ )
   {
     int pixel = block[(-1 + pad)*padwidth + x + pad];
     int below = block[(-1 + pad + 1)*padwidth + x + pad];
-    int diff = below - pixel;
-    sg0 = diff >> shift;
-    v0 = (diff + sg0) ^ sg0;
-    v0 = (v0 + 4) >> 3;
-    idx = 15 + ((v0 - 15)&((v0 - 15) >> shift));
-    w0 = lutRowPtr[idx];
-    int mod = (w0 + sg0) ^ sg0;
-    downbuffer[x] = mod;
+    bifApplyLut(below - pixel, downbuffer[x], cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift1);
 
     int belowright = block[(-1 + pad + 1)*padwidth + x + pad + 1];
-    diff = belowright - pixel;
-    sg0 = diff >> shift;
-    v0 = (diff + sg0) ^ sg0;
-    v0 = (v0 + 4) >> 3;
-    idx = 15 + ((v0 - 15)&((v0 - 15) >> shift));
-    w0 = lutRowPtr[idx] >> 1;
-    mod = (w0 + sg0) ^ sg0;
-    downrightbuffer[1][x + 1] = mod;
+    bifApplyLut(belowright - pixel, downrightbuffer[1][x + 1], cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift2);
 
     int belowleft = block[(-1 + pad + 1)*padwidth + x + pad - 1];
-    diff = belowleft - pixel;
-    sg0 = diff >> shift;
-    v0 = (diff + sg0) ^ sg0;
-    v0 = (v0 + 4) >> 3;
-    idx = 15 + ((v0 - 15)&((v0 - 15) >> shift));
-    w0 = lutRowPtr[idx] >> 1;
-    mod = (w0 + sg0) ^ sg0;
-    downleftbuffer[x] = mod;
+    bifApplyLut(belowleft - pixel, downleftbuffer[x], cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift2);
   }
   int width = uiWidth;
   for( int y = 0; y < uiHeight; y++ )
   {
-    int diff;
-
     int16_t *rowStart = &block[(y + pad)*padwidth + pad];
 
     int pixel = rowStart[-1];
 
-    int right = rowStart[0];
-    diff = right - pixel;
-    sg0 = diff >> shift;
-    v0 = (diff + sg0) ^ sg0;
-    v0 = (v0 + 4) >> 3;
-    idx = 15 + ((v0 - 15)&((v0 - 15) >> shift));
-    w0 = lutRowPtr[idx];
-    int mod = (w0 + sg0) ^ sg0;
-    int rightmod = mod;
+    int right = rowStart[0], rightmod = 0;
+    bifApplyLut(right - pixel, rightmod, cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift1);
 
     pixel = rowStart[-padwidth - 1];
     int belowright = right;
-    diff = belowright - pixel;
-    sg0 = diff >> shift;
-    v0 = (diff + sg0) ^ sg0;
-    v0 = (v0 + 4) >> 3;
-    idx = 15 + ((v0 - 15)&((v0 - 15) >> shift));
-    w0 = lutRowPtr[idx] >> 1;
-    mod = (w0 + sg0) ^ sg0;
-    downrightbuffer[(y + 1) % 2][0] = mod;
+    bifApplyLut(belowright - pixel, downrightbuffer[(y + 1) % 2][0], cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift2);
 
     pixel = rowStart[-padwidth + width];
     int belowleft = rowStart[width - 1];
-    diff = belowleft - pixel;
-    sg0 = diff >> shift;
-    v0 = (diff + sg0) ^ sg0;
-    v0 = (v0 + 4) >> 3;
-    idx = 15 + ((v0 - 15)&((v0 - 15) >> shift));
-    w0 = lutRowPtr[idx] >> 1;
-    mod = (w0 + sg0) ^ sg0;
-    downleftbuffer[width] = mod;
+    bifApplyLut(belowleft - pixel, downleftbuffer[width], cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift2);
 
     for( int x = 0; x < uiWidth; x++ )
     {
       pixel = rowStart[x];
-      int modsum = 0;
+      int modsum = 0, mod = 0;
 
       int abovemod = -downbuffer[x];
       modsum += abovemod;
@@ -218,57 +242,28 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
       modsum += leftmod;
 
       right = rowStart[x + 1];
-      diff = right - pixel;
-      sg0 = diff >> shift;
-      v0 = (diff + sg0) ^ sg0;
-      v0 = (v0 + 4) >> 3;
-      idx = 15 + ((v0 - 15)&((v0 - 15) >> shift));
-      w0 = lutRowPtr[idx];
-      mod = (w0 + sg0) ^ sg0;
-
+      bifApplyLut(right - pixel, mod, cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift1);
       modsum += mod;
       rightmod = mod;
 
       int below = rowStart[x + padwidth];
-      diff = below - pixel;
-      sg0 = diff >> shift;
-      v0 = (diff + sg0) ^ sg0;
-      v0 = (v0 + 4) >> 3;
-      idx = 15 + ((v0 - 15)&((v0 - 15) >> shift));
-      w0 = lutRowPtr[idx];
-      mod = (w0 + sg0) ^ sg0;
+      bifApplyLut(below - pixel, mod, cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift1);
       modsum += mod;
       downbuffer[x] = mod;
 
       int aboverightmod = -downleftbuffer[x + 1];
-      // modsum += ((int16_t)((uint16_t)((aboverightmod) >> 1)));
       modsum += aboverightmod;
 
       int aboveleftmod = -downrightbuffer[(y + 1) % 2][x];
-      // modsum += ((int16_t)((uint16_t)((aboveleftmod) >> 1)));
       modsum += aboveleftmod;
 
       int belowleft = rowStart[x + padwidth - 1];
-      diff = belowleft - pixel;
-      sg0 = diff >> shift;
-      v0 = (diff + sg0) ^ sg0;
-      v0 = (v0 + 4) >> 3;
-      idx = 15 + ((v0 - 15)&((v0 - 15) >> shift));
-      w0 = lutRowPtr[idx] >> 1;
-      mod = (w0 + sg0) ^ sg0;
-      // modsum += ((int16_t)((uint16_t)((mod) >> 1)));
+      bifApplyLut(belowleft - pixel, mod, cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift2);
       modsum += mod;
       downleftbuffer[x] = mod;
 
       int belowright = rowStart[x + padwidth + 1];
-      diff = belowright - pixel;
-      sg0 = diff >> shift;
-      v0 = (diff + sg0) ^ sg0;
-      v0 = (v0 + 4) >> 3;
-      idx = 15 + ((v0 - 15)&((v0 - 15) >> shift));
-      w0 = lutRowPtr[idx] >> 1;
-      mod = (w0 + sg0) ^ sg0;
-      //modsum += ((int16_t)((uint16_t)((mod) >> 1)));
+      bifApplyLut(belowright - pixel, mod, cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift2);
       modsum += mod;
       downrightbuffer[y % 2][x + 1] = mod;
 
@@ -277,56 +272,34 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
       // speed when SIMD is turned off.
 
       int above = rowStart[x - 2 * padwidth];
-      diff = above - pixel;
-      sg0 = diff >> shift;
-      v0 = (diff + sg0) ^ sg0;
-      v0 = (v0 + 4) >> 3;
-      idx = 15 + ((v0 - 15)&((v0 - 15) >> shift));
-      w0 = lutRowPtr[idx] >> 1;
-      mod = (w0 + sg0) ^ sg0;
+      bifApplyLut(above - pixel, mod, cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift3);
       modsum += mod;
 
       below = rowStart[x + 2 * padwidth];
-      diff = below - pixel;
-      sg0 = diff >> shift;
-      v0 = (diff + sg0) ^ sg0;
-      v0 = (v0 + 4) >> 3;
-      idx = 15 + ((v0 - 15)&((v0 - 15) >> shift));
-      w0 = lutRowPtr[idx] >> 1;
-      mod = (w0 + sg0) ^ sg0;
+      bifApplyLut(below - pixel, mod, cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift3);
       modsum += mod;
 
       int left = rowStart[x - 2];
-      diff = left - pixel;
-      sg0 = diff >> shift;
-      v0 = (diff + sg0) ^ sg0;
-      v0 = (v0 + 4) >> 3;
-      idx = 15 + ((v0 - 15)&((v0 - 15) >> shift));
-      w0 = lutRowPtr[idx] >> 1;
-      mod = (w0 + sg0) ^ sg0;
+      bifApplyLut(left - pixel, mod, cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift3);
       modsum += mod;
 
       right = rowStart[x + 2];
-      diff = right - pixel;
-      sg0 = diff >> shift;
-      v0 = (diff + sg0) ^ sg0;
-      v0 = (v0 + 4) >> 3;
-      idx = 15 + ((v0 - 15)&((v0 - 15) >> shift));
-      w0 = lutRowPtr[idx] >> 1;
-      mod = (w0 + sg0) ^ sg0;
+      bifApplyLut(right - pixel, mod, cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift3);
       modsum += mod;
 
-      blkFilt[(y + pad)*(padwidth + 4) + x + pad] = (( int16_t ) (( uint16_t ) ((modsum*bfac + bifRoundAdd) >> bifRoundShift)));
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+      blkFilt[(y + pad) * padwidth + x + pad] = ((int16_t)((uint16_t)((modsum * bfac + (bifRoundAdd << 3)) >> (bifRoundShift + 3))));
+#else
+      blkFilt[(y + pad) * padwidth + x + pad] = (( int16_t ) (( uint16_t ) ((modsum*bfac + bifRoundAdd) >> bifRoundShift)));
+#endif
     }
   }
 
   // Copy back
-  Pel *tempBlockPtr = ( short* ) blkFilt + (((padwidth + 4) << 1) + 2);
-  int tempBlockStride = padwidth + 4;
+  Pel* tempBlockPtr = blkFilt + pad * padwidth + pad;
   if( isRDO )
   {
-    Pel *srcBlockPtr = ( short* ) block + (((padwidth) << 1) + 2);
-    int srcBlockStride = padwidth;
+    Pel *srcBlockPtr = block + pad * padwidth + pad;
     for( uint32_t yy = 0; yy < uiHeight; yy++ )
     {
       for( uint32_t xx = 0; xx < uiWidth; xx++ )
@@ -334,8 +307,8 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
         recPtr[xx] = ClipPel( srcBlockPtr[xx] + tempBlockPtr[xx], clpRng );
       }
       recPtr += recStride;
-      tempBlockPtr += tempBlockStride;
-      srcBlockPtr += srcBlockStride;
+      tempBlockPtr += padwidth;
+      srcBlockPtr += padwidth;
     }
   }
   else if( noClip )
@@ -349,7 +322,7 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
         recPtr[xx] = recPtr[xx] + tempBlockPtr[xx]; // clipping is done jointly for SAO/BIF/CCSAO
       }
       recPtr += recStride;
-      tempBlockPtr += tempBlockStride;
+      tempBlockPtr += padwidth;
     }
   }
   else
@@ -362,41 +335,44 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
         recPtr[xx] = ClipPel<int>( recPtr[xx] + tempBlockPtr[xx], clpRng );
       }
       recPtr += recStride;
-      tempBlockPtr += tempBlockStride;
+      tempBlockPtr += padwidth;
     }
   }
 }
+
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+int BilateralFilter::calcMAD(int16_t* block, int stride, int width, int height, int whlog2)
+{
+  int average = 0;
+  for (int i = 0; i < height; i++)
+  {
+    for (int j = 0; j < width; j++)
+    {
+      average += block[j];
+    }
+    block += stride;
+  }
+  block -= stride * height;
+  average = (average + (1 << (whlog2 - 1))) >> whlog2;
+  int mad = 0;
+  for (int i = 0; i < height; i++)
+  {
+    for (int j = 0; j < width; j++)
+    {
+      mad += std::abs(block[j] - average);
+    }
+    block += stride;
+  }
+  mad = (mad + (1 << (whlog2 - 1))) >> whlog2;
+  return mad;
+}
+#endif
+
 #if JVET_V0094_BILATERAL_FILTER
 void BilateralFilter::bilateralFilterRDOdiamond5x5(const ComponentID compID, PelBuf& resiBuf, const CPelBuf& predBuf, PelBuf& recoBuf, int32_t qp, const CPelBuf& recIPredBuf, const ClpRng& clpRng, TransformUnit & currTU, bool useReco, bool doReshape, std::vector<Pel>* pLUT)
 {
   uint32_t uiWidth = predBuf.width;
   uint32_t uiHeight = predBuf.height;
-  
-  int bfac = 1;
-  const int bifRoundAdd = BIF_ROUND_ADD >> currTU.cs->pps->getBIFStrength();
-  const int bifRoundShift = BIF_ROUND_SHIFT - currTU.cs->pps->getBIFStrength();
-
-  const char* lutRowPtr = nullptr;
-
-  if( isLuma( compID ) )
-  {
-    lutRowPtr = getFilterLutParameters( std::min( uiWidth, uiHeight ), currTU.cu->predMode, qp + currTU.cs->pps->getBIFQPOffset(), bfac );
-  }
-  else
-  {
-    int widthForStrength = currTU.blocks[compID].width;
-    int heightForStrength = currTU.blocks[compID].height;
-
-    if( currTU.blocks[COMPONENT_Y].valid() )
-    {
-      widthForStrength = currTU.blocks[COMPONENT_Y].width;
-      heightForStrength = currTU.blocks[COMPONENT_Y].height;
-    }
-
-    lutRowPtr = getFilterLutParametersChroma( std::min( uiWidth, uiHeight ), currTU.cu->predMode, qp + currTU.cs->pps->getChromaBIFQPOffset(), bfac, widthForStrength, heightForStrength, currTU.blocks[COMPONENT_Y].valid() );
-
-    CHECK( doReshape, "Reshape domain is not used for chroma" );
-  }
 
   const unsigned uiPredStride = predBuf.stride;
   const unsigned uiStrideRes = resiBuf.stride;
@@ -416,11 +392,7 @@ void BilateralFilter::bilateralFilterRDOdiamond5x5(const ComponentID compID, Pel
   const uint32_t uiWidthExt = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
   const uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
     
-  int iWidthExtSIMD = uiWidthExt | 0x04;  
-  if( uiWidth < 8 )
-  {
-    iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
-  }
+  int iWidthExtSIMD = uiWidthExt + 16;
   
   memset(tempblock, 0, iWidthExtSIMD*uiHeightExt * sizeof(Pel));
   Pel *tempBlockPtr = tempblock + NUMBER_PADDED_SAMPLES* iWidthExtSIMD + NUMBER_PADDED_SAMPLES;
@@ -589,7 +561,38 @@ void BilateralFilter::bilateralFilterRDOdiamond5x5(const ComponentID compID, Pel
   std::copy( tempblock + iWidthExtSIMD, tempblock + iWidthExtSIMD + uiWidthExt, tempblock );
   std::copy( tempblock + iWidthExtSIMD * ( uiHeightExt - 2 ), tempblock + iWidthExtSIMD * ( uiHeightExt - 2 ) + uiWidthExt, tempblock + iWidthExtSIMD * ( uiHeightExt - 1 ) );
 
-  m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, piReco, uiRecStride, iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, true, lutRowPtr, false );
+  int bfac = 1;
+  const int bifRoundAdd = BIF_ROUND_ADD >> currTU.cs->pps->getBIFStrength();
+  const int bifRoundShift = BIF_ROUND_SHIFT - currTU.cs->pps->getBIFStrength();
+
+  const char* lutRowPtr = nullptr;
+  int cutBitsNum = 3;
+
+  if (isLuma(compID))
+  {
+    lutRowPtr = getFilterLutParameters(tempblock + iWidthExtSIMD * 2 + 2, iWidthExtSIMD, uiWidth, uiHeight, currTU.cu->predMode, qp + currTU.cs->pps->getBIFQPOffset(), bfac);
+  }
+  else
+  {
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+    cutBitsNum = 2;
+#endif
+    int widthForStrength = currTU.blocks[compID].width;
+    int heightForStrength = currTU.blocks[compID].height;
+
+    if (currTU.blocks[COMPONENT_Y].valid())
+    {
+      widthForStrength = currTU.blocks[COMPONENT_Y].width;
+      heightForStrength = currTU.blocks[COMPONENT_Y].height;
+    }
+
+    lutRowPtr = getFilterLutParametersChroma(tempblock + iWidthExtSIMD * 2 + 2, iWidthExtSIMD, uiWidth, uiHeight, currTU.cu->predMode, qp + currTU.cs->pps->getChromaBIFQPOffset(), bfac, widthForStrength, heightForStrength, currTU.blocks[COMPONENT_Y].valid());
+
+    CHECK(doReshape, "Reshape domain is not used for chroma");
+#endif
+  }
+  m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, piReco, uiRecStride, iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, true, lutRowPtr, false, cutBitsNum);
 
   if( !useReco )
   {
@@ -659,29 +662,6 @@ void BilateralFilter::bilateralFilterDiamond5x5( const ComponentID compID, const
         int  recStride = rec.get( compID ).stride;
         Pel *recPtr    = rec.get( compID ).bufAt(blkDst);
 
-        int         bfac      = 1;
-        const char *lutRowPtr = nullptr;
-        if( isLuma( compID ) )
-        {
-          lutRowPtr = getFilterLutParameters( std::min( width, height ), currTU.cu->predMode, qp + currTU.cs->pps->getBIFQPOffset(), bfac );
-        }
-        else
-        {
-          int widthForStrength = currTU.blocks[compID].width;
-          int heightForStrength = currTU.blocks[compID].height;
-
-          if( currTU.blocks[COMPONENT_Y].valid() )
-          {
-            widthForStrength = currTU.blocks[COMPONENT_Y].width;
-            heightForStrength = currTU.blocks[COMPONENT_Y].height;
-          }
-
-          lutRowPtr = getFilterLutParametersChroma(std::min( uiWidth, uiHeight ), currTU.cu->predMode, qp + currTU.cs->pps->getChromaBIFQPOffset(), bfac, widthForStrength, heightForStrength, currTU.blocks[COMPONENT_Y].valid() );
-        }
-
-        int bifRoundAdd   = BIF_ROUND_ADD >> currTU.cs->pps->getBIFStrength();
-        int bifRoundShift = BIF_ROUND_SHIFT - currTU.cs->pps->getBIFStrength();
-
         bool topAltAvailable  = !clipT;
         bool leftAltAvailable = !clipL;
 
@@ -708,11 +688,7 @@ void BilateralFilter::bilateralFilterDiamond5x5( const ComponentID compID, const
         uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
         uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
 
-        int iWidthExtSIMD = uiWidthExt | 0x04;
-        if (uiWidth < 8)
-        {
-          iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
-        }
+        int iWidthExtSIMD = uiWidthExt + 16;
 
         Pel *tempBlockPtr;
 
@@ -897,7 +873,36 @@ void BilateralFilter::bilateralFilterDiamond5x5( const ComponentID compID, const
           }
         }
 
-        m_bilateralFilterDiamond5x5( uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, false, lutRowPtr, false );
+        int         bfac = 1;
+        const char* lutRowPtr = nullptr;
+        int cutBitsNum = 3;
+        if (isLuma(compID))
+        {
+          lutRowPtr = getFilterLutParameters(tempblock + iWidthExtSIMD * 2 + 2, iWidthExtSIMD, uiWidth, uiHeight, currTU.cu->predMode, qp + currTU.cs->pps->getBIFQPOffset(), bfac);
+        }
+        else
+        {
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+          cutBitsNum = 2;
+#endif
+          int widthForStrength = currTU.blocks[compID].width;
+          int heightForStrength = currTU.blocks[compID].height;
+
+          if (currTU.blocks[COMPONENT_Y].valid())
+          {
+            widthForStrength = currTU.blocks[COMPONENT_Y].width;
+            heightForStrength = currTU.blocks[COMPONENT_Y].height;
+          }
+
+          lutRowPtr = getFilterLutParametersChroma(tempblock + iWidthExtSIMD * 2 + 2, iWidthExtSIMD, uiWidth, uiHeight, currTU.cu->predMode, qp + currTU.cs->pps->getChromaBIFQPOffset(), bfac, widthForStrength, heightForStrength, currTU.blocks[COMPONENT_Y].valid());
+#endif
+        }
+
+        int bifRoundAdd = BIF_ROUND_ADD >> currTU.cs->pps->getBIFStrength();
+        int bifRoundShift = BIF_ROUND_SHIFT - currTU.cs->pps->getBIFStrength();
+
+        m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, false, lutRowPtr, false, cutBitsNum);
 
         xStart = xEnd;
       }
@@ -923,31 +928,6 @@ void BilateralFilter::bilateralFilterDiamond5x5( const ComponentID compID, const
     int  recStride = rec.get( compID ).stride;
     Pel *recPtr    = rec.get( compID ).bufAt(compArea);
 
-    int         bfac      = 1;
-
-    const char *lutRowPtr = nullptr;
-
-    if( isLuma( compID ) )
-    {
-      lutRowPtr = getFilterLutParameters(std::min(uiWidth, uiHeight), currTU.cu->predMode, qp + currTU.cs->pps->getBIFQPOffset(), bfac);
-    }
-    else
-    {
-      int widthForStrength = currTU.blocks[compID].width;
-      int heightForStrength = currTU.blocks[compID].height;
-
-      if( currTU.blocks[COMPONENT_Y].valid() )
-      {
-        widthForStrength = currTU.blocks[COMPONENT_Y].width;
-        heightForStrength = currTU.blocks[COMPONENT_Y].height;
-      }
-
-      lutRowPtr = getFilterLutParametersChroma( std::min( uiWidth, uiHeight ), currTU.cu->predMode, qp + currTU.cs->pps->getChromaBIFQPOffset(), bfac, widthForStrength, heightForStrength, currTU.blocks[COMPONENT_Y].valid() );
-    }
-
-    int bifRoundAdd   = BIF_ROUND_ADD >> currTU.cs->pps->getBIFStrength();
-    int bifRoundShift = BIF_ROUND_SHIFT - currTU.cs->pps->getBIFStrength();
-
     const CompArea &myArea = currTU.blocks[compID];
     topAltAvailable        = myArea.y - NUMBER_PADDED_SAMPLES >= 0;
     leftAltAvailable       = myArea.x - NUMBER_PADDED_SAMPLES >= 0;
@@ -962,11 +942,7 @@ void BilateralFilter::bilateralFilterDiamond5x5( const ComponentID compID, const
     uint32_t uiWidthExt  = uiWidth + (NUMBER_PADDED_SAMPLES << 1);
     uint32_t uiHeightExt = uiHeight + (NUMBER_PADDED_SAMPLES << 1);
 
-    int iWidthExtSIMD = uiWidthExt | 0x04;
-    if (uiWidth < 8)
-    {
-      iWidthExtSIMD = 8 + (NUMBER_PADDED_SAMPLES << 1);
-    }
+    int iWidthExtSIMD = uiWidthExt + 16;
 
     Pel *tempBlockPtr;
 
@@ -1163,7 +1139,37 @@ void BilateralFilter::bilateralFilterDiamond5x5( const ComponentID compID, const
       }
     }
 
-    m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, false, lutRowPtr, noClip);
+    int         bfac = 1;
+    const char* lutRowPtr = nullptr;
+    int cutBitsNum = 3;
+
+    if (isLuma(compID))
+    {
+      lutRowPtr = getFilterLutParameters(tempblock + iWidthExtSIMD * 2 + 2, iWidthExtSIMD, uiWidth, uiHeight, currTU.cu->predMode, qp + currTU.cs->pps->getBIFQPOffset(), bfac);
+    }
+    else
+    {
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+      cutBitsNum = 2;
+#endif
+      int widthForStrength = currTU.blocks[compID].width;
+      int heightForStrength = currTU.blocks[compID].height;
+
+      if (currTU.blocks[COMPONENT_Y].valid())
+      {
+        widthForStrength = currTU.blocks[COMPONENT_Y].width;
+        heightForStrength = currTU.blocks[COMPONENT_Y].height;
+      }
+
+      lutRowPtr = getFilterLutParametersChroma(tempblock + iWidthExtSIMD * 2 + 2, iWidthExtSIMD, uiWidth, uiHeight, currTU.cu->predMode, qp + currTU.cs->pps->getChromaBIFQPOffset(), bfac, widthForStrength, heightForStrength, currTU.blocks[COMPONENT_Y].valid());
+#endif
+    }
+
+    int bifRoundAdd = BIF_ROUND_ADD >> currTU.cs->pps->getBIFStrength();
+    int bifRoundShift = BIF_ROUND_SHIFT - currTU.cs->pps->getBIFStrength();
+
+    m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, false, lutRowPtr, noClip, cutBitsNum);
   }
 }
 void BilateralFilter::clipNotBilaterallyFilteredBlocks(const ComponentID compID, const CPelUnitBuf& src, PelUnitBuf& rec, const ClpRng& clpRng, TransformUnit & currTU)
@@ -1395,8 +1401,6 @@ void BilateralFilter::bilateralFilterPicRDOperCTU( const ComponentID compID, Cod
       
       for( auto &currCU : cs.traverseCUs( CS::getArea( cs, ctuArea, chType ), chType ) )
       {
-        bool isInter = ( currCU.predMode == MODE_INTER ) ? true : false;
-
         bool valid = isLuma( compID ) ? true: currCU.blocks[compID].valid();
         if( !valid )
         {
@@ -1405,6 +1409,10 @@ void BilateralFilter::bilateralFilterPicRDOperCTU( const ComponentID compID, Cod
 
         for (auto &currTU : CU::traverseTUs(currCU))
         {
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+          bool applyBIF = getApplyBIF(currTU, compID);
+#else
+          bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
           bool applyBIF = true;
           if( isLuma( compID ) )
           {
@@ -1430,6 +1438,7 @@ void BilateralFilter::bilateralFilterPicRDOperCTU( const ComponentID compID, Cod
               applyBIF = ( tuCBF || isInter == false ) && ( currTU.cu->qp > 17 );
             }
           }
+#endif
 
           // We should ideally also check the CTU-BIF-flag here. However, given that this function
           // is only called by the encoder, and the encoder always has CTU-BIF-flag on, there is no
@@ -1579,8 +1588,28 @@ void BilateralFilter::bilateralFilterPicRDOperCTU( const ComponentID compID, Cod
 #endif
 
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-const char* BilateralFilter::getFilterLutParametersChroma( const int size, const PredMode predMode, const int32_t qp, int& bfac, int widthForStrength, int heightForStrength, bool isLumaValid)
+const char* BilateralFilter::getFilterLutParametersChroma(int16_t* block, const int stride, const int width, const int height, const PredMode predMode, const int32_t qp, int& bfac, int widthForStrength, int heightForStrength, bool isLumaValid)
 {
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+  int w = floorLog2(widthForStrength);
+  int h = floorLog2(heightForStrength);
+
+  int mad = m_calcMAD(block, stride, width, height, floorLog2(width) + floorLog2(height));
+
+  w = std::min(w, 7);
+  h = std::min(h, 7);
+  mad = std::min(mad >> 4, 15);
+  bfac = m_tuSizeFactorChroma[predMode == MODE_INTER][w * 8 + h];
+  if (bfac) // BIF is not applied if tuSizeFactor[(w, h)] = 0
+  {
+    bfac += m_tuMADFactorChroma[predMode == MODE_INTER][mad];
+  }
+
+  int sqp = qp - 17;
+  sqp = std::min(sqp, 25);
+  sqp = std::max(sqp, 0);
+  return m_lutChroma[sqp];
+#else
   int conditionForStrength = std::min(widthForStrength, heightForStrength);
   int T1 = 4;
   int T2 = 16;
@@ -1632,6 +1661,39 @@ const char* BilateralFilter::getFilterLutParametersChroma( const int size, const
     sqp = maxQP;
   }
   return m_wBIFChroma[sqp - 17];
+#endif
+}
+#endif
+
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+bool BilateralFilter::getApplyBIF(const TransformUnit& currTU, ComponentID compID)
+{
+  bool applyBIF = currTU.blocks[compID].valid() && (TU::getCbf(currTU, compID) || currTU.cu->predMode != MODE_INTER) && (currTU.cu->qp > 17);
+  if (applyBIF)
+  {
+    int w = currTU.blocks[compID].width, h = currTU.blocks[compID].height;
+    char(*factor)[64] = nullptr;
+#if JVET_V0094_BILATERAL_FILTER
+    if (isLuma(compID))
+    {
+      factor = m_tuSizeFactor;
+    }
+#endif
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+    if (!isLuma(compID))
+    {
+      if (currTU.blocks[COMPONENT_Y].valid())
+      {
+        w = currTU.blocks[COMPONENT_Y].width, h = currTU.blocks[COMPONENT_Y].height;
+      }
+      factor = m_tuSizeFactorChroma;
+    }
+#endif
+    w = floorLog2(w), h = floorLog2(h);
+    w = std::min(w, 7), h = std::min(h, 7);
+    applyBIF = factor && factor[currTU.cu->predMode == MODE_INTER][w * 8 + h];
+  }
+  return applyBIF;
 }
 #endif
 

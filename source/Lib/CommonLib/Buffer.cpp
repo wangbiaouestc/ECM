@@ -41,6 +41,7 @@
 #include "Unit.h"
 #include "Buffer.h"
 #include "InterpolationFilter.h"
+#include "Reshape.h"
 
 void applyPROFCore(Pel* dst, int dstStride, const Pel* src, int srcStride, int width, int height, const Pel* gradX, const Pel* gradY, int gradStride, const int* dMvX, const int* dMvY, int dMvStride, const bool& bi, int shiftNum, Pel offset, const ClpRng& clpRng)
 {
@@ -1497,15 +1498,7 @@ void AreaBuf<Pel>::scaleSignal(const int scale, const bool dir, const ClpRng& cl
     {
       for (unsigned x = 0; x < width; x++)
       {
-        src[x] = (Pel)Clip3((Pel)(-maxAbsclipBD - 1), (Pel)maxAbsclipBD, src[x]);
-        sign = src[x] >= 0 ? 1 : -1;
-        absval = sign * src[x];
-        int val = sign * ((absval * scale + (1 << (CSCALE_FP_PREC - 1))) >> CSCALE_FP_PREC);
-        if (sizeof(Pel) == 2) // avoid overflow when storing data
-        {
-           val = Clip3<int>(-32768, 32767, val);
-        }
-        dst[x] = (Pel)val;
+        dst[x] = Reshape::scalePel(src[x], scale, maxAbsclipBD);
       }
       dst += stride;
       src += stride;

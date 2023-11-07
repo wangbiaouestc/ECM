@@ -1526,6 +1526,16 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
     WRITE_FLAG(pcSPS->getUseAffineParaRefinement() ? 1 : 0,                                    "sps_affine_nontranslation_parameter_refinement");
 #endif
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+    if (pcSPS->getTMToolsEnableFlag())
+    {
+#endif
+      WRITE_FLAG(pcSPS->getUseAffineTM() ? 1 : 0,                                              "sps_tm_affine_flag");
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+    }
+#endif
+#endif
   }
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   if (pcSPS->getUseMMVD() || pcSPS->getUseAffineMmvdMode())
@@ -1606,6 +1616,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #endif
 #if JVET_AE0059_INTER_CCCM
   WRITE_FLAG( pcSPS->getUseInterCccm() ? 1 : 0,                                        "sps_inter_cccm");
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  WRITE_FLAG( pcSPS->getUseInterCcpMerge() ? 1 : 0,                                    "sps_inter_ccp_merge");
 #endif
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
   if (pcSPS->getTMnoninterToolsEnableFlag())

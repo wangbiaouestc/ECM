@@ -83,6 +83,37 @@ protected:
   static const uint8_t      m_RenormTable_32  [ 32];          // Std         MP   MPI
 };
 
+#if EXTENSION_CABAC_TRAINING
+class BinCollector
+{
+public:
+  void addBin(bool b)
+  {
+    int pos = 7 - (m_counter & 7);
+    if (pos == 7)
+    {
+      extractedBins.push_back(0);
+    }
+    extractedBins.back() |= (b ? 1 : 0) << pos;
+    m_counter++;
+  }
+
+  const std::vector<uint8_t> getExtractedBins() const { return extractedBins; }
+  uint64_t getNumExtractedBins() const { return m_counter; }
+
+  void resetCounters()
+  {
+    extractedBins.clear();
+    m_counter = 0;
+  }
+
+private:
+  std::vector<uint8_t> extractedBins;
+  uint64_t m_counter;
+};
+
+#endif
+
 class BinProbModelBase : public ProbModelTables
 {
 public:
@@ -90,6 +121,9 @@ public:
   ~BinProbModelBase() {}
   static uint32_t estFracBitsEP ()                    { return  (       1 << SCALE_BITS ); }
   static uint32_t estFracBitsEP ( unsigned numBins )  { return  ( numBins << SCALE_BITS ); }
+#if EXTENSION_CABAC_TRAINING
+  BinCollector m_ctxBinTrace;
+#endif
 };
 
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
@@ -280,12 +314,12 @@ public:
   }
 private:
   uint16_t m_state[2];
-  uint8_t  m_rate;
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT 
   uint16_t m_stateUsed[2];
   uint8_t  m_rateOffset[2];
   uint8_t  m_weight;
 #endif
+  uint8_t  m_rate;
 };
 
 
@@ -591,6 +625,9 @@ public:
 #if JVET_AE0059_INTER_CCCM
   static const CtxSet   InterCccmFlag;
 #endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  static const CtxSet   InterCcpMergeFlag;
+#endif
   static const unsigned NumberOfContexts;
 
   // combined sets for less complex copying
@@ -599,9 +636,13 @@ public:
   static const CtxSet   Sao;
   static const CtxSet   Alf;
   static const CtxSet   Palette;
+  static const CtxSet   Split;
 
 public:
   static const std::vector<uint8_t>&  getInitTable( unsigned initId );
+#if EXTENSION_CABAC_TRAINING
+  static std::vector<uint16_t> sm_InitTableNameIndexes;
+#endif
 private:
   static std::vector<std::vector<uint8_t> > sm_InitTables;
   static CtxSet addCtxSet( std::initializer_list<std::initializer_list<uint8_t> > initSet2d );
@@ -625,6 +666,10 @@ public:
   CtxStore( bool dummy );
   CtxStore( const CtxStore<BinProbModel>& ctxStore );
 public:
+#if EXTENSION_CABAC_TRAINING
+  void copyFrom(const CtxStore<BinProbModel>& src) { CHECK(1, "CtxStore::copyFrom may not be called when EXTENSION_CABAC_TRAINING is enabled."); }
+  void copyFrom(const CtxStore<BinProbModel>& src, const CtxSet& ctxSet) { CHECK(1, "CtxStore::copyFrom may not be called when EXTENSION_CABAC_TRAINING is enabled."); }
+#else
   void copyFrom(const CtxStore<BinProbModel>& src)
   {
     checkInit();
@@ -637,6 +682,7 @@ public:
     std::copy_n(reinterpret_cast<const char*>(src.m_ctx + ctxSet.Offset), sizeof(BinProbModel) * ctxSet.Size,
       reinterpret_cast<char*>(m_ctx + ctxSet.Offset));
   }
+#endif
   void init(int qp, int initId);
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   void loadWinSizes( const std::vector<uint8_t>&   windows );

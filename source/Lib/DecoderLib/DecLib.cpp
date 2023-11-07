@@ -459,6 +459,9 @@ DecLib::DecLib()
   , m_parameterSetManager()
   , m_apcSlicePilot(NULL)
   , m_SEIs()
+#if EXTENSION_CABAC_TRAINING
+  , m_binFileByteOffset(0)
+#endif
   , m_cIntraPred()
   , m_cInterPred()
   , m_cTrQuant()
@@ -631,6 +634,7 @@ Picture* DecLib::xGetNewPicBuffer( const SPS &sps, const PPS &pps, const uint32_
 
 
     pcPic->create(
+      sps.getRprEnabledFlag(),
 #if JVET_Z0118_GDR
       sps.getGDREnabledFlag(),
 #endif
@@ -674,6 +678,7 @@ Picture* DecLib::xGetNewPicBuffer( const SPS &sps, const PPS &pps, const uint32_
 
 
     pcPic->create(
+      sps.getRprEnabledFlag(),
 #if JVET_Z0118_GDR
       sps.getGDREnabledFlag(),
 #endif
@@ -688,6 +693,7 @@ Picture* DecLib::xGetNewPicBuffer( const SPS &sps, const PPS &pps, const uint32_
       pcPic->destroy();
 
       pcPic->create( 
+        sps.getRprEnabledFlag(),
 #if JVET_Z0118_GDR        
         sps.getGDREnabledFlag(),
 #endif
@@ -1009,8 +1015,7 @@ void DecLib::finishPicture(int& poc, PicList*& rpcListPic, MsgLevel msgl )
   m_maxDecSliceAddrInSubPic = -1;
 
   m_pcPic->destroyTempBuffers();
-  m_pcPic->cs->destroyCoeffs();
-  m_pcPic->cs->releaseIntermediateData();
+  m_pcPic->cs->destroyTemporaryCsData();
 #if JVET_AA0096_MC_BOUNDARY_PADDING
   m_cFrameMcPadPrediction.init(&m_cRdCost, pcSlice->getSPS()->getChromaFormatIdc(), pcSlice->getSPS()->getMaxCUHeight(),
                                NULL, m_pcPic->getPicWidthInLumaSamples());
@@ -1816,8 +1821,9 @@ void DecLib::xActivateParameterSets( const InputNALUnit nalu )
     m_apcSlicePilot->setPicHeader(m_pcPic->cs->picHeader);
 #endif
 
-    m_pcPic->createTempBuffers( m_pcPic->cs->pps->pcv->maxCUWidth );
-    m_pcPic->cs->createCoeffs((bool)m_pcPic->cs->sps->getPLTMode());
+    m_pcPic->createTempBuffers( m_pcPic->cs->pps->pcv->maxCUWidth, false, false, true);
+    m_pcPic->cs->createTemporaryCsData((bool)m_pcPic->cs->sps->getPLTMode());
+    m_pcPic->cs->initStructData();
 
     m_pcPic->allocateNewSlice();
     // make the slice-pilot a real slice, and set up the slice-pilot for the next slice
@@ -2921,6 +2927,28 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
       }
 
       pcSlice->setCheckLDC(bLowDelay);
+#if JVET_AF0128_LIC_MERGE_TM
+      bool bLowDelayB = false;
+      if (pcSlice->isInterB() && bLowDelay)
+      {
+        int min = MAX_INT;
+        for (int k = 0; k < NUM_REF_PIC_LIST_01; k++)
+        {
+          for (iRefIdx = 0; iRefIdx < pcSlice->getNumRefIdx((RefPicList)k); iRefIdx++)
+          {
+            if (pcSlice->getPOC() - pcSlice->getRefPic((RefPicList)k, iRefIdx)->getPOC() < min)
+            {
+              min = pcSlice->getPOC() - pcSlice->getRefPic((RefPicList)k, iRefIdx)->getPOC();
+            }
+          }
+        }
+        if (min == 1)
+        {
+          bLowDelayB = true;
+        }
+      }
+      pcSlice->setCheckLDB(bLowDelayB);
+#endif
     }
 #if JVET_Y0128_NON_CTC
     //---------------
@@ -3028,6 +3056,9 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
       pcSlice->generateCombinedList();
       pcSlice->generateRefPicPairList();
     }
+#endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+    pcSlice->generateEqualPocDist();
 #endif
 
     NalUnitInfo naluInfo;
@@ -3210,6 +3241,10 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
 
   //  Decode a picture
   m_cSliceDecoder.decompressSlice( pcSlice, &( nalu.getBitstream() ), ( m_pcPic->poc == getDebugPOC() ? getDebugCTU() : -1 ) );
+#if EXTENSION_CABAC_TRAINING
+  CABACReader&   cabacReader = *(m_CABACDecoder.getCABACReader(0));
+  cabacReader.traceStoredCabacBits(pcSlice, getBinFileByteOffset());
+#endif
 
   m_bFirstSliceInPicture = false;
   m_uiSliceSegmentIdx++;

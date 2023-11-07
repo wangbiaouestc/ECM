@@ -1518,51 +1518,23 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
     return;
   }
 #endif
-#if SECONDARY_MPM
-  const int numMPMs = NUM_PRIMARY_MOST_PROBABLE_MODES;
-#else
-  const int numMPMs   = NUM_MOST_PROBABLE_MODES;
-#endif
   const int numBlocks = CU::getNumPUs( cu );
 #if !SECONDARY_MPM
   unsigned  mpmPreds   [4][numMPMs];
 #endif
-  unsigned  mpm_idxs    [4];
-  unsigned  ipredModes [4];
 
   const PredictionUnit* pu = cu.firstPU;
 
   // prev_intra_luma_pred_flag
   for( int k = 0; k < numBlocks; k++ )
   {
-#if !SECONDARY_MPM
-    unsigned*  mpmPred   = mpmPreds[k];
-#endif
-    unsigned&  mpm_idx    = mpm_idxs[k];
-    unsigned&  ipredMode = ipredModes[k];
-#if SECONDARY_MPM
-    const uint8_t* mpmPred = cu.firstPU->intraMPM;
-#else
-    PU::getIntraMPMs( *pu, mpmPred );
-#endif
-
-    ipredMode = pu->intraDir[0];
-    mpm_idx    = numMPMs;
-    for( unsigned idx = 0; idx < numMPMs; idx++ )
-    {
-      if( ipredMode == mpmPred[idx] )
-      {
-        mpm_idx = idx;
-        break;
-      }
-    }
     if ( pu->multiRefIdx )
     {
-      CHECK(mpm_idx >= numMPMs, "use of non-MPM");
+      CHECK(!pu->mpmFlag, "use of non-MPM");
     }
     else
     {
-      m_BinEncoder.encodeBin(mpm_idx < numMPMs, Ctx::IntraLumaMpmFlag());
+      m_BinEncoder.encodeBin(pu->mpmFlag, Ctx::IntraLumaMpmFlag());
     }
 
     pu = pu->next;
@@ -1573,13 +1545,9 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
   // mpm_idx / rem_intra_luma_pred_mode
   for( int k = 0; k < numBlocks; k++ )
   {
-    const unsigned& mpm_idx = mpm_idxs[k];
-#if ENABLE_TRACING && (ENABLE_DIMD || JVET_W0123_TIMD_FUSION)
-    int pred_idx = -1;
-    bool secondMpmFlag = false;
-#endif
-    if( mpm_idx < numMPMs )
+    if(pu->mpmFlag)
     {
+      const unsigned mpm_idx = pu->ipredIdx;
       {
         unsigned ctx = (pu->cu->ispMode == NOT_INTRA_SUBPARTITIONS ? 1 : 0);
 #if SECONDARY_MPM
@@ -1611,38 +1579,15 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
           m_BinEncoder.encodeBinEP(mpm_idx > 4);
         }
       }
-#if ENABLE_TRACING && (ENABLE_DIMD || JVET_W0123_TIMD_FUSION)
-      pred_idx = mpm_idx;
-#endif
     }
     else
     {
-#if !SECONDARY_MPM
-      unsigned* mpmPred   = mpmPreds[k];
-#endif
-      unsigned  ipredMode = ipredModes[k];
-
-      // sorting of MPMs
-#if !SECONDARY_MPM
-      std::sort( mpmPred, mpmPred + numMPMs );
-#endif
 
       {        
 #if SECONDARY_MPM
-        const uint8_t* secondaryMPMs = cu.firstPU->intraMPM + NUM_PRIMARY_MOST_PROBABLE_MODES;
-        uint8_t secondaryMPMIdx = NUM_SECONDARY_MOST_PROBABLE_MODES;
-
-        for (unsigned idx = 0; idx < NUM_SECONDARY_MOST_PROBABLE_MODES; idx++)
+        if( pu->secondMpmFlag)
         {
-          if (ipredMode == secondaryMPMs[idx])
-          {
-            secondaryMPMIdx = idx;
-            break;
-          }
-        }
-
-        if( secondaryMPMIdx < NUM_SECONDARY_MOST_PROBABLE_MODES )
-        {
+          uint8_t secondaryMPMIdx = pu->ipredIdx;
           m_BinEncoder.encodeBin(1, Ctx::IntraLumaSecondMpmFlag());
 #if JVET_AD0085_MPM_SORTING
           if (cu.cs->sps->getUseMpmSorting())
@@ -1669,30 +1614,14 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
 #if JVET_AD0085_MPM_SORTING
           }
 #endif
-#if ENABLE_TRACING && (ENABLE_DIMD || JVET_W0123_TIMD_FUSION)
-          pred_idx = secondaryMPMIdx + NUM_PRIMARY_MOST_PROBABLE_MODES;
-          secondMpmFlag = true;
-#endif
         }
         else
         {
           m_BinEncoder.encodeBin(0, Ctx::IntraLumaSecondMpmFlag());
                  
-          unsigned nonMPMIdx = NUM_NON_MPM_MODES;
-
-          for (unsigned idx = 0; idx < NUM_NON_MPM_MODES; idx++)
-          {
-            if (ipredMode == cu.firstPU->intraNonMPM[idx])
-            {
-              nonMPMIdx = idx;
-              break;
-            }
-          }
+          unsigned nonMPMIdx = pu->ipredIdx;
 
           xWriteTruncBinCode( nonMPMIdx, NUM_LUMA_MODE - NUM_MOST_PROBABLE_MODES);  // Remaining mode is truncated binary coded
-#if ENABLE_TRACING && (ENABLE_DIMD || JVET_W0123_TIMD_FUSION)
-          pred_idx = nonMPMIdx;
-#endif
         }
 #else
         std::sort(mpmPred, mpmPred + numMPMs);
@@ -1712,7 +1641,7 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
     }
 
 #if JVET_AC0105_DIRECTIONAL_PLANAR
-    if (CU::isDirectionalPlanarAvailable(cu) && mpm_idx == 0)
+    if (CU::isDirectionalPlanarAvailable(cu) && pu->mpmFlag && pu->ipredIdx == 0)
     {
       m_BinEncoder.encodeBin(cu.plIdx > 0, Ctx::IntraLumaPlanarFlag(2));
       if (cu.plIdx)
@@ -1724,7 +1653,7 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
 #endif
 
 #if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
-    DTRACE(g_trace_ctx, D_SYNTAX, "intra_luma_pred_modes() idx=%d pos=(%d,%d) predIdx=%d mpm=%d secondmpm=%d\n", k, pu->lumaPos().x, pu->lumaPos().y, pred_idx, mpm_idx < numMPMs, secondMpmFlag);
+    DTRACE(g_trace_ctx, D_SYNTAX, "intra_luma_pred_modes() idx=%d pos=(%d,%d) predIdx=%d mpm=%d secondmpm=%d\n", k, pu->lumaPos().x, pu->lumaPos().y, pu->ipredIdx + (!pu->mpmFlag && pu->secondMpmFlag ? NUM_PRIMARY_MOST_PROBABLE_MODES: 0), pu->mpmFlag, pu->secondMpmFlag);
 #else
     DTRACE( g_trace_ctx, D_SYNTAX, "intra_luma_pred_modes() idx=%d pos=(%d,%d) mode=%d\n", k, pu->lumaPos().x, pu->lumaPos().y, pu->intraDir[0] );
 #endif
@@ -1804,41 +1733,19 @@ void CABACWriter::intra_luma_pred_mode( const PredictionUnit& pu )
   }
 #endif
   // prev_intra_luma_pred_flag
-#if SECONDARY_MPM
-  const int numMPMs = NUM_PRIMARY_MOST_PROBABLE_MODES;
-  const uint8_t* mpmPred = pu.intraMPM;
-#else
-  const int numMPMs  = NUM_MOST_PROBABLE_MODES;
-  unsigned  mpmPred[numMPMs];
-#endif
-
-#if !SECONDARY_MPM
-  PU::getIntraMPMs( pu, mpmPred );
-#endif
-
-  unsigned ipredMode = pu.intraDir[0];
-  unsigned mpm_idx = numMPMs;
-
-  for( int idx = 0; idx < numMPMs; idx++ )
-  {
-    if( ipredMode == mpmPred[idx] )
-    {
-      mpm_idx = idx;
-      break;
-    }
-  }
   if ( pu.multiRefIdx )
   {
-    CHECK(mpm_idx >= numMPMs, "use of non-MPM");
+    CHECK(!pu.mpmFlag, "use of non-MPM");
   }
   else
   {
-    m_BinEncoder.encodeBin(mpm_idx < numMPMs, Ctx::IntraLumaMpmFlag());
+    m_BinEncoder.encodeBin(pu.mpmFlag, Ctx::IntraLumaMpmFlag());
   }
 
   // mpm_idx / rem_intra_luma_pred_mode
-  if( mpm_idx < numMPMs )
+  if (pu.mpmFlag)
   {
+    unsigned mpm_idx = pu.ipredIdx;
     {
       unsigned ctx = (pu.cu->ispMode == NOT_INTRA_SUBPARTITIONS ? 1 : 0);
 #if SECONDARY_MPM
@@ -1875,20 +1782,9 @@ void CABACWriter::intra_luma_pred_mode( const PredictionUnit& pu )
 #endif
     { 
 #if SECONDARY_MPM
-      auto secondMpmPred = mpmPred + NUM_PRIMARY_MOST_PROBABLE_MODES;
-      unsigned   secondMpmIdx = NUM_SECONDARY_MOST_PROBABLE_MODES;
-
-      for (unsigned idx = 0; idx < NUM_SECONDARY_MOST_PROBABLE_MODES; idx++)
+      if (pu.secondMpmFlag)
       {
-        if (ipredMode == secondMpmPred[idx])
-        {
-          secondMpmIdx = idx;
-          break;
-        }
-      }
-
-      if (secondMpmIdx < NUM_SECONDARY_MOST_PROBABLE_MODES)
-      {
+        unsigned secondMpmIdx = pu.ipredIdx;
         m_BinEncoder.encodeBin(1, Ctx::IntraLumaSecondMpmFlag());
 #if JVET_AD0085_MPM_SORTING
         if (pu.cs->sps->getUseMpmSorting())
@@ -1920,28 +1816,12 @@ void CABACWriter::intra_luma_pred_mode( const PredictionUnit& pu )
       {
         m_BinEncoder.encodeBin(0, Ctx::IntraLumaSecondMpmFlag());
                 
-        unsigned   non_mpm_idx = NUM_NON_MPM_MODES;
-        for (unsigned idx = 0; idx < NUM_NON_MPM_MODES; idx++)
-        {
-          if (ipredMode == pu.intraNonMPM[idx])
-          {
-            non_mpm_idx = idx;
-            break;
-          }
-        }
+        unsigned non_mpm_idx = pu.ipredIdx;
 
         xWriteTruncBinCode(non_mpm_idx, NUM_LUMA_MODE - NUM_MOST_PROBABLE_MODES);  // Remaining mode is truncated binary coded
       }
 #else
-      std::sort(mpmPred, mpmPred + numMPMs);
-
-      for (int idx = numMPMs - 1; idx >= 0; idx--)
-      {
-        if (ipredMode > mpmPred[idx])
-        {
-          ipredMode--;
-        }
-      }
+      unsigned ipredMode = pu.intraDir[0];
 
       xWriteTruncBinCode(ipredMode, NUM_LUMA_MODE - NUM_MOST_PROBABLE_MODES);  // Remaining mode is truncated binary coded
 #endif
@@ -1949,7 +1829,7 @@ void CABACWriter::intra_luma_pred_mode( const PredictionUnit& pu )
   }
 
 #if JVET_AC0105_DIRECTIONAL_PLANAR
-  if (CU::isDirectionalPlanarAvailable(*pu.cu) && mpm_idx == 0)
+  if (CU::isDirectionalPlanarAvailable(*pu.cu) && pu.mpmFlag && pu.ipredIdx == 0)
   {
     m_BinEncoder.encodeBin(pu.cu->plIdx > 0, Ctx::IntraLumaPlanarFlag(2));
     if (pu.cu->plIdx)
@@ -5323,7 +5203,7 @@ uint64_t CABACWriter::geo_mode_est(const TempCtx& ctxStart, const int geoMode
 #endif
 )
 {
-  getCtx() = ctxStart;
+  getCtx() = SubCtx(Ctx::GeoSubModeIdx, ctxStart);
   resetBits();
 
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
@@ -5337,7 +5217,7 @@ uint64_t CABACWriter::geo_mode_est(const TempCtx& ctxStart, const int geoMode
 
 uint64_t CABACWriter::geo_mergeIdx_est(const TempCtx& ctxStart, const int candIdx, const int maxNumGeoCand)
 {
-  getCtx() = ctxStart;
+  getCtx() = SubCtx(Ctx::MergeIdx, ctxStart);
   resetBits();
 
   int numCandminus2 = maxNumGeoCand - 2;
@@ -5359,7 +5239,7 @@ uint64_t CABACWriter::geo_mergeIdx_est(const TempCtx& ctxStart, const int candId
 #if JVET_Y0065_GPM_INTRA
 uint64_t CABACWriter::geo_intraFlag_est( const TempCtx& ctxStart, const int flag)
 {
-  getCtx() = ctxStart;
+  getCtx() = SubCtx(Ctx::GPMIntraFlag, ctxStart);
   resetBits();
 
   m_BinEncoder.encodeBin(flag, Ctx::GPMIntraFlag());
@@ -5367,9 +5247,8 @@ uint64_t CABACWriter::geo_intraFlag_est( const TempCtx& ctxStart, const int flag
   return getEstFracBits();
 }
 
-uint64_t CABACWriter::geo_intraIdx_est( const TempCtx& ctxStart, const int intraIdx)
+uint64_t CABACWriter::geo_intraIdx_est( const int intraIdx)
 {
-  getCtx() = ctxStart;
   resetBits();
 
   unary_max_eqprob(intraIdx, GEO_MAX_NUM_INTRA_CANDS-1);
@@ -5380,7 +5259,7 @@ uint64_t CABACWriter::geo_intraIdx_est( const TempCtx& ctxStart, const int intra
 
 uint64_t CABACWriter::geo_mmvdFlag_est(const TempCtx& ctxStart, const int flag)
 {
-  getCtx() = ctxStart;
+  getCtx() = SubCtx(Ctx::GeoMmvdFlag, ctxStart);
   resetBits();
 
   m_BinEncoder.encodeBin(flag, Ctx::GeoMmvdFlag());
@@ -5391,7 +5270,7 @@ uint64_t CABACWriter::geo_mmvdFlag_est(const TempCtx& ctxStart, const int flag)
 #if TM_MRG
 uint64_t CABACWriter::geo_tmFlag_est(const TempCtx& ctxStart, const int flag)
 {
-  getCtx() = ctxStart;
+  getCtx() = SubCtx(Ctx::TMMergeFlag, ctxStart);
   resetBits();
 
   m_BinEncoder.encodeBin(flag, Ctx::TMMergeFlag());
@@ -5402,7 +5281,7 @@ uint64_t CABACWriter::geo_tmFlag_est(const TempCtx& ctxStart, const int flag)
 
 uint64_t CABACWriter::geo_mmvdIdx_est(const TempCtx& ctxStart, const int geoMMVDIdx, const bool extMMVD)
 {
-  getCtx() = ctxStart;
+  getCtx() = SubCtx(Ctx::GeoMmvdStepMvpIdx, ctxStart);
   resetBits();
 
   CHECK(geoMMVDIdx >= (extMMVD ? GPM_EXT_MMVD_MAX_REFINE_NUM : GPM_MMVD_MAX_REFINE_NUM), "invalid GPM MMVD index exist");
@@ -5441,7 +5320,7 @@ uint64_t CABACWriter::geo_mmvdIdx_est(const TempCtx& ctxStart, const int geoMMVD
 #if JVET_AA0058_GPM_ADAPTIVE_BLENDING
 uint64_t CABACWriter::geoBldFlagEst(const TempCtx& ctxStart, const int flag)
 {
-  getCtx() = ctxStart;
+  getCtx() = SubCtx(Ctx::GeoBldFlag, ctxStart);
   resetBits();
 
   geoAdaptiveBlendingIdx(flag);
@@ -7420,6 +7299,12 @@ void CABACWriter::transform_unit(const TransformUnit& tu, CUCtx& cuCtx, Partitio
       }
     }
 
+#if JVET_AF0073_INTER_CCP_MERGE
+  if ( !lumaOnly )
+  {
+    interCcpMerge( tu );
+  }
+#endif
 #if JVET_AE0059_INTER_CCCM
   if ( !lumaOnly )
   {
@@ -8978,16 +8863,19 @@ void CABACWriter::rribcData(const CodingUnit& cu)
 
 #if SIGN_PREDICTION
 #if JVET_Y0141_SIGN_PRED_IMPROVE
-struct signCombInfo
+struct SignCombInfo
 {
-  uint32_t sign;
   unsigned idx;
+  bool     sign;
   bool     isSignPred;
 
-  signCombInfo(const unsigned _sign, const unsigned _idx, const bool _isPred) : sign(_sign), idx(_idx), isSignPred(_isPred) { }
+  SignCombInfo(const unsigned _sign, const unsigned _idx, const bool _isPred)
+    : idx(_idx), sign(_sign), isSignPred(_isPred)
+  {
+  }
 };
 
-bool compareOrderIdx(signCombInfo cand0, signCombInfo cand1)
+bool compareOrderIdx(SignCombInfo cand0, SignCombInfo cand1)
 {
   return (cand0.idx < cand1.idx);
 }
@@ -8999,9 +8887,9 @@ void CABACWriter::codePredictedSigns( TransformUnit &tu, ComponentID compID )
   const bool useSignPred = TU::getUseSignPred( tu, compID );
 
   CoeffBuf buff = tu.getCoeffs( compID );
-  CoeffBuf signBuff = tu.getCoeffSigns( compID );
+  AreaBuf<SIGN_PRED_TYPE> signBuff = tu.getCoeffSigns(compID);
   TCoeff *coeff = buff.buf;
-  TCoeff *signs = signBuff.buf;
+  SIGN_PRED_TYPE         *signs    = signBuff.buf;
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   IdxBuf signScanIdxBuff = tu.getCoeffSignsScanIdx(compID);
   unsigned *signScanIdx = signScanIdxBuff.buf;
@@ -9016,7 +8904,7 @@ void CABACWriter::codePredictedSigns( TransformUnit &tu, ComponentID compID )
         TCoeff coef = coeff[x];
         if (coef)
         {
-          if (signs[x] != TrQuant::SIGN_PRED_HIDDEN)
+          if (signs[x] != SIGN_PRED_HIDDEN)
           {
             m_BinEncoder.encodeBinEP(coef < 0 ? 1 : 0);
           }
@@ -9028,11 +8916,12 @@ void CABACWriter::codePredictedSigns( TransformUnit &tu, ComponentID compID )
   }
   else
   {
-    std::vector<signCombInfo> signCombList;
+    std::vector<SignCombInfo>                  signCombList;
     bool lfnstEnabled = tu.checkLFNSTApplied(compID);
-    std::vector<uint32_t> levelList;
-    const int32_t maxNumPredSigns = lfnstEnabled ? std::min<int>( 4, tu.cs->sps->getNumPredSigns() ) : tu.cs->sps->getNumPredSigns();
-    int numScanPos = 0;
+    static_vector<uint32_t, SIGN_PRED_MAX_NUM> levelList;
+    const int32_t                              maxNumPredSigns =
+      lfnstEnabled ? std::min<int>(4, tu.cs->sps->getNumPredSigns()) : tu.cs->sps->getNumPredSigns();
+    CHECK(maxNumPredSigns > levelList.max_size(), "levelList is too small");
     uint32_t extAreaSize = (lfnstEnabled ? 4 : tu.cs->sps->getSignPredArea());
     uint32_t spAreaWidth = std::min(tu.blocks[compID].width, extAreaSize);
     uint32_t spAreaHeight = std::min(tu.blocks[compID].height, extAreaSize);
@@ -9043,27 +8932,27 @@ void CABACWriter::codePredictedSigns( TransformUnit &tu, ComponentID compID )
         TCoeff coef = coeff[x];
         if (coef)
         {
-          TCoeff sign = signs[x];
-          if (sign != TrQuant::SIGN_PRED_HIDDEN)
+          SIGN_PRED_TYPE sign = signs[x];
+          if (sign != SIGN_PRED_HIDDEN)
           {
-            if (sign == TrQuant::SIGN_PRED_BYPASS)
+            if (sign == SIGN_PRED_BYPASS)
             {
-              uint32_t curSign = (coef < 0) ? 1 : 0;
+              const bool   curSign = coef < 0;
               unsigned scanIdx = signScanIdx[x];
-              signCombInfo signCand(curSign, scanIdx, false);
+              SignCombInfo signCand(curSign, scanIdx, false);
               signCombList.push_back(signCand);
             }
             else
             {
-              uint32_t errSignPred = ((coef > 0 && sign == TrQuant::SIGN_PRED_POSITIVE) || (coef < 0 && sign == TrQuant::SIGN_PRED_NEGATIVE)) ? 0 : 1;
+              const bool errSignPred =
+                !(coef > 0 && sign == SIGN_PRED_POSITIVE) && !(coef < 0 && sign == SIGN_PRED_NEGATIVE);
               unsigned scanIdx = signScanIdx[x];
-              signCombInfo signCand(errSignPred, scanIdx, true);
+              SignCombInfo signCand(errSignPred, scanIdx, true);
               signCombList.push_back(signCand);
             }
-            if (numScanPos < maxNumPredSigns)
+            if (levelList.size() < maxNumPredSigns)
             {
               levelList.push_back(abs(coef));
-              numScanPos++;
             }
           }
         }
@@ -9073,20 +8962,20 @@ void CABACWriter::codePredictedSigns( TransformUnit &tu, ComponentID compID )
       signScanIdx += signScanIdxBuff.stride;
     }
     std::stable_sort(signCombList.begin(), signCombList.end(), compareOrderIdx);
-    numScanPos = 0;
+    int numScanPos = 0;
     for (uint32_t idx = 0; idx < signCombList.size(); idx++)
     {
       if (signCombList[idx].isSignPred)
       {
-        uint32_t errSignPred = signCombList[idx].sign;
+        const bool errSignPred = signCombList[idx].sign;
         uint32_t level = levelList[numScanPos++];
         int levOffset = (level < 2) ? 0 : 1;
-        m_BinEncoder.encodeBin(errSignPred, (*ctx)(ctxOffset + levOffset));
+        m_BinEncoder.encodeBin(errSignPred ? 1 : 0, (*ctx)(ctxOffset + levOffset));
       }
       else
       {
-        uint32_t curSign = signCombList[idx].sign;
-        m_BinEncoder.encodeBinEP(curSign);
+        const bool curSign = signCombList[idx].sign;
+        m_BinEncoder.encodeBinEP(curSign ? 1 : 0);
       }
     }
     if (spAreaWidth != extAreaWidth || spAreaHeight != extAreaHeight)
@@ -9118,17 +9007,18 @@ void CABACWriter::codePredictedSigns( TransformUnit &tu, ComponentID compID )
 
       if( coef )
       {
-        TCoeff sign = signs[x];
-        if( sign != TrQuant::SIGN_PRED_HIDDEN )
+        SIGN_PRED_TYPE sign = signs[x];
+        if (sign != SIGN_PRED_HIDDEN)
         {
 
-          if( sign == TrQuant::SIGN_PRED_BYPASS || !useSignPred )
+          if( sign == SIGN_PRED_BYPASS || !useSignPred )
           {
             m_BinEncoder.encodeBinEP( coef < 0 ? 1 : 0 );
           }
           else
           {
-            uint32_t   errSignPred = ( ( coef > 0 && sign == TrQuant::SIGN_PRED_POSITIVE ) || ( coef < 0 && sign == TrQuant::SIGN_PRED_NEGATIVE ) ) ? 0 : 1;
+            uint32_t errSignPred =
+              ((coef > 0 && sign == SIGN_PRED_POSITIVE) || (coef < 0 && sign == SIGN_PRED_NEGATIVE)) ? 0 : 1;
             uint32_t ctxId = ( x || y ) ? 1 : 0;
             m_BinEncoder.encodeBin( errSignPred, ( *ctx )( ctxId + ctxOffset ) );
           }
@@ -9239,7 +9129,6 @@ void CABACWriter::cuTmrlFlag(const CodingUnit& cu)
       uint32_t mrlIdxSuffix = uint32_t(cu.tmrlListIdx & (MRL_IDX_RICE_CODE_DIVISOR - 1));
       m_BinEncoder.encodeBin((mrlIdxSuffix & 1), Ctx::TmrlDerive(maxNumCtxBins + 1));
       m_BinEncoder.encodeBin(((mrlIdxSuffix >> 1) & 1), Ctx::TmrlDerive(maxNumCtxBins + 2));
-      CHECK(cu.tmrlList[cu.tmrlListIdx].intraDir != pu->intraDir[0] || cu.tmrlList[cu.tmrlListIdx].multiRefIdx != pu->multiRefIdx, "? ");
       DTRACE(g_trace_ctx, D_SYNTAX, "cu_tmrl_idx() ctx=%d pos=(%d,%d) tmrlidx=%d\n", 0, cu.lumaPos().x, cu.lumaPos().y, cu.tmrlListIdx);
     }
     else
@@ -9260,6 +9149,16 @@ void CABACWriter::interCccm(const TransformUnit& tu)
   {
     m_BinEncoder.encodeBin(tu.interCccm > 0 ? 1 : 0, Ctx::InterCccmFlag(0));
     DTRACE(g_trace_ctx, D_SYNTAX, "inter_cccm() pos=(%d,%d) inter_cccm_flag=%d\n", tu.blocks[tu.chType].x, tu.blocks[tu.chType].y, tu.interCccm > 0 ? 1 : 0);
+  }
+}
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+void CABACWriter::interCcpMerge(const TransformUnit& tu)
+{
+  if (TU::interCcpMergeAllowed(tu))
+  {
+    m_BinEncoder.encodeBin(tu.interCcpMerge > 0 ? 1 : 0, Ctx::InterCcpMergeFlag(0));
+    DTRACE(g_trace_ctx, D_SYNTAX, "inter_ccp_merge() pos=(%d,%d) inter_ccp_merge_flag=%d\n", tu.blocks[tu.chType].x, tu.blocks[tu.chType].y, tu.interCcpMerge > 0 ? 1 : 0);
   }
 }
 #endif

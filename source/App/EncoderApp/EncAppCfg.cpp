@@ -1031,6 +1031,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("MMVD",                                            m_MMVD,                                            true, "Enable Merge mode with Motion Vector Difference (0:off, 1:on)  [default: 1]")
   ("Affine",                                          m_Affine,                                         false, "Enable affine prediction (0:off, 1:on)  [default: off]")
   ("AffineType",                                      m_AffineType,                                      true,  "Enable affine type prediction (0:off, 1:on)  [default: on]" )
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+  ("AffineTM",                                        m_useAffineTM,                                     true, "Enable TM-based subblock motion refinement (0:off, 1:on)  [default: on]")
+#endif
 #if AFFINE_MMVD
   ("AffineMMVD",                                      m_AffineMmvdMode,                                  true, "Affine MMVD mode (0:off, 1:on)  [default: on]" )
 #endif
@@ -1200,6 +1203,11 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #else
   ( "IBCFastMethod",                                  m_IBCFastMethod,                                     6u, "Fast methods for IBC")
 #endif
+#if JVET_AF0057
+    ("DMVREncMvSelect",                               m_dmvrEncSelect,                                   false, "Enable method for avoiding select MVs that are more likely to give subjective artifacts")
+    ("DMVREncMvSelectBaseQpTh",                       m_dmvrEncSelectBaseQpTh,                              33,"Base QP Threshold for enabling the DMVR MV selection")
+    ("DMVREncMvSelectDisableHighestTemporalLayer",    m_dmvrEncSelectDisableHighestTemporalLayer,         true,"Disable DMVR encoder control for highest temporal layer unless frame rate is less or equal to 30Hz")
+#endif
 #if JVET_AA0061_IBC_MBVD
   ("IBCMBVD",                                         m_ibcMbvd,                                         true, "IBC MMVD mode (0:off, 1:on)  [default: on]" )
 #if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
@@ -1270,6 +1278,10 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #endif
 #if JVET_AE0059_INTER_CCCM
   ("InterCCCM",                                       m_interCccm,                                      true, "CCCM for inter prediction (0: off, 1:on)  [default: on]")
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  ("InterCcpMerge",                                   m_interCcpMerge,                                  true, "Cross-component prediction merge for inter prediction (0: off, 1:on)  [default: on]")
+  ("InterCcpMergeFastMode",                           m_interCcpMergeFastMode,                             0, "Fast mode of cross-component prediction merge for inter prediction")
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   ("BIF",                                             m_BIF,                                            true, "bilateral filter   (0: off, 1:on)  [default: on]")
@@ -3038,6 +3050,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #else
   m_interMTSMaxSize = (m_iSourceHeight > 1080)? 32 : 16;
 #endif
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  m_interCcpMergeFastMode = (m_sourceHeight > 1080) ? 1 : 0;
 #endif
   if (m_chromaFormatIDC != CHROMA_420)
   {
@@ -5435,6 +5450,9 @@ void EncAppCfg::xPrintParameter()
     m_AffineAmvrEncOpt = m_AffineAmvr ? m_AffineAmvrEncOpt : false;
     msg( VERBOSE, "AffineAmvrEncOpt:%d ", m_AffineAmvrEncOpt );
     msg(VERBOSE, "AffineAmvp:%d ", m_AffineAmvp);
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+    msg(VERBOSE, "AffineTM:%d ", m_useAffineTM);
+#endif
     msg(VERBOSE, "DMVR:%d ", m_DMVR);
 #if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
     msg(VERBOSE, "AffineParameterRefinement:%d ", m_affineParaRefinement);
@@ -5686,6 +5704,9 @@ void EncAppCfg::xPrintParameter()
 #endif
 #if JVET_AE0059_INTER_CCCM
   msg( VERBOSE, "InterCCCM:%d ", m_interCccm );
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  msg( VERBOSE, "InterCcpMerge:%d ", m_interCcpMerge );
 #endif
 #if !JVET_AA0132_CONFIGURABLE_TM_TOOLS
 #if JVET_W0090_ARMC_TM

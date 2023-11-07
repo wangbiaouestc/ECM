@@ -50,8 +50,7 @@
 #include <cstring>
 #include <assert.h>
 #include <cassert>
-
-
+#include <cstdint>
 
 #define BASE_ENCODER                                      1
 #define BASE_NORMATIVE                                    1
@@ -66,6 +65,7 @@
 #define REMOVE_PCM                                        1 // Remove PCM related code for memory reduction and speedup
 #define JVET_Y0152_TT_ENC_SPEEDUP                         1 // TT encoding speedup
 #define JVET_AE0057_MTT_ET                                1 // JVET-AE0057: MTT early termination of 64x64 luma CU based on no-split RD cost 
+#define JVET_AF0177_ALF_COV_FLOAT                         1 // JVET-AF0177: Use float for ALF and CCALF covariance matrix
 
 
 // Software optimization
@@ -136,6 +136,7 @@
 #define JVET_AB0061_ITMP_BV_FOR_IBC                       1 // JVET-AB0061: Storing IntraTMP BV for IBC BV prediction
 #define JVET_AD0086_ENHANCED_INTRA_TMP                    1 // JVET-AD0086: Enhanced intra TMP
 #define JVET_AE0077_EXT_INTRATMP                          1 // JVET-AE0077: Extended search areas for intraTMP
+#define JVET_AF0079_STORING_INTRATMP                      1 // JVET-AF0079: Storing fractional-pel intraTMP BV
 #endif
 
 #define JVET_W0123_TIMD_FUSION                            1 // JVET-W0123: Template based intra mode derivation and fusion
@@ -229,6 +230,10 @@
 #define JVET_AE0174_NONINTER_TM_TOOLS_CONTROL             1 // JVET-AE0174: Add non-inter TM sps flag to control whether template matching is used for non-inter (Intra and IBC) tools
 #define JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES    1 // JVET-AE0094: IBC with non-adjacent spatial candidates
 
+#if JVET_AC0071_DBV && JVET_V0130_INTRA_TMP
+#define JVET_AF0066_ENABLE_DBV_4_SINGLE_TREE              1 // JVET-AF0066: Enable DBV mode in single tree configuration
+#endif
+
 // Inter
 #define CIIP_PDPC                                         1 // Apply pdpc to megre prediction as a new CIIP mode (CIIP_PDPC) additional to CIIP mode
 #define JVET_X0090_CIIP_FIX                               1 // JVET-X0090: combination of CIIP, OBMC and LMCS
@@ -238,6 +243,7 @@
 #define INTER_LIC                                         1 // Add LIC to non-subblock inter
 #if INTER_LIC
 #define JVET_AD0213_LIC_IMP                               1 // JVET-AD0213: bi-predictive LIC and the combination of LIC and OBMC
+#define JVET_AF0128_LIC_MERGE_TM                          1 // JVET-AF0128: LIC flag derivation for merge candidates with template costs
 #endif
 #define NON_ADJACENT_MRG_CAND                             1 // Add non-adjacent merge candidates
 #define MULTI_HYP_PRED                                    1 // Multiple hypothesis prediction
@@ -298,6 +304,10 @@
 #if IF_12TAP && JVET_AA0042_RPR_FILTERS && JVET_Z0117_CHROMA_IF
 #define JVET_AE0150_SMALL_SCALE_RPR_FILTERS               1 // RPR filters and thresholds for scale factors 1.1x to 1.35x
 #endif
+#define JVET_AF0190_RPR_TMP_REORDER_LIC                   1 // JVET-AF0190: enabling template-based reordering tools and LIC for scaled pictures in the RPR
+#define JVET_AF0073_INTER_CCP_MERGE                       1 // JVET-AF0073: Cross-component prediction merge mode for inter prediction
+#define JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT          1 // JVET-AF0159: Affine subblock BDOF refinement
+#define JVET_AF0057                                       1 // JVET-AF0057: Encoder only. DMVR with robust MV derivation.
 
 // Inter template matching tools
 #define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction
@@ -314,6 +324,7 @@
 #define JVET_W0097_GPM_MMVD_TM                            1 // JVET-W0097: GPM-MMVD and GPM-TM, GPM-TM part is controlled by TM_MRG
 #define JVET_X0141_CIIP_TIMD_TM                           1 // JVET-X0141: CIIP with TIMD and TM merge, CIIP-TM part is controlled by TM_MRG, and CIIP-TIMD part is controlled by JVET_W0123_TIMD_FUSION
 #define JVET_Y0134_TMVP_NAMVP_CAND_REORDERING             1 // JVET-Y0134: MV candidate reordering for TMVP and NAMVP types (controlled by JVET_W0090_ARMC_TM), and reference picture selection for TMVP 
+#define JVET_AF0163_TM_SUBBLOCK_REFINEMENT                1 // JVET-AF0163: TM based subblock motion refinement
 #if JVET_W0090_ARMC_TM
 #define JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED            1 // JVET-Y0067: TM based reordering for MMVD and affine MMVD and MVD sign prediction
 #define JVET_AD0140_MVD_PREDICTION                        1 // JVET-AD0140: MVD (sign and suffix) prediction
@@ -364,6 +375,7 @@
 #define SLICE_TYPE_WIN_SIZE                               1 // Context window initialization based on slice type
 #define JVET_Z0135_TEMP_CABAC_WIN_WEIGHT                  1 // JVET-Z0135 Test 4.3b: Temporal CABAC, weighted states, windows adjustment
 #define JVET_AD0206_CABAC_INIT_AT_GDR                     1 // JVET-AD0206: Cabac initialization at GDR picture
+#define JVET_AF0133_RETRAINING_ISLICE_CTX                 1 // JVET-AF0133: retrained I-slice context model
 
 // Loop filters
 #define ALF_IMPROVEMENT                                   1 // ALF improvement
@@ -385,6 +397,8 @@
 #define JVET_AD0222_ADDITONAL_ALF_FIXFILTER               1 // JVET-AD0222: Additional ALF fixed filter
 #define JVET_AE0139_ALF_IMPROVED_FIXFILTER                1 // JVET-AE0139: Improved ALF fixed filter
 #define JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO      1 // JVET-AE0151: CCSAO with history offsets and extended edge classifiers
+#define JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF            1 // JVET-AF0197: Luma Residual Tap in CCALF
+#define JVET_AF0112_BIF_DYNAMIC_SCALING                   1 // JVET-AF0112: Dynamic TU scale factor for BIF with LUTs interpolation
 
 // SIMD optimizations
 #if IF_12TAP
@@ -392,9 +406,6 @@
 #if IF_12TAP_SIMD
 #define SIMD_4x4_12                                       1 // Enable 4x4-block combined passes for 12-tap filters
 #endif
-#endif
-#if SIGN_PREDICTION
-#define ENABLE_SIMD_SIGN_PREDICTION                       1
 #endif
 #if JVET_V0130_INTRA_TMP
 #define ENABLE_SIMD_TMP                                   1
@@ -596,6 +607,10 @@ typedef std::pair<int, int>  TrCost;
 
 #ifndef EXTENSION_HDRTOOLS
 #define EXTENSION_HDRTOOLS                                0 //< extension for HDRTools/Metrics support; this macro should be controlled by makefile, as it would be used to control whether the library is built and linked
+#endif
+
+#ifndef EXTENSION_CABAC_TRAINING
+#define EXTENSION_CABAC_TRAINING                          0 //< JVET-AF0133: extension for CABAC context model training; this macro should be controlled by makefile, as it would be used to control whether the library is built and linked
 #endif
 
 #define JVET_O0756_CONFIG_HDRMETRICS                      1
@@ -1446,6 +1461,15 @@ enum MergeType
   NUM_MRG_TYPE                   // 5
 };
 
+#if SIGN_PREDICTION
+enum SIGN_PRED_TYPE : uint8_t
+{
+  SIGN_PRED_BYPASS   = 0,
+  SIGN_PRED_POSITIVE = 1,
+  SIGN_PRED_NEGATIVE = 2,
+  SIGN_PRED_HIDDEN   = 3,
+};
+#endif
 
 //////////////////////////////////////////////////////////////////////////
 // Encoder modes to try out

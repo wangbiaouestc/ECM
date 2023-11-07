@@ -51,6 +51,11 @@
 int main(int argc, char* argv[])
 {
   int returnCode = EXIT_SUCCESS;
+#if EXTENSION_CABAC_TRAINING
+  std::ofstream out("CabacBits_data.xml", std::ios::trunc);
+  out << "<CabacBits>" << std::endl;
+  std::ofstream out2("CabacBits_data.bin", std::ios::trunc | std::ios::binary);
+#endif
 
   // print information
   fprintf( stdout, "\n" );
@@ -105,6 +110,14 @@ int main(int argc, char* argv[])
     std::cout << "Memory allocation failed: " << e.what() << std::endl;
     returnCode = EXIT_FAILURE;
   }
+#endif
+
+  #if JVET_Z0150_MEMORY_USAGE_PRINT
+#ifdef __linux
+  int vm = getProcStatusValue("VmPeak:");
+  int rm = getProcStatusValue("VmHWM:");
+  printf("\nMemory Usage: VmPeak= %d KB ( %.1f GiB ),  VmHWM= %d KB ( %.1f GiB )\n", vm, (double)vm/(1024*1024), rm, (double)rm/(1024*1024));
+#endif
 #endif
 
   // ending time

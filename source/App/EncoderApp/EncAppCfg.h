@@ -394,6 +394,9 @@ protected:
   bool      m_sbTmvpEnableFlag;
   bool      m_Affine;
   bool      m_AffineType;
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+  bool      m_useAffineTM;
+#endif
 #if AFFINE_MMVD
   bool      m_AffineMmvdMode;
 #endif
@@ -530,6 +533,11 @@ protected:
   unsigned  m_IBCHashSearchMaxCand;
   unsigned  m_IBCHashSearchRange4SmallBlk;
   unsigned  m_IBCFastMethod;
+#if JVET_AF0057
+  bool      m_dmvrEncSelect;
+  int       m_dmvrEncSelectBaseQpTh;
+  bool      m_dmvrEncSelectDisableHighestTemporalLayer;
+#endif
 #if JVET_AA0061_IBC_MBVD
   bool      m_ibcMbvd;
 #if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
@@ -582,6 +590,10 @@ protected:
 #endif
 #if JVET_AE0059_INTER_CCCM
   bool m_interCccm; ///< CCCM for inter prediction
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  bool m_interCcpMerge; ///< Cross-component prediction merge for inter prediction
+  int  m_interCcpMergeFastMode;
 #endif
 #if JVET_AE0100_BVGCCCM
   bool m_bvgCccm; ///< Block vector guided CCCM

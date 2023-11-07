@@ -409,6 +409,9 @@ protected:
   bool      m_sbTmvpEnableFlag;
   bool      m_Affine;
   bool      m_AffineType;
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+  bool      m_useAffineTM; 
+#endif
 #if AFFINE_MMVD
   bool      m_AffineMmvdMode;
 #endif
@@ -536,6 +539,11 @@ protected:
   unsigned  m_IBCHashSearchMaxCand;
   unsigned  m_IBCHashSearchRange4SmallBlk;
   unsigned  m_IBCFastMethod;
+#if JVET_AF0057
+  bool      m_dmvrEncSelect;
+  int       m_dmvrEncSelectBaseQpTh;
+  bool      m_dmvrEncSelectDisableHighestTemporalLayer;
+#endif
 #if JVET_AA0061_IBC_MBVD
   bool      m_ibcMbvd;
 #if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
@@ -992,6 +1000,10 @@ protected:
 #endif
 #if JVET_AE0059_INTER_CCCM
   bool m_interCccm;
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  bool m_interCcpMerge;
+  int  m_interCcpMergeFastMode;
 #endif
 #if JVET_AE0100_BVGCCCM
   bool m_bvgCccm;
@@ -1467,6 +1479,10 @@ public:
   bool      getAffine                       ()         const { return m_Affine; }
   void      setAffineType( bool b )                          { m_AffineType = b; }
   bool      getAffineType()                            const { return m_AffineType; }
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+  void      setUseAffineTM( bool b )                         { m_useAffineTM = b; }
+  bool      getUseAffineTM()                           const { return  m_useAffineTM; }
+#endif
 #if AFFINE_MMVD
   void      setAffineMmvdMode               ( bool b )       { m_AffineMmvdMode = b; }
   bool      getAffineMmvdMode               ()         const { return m_AffineMmvdMode; }
@@ -1721,7 +1737,12 @@ public:
   unsigned  getIBCHashSearchRange4SmallBlk  ()         const { return m_IBCHashSearchRange4SmallBlk; }
   void      setIBCFastMethod                (unsigned n)     { m_IBCFastMethod = n; }
   unsigned  getIBCFastMethod                ()         const { return m_IBCFastMethod; }
-
+#if JVET_AF0057
+  void      setDMVREncMvSelection(bool b) { m_dmvrEncSelect = b; }
+  bool      getDMVREncMvSelection()         const { return m_dmvrEncSelect; }
+  void      setDMVREncMvSelectDisableHighestTemporalLayer(bool b) { m_dmvrEncSelectDisableHighestTemporalLayer = b; }
+  int       getDMVREncMvSelectDisableHighestTemporalLayer()         const { return m_dmvrEncSelectDisableHighestTemporalLayer; }
+#endif
   void      setUseWrapAround                ( bool b )       { m_wrapAround = b; }
   bool      getUseWrapAround                ()         const { return m_wrapAround; }
   void      setWrapAroundOffset             ( unsigned u )   { m_wrapAroundOffset = u; }
@@ -1747,6 +1768,12 @@ public:
 #if JVET_AE0059_INTER_CCCM
   void setUseInterCccm(bool b) { m_interCccm = b; }
   bool getUseInterCccm() const { return m_interCccm; }
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  void setUseInterCcpMerge(bool b) { m_interCcpMerge = b; }
+  bool getUseInterCcpMerge() const { return m_interCcpMerge; }
+  void setInterCcpMergeFastMode(int currMode) { m_interCcpMergeFastMode = currMode; }
+  int  getInterCcpMergeFastMode() const { return m_interCcpMergeFastMode; }
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   void      setUseBIF                       ( bool b )       { m_BIF = b; }

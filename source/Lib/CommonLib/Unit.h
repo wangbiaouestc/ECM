@@ -285,17 +285,6 @@ struct TransformUnit;
 struct PredictionUnit;
 class  CodingStructure;
 
-#if JVET_AB0157_TMRL
-struct TmrlMode
-{
-  int8_t  multiRefIdx;
-  uint8_t intraDir;
-  TmrlMode() : multiRefIdx(0), intraDir(0) {}
-  TmrlMode(int8_t _multiRefIdx, uint8_t _intraDir) :
-    multiRefIdx(_multiRefIdx), intraDir(_intraDir) {}
-};
-#endif
-
 struct CodingUnit : public UnitArea
 {
   CodingStructure *cs;
@@ -359,20 +348,12 @@ struct CodingUnit : public UnitArea
 #endif
 #if TMP_FAST_ENC
 #if JVET_AD0086_ENHANCED_INTRA_TMP
-  int                tmpXdisp[MTMP_NUM];
-  int                tmpYdisp[MTMP_NUM];
-  IntraTMPFusionInfo tmpFusionInfo[TMP_GROUP_IDX << 1];
   bool               tmpFlmFlag;
-  int64_t            tmpFlmParams[TMP_FLM_PARAMS][MTMP_NUM];
   uint8_t            tmpIdx;
   bool               tmpFusionFlag;
   int                tmpIsSubPel;
   int                tmpSubPelIdx;
-#else
-  int            tmpXdisp;
-  int            tmpYdisp;
 #endif
-  int            tmpNumCand;
 #endif
 #if JVET_W0123_TIMD_FUSION
   bool           timd;
@@ -439,7 +420,6 @@ struct CodingUnit : public UnitArea
 #if JVET_AB0157_TMRL
   bool           tmrlFlag;
   uint8_t        tmrlListIdx;
-  TmrlMode       tmrlList[MRL_LIST_SIZE];
 #endif
 #if JVET_AC0094_REF_SAMPLES_OPT
   bool           areAboveRightUnavail;
@@ -507,14 +487,10 @@ struct IntraPredictionData
   bool      parseLumaMode = false;
   int8_t    candId = -1;
   bool      parseChromaMode = false;
+#endif
   bool      mpmFlag = false;
   int8_t    ipredIdx = -1;
   bool      secondMpmFlag = false;
-#endif
-#if SECONDARY_MPM
-  uint8_t intraMPM[NUM_MOST_PROBABLE_MODES];
-  uint8_t intraNonMPM[NUM_NON_MPM_MODES];
-#endif
   uint8_t  intraDir[MAX_NUM_CHANNEL_TYPE];
 #if JVET_AB0155_SGPM
   uint8_t intraDir1[MAX_NUM_CHANNEL_TYPE];
@@ -654,6 +630,9 @@ struct InterPredictionData
 #else
   Mv        mvdL0SubPu[MAX_NUM_SUBCU_DMVR];
 #endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+  int       availableBdofRefinedMv;
+#endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   bool      reduceTplSize;
 #endif
@@ -670,6 +649,9 @@ struct InterPredictionData
   Mv        mvdAffi [NUM_REF_PIC_LIST_01][3];
   Mv        mvAffi[NUM_REF_PIC_LIST_01][3];
   bool      ciipFlag;
+#if JVET_AF0057
+  bool      dmvrImpreciseMv;
+#endif
 #if CIIP_PDPC
   bool      ciipPDPC;
 #endif
@@ -786,6 +768,10 @@ struct TransformUnit : public UnitArea
 #if JVET_AE0059_INTER_CCCM
   int8_t         interCccm;
 #endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  int8_t         interCcpMerge;
+  CCPModelCandidate curCand;
+#endif
   TransformUnit() : chType( CH_L ) { }
   TransformUnit(const UnitArea& unit);
   TransformUnit(const ChromaFormat _chromaFormat, const Area &area);
@@ -798,9 +784,9 @@ struct TransformUnit : public UnitArea
 #if REMOVE_PCM
 #if SIGN_PREDICTION
 #if JVET_Y0141_SIGN_PRED_IMPROVE
-  void init(TCoeff **coeffs, TCoeff **signs, unsigned **signsScanIdx, Pel **pltIdx, bool **runType);
+  void init(TCoeff **coeffs, SIGN_PRED_TYPE **signs, unsigned **signsScanIdx, Pel **pltIdx, bool **runType);
 #else
-  void init(TCoeff **coeffs, TCoeff **signs, Pel **pltIdx, bool **runType);
+  void        init(TCoeff **coeffs, SIGN_PRED_TYPE **signs, Pel **pltIdx, bool **runType);
 #endif
 #else
   void init(TCoeff **coeffs, Pel **pltIdx, bool **runType);
@@ -808,9 +794,9 @@ struct TransformUnit : public UnitArea
 #else
 #if SIGN_PREDICTION
 #if JVET_Y0141_SIGN_PRED_IMPROVE
-  void init(TCoeff **coeffs, TCoeff **signs, unsigned **signsScanIdx, Pel **pcmbuf, bool **runType);
+  void    init(TCoeff **coeffs, SIGN_PRED_TYPE **signs, unsigned **signsScanIdx, Pel **pcmbuf, bool **runType);
 #else
-  void init(TCoeff **coeffs, TCoeff **signs, Pel **pcmbuf, bool **runType);
+  void init(TCoeff **coeffs, SIGN_PRED_TYPE **signs, Pel **pcmbuf, bool **runType);
 #endif
 #else
   void init(TCoeff **coeffs, Pel **pcmbuf, bool **runType);
@@ -830,12 +816,18 @@ struct TransformUnit : public UnitArea
          CoeffBuf getCoeffs(const ComponentID id);
   const CCoeffBuf getCoeffs(const ComponentID id) const;
 #if SIGN_PREDICTION
-         CoeffBuf getCoeffSigns(const ComponentID id);
-  const CCoeffBuf getCoeffSigns(const ComponentID id) const;
+  AreaBuf<SIGN_PRED_TYPE> getCoeffSigns(const ComponentID id);
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   IdxBuf          getCoeffSignsScanIdx(const ComponentID id);
   const CIdxBuf   getCoeffSignsScanIdx(const ComponentID id) const;
 #endif
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  const MotionInfo& getMotionInfo() const;
+  const MotionInfo& getMotionInfo( const Position& pos ) const;
+  
+  const int& getCcpmIdxInfo() const;
+  const int& getCcpmIdxInfo( const Position& pos ) const;
 #endif
 #if !REMOVE_PCM
          PelBuf   getPcmbuf(const ComponentID id);
@@ -864,7 +856,7 @@ struct TransformUnit : public UnitArea
 private:
   TCoeff *m_coeffs[ MAX_NUM_TBLOCKS ];
 #if SIGN_PREDICTION
-  TCoeff *m_coeffSigns[ MAX_NUM_TBLOCKS ];
+  SIGN_PRED_TYPE *m_coeffSigns[MAX_NUM_TBLOCKS];
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   unsigned *m_coeffSignsIdx[MAX_NUM_TBLOCKS];
 #endif

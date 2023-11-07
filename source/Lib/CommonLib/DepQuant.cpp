@@ -2586,28 +2586,24 @@ void DepQuant::quant( TransformUnit &tu, const ComponentID &compID, const CCoeff
 
 #if SIGN_PREDICTION
 #if JVET_Y0141_SIGN_PRED_IMPROVE
-bool compareLevels(PositionWithLevel a, PositionWithLevel b) { return a.level > b.level; }
-uint32_t DepQuant::getPredictedSigns(TransformUnit& tu, const ComponentID compID, std::vector<Position> &predSignsXY, uint8_t* signBuf, bool isDecoder)
+void DepQuant::getPredictedSigns(TransformUnit &tu, const ComponentID compID,
+                                 static_vector<Position, SIGN_PRED_MAX_NUM> &predSignsXY, uint8_t *signBuf,
+                                 bool isDecoder)
 {
-  uint32_t numPredSigns = 0;
-  uint32_t numAreaSigns = 0;
-  bool bUseSignPred = TU::getUseSignPred(tu, compID);
-  std::vector<PositionWithLevel> predSignsXYLevel;
-  if (bUseSignPred)
+  if (TU::getUseSignPred(tu, compID))
   {
-    bool lfnstEnabled = tu.checkLFNSTApplied(compID);
-    const int32_t maxNumPredSigns = lfnstEnabled ? std::min<int>( 4, tu.cs->sps->getNumPredSigns() ) : tu.cs->sps->getNumPredSigns();
-    CoeffBuf bufQCoeffs = tu.getCoeffs(compID);
-    CoeffBuf bufSigns = tu.getCoeffSigns(compID);
-    TCoeff *coeff = bufQCoeffs.buf;
-    TCoeff *signs = bufSigns.buf;
-    const CompArea&     area = tu.blocks[compID];
-    const int           numCoeff = area.area();
-    const SizeType      hsId = gp_sizeIdxInfo->idxFrom(area.width);
-    const SizeType      vsId = gp_sizeIdxInfo->idxFrom(area.height);
-    const CoeffScanType scanType = SCAN_DIAG;
-    const ScanElement *scan = g_scanOrder[SCAN_GROUPED_4x4][scanType][hsId][vsId];
-    const uint64_t stateTransTab = g_stateTransTab[tu.cs->slice->getDepQuantEnabledIdc()];
+    CoeffBuf        bufQCoeffs = tu.getCoeffs(compID);
+    TCoeff         *coeff      = bufQCoeffs.buf;
+    const ptrdiff_t strideC    = bufQCoeffs.stride;
+
+    const CompArea &area     = tu.blocks[compID];
+    const int       numCoeff = area.area();
+
+    const SizeType     hsId = gp_sizeIdxInfo->idxFrom(area.width);
+    const SizeType     vsId = gp_sizeIdxInfo->idxFrom(area.height);
+    const ScanElement *scan = g_scanOrder[SCAN_GROUPED_4x4][SCAN_DIAG][hsId][vsId];
+
+    // Find last nonzero coefficient
     int lastScanIdx = -1;
     for (int scanIdx = numCoeff - 1; scanIdx >= 0; scanIdx--)
     {
@@ -2617,55 +2613,68 @@ uint32_t DepQuant::getPredictedSigns(TransformUnit& tu, const ComponentID compID
         break;
       }
     }
+
+    // exit if all coefficients are 0
     if (lastScanIdx < 0)
     {
-      return 0;
+      return;
     }
-        //----- dequant coefficients ----- 
-    uint32_t extAreaSize = (lfnstEnabled ? 4 : tu.cs->sps->getSignPredArea());
-    uint32_t signPredHeight = (tu.blocks[compID].height > extAreaSize) ? extAreaSize : tu.blocks[compID].height;
-    uint32_t signPredWidth = (tu.blocks[compID].width > extAreaSize) ? extAreaSize : tu.blocks[compID].width;
+
+    AreaBuf<SIGN_PRED_TYPE> bufSigns = tu.getCoeffSigns(compID);
+    const SIGN_PRED_TYPE   *signs    = bufSigns.buf;
+    const ptrdiff_t strideS  = bufSigns.stride;
+
+    const bool lfnstEnabled = tu.checkLFNSTApplied(compID);
+
+    const uint32_t extAreaSize    = lfnstEnabled ? 4 : tu.cs->sps->getSignPredArea();
+    const uint32_t signPredHeight = std::min(tu.blocks[compID].height, extAreaSize);
+    const uint32_t signPredWidth  = std::min(tu.blocks[compID].width, extAreaSize);
+
+    uint32_t numAreaSigns = 0;
+
     if (isDecoder)
     {
-      for (uint32_t uiY = 0; uiY < signPredHeight; uiY++)
+      for (uint32_t y = 0; y < signPredHeight; y++)
       {
-        for (uint32_t uiX = 0; uiX < signPredWidth; uiX++)
+        for (uint32_t x = 0; x < signPredWidth; x++)
         {
-          int coef = coeff[uiX];
+          const TCoeff coef = coeff[y * strideC + x];
           if (coef != 0)
           {
-            if (signs[uiX] != TrQuant::SIGN_PRED_HIDDEN)
+            if (signs[y * strideS + x] != SIGN_PRED_HIDDEN)
             {
-              uint32_t curSign = ((coef < 0) ? 1 : 0);
-              signBuf[numAreaSigns] = (uint8_t)curSign;
+              signBuf[numAreaSigns] = coef < 0 ? 1 : 0;
               numAreaSigns++;
             }
           }
         }
-        coeff += bufQCoeffs.stride;
-        signs += bufSigns.stride;
       }
-      coeff = bufQCoeffs.buf;
-      signs = bufSigns.buf;
-           
     }
-    for (int state = 0, scanIdx = lastScanIdx; scanIdx >= 0; scanIdx--)
+
+    // This should be a 4KB data structure, which isn't too large for the stack
+    // 32 is the maximum value of extAreaSize below
+    static_vector<PositionWithLevel, 32 * 32> predSignsXYLevel;
+
+    const uint64_t stateTransTab = g_stateTransTab[tu.cs->slice->getDepQuantEnabledIdc()];
+
+    int state = 0;
+    for (int scanIdx = lastScanIdx; scanIdx >= 0; scanIdx--)
     {
-      const unsigned  rasterPos = scan[scanIdx].idx;
-      uint32_t uiX = scan[scanIdx].x;
-      uint32_t uiY = scan[scanIdx].y;
-      const TCoeff&   level = abs(coeff[rasterPos]);
-      if (level && uiY < signPredHeight && uiX < signPredWidth)
+      const auto    &scanData  = scan[scanIdx];
+      const uint32_t rasterPos = scanData.idx;
+      const TCoeff   level     = coeff[rasterPos];
+      if (level != 0 && scanData.y < signPredHeight && scanData.x < signPredWidth)
       {
-        if (signs[rasterPos] != TrQuant::SIGN_PRED_HIDDEN)
+        if (signs[rasterPos] != SIGN_PRED_HIDDEN)
         {
-          Intermediate_Int  qIdx = (level << 1) - (state & 1);
-          predSignsXYLevel.push_back(PositionWithLevel(uiX, uiY, qIdx));
+          Intermediate_Int qIdx = 2 * std::abs(level) - (state & 1);
+          predSignsXYLevel.push_back({ scanData.x, scanData.y, qIdx });
         }
       }
-      state = int((stateTransTab >> ((state << 3) + ((level & 1) << 2))) & 15);
+      state = int((stateTransTab >> (4 * (2 * state + (level & 1)))) & 15);
     }
-    std::stable_sort(predSignsXYLevel.begin(), predSignsXYLevel.end(), compareLevels);
+    std::stable_sort(predSignsXYLevel.begin(), predSignsXYLevel.end(),
+                     [](const PositionWithLevel &a, const PositionWithLevel &b) { return a.level > b.level; });
 
     IdxBuf bufSignsScanIdx = tu.getCoeffSignsScanIdx(compID);
 
@@ -2674,68 +2683,62 @@ uint32_t DepQuant::getPredictedSigns(TransformUnit& tu, const ComponentID compID
       CHECK(numAreaSigns != predSignsXYLevel.size(), "sign prediction number error");
     }
 
+    const int32_t maxNumPredSigns =
+      lfnstEnabled ? std::min<int>(4, tu.cs->sps->getNumPredSigns()) : tu.cs->sps->getNumPredSigns();
+
     for (int idx = 0; idx < predSignsXYLevel.size(); idx++)
     {
-      Position pos = Position(predSignsXYLevel[idx].x, predSignsXYLevel[idx].y);
-      bufSignsScanIdx.at(pos) = idx;
+      const PositionWithLevel &pos = predSignsXYLevel[idx];
+
+      bufSignsScanIdx.at(pos.x, pos.y) = idx;
+
       if (isDecoder)
       {
-        TCoeff &quantCoeff = bufQCoeffs.at(pos);
+        TCoeff &quantCoeff = bufQCoeffs.at(pos.x, pos.y);
         quantCoeff = std::abs(quantCoeff) * (signBuf[idx] ? -1 : 1);
       }
+
       if (idx < maxNumPredSigns)
       {
-        predSignsXY.push_back(pos);
-        numPredSigns++;
+        predSignsXY.push_back({ pos.x, pos.y });
       }
     }
-    CHECK(numPredSigns > maxNumPredSigns, "");
+    CHECK(predSignsXY.size() > maxNumPredSigns, "");
   }
-  return numPredSigns;
 }
 #else
-uint32_t DepQuant::getPredictedSigns( TransformUnit& tu, const ComponentID compID, std::vector<Position> &predSignsXY )
+void DepQuant::getPredictedSigns(TransformUnit &tu, const ComponentID compID,
+                                 static_vector<Position, SIGN_PRED_MAX_NUM> &predSignsXY)
 {
-uint32_t numPredSigns = 0;
-  bool bUseSignPred = TU::getUseSignPred( tu, compID );
-
-  if( bUseSignPred )
+  if (TU::getUseSignPred(tu, compID))
   {
-    const int32_t  maxNumPredSigns = tu.cs->sps->getNumPredSigns();
+    const int32_t maxNumPredSigns = tu.cs->sps->getNumPredSigns();
+
     CoeffBuf bufQCoeffs = tu.getCoeffs( compID );
-    CoeffBuf bufSigns = tu.getCoeffSigns( compID );
-    TCoeff *coeff = bufQCoeffs.buf;
-    TCoeff *signs = bufSigns.buf;
-    for( uint32_t uiY = 0; uiY < SIGN_PRED_FREQ_RANGE; uiY++ )
+    AreaBuf<SIGN_PRED_TYPE> bufSigns = tu.getCoeffSigns(compID);
+    const TCoeff *coeff = bufQCoeffs.buf;
+    const TCoeff *signs = bufSigns.buf;
+    const ptrdiff_t strideC = bufQCoeffs.stride;
+    const ptrdiff_t strideS = bufSigns.stride;
+
+    for (uint32_t y = 0; y < SIGN_PRED_FREQ_RANGE; y++)
     {
-      for( uint32_t uiX = 0; uiX < SIGN_PRED_FREQ_RANGE; uiX++ )
+      for (uint32_t x = 0; x < SIGN_PRED_FREQ_RANGE; x++)
       {
-        uint32_t uiLevel = abs( coeff[uiX] );
-
-        if( uiLevel )
+        if (coeff[y * strideC + x] != 0)
         {
-          if( signs[uiX] != TrQuant::SIGN_PRED_HIDDEN )
+          if (signs[y * strideS + x] != SIGN_PRED_HIDDEN)
           {
-            predSignsXY.push_back( Position( uiX, uiY ) );
-
-            if( ++numPredSigns >= maxNumPredSigns )
+            predSignsXY.push_back({ x, y });
+            if (predSignsXY.size() >= maxNumPredSigns)
             {
-              break;
+              return;
             }
-
           }
         }
       }
-      if( numPredSigns == maxNumPredSigns )
-      {
-        break;
-      }
-
-      coeff += bufQCoeffs.stride;
-      signs += bufSigns.stride;
     }
   }
-  return numPredSigns;
 }
 #endif
 #endif

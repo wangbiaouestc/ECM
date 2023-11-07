@@ -1759,6 +1759,9 @@ private:
   bool              m_SMVD;
   bool              m_Affine;
   bool              m_AffineType;
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+  bool              m_useAffineTM;
+#endif
   bool              m_PROF;
   bool              m_bcw;                        //
 #if ENABLE_DIMD
@@ -1813,6 +1816,11 @@ private:
 #if JVET_AE0059_INTER_CCCM
   bool              m_interCccm;
 #endif
+
+#if JVET_AF0073_INTER_CCP_MERGE
+  bool              m_interCcpMerge;
+#endif
+
 #if LUMA_ADAPTIVE_DEBLOCKING_FILTER_QP_OFFSET
   bool              m_LadfEnabled;
   int               m_LadfNumIntervals;
@@ -2457,6 +2465,10 @@ void                    setCCALFEnabledFlag( bool b )                           
   void      setUseInterCccm       ( bool b )                                         { m_interCccm = b; }
   bool      getUseInterCccm       ()                                      const      { return m_interCccm; }
 #endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  void      setUseInterCcpMerge   ( bool b )                                         { m_interCcpMerge = b; }
+  bool      getUseInterCcpMerge   ()                                      const      { return m_interCcpMerge; }
+#endif
   void      setUseMRL             ( bool b )                                        { m_MRL = b; }
   bool      getUseMRL             ()                                      const     { return m_MRL; }
   void      setUseMIP             ( bool b )                                        { m_MIP = b; }
@@ -2469,6 +2481,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
   void      setUseFastSubTmvp     ( bool b )                                        { m_fastSubTmvp = b; }
   bool      getUseFastSubTmvp     ()                                      const     { return m_fastSubTmvp; }
+#endif
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+  void      setUseAffineTM        ( bool b )                                        { m_useAffineTM = b; }
+  bool      getUseAffineTM        ()                                     const      { return  m_useAffineTM; }
 #endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   void      setUseArmcRefinedMotion ( bool b )                                      { m_armcRefinedMotion = b; }
@@ -3424,6 +3440,9 @@ private:
   bool                       m_pendingRasInit;
 
   bool                       m_bCheckLDC;
+#if JVET_AF0128_LIC_MERGE_TM
+  bool                       m_bCheckLDB;
+#endif
 
   bool                       m_biDirPred;
   int                        m_symRefIdx[2];
@@ -3436,6 +3455,9 @@ private:
   bool                       m_amvpMergeModeValidCandPair[MAX_NUM_REF][MAX_NUM_REF];
 #endif
 
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+  bool                       m_pairEqualPocDist[MAX_NUM_REF][MAX_NUM_REF];
+#endif
   //  Data
   int                        m_iSliceQpDelta;
   int                        m_iSliceChromaQpDelta[MAX_NUM_COMPONENT+1];
@@ -3690,6 +3712,9 @@ public:
   bool                        getIsUsedAsLongTerm(int i, int j) const                { return m_bIsUsedAsLongTerm[i][j];                             }
   void                        setIsUsedAsLongTerm(int i, int j, bool value)          { m_bIsUsedAsLongTerm[i][j] = value;                            }
   bool                        getCheckLDC() const                                    { return m_bCheckLDC;                                           }
+#if JVET_AF0128_LIC_MERGE_TM
+  bool                        getCheckLDB() const                                    { return m_bCheckLDB;                                           }
+#endif
   int                         getList1IdxToList0Idx( int list1Idx ) const            { return m_list1IdxToList0Idx[list1Idx];                        }
   void                        setPOC( int i )                                        { m_iPOC              = i;                                      }
   bool                        getPictureHeaderInSliceHeader() const                  { return m_pictureHeaderInSliceHeader;                         }
@@ -3751,6 +3776,10 @@ public:
   int8_t                      getNumNonScaledRefPicPair() { return m_numNonScaledRefPicPair; }
   const std::vector<RefPicPair> &getRefPicPairList() const { return m_refPicPairList; }
 #endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+  void                        generateEqualPocDist();
+  bool                        getPairEqualPocDist(int refIdx0, int refIdx1) const { return m_pairEqualPocDist[refIdx0][refIdx1]; };
+#endif
 #if MULTI_HYP_PRED
   void                        setMultiHypRefPicList();
   const std::vector<RefListAndRefIdx> &getMultiHypRefPicList() const { return m_multiHypRefPics; }
@@ -3761,6 +3790,9 @@ public:
   void                        setColFromL0Flag( bool colFromL0 )                     { m_colFromL0Flag = colFromL0;                                  }
   void                        setColRefIdx( uint32_t refIdx)                             { m_colRefIdx = refIdx;                                         }
   void                        setCheckLDC( bool b )                                  { m_bCheckLDC = b;                                              }
+#if JVET_AF0128_LIC_MERGE_TM
+  void                        setCheckLDB( bool b )                                  { m_bCheckLDB = b;                                              }
+#endif
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   void                        setColFromL0Flag2nd(bool colFromL0)                    { m_colFromL0Flag2nd = colFromL0;                               }
   void                        setColRefIdx2nd(uint32_t refIdx)                       { m_colRefIdx2nd = refIdx;                                      }
