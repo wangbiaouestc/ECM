@@ -49,6 +49,7 @@
 #include <cstring>
 #include <assert.h>
 #include <cassert>
+#include <cstdint>
 
 // clang-format off
 
