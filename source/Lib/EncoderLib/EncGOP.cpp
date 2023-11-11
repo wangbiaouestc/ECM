@@ -4222,9 +4222,6 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
 
 
         tmpBitsBeforeWriting = m_HLSWriter->getNumberOfWrittenBits();
-        pcSlice->m_ccAlfFilterParam      = m_pcALF->getCcAlfFilterParam();
-        pcSlice->m_ccAlfFilterControl[0] = m_pcALF->getCcAlfControlIdc(COMPONENT_Cb);
-        pcSlice->m_ccAlfFilterControl[1] = m_pcALF->getCcAlfControlIdc(COMPONENT_Cr);
 
 #if EMBEDDED_APS
         m_HLSWriter->codeSliceHeader( m_aps, pcSlice );
