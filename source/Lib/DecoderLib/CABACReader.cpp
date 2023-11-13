@@ -3078,6 +3078,7 @@ void CABACReader::cu_palette_info(CodingUnit& cu, ComponentID compBegin, uint32_
   {
     recievedPLTnum = exp_golomb_eqprob(0);
   }
+  DTRACE(g_trace_ctx, D_SYNTAX, "cu_palette_info() recieved_plt_num=%d\n", recievedPLTnum);
 
   cu.curPLTSize[compBegin] = curPLTidx + recievedPLTnum;
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
@@ -3091,6 +3092,7 @@ void CABACReader::cu_palette_info(CodingUnit& cu, ComponentID compBegin, uint32_
       ComponentID compID = (ComponentID)comp;
       const int  channelBitDepth = sps.getBitDepth(toChannelType(compID));
       cu.curPLT[compID][idx] = m_BinDecoder.decodeBinsEP(channelBitDepth);
+      DTRACE(g_trace_ctx, D_SYNTAX, "cu_palette_info() comp=%d idx=%d cur_plt=%d\n", comp, idx, cu.curPLT[compID][idx]);
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
       if( cu.isLocalSepTree() )
       {
@@ -3112,6 +3114,7 @@ void CABACReader::cu_palette_info(CodingUnit& cu, ComponentID compBegin, uint32_
   {
     uint32_t escCode = 0;
     escCode = m_BinDecoder.decodeBinEP();
+    DTRACE(g_trace_ctx, D_SYNTAX, "cu_palette_info() esc_code=%d\n", escCode);
     cu.useEscape[compBegin] = (escCode != 0);
   }
   uint32_t    indexMaxSize = cu.useEscape[compBegin] ? (cu.curPLTSize[compBegin] + 1) : cu.curPLTSize[compBegin];
@@ -3332,6 +3335,7 @@ void CABACReader::cuPaletteSubblockInfo(CodingUnit& cu, ComponentID compBegin, u
 void CABACReader::parseScanRotationModeFlag(CodingUnit& cu, ComponentID compBegin)
 {
   cu.useRotation[compBegin] = m_BinDecoder.decodeBin(Ctx::RotationFlag());
+  DTRACE(g_trace_ctx, D_SYNTAX, "cu_palette_info() use_rotation=%d\n", cu.useRotation[compBegin]);
 }
 
 void CABACReader::xDecodePLTPredIndicator(CodingUnit& cu, uint32_t maxPLTSize, ComponentID compBegin)
@@ -4258,7 +4262,7 @@ void CABACReader::ibcMbvdData(PredictionUnit& pu)
   }
   uiUnaryIdx += temp;
   pu.ibcMbvdMergeIdx = var0 * mbvdsPerBase + uiUnaryIdx;
-  DTRACE(g_trace_ctx, D_SYNTAX, "ibc_mbvd_data() merge_idx=%d\n", pu.ibcMbvdMergeIdx);
+  DTRACE(g_trace_ctx, D_SYNTAX, "ibc_mbvd_data() ibc_merge_idx=%d\n", pu.ibcMbvdMergeIdx);
 
   if (biMbvdMode == 1)
   {
@@ -4298,7 +4302,7 @@ void CABACReader::ibcMbvdData(PredictionUnit& pu)
       uiUnaryIdx1 += (uiUnaryIdx+1);
     }
     pu.ibcMergeIdx1 = var1 * mbvdsPerBase + uiUnaryIdx1 + IBC_MRG_MAX_NUM_CANDS;
-    DTRACE(g_trace_ctx, D_SYNTAX, "ibc_mbvd_data() merge_idx1=%d\n", pu.ibcMergeIdx1 - IBC_MRG_MAX_NUM_CANDS);
+    DTRACE(g_trace_ctx, D_SYNTAX, "ibc_mbvd_data() ibc_merge_idx1=%d\n", pu.ibcMergeIdx1 - IBC_MRG_MAX_NUM_CANDS);
   }
 #else
   unsigned int uiUnaryIdx = 0;
@@ -5348,7 +5352,12 @@ void CABACReader::merge_idx( PredictionUnit& pu )
 #endif
   }
 
-  DTRACE( g_trace_ctx, D_SYNTAX, "merge_idx() merge_idx=%d\n", pu.mergeIdx );
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  if (pu.ibcMbvdMergeFlag) 
+    DTRACE( g_trace_ctx, D_SYNTAX, "merge_idx() ibc_merge_idx1=%d\n", pu.ibcMergeIdx1 ); 
+  else 
+#endif
+    DTRACE( g_trace_ctx, D_SYNTAX, "merge_idx() merge_idx=%d\n", pu.mergeIdx );
 #if JVET_X0049_ADAPT_DMVR
   if (pu.bmMergeFlag && pu.bmDir == 2)
   {
@@ -7792,6 +7801,7 @@ void CABACReader::cu_chroma_qp_offset( CodingUnit& cu )
    *              1 if outer flag is set and there is no inner flag
    *              1+ otherwise */
   cu.chromaQpAdj = cu.cs->chromaQpAdj = qpAdj;
+  DTRACE(g_trace_ctx, D_SYNTAX, "cu_chroma_qp_offset() chroma_qp_adj=%d\n", cu.chromaQpAdj);
 }
 
 //================================================================================
