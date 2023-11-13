@@ -24041,92 +24041,6 @@ void InterPrediction::getAmvpMergeModeMergeList(PredictionUnit& pu, MvField* mvF
       bestMvpIdxLoopStart = decAmvpMvpIdx;
       bestMvpIdxLoopEnd = bestMvpIdxLoopStart + 1;
     }
-#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
-    pu.mv[refListAmvp] = amvpInfo.mvCand[0];
-
-    // BM select merge candidate
-    struct bmCostSort
-    {
-      int mergeIdx;
-      Distortion bmCost;
-    };
-    bmCostSort temp;
-    const auto CostIncSort = [](const bmCostSort& x, const bmCostSort& y) { return x.bmCost < y.bmCost; };
-    std::vector<bmCostSort> input;
-    // here to select the merge cand which has minimum BM cost, at each cand, the cost is derived by  minBMcost(mvpIdx0, mvpIdx1)
-    if (bmMergeCtx.numValidMergeCand > 1)
-    {
-      // pre Fill AMVP prediction blocks
-#if JVET_X0049_BDMVR_SW_OPT
-      Pel* pelBufferAmvp = m_filteredBlock[3][refListAmvp][0] + BDMVR_CENTER_POSITION;
-      const SizeType stride = BDMVR_BUF_STRIDE;
-#else
-      Pel* pelBufferAmvp = m_filteredBlock[3][refListAmvp][0];
-      const SizeType stride = pu.lwidth();
-#endif
-      PelUnitBuf predBufAmvp = PelUnitBuf(pu.chromaFormat, PelBuf(pelBufferAmvp, stride, pu.lwidth(), pu.lheight()));
-      const Picture& refPicAmvp = *pu.cu->slice->getRefPic((RefPicList)refListAmvp, pu.refIdx[refListAmvp])->unscaledPic;
-      xBDMVRFillBlkPredPelBuffer(pu, refPicAmvp, pu.mv[refListAmvp], predBufAmvp, pu.cs->slice->clpRng(COMPONENT_Y));
-      Mv mvAmBdmvr[2/*refListId*/];
-      for (int mergeIdx = 0; mergeIdx < bmMergeCtx.numValidMergeCand; mergeIdx++)
-      {
-        pu.refIdx[refListMerge] = bmMergeCtx.mvFieldNeighbours[(mergeIdx << 1) + refListMerge].refIdx;
-        mvAmBdmvr[refListAmvp] = amvpInfo.mvCand[0];
-        mvAmBdmvr[refListMerge] = bmMergeCtx.mvFieldNeighbours[(mergeIdx << 1) + refListMerge].mv;
-#if JVET_Y0128_NON_CTC
-#if JVET_AA0124_AMVPMERGE_DMVD_OFF_RPR_ON
-#if JVET_AB0078_AMVPMERGE_LDB
-        if (pu.cu->slice->getSPS()->getUseDMVDMode() == true && !pu.cu->slice->getCheckLDC())
-#else
-        if (pu.cu->slice->getSPS()->getUseDMVDMode() == true)
-#endif
-        {
-#endif
-          CHECK(pu.cu->slice->getRefPic((RefPicList)refListMerge, pu.refIdx[refListMerge])->isRefScaled(pu.cs->pps), "this is not possible");
-#if JVET_AA0124_AMVPMERGE_DMVD_OFF_RPR_ON
-        }
-#endif
-#endif
-#if JVET_Z0085_AMVPMERGE_DMVD_OFF
-#if JVET_AB0078_AMVPMERGE_LDB
-        const int pocMerge = pu.cu->slice->getRefPOC(refListMerge, pu.refIdx[refListMerge]);
-        if (pu.cu->cs->sps->getUseDMVDMode() && ((pocAmvp - curPoc) * (pocMerge - curPoc) < 0))
-#else
-        if (pu.cu->cs->sps->getUseDMVDMode())
-#endif
-        {
-#endif
-          Distortion tmpBmCost = xBDMVRGetMatchingError(pu, mvAmBdmvr, useMR);
-          temp.mergeIdx = mergeIdx;
-          temp.bmCost = tmpBmCost;
-#if JVET_Z0085_AMVPMERGE_DMVD_OFF
-        }
-        else
-        {
-          temp.mergeIdx = mergeIdx;
-          temp.bmCost = std::numeric_limits<Distortion>::max();
-        }
-#endif
-        input.push_back(temp);
-      }
-      stable_sort(input.begin(), input.end(), CostIncSort);
-    }
-#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
-    else
-    {
-      temp.mergeIdx = 0;
-      temp.bmCost = 0;
-      input.push_back(temp);
-    }
-#else
-    if (bmMergeCtx.numValidMergeCand == 1)
-    {
-      pu.mv[refListMerge] = bmMergeCtx.mvFieldNeighbours[refListMerge].mv;
-      pu.refIdx[refListMerge] = bmMergeCtx.mvFieldNeighbours[refListMerge].refIdx;
-    }
-    else
-#endif
-#endif
     for (int bestMvpIdxToTest = bestMvpIdxLoopStart; bestMvpIdxToTest < bestMvpIdxLoopEnd; bestMvpIdxToTest++)
     {
 #if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
@@ -24243,7 +24157,6 @@ void InterPrediction::getAmvpMergeModeMergeList(PredictionUnit& pu, MvField* mvF
       {
         pu.refIdx[refListAmvp] = refIdxAmvp;
 #endif
-#if !JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
       pu.mv[refListAmvp] = amvpInfo.mvCand[bestMvpIdxToTest];
 
       // BM select merge candidate
@@ -24327,7 +24240,6 @@ void InterPrediction::getAmvpMergeModeMergeList(PredictionUnit& pu, MvField* mvF
         pu.refIdx[refListMerge] = bmMergeCtx.mvFieldNeighbours[refListMerge].refIdx;
       }
       else
-#endif
 #endif
       {
         pu.mv[refListMerge] = bmMergeCtx.mvFieldNeighbours[(input[0].mergeIdx << 1) + refListMerge].mv;
