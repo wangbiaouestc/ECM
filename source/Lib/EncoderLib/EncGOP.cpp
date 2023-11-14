@@ -4192,6 +4192,8 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
             picHeader->setNumL0Weights(pcSlice->getNumRefIdx(REF_PIC_LIST_1));
           }
 
+          picHeader->setDisFracMBVD(pcSlice->getPicHeader()->getDisFracMBVD());
+
           pcPic->cs->picHeader->setPic(pcPic);
           pcPic->cs->picHeader->setValid();
           if (pcPic->cs->pps->getNumSlicesInPic() > 1 || !m_pcCfg->getEnablePictureHeaderInSliceHeader())
