@@ -3072,6 +3072,7 @@ void CABACReader::cu_palette_info(CodingUnit& cu, ComponentID compBegin, uint32_
       curPLTidx++;
     }
   }
+  cu.reusePLTSize[compBegin] = curPLTidx;
 
   uint32_t recievedPLTnum = 0;
   if (curPLTidx < maxPltSize)
