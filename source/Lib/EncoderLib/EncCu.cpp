@@ -6901,11 +6901,8 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
   }
 
 #if JVET_AE0046_BI_GPM
-  bool refinePossible[MRG_MAX_NUM_CANDS];
-  for (int idx = 0; idx < MRG_MAX_NUM_CANDS; idx++)
-  {
-    refinePossible[idx] = false;
-  }
+  std::array<bool, GEO_MAX_NUM_UNI_CANDS> refinePossible;
+  refinePossible.fill(false);
 #endif
 
   // 1. bit estimation
@@ -8087,8 +8084,8 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
       pu.mmvdMergeIdx = MAX_UCHAR;
 
 #if JVET_AE0046_BI_GPM
-      pu.gpmDmvrRefinePart0 = refinePossible[pu.geoMergeIdx0];
-      pu.gpmDmvrRefinePart1 = refinePossible[pu.geoMergeIdx1];
+      pu.gpmDmvrRefinePart0 = pu.geoMergeIdx0 < refinePossible.size() ? refinePossible[pu.geoMergeIdx0] : false;
+      pu.gpmDmvrRefinePart1 = pu.geoMergeIdx1 < refinePossible.size() ? refinePossible[pu.geoMergeIdx1] : false;
 #endif
 
 #if TM_MRG
