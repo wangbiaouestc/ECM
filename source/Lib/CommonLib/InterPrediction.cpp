@@ -359,10 +359,10 @@ void InterPrediction::destroy()
   // one vector for each subblock
   for (uint32_t c = 0; c < 256; c++)
   {
-      xFree(m_dmvrRightBoundary[c]);
-      m_dmvrRightBoundary[c] = nullptr;
-      xFree(m_dmvrBottomBoundary[c]);
-      m_dmvrBottomBoundary[c] = nullptr;
+    xFree(m_dmvrRightBoundary[c]);
+    m_dmvrRightBoundary[c] = nullptr;
+    xFree(m_dmvrBottomBoundary[c]);
+    m_dmvrBottomBoundary[c] = nullptr;
   }
 #endif
 
@@ -570,6 +570,15 @@ void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, cons
   m_currChromaFormat = chromaFormatIDC;
   if( m_acYuvPred[REF_PIC_LIST_0][COMPONENT_Y] == nullptr ) // check if first is null (in which case, nothing initialised yet)
   {
+#if JVET_AF0057
+    // one vector for each subblock
+    for( uint32_t c = 0; c < 256; c++ )
+    {
+      m_dmvrRightBoundary[c] = (Pel*)xMalloc( Pel, 16 );
+      m_dmvrBottomBoundary[c] = (Pel*)xMalloc( Pel, 16 );
+    }
+#endif
+    
     for( uint32_t c = 0; c < MAX_NUM_COMPONENT; c++ )
     {
 #if IF_12TAP || MULTI_PASS_DMVR
@@ -589,14 +598,6 @@ void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, cons
       int extHeight = MAX_CU_SIZE + (2 * BIO_EXTEND_SIZE + 2) + 1;
       extWidth = extWidth > (MAX_CU_SIZE + (2 * DMVR_NUM_ITERATION) + 16) ? extWidth : MAX_CU_SIZE + (2 * DMVR_NUM_ITERATION) + 16;
       extHeight = extHeight > (MAX_CU_SIZE + (2 * DMVR_NUM_ITERATION) + 1) ? extHeight : MAX_CU_SIZE + (2 * DMVR_NUM_ITERATION) + 1;
-#endif
-#if JVET_AF0057
-      // one vector for each subblock
-      for (uint32_t c = 0; c < 256; c++)
-      {
-          m_dmvrRightBoundary[c] = (Pel*)xMalloc(Pel, 16);
-          m_dmvrBottomBoundary[c] = (Pel*)xMalloc(Pel, 16);
-      }
 #endif
 
       for( uint32_t i = 0; i < LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS_SIGNAL; i++ )
