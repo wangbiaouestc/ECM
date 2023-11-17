@@ -1587,7 +1587,7 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
 #if SECONDARY_MPM
         if( pu->secondMpmFlag)
         {
-          uint8_t secondaryMPMIdx = pu->ipredIdx;
+          uint8_t secondaryMPMIdx = pu->ipredIdx - NUM_PRIMARY_MOST_PROBABLE_MODES;
           m_BinEncoder.encodeBin(1, Ctx::IntraLumaSecondMpmFlag());
 #if JVET_AD0085_MPM_SORTING
           if (cu.cs->sps->getUseMpmSorting())
@@ -1653,7 +1653,7 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
 #endif
 
 #if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
-    DTRACE(g_trace_ctx, D_SYNTAX, "intra_luma_pred_modes() idx=%d pos=(%d,%d) predIdx=%d mpm=%d secondmpm=%d\n", k, pu->lumaPos().x, pu->lumaPos().y, pu->ipredIdx + (!pu->mpmFlag && pu->secondMpmFlag ? NUM_PRIMARY_MOST_PROBABLE_MODES: 0), pu->mpmFlag, pu->secondMpmFlag);
+    DTRACE(g_trace_ctx, D_SYNTAX, "intra_luma_pred_modes() idx=%d pos=(%d,%d) predIdx=%d mpm=%d secondmpm=%d\n", k, pu->lumaPos().x, pu->lumaPos().y, pu->ipredIdx, pu->mpmFlag, pu->secondMpmFlag);
 #else
     DTRACE( g_trace_ctx, D_SYNTAX, "intra_luma_pred_modes() idx=%d pos=(%d,%d) mode=%d\n", k, pu->lumaPos().x, pu->lumaPos().y, pu->intraDir[0] );
 #endif
@@ -1784,7 +1784,7 @@ void CABACWriter::intra_luma_pred_mode( const PredictionUnit& pu )
 #if SECONDARY_MPM
       if (pu.secondMpmFlag)
       {
-        unsigned secondMpmIdx = pu.ipredIdx;
+        unsigned secondMpmIdx = pu.ipredIdx - NUM_PRIMARY_MOST_PROBABLE_MODES;
         m_BinEncoder.encodeBin(1, Ctx::IntraLumaSecondMpmFlag());
 #if JVET_AD0085_MPM_SORTING
         if (pu.cs->sps->getUseMpmSorting())
@@ -2710,6 +2710,7 @@ void CABACWriter::cu_palette_info(const CodingUnit& cu, ComponentID compBegin, u
   {
     exp_golomb_eqprob(cu.curPLTSize[compBegin] - reusedPLTnum, 0);
   }
+  DTRACE(g_trace_ctx, D_SYNTAX, "cu_palette_info() recieved_plt_num=%d\n", cu.curPLTSize[compBegin] - reusedPLTnum);
 
   for (int comp = compBegin; comp < (compBegin + numComp); comp++)
   {
@@ -2718,12 +2719,14 @@ void CABACWriter::cu_palette_info(const CodingUnit& cu, ComponentID compBegin, u
       ComponentID compID = (ComponentID)comp;
       const int  channelBitDepth = sps.getBitDepth(toChannelType(compID));
       m_BinEncoder.encodeBinsEP(cu.curPLT[comp][idx], channelBitDepth);
+      DTRACE(g_trace_ctx, D_SYNTAX, "cu_palette_info() comp=%d idx=%d cur_plt=%d\n", comp, idx, cu.curPLT[compID][idx]);
     }
   }
   uint32_t signalEscape = (cu.useEscape[compBegin]) ? 1 : 0;
   if (cu.curPLTSize[compBegin] > 0)
   {
     m_BinEncoder.encodeBinEP(signalEscape);
+    DTRACE(g_trace_ctx, D_SYNTAX, "cu_palette_info() esc_code=%d\n", signalEscape);
   }
   //encode index map
   uint32_t   height = cu.block(compBegin).height;
@@ -2884,6 +2887,7 @@ void CABACWriter::cuPaletteSubblockInfo(const CodingUnit& cu, ComponentID compBe
 void CABACWriter::codeScanRotationModeFlag(const CodingUnit& cu, ComponentID compBegin)
 {
   m_BinEncoder.encodeBin((cu.useRotation[compBegin]), Ctx::RotationFlag());
+  DTRACE(g_trace_ctx, D_SYNTAX, "cu_palette_info() use_rotation=%d\n", cu.useRotation[compBegin]);
 }
 void CABACWriter::xEncodePLTPredIndicator(const CodingUnit& cu, uint32_t maxPLTSize, ComponentID compBegin)
 {
@@ -3760,7 +3764,7 @@ void CABACWriter::ibcMbvdData(const PredictionUnit& pu)
   {
     m_BinEncoder.encodeBinsEP( mvpIdx % riceParVal, length);
   }
-  DTRACE(g_trace_ctx, D_SYNTAX, "ibc_mbvd_data() merge_idx=%d\n", pu.ibcMbvdMergeIdx);
+  DTRACE(g_trace_ctx, D_SYNTAX, "ibc_mbvd_data() ibc_merge_idx=%d\n", pu.ibcMbvdMergeIdx);
 
   if (pu.interDir == 3 && pu.ibcMergeIdx1 >= IBC_MRG_MAX_NUM_CANDS)
   {
@@ -3786,7 +3790,7 @@ void CABACWriter::ibcMbvdData(const PredictionUnit& pu)
     {
       m_BinEncoder.encodeBinsEP( mvpIdx1 % riceParVal, length1);
     }
-    DTRACE(g_trace_ctx, D_SYNTAX, "ibc_mbvd_data() merge_idx1=%d\n", pu.ibcMergeIdx1-IBC_MRG_MAX_NUM_CANDS);
+    DTRACE(g_trace_ctx, D_SYNTAX, "ibc_mbvd_data() ibc_merge_idx1=%d\n", pu.ibcMergeIdx1 - IBC_MRG_MAX_NUM_CANDS);
   }
 #else
   unsigned int ricePar = 1;
@@ -4875,7 +4879,12 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
 #endif
   }
 #if JVET_X0049_ADAPT_DMVR
-  DTRACE( g_trace_ctx, D_SYNTAX, "merge_idx() merge_idx=%d\n", mergeIdx );
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  if (pu.ibcMbvdMergeFlag)
+    DTRACE( g_trace_ctx, D_SYNTAX, "merge_idx() ibc_merge_idx1=%d\n", mergeIdx );
+  else 
+#endif
+    DTRACE( g_trace_ctx, D_SYNTAX, "merge_idx() merge_idx=%d\n", mergeIdx );
 #else
   DTRACE( g_trace_ctx, D_SYNTAX, "merge_idx() merge_idx=%d\n", pu.mergeIdx );
 #endif
@@ -7396,6 +7405,7 @@ void CABACWriter::cu_chroma_qp_offset( const CodingUnit& cu )
       unary_max_symbol( qpAdj-1, Ctx::ChromaQpAdjIdc(), Ctx::ChromaQpAdjIdc(), length-1 );
     }
   }
+  DTRACE(g_trace_ctx, D_SYNTAX, "cu_chroma_qp_offset() chroma_qp_adj=%d\n", cu.chromaQpAdj);
 }
 
 

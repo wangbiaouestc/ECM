@@ -11630,7 +11630,6 @@ void IntraSearch::setLumaIntraPredIdx(PredictionUnit& pu)
   {
     pu.mpmFlag = false;
     pu.secondMpmFlag = true;
-    pred_idx -= NUM_PRIMARY_MOST_PROBABLE_MODES;
   }
   else
   {

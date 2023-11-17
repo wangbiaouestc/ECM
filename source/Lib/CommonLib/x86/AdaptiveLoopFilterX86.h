@@ -81,8 +81,9 @@ constexpr int p0[FIX_FILTER_NUM_COEFF_13_DB_9] =
   47, 52, 53, 49, 56, 55, 62, 63
 };
 static std::array<std::array<std::array<short, FIX_FILTER_NUM_COEFF_13_DB_9>, NUM_FIXED_FILTERS>, NUM_SETS_FIXED_FILTERS> packedDataFixedFilters13Db9;
-static std::array<std::array<std::array<short, FIX_FILTER_NUM_COEFF_9_DB_9>, NUM_FIXED_FILTERS>, NUM_SETS_FIXED_FILTERS> packedDataFixedFilters9Db9;
-static std::array<std::array<std::array<short, FIX_FILTER_NUM_COEFF_DB_COMBINE_9_DB_9>, NUM_FIXED_FILTERS>, NUM_SETS_FIXED_FILTERS> packedDataFixedFilters9Db9Combine;
+// Adding +1 to filter size to avoid reading past end of array
+static std::array<std::array<std::array<short, FIX_FILTER_NUM_COEFF_9_DB_9 + 1>, NUM_FIXED_FILTERS>, NUM_SETS_FIXED_FILTERS> packedDataFixedFilters9Db9;
+static std::array<std::array<std::array<short, FIX_FILTER_NUM_COEFF_DB_COMBINE_9_DB_9 + 1>, NUM_FIXED_FILTERS>, NUM_SETS_FIXED_FILTERS> packedDataFixedFilters9Db9Combine;
 constexpr int p0Filter9Db9[FIX_FILTER_NUM_COEFF_9_DB_9] =
 {
   0,  1,  4,  9, 16,  3,  8, 15,
@@ -5442,7 +5443,7 @@ static void simdFixFilter9x9Db9Blk(AlfClassifier **classifier, const CPelBuf &sr
   const int srcBeforeDbStride = srcLumaBeforeDb.stride;
   const Pel *srcBeforeDb = srcLumaBeforeDb.buf + curBlk.y * srcBeforeDbStride + curBlk.x;
   const int srcBeforeDbStride2 = srcBeforeDbStride * stepY;
-  const std::array<std::array<short, FIX_FILTER_NUM_COEFF_9_DB_9>, NUM_FIXED_FILTERS>& filterCoeffFixed = packedDataFixedFilters9Db9[fixedFiltQpInd];
+  const std::array<std::array<short, FIX_FILTER_NUM_COEFF_9_DB_9 + 1>, NUM_FIXED_FILTERS>& filterCoeffFixed = packedDataFixedFilters9Db9[fixedFiltQpInd];
 
 #if USE_AVX2 
   if (vext >= AVX2 && (width % 16) == 0)
@@ -6313,7 +6314,7 @@ static void simdFilterResi9x9Db9Blk(AlfClassifier **classifier, const CPelBuf &s
   const __m128i mmClippingValues = _mm_loadl_epi64((const __m128i *) clippingValues);
   const __m128i mm11 = _mm_set1_epi8(1);
   const __m128i mm3 = _mm_set1_epi16(3);
-  const std::array<std::array<short, FIX_FILTER_NUM_COEFF_DB_COMBINE_9_DB_9>, NUM_FIXED_FILTERS>& filterCoeffFixed = packedDataFixedFilters9Db9Combine[fixedFiltQpInd];
+  const std::array<std::array<short, FIX_FILTER_NUM_COEFF_DB_COMBINE_9_DB_9 + 1>, NUM_FIXED_FILTERS>& filterCoeffFixed = packedDataFixedFilters9Db9Combine[fixedFiltQpInd];
   const Pel zeros[8] = { 0 };
   for (int i = 0; i < height; i += stepY)
   {

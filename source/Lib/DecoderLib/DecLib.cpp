@@ -157,21 +157,40 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
 
                 if( debugCTU < 0 || poc != debugPOC )
                 {
-                for( int i = 0; i < pic->slices.size(); i++ )
-                {
-                  if( pcEncPic->slices.size() <= i )
+                  for (int i = 0; i < pic->slices.size(); i++)
                   {
-                    pcEncPic->slices.push_back( new Slice );
-                    pcEncPic->slices.back()->initSlice();
-                    pcEncPic->slices.back()->setPPS( pcEncPic->slices[0]->getPPS() );
-                    pcEncPic->slices.back()->setSPS( pcEncPic->slices[0]->getSPS() );
-                    pcEncPic->slices.back()->setVPS( pcEncPic->slices[0]->getVPS() );
-                    pcEncPic->slices.back()->setPic( pcEncPic->slices[0]->getPic() );
+                    if (pcEncPic->slices.size() <= i)
+                    {
+                      pcEncPic->slices.push_back(new Slice);
+                      pcEncPic->slices.back()->initSlice();
+                      pcEncPic->slices.back()->setPPS(pcEncPic->slices[0]->getPPS());
+                      pcEncPic->slices.back()->setSPS(pcEncPic->slices[0]->getSPS());
+                      pcEncPic->slices.back()->setVPS(pcEncPic->slices[0]->getVPS());
+                      pcEncPic->slices.back()->setPic(pcEncPic->slices[0]->getPic());
+                    }
+
+                    // copy decoded PPS and SPS to the encoder
+                    auto& pps = *const_cast<PPS*>(pcEncPic->slices[i]->getPPS());
+                    auto* pcv = pcEncPic->slices[i]->getPPS()->pcv;
+                    pps = *(pic->slices[i]->getPPS());
+                    pps.pcv = pcv;
+
+                    // RPL is not initizlized after parsing at decoder, so we save the encoder RPL and copy it to the decoded SPS
+                    auto& sps = *const_cast<SPS*>(pcEncPic->slices[i]->getSPS());
+                    auto rplList0 = *sps.getRPLList0();
+                    auto rplList1 = *sps.getRPLList1();
+                    bool isAllEntriesinRPLHasSameSignFlag = sps.getAllActiveRplEntriesHasSameSignFlag();
+                    sps = *(pic->slices[i]->getSPS());
+                    *(sps.getRPLList0()) = rplList0;
+                    *(sps.getRPLList1()) = rplList1;
+                    sps.setAllActiveRplEntriesHasSameSignFlag(isAllEntriesinRPLHasSameSignFlag);
+                    
+                    pcEncPic->slices[i]->copySliceInfo(pic->slices[i], false);
                   }
-                  pcEncPic->slices[i]->copySliceInfo( pic->slices[i], false );
-                }
                 }
 
+                pcEncPic->cs->pps   = pcEncPic->slices.back()->getPPS();
+                pcEncPic->cs->sps   = pcEncPic->slices.back()->getSPS();
                 pcEncPic->cs->slice = pcEncPic->slices.back();
 
                 if( debugCTU >= 0 && poc == debugPOC )
@@ -281,7 +300,7 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
                 {
                   pcEncPic->copySAO( *pic, 1 );
                 }
-
+                pcEncPic->cs->initStructData();
                 pcEncPic->cs->copyStructure( *pic->cs, CH_L, true, true );
 
                 if( CS::isDualITree( *pcEncPic->cs ) )
@@ -634,6 +653,7 @@ Picture* DecLib::xGetNewPicBuffer( const SPS &sps, const PPS &pps, const uint32_
 
 
     pcPic->create(
+      sps.getRprEnabledFlag(),
 #if JVET_Z0118_GDR
       sps.getGDREnabledFlag(),
 #endif
@@ -677,6 +697,7 @@ Picture* DecLib::xGetNewPicBuffer( const SPS &sps, const PPS &pps, const uint32_
 
 
     pcPic->create(
+      sps.getRprEnabledFlag(),
 #if JVET_Z0118_GDR
       sps.getGDREnabledFlag(),
 #endif
@@ -691,6 +712,7 @@ Picture* DecLib::xGetNewPicBuffer( const SPS &sps, const PPS &pps, const uint32_
       pcPic->destroy();
 
       pcPic->create( 
+        sps.getRprEnabledFlag(),
 #if JVET_Z0118_GDR        
         sps.getGDREnabledFlag(),
 #endif

@@ -3544,14 +3544,15 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
         const uint32_t  log2SaoOffsetScaleLuma = (uint32_t)std::max(0, pcSlice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA) - MAX_SAO_TRUNCATED_BITDEPTH);
         const uint32_t  log2SaoOffsetScaleChroma = (uint32_t)std::max(0, pcSlice->getSPS()->getBitDepth(CHANNEL_TYPE_CHROMA) - MAX_SAO_TRUNCATED_BITDEPTH);
 
-        m_pcSAO->destroyEncData();
-        m_pcSAO->createEncData(m_pcCfg->getSaoCtuBoundary(), numCtuInFrame);
-
         if ( saoSize.width != picWidth || saoSize.height != picHeight ) 
         {
           m_pcSAO->create(picWidth, picHeight, chromaFormatIDC, maxCUWidth, maxCUHeight, maxTotalCUDepth, log2SaoOffsetScaleLuma, log2SaoOffsetScaleChroma);
           m_pcSAO->setReshaper(m_pcReshaper);
         }
+
+        // create SAO encoder data based on the picture size
+        m_pcSAO->destroyEncData();
+        m_pcSAO->createEncData(m_pcCfg->getSaoCtuBoundary(), numCtuInFrame);
       }
 
       if( pcSlice->getSPS()->getScalingListFlag() && m_pcCfg->getUseScalingListId() == SCALING_LIST_FILE_READ )
@@ -3729,14 +3730,11 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
       }
 #endif
 
-      if ( pcSlice->getSPS()->getALFEnabledFlag() )
-      {
-        // create ALF object based on the picture size
-        m_pcALF->create(m_pcCfg, picWidth, picHeight, chromaFormatIDC, maxCUWidth, maxCUHeight, maxTotalCUDepth, m_pcCfg->getBitDepth(), m_pcCfg->getInputBitDepth(), true);
-      }
-
       if( pcSlice->getSPS()->getALFEnabledFlag() )
       {
+        // create ALF encoder data based on the picture size
+        m_pcALF->create(m_pcCfg, picWidth, picHeight, chromaFormatIDC, maxCUWidth, maxCUHeight, maxTotalCUDepth, m_pcCfg->getBitDepth(), m_pcCfg->getInputBitDepth(), true);
+
         for (int s = 0; s < uiNumSliceSegments; s++)
         {
           pcPic->slices[s]->setTileGroupAlfEnabledFlag(COMPONENT_Y, false);
@@ -4194,6 +4192,8 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
             picHeader->setNumL0Weights(pcSlice->getNumRefIdx(REF_PIC_LIST_1));
           }
 
+          picHeader->setDisFracMBVD(pcSlice->getPicHeader()->getDisFracMBVD());
+
           pcPic->cs->picHeader->setPic(pcPic);
           pcPic->cs->picHeader->setValid();
           if (pcPic->cs->pps->getNumSlicesInPic() > 1 || !m_pcCfg->getEnablePictureHeaderInSliceHeader())
@@ -4224,9 +4224,6 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
 
 
         tmpBitsBeforeWriting = m_HLSWriter->getNumberOfWrittenBits();
-        pcSlice->m_ccAlfFilterParam      = m_pcALF->getCcAlfFilterParam();
-        pcSlice->m_ccAlfFilterControl[0] = m_pcALF->getCcAlfControlIdc(COMPONENT_Cb);
-        pcSlice->m_ccAlfFilterControl[1] = m_pcALF->getCcAlfControlIdc(COMPONENT_Cr);
 
 #if EMBEDDED_APS
         m_HLSWriter->codeSliceHeader( m_aps, pcSlice );
