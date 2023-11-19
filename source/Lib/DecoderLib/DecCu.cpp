@@ -2649,7 +2649,7 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #endif
             && PU::checkAffineTMCondition(pu))
           {
-            for (uint32_t uiAffMergeCand = 0; uiAffMergeCand < pu.cu->slice->getPicHeader()->getMaxNumAffineMergeCand(); uiAffMergeCand++)
+            for (uint32_t uiAffMergeCand = 0; uiAffMergeCand < affineMergeCtx.numValidMergeCand; uiAffMergeCand++)
             {
               if (affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 0][0].mv == Mv(0, 0) && affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 1][0].mv == Mv(0, 0) &&
                 affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 0][1].mv == Mv(0, 0) && affineMergeCtx.mvFieldNeighbours[(uiAffMergeCand << 1) + 1][1].mv == Mv(0, 0) &&
