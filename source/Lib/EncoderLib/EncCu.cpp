@@ -1653,7 +1653,7 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
 #if JVET_AF0073_INTER_CCP_MERGE
   {
     CodingUnit& cu = *bestCS->cus.front();
-    if ((!slice.isIntra()) && !(cu.chromaFormat == CHROMA_400 || CS::isDualITree(*bestCS))
+    if (!(cu.chromaFormat == CHROMA_400 || CS::isDualITree(*bestCS))
       && partitioner.chType == CHANNEL_TYPE_LUMA
       && (!CU::isIntra(cu)) && bestCS->cus.size() == 1
       && bestCS->area.Cb() == (*bestCS->cus.back()).Cb()
