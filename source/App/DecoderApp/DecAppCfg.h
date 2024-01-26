@@ -95,6 +95,9 @@ protected:
 #if DUMP_BEFORE_INLOOP
   bool          m_dumpBeforeInloop;
 #endif
+#if JVET_AG0196_CABAC_RETRAIN
+  bool          m_activateDump;
+#endif
 public:
   DecAppCfg();
   virtual ~DecAppCfg();

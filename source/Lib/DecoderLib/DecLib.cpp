@@ -58,6 +58,13 @@
 #include "CommonLib/CodingStatistics.h"
 #endif
 
+#if JVET_AG0196_CABAC_RETRAIN
+namespace CabacRetrain
+{
+  extern void endFrame(int poc,int qp,bool switchBp,SliceType st);
+}
+#endif
+
 bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::string& bitstreamFileName, ParameterSetMap<APS> *apsMap, bool bDecodeUntilPocFound /* = false */, int debugCTU /* = -1*/, int debugPOC /* = -1*/ )
 {
   int      poc;
@@ -931,7 +938,9 @@ void DecLib::finishPicture(int& poc, PicList*& rpcListPic, MsgLevel msgl )
   {
     c += 32;  // tolower
   }
-
+#if JVET_AG0196_CABAC_RETRAIN
+  CabacRetrain::endFrame(pcSlice->getPOC(),pcSlice->getSliceQp(),pcSlice->getCabacInitFlag(),pcSlice->isIntra()?I_SLICE:pcSlice->isInterP()?P_SLICE:B_SLICE);
+#endif
   if (pcSlice->isDRAP()) c = 'D';
 
   //-- For time output for each slice
@@ -1947,7 +1956,11 @@ void DecLib::xActivateParameterSets( const InputNALUnit nalu )
     // RdCost
     m_cRdCost.setCostMode ( COST_STANDARD_LOSSY ); // not used in decoder side RdCost stuff -> set to default
 
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+    m_cSliceDecoder.create(pps->getPicWidthInLumaSamples(), sps->getMaxCUWidth());
+#else
     m_cSliceDecoder.create();
+#endif
 
     if( sps->getALFEnabledFlag() )
     {

@@ -45,7 +45,12 @@
 
 using namespace std;
 namespace po = df::program_options_lite;
-
+#if JVET_AG0196_CABAC_RETRAIN
+namespace CabacRetrain
+{
+extern void init(const std::string &fn,bool activate);
+}
+#endif
 //! \ingroup DecoderApp
 //! \{
 
@@ -78,11 +83,12 @@ bool DecAppCfg::parseCfg( int argc, char* argv[] )
   ("ReconFile,o",               m_reconFileName,                       string(""), "reconstructed YUV output file name\n")
 
   ("OplFile,-opl",              m_oplFilename ,                        string(""), "opl-file name without extension for conformance testing\n")
-
 #if ENABLE_SIMD_OPT && defined(TARGET_SIMD_X86)
   ("SIMD",                      ignore,                                string(""), "SIMD extension to use (SCALAR, SSE41, SSE42, AVX, AVX2, AVX512), default: the highest supported extension\n")
 #endif
-
+#if JVET_AG0196_CABAC_RETRAIN
+  ("ActivateCABACDumping",      m_activateDump,                        false,      "If true dump cabac bins in file")
+#endif
   ("WarnUnknowParameter,w",     warnUnknowParameter,                   0,          "warn for unknown configuration parameters instead of failing")
   ("SkipFrames,s",              m_iSkipFrame,                          0,          "number of frames to skip before random access")
   ("OutputBitDepth,d",          m_outputBitDepth[CHANNEL_TYPE_LUMA],   0,          "bit depth of YUV output luma component (default: use 0 for native depth)")
@@ -229,6 +235,9 @@ bool DecAppCfg::parseCfg( int argc, char* argv[] )
       msg( ERROR, "File %s could not be opened. Using all LayerIds as default.\n", cfg_TargetDecLayerIdSetFile.c_str() );
     }
   }
+#if JVET_AG0196_CABAC_RETRAIN
+  CabacRetrain::init(m_bitstreamFileName,m_activateDump);
+#endif
   return true;
 }
 

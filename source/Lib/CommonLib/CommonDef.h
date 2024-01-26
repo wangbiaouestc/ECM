@@ -113,6 +113,13 @@
 #define NULL              0
 #endif
 
+#if JVET_AG0100_TRANSFORM_COEFFICIENT_CODING
+#define GTN                                               7
+#define GTN_LEVEL                                         (GTN + 1)
+#define GTN_MAXSUM                                        80
+#define NSIGCTX                                           6
+#define NGTXCTX                                           7
+#endif
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
 static const double REFINE_THRESHOLD_AFFINE_MERGE = 0.75;
 #endif
@@ -1531,6 +1538,11 @@ static const int MAX_NUM_CANDS =                                64;
 // max number of parameters used in CCCM related methods
 static const int CCCM_NUM_PARAMS_MAX =      CCCM_NO_SUB_NUM_PARAMS;
 static const int CCCM_REF_SAMPLES_MAX =       CCCM_MAX_REF_SAMPLES;
+#endif
+
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+static constexpr int CABAC_SPATIAL_MAX_BINS                  = 128;
+static constexpr int CABAC_SPATIAL_MAX_BINS_PER_CTX          =   4;
 #endif
 
 // ====================================================================================================================

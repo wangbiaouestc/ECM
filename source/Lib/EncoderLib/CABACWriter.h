@@ -63,7 +63,11 @@ public:
   virtual ~CABACWriter() {}
 
 public:
+#if JVET_AG0196_CABAC_RETRAIN
+  void        initCtxModels             ( Slice&                  slice );
+#else
   void        initCtxModels             ( const Slice&                  slice );
+#endif
   void        setEncCu(EncCu* pcEncCu) { m_EncCu = pcEncCu; }
   SliceType   getCtxInitId              ( const Slice&                  slice );
   void        initBitstream             ( OutputBitstream*              bitstream )           { m_Bitstream = bitstream; m_BinEncoder.init( m_Bitstream ); }
@@ -76,6 +80,12 @@ public:
   uint64_t    getEstFracBits            ()                                            const   { return m_BinEncoder.getEstFracBits(); }
   uint32_t    getNumBins                ()                                                    { return m_BinEncoder.getNumBins(); }
   bool        isEncoding                ()                                                    { return m_BinEncoder.isEncoding(); }
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+  void                  setBinBufferActive (bool b)      { m_BinEncoder.setBinBufferActive(b); }
+  void                  setBinBuffer(BinStoreVector *bb) { m_BinEncoder.setBinBuffer(bb);      }
+  const BinStoreVector *getBinBuffer()             const { return m_BinEncoder.getBinBuffer(); }
+  void                  updateCtxs  (BinStoreVector *bb) { m_BinEncoder.updateCtxs(bb);        }
+#endif
 
 public:
   // slice segment data (clause 7.3.8.1)
@@ -379,6 +389,18 @@ public:
   void        residual_lfnst_mode       ( const CodingUnit&             cu,       CUCtx&            cuCtx );
   void        isp_mode                  ( const CodingUnit&             cu );
   void        last_sig_coeff            ( CoeffCodingContext&           cctx,     const TransformUnit& tu, ComponentID       compID );
+#if JVET_AG0143_INTER_INTRA
+#if TCQ_8STATES
+#if JVET_AE0102_LFNST_CTX 
+  void        residual_coding_subblock(CoeffCodingContext& cctx, const TCoeff* coeff, const uint64_t stateTransTable, int& state, const CodingUnit &cu, int lfnstIdx = -1);
+#else
+  void        residual_coding_subblock(CoeffCodingContext& cctx, const TCoeff* coeff, const uint64_t stateTransTable, int& state, const CodingUnit &cu);
+#endif
+
+#else
+  void        residual_coding_subblock(CoeffCodingContext &cctx, const TCoeff *coeff, const int stateTransTable, int &state, const CodingUnit &cu);
+#endif
+  #else
 #if TCQ_8STATES
 #if JVET_AE0102_LFNST_CTX 
   void        residual_coding_subblock(CoeffCodingContext& cctx, const TCoeff* coeff, const uint64_t stateTransTable, int& state, int lfnstIdx = -1);
@@ -386,13 +408,19 @@ public:
   void        residual_coding_subblock(CoeffCodingContext& cctx, const TCoeff* coeff, const uint64_t stateTransTable, int& state);
 #endif
 #else
-	void        residual_coding_subblock  ( CoeffCodingContext&           cctx,     const TCoeff*     coeff, const int stateTransTable, int& state );
+  void        residual_coding_subblock(CoeffCodingContext &cctx, const TCoeff *coeff, const int stateTransTable, int &state);
 #endif
+
+  #endif
 #if SIGN_PREDICTION
   void        codePredictedSigns ( TransformUnit &tu, ComponentID compID);
 #endif
-	void        residual_codingTS         ( const TransformUnit&          tu,       ComponentID       compID );
-  void        residual_coding_subblockTS( CoeffCodingContext&           cctx,     const TCoeff*     coeff  );
+  void        residual_codingTS         ( const TransformUnit&          tu,       ComponentID       compID );
+#if JVET_AG0143_INTER_INTRA
+  void        residual_coding_subblockTS(CoeffCodingContext &cctx, const TCoeff *coeff, const CodingUnit &cu);
+#else
+  void        residual_coding_subblockTS(CoeffCodingContext &cctx, const TCoeff *coeff);
+#endif
   void        joint_cb_cr               ( const TransformUnit&          tu,       const int cbfMask );
 
 
@@ -474,6 +502,11 @@ public:
       m_CABACWriter[i]->m_CABACDataStore = m_CABACDataStore;
       m_CABACEstimator[i]->m_CABACDataStore = m_CABACDataStore;
     }
+
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+    m_BinEncoderStd.initBufferer  (CABAC_SPATIAL_MAX_BINS, Ctx::NumberOfContexts, CABAC_SPATIAL_MAX_BINS_PER_CTX);
+    m_BitEstimatorStd.initBufferer(CABAC_SPATIAL_MAX_BINS, Ctx::NumberOfContexts, CABAC_SPATIAL_MAX_BINS_PER_CTX);
+#endif
   }
 
   virtual ~CABACEncoder()
@@ -489,7 +522,12 @@ public:
     , m_CABACEstimatorStd   ( m_BitEstimatorStd )
     , m_CABACWriter         { &m_CABACWriterStd,   }
     , m_CABACEstimator      { &m_CABACEstimatorStd }
-  {}
+  {
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+    m_BinEncoderStd.initBufferer  (CABAC_SPATIAL_MAX_BINS, Ctx::NumberOfContexts, CABAC_SPATIAL_MAX_BINS_PER_CTX);
+    m_BitEstimatorStd.initBufferer(CABAC_SPATIAL_MAX_BINS, Ctx::NumberOfContexts, CABAC_SPATIAL_MAX_BINS_PER_CTX);
+#endif
+  }
 #endif
 
   CABACWriter*                getCABACWriter          ( const SPS*   sps   )        { return m_CABACWriter   [0]; }

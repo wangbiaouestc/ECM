@@ -3524,6 +3524,10 @@ private:
 
   bool                       m_cabacInitFlag;
 
+#if JVET_AG0196_CABAC_RETRAIN
+  SliceType                  m_cabacInitSliceType;
+#endif
+
   uint32_t                   m_sliceSubPicId;
 
 
@@ -3733,7 +3737,11 @@ public:
   void                        checkSTSA(PicList& rcListPic);
   void                        checkRPL(const ReferencePictureList* pRPL0, const ReferencePictureList* pRPL1, const int associatedIRAPDecodingOrderNumber, PicList& rcListPic);
   void                        decodingRefreshMarking(int& pocCRA, bool& bRefreshPending, PicList& rcListPic, const bool bEfficientFieldIRAPEnabled);
+#if JVET_AG0196_CABAC_RETRAIN
+  void                        setSliceType( SliceType e )                            { m_eSliceType        = e; m_cabacInitSliceType = m_eSliceType; }
+#else
   void                        setSliceType( SliceType e )                            { m_eSliceType        = e;                                      }
+#endif
   void                        setSliceQp( int i )                                    { m_iSliceQp          = i;                                      }
   void                        setSliceQpDelta( int i )                               { m_iSliceQpDelta     = i;                                      }
   void                        setSliceChromaQpDelta( ComponentID compID, int i )     { m_iSliceChromaQpDelta[compID] = isLuma(compID) ? 0 : i;       }
@@ -3933,6 +3941,11 @@ public:
 
   void                        setCabacInitFlag( bool val )                           { m_cabacInitFlag = val;                                        } //!< set CABAC initial flag
   bool                        getCabacInitFlag()                               const { return m_cabacInitFlag;                                       } //!< get CABAC initial flag
+
+#if JVET_AG0196_CABAC_RETRAIN
+  void                        setCabacInitSliceType( SliceType val )                 { m_cabacInitSliceType = val; }
+  SliceType                   getCabacInitSliceType()                          const { return m_cabacInitSliceType; }
+#endif
 
   void                        setEncCABACTableIdx( SliceType idx )                   { m_encCABACTableIdx = idx;                                     }
   SliceType                   getEncCABACTableIdx() const                            { return m_encCABACTableIdx;                                    }
