@@ -73,6 +73,9 @@ namespace CU
   bool isSameSubPic                   (const CodingUnit &cu, const CodingUnit &cu2);
   bool isLastSubCUOfCtu               (const CodingUnit &cu);
   uint32_t getCtuAddr                     (const CodingUnit &cu);
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+  bool isOnCtuBottom                  (const CodingUnit& cu);
+#endif
 #if JVET_V0130_INTRA_TMP
   Position getCtuXYAddr               (const CodingUnit& cu);
 #endif

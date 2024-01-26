@@ -69,6 +69,15 @@ EncSlice::~EncSlice()
 
 void EncSlice::create( int iWidth, int iHeight, ChromaFormat chromaFormat, uint32_t iMaxCUWidth, uint32_t iMaxCUHeight, uint8_t uhTotalDepth )
 {
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+  int numBinBuffers = iWidth / iMaxCUWidth + 1;
+  
+  for ( int i = 0; i < numBinBuffers; i++ )
+  {
+    m_binVectors.push_back( BinStoreVector() );
+    m_binVectors[i].reserve( CABAC_SPATIAL_MAX_BINS );
+  }
+#endif
 }
 
 void EncSlice::destroy()
@@ -77,6 +86,9 @@ void EncSlice::destroy()
   m_vdRdPicLambda.clear();
   m_vdRdPicQp.clear();
   m_viRdPicQp.clear();
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+  m_binVectors.clear();
+#endif
 }
 
 void EncSlice::init( EncLib* pcEncLib, const SPS& sps )
@@ -2105,8 +2117,24 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
       pcPic->mctsInfo.init( &cs, ctuRsAddr );
     }
 
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+    // Update the CABAC states based on CTU above
+    if ( ctuYPosInCtus )
+    {
+      pCABACWriter->updateCtxs( getBinVector(ctuXPosInCtus) );
+    }
+
+    // No data collection during the compress pass
+    pCABACWriter->setBinBuffer( nullptr );
+#endif
+
   if (pCfg->getSwitchPOC() != pcPic->poc || ctuRsAddr >= pCfg->getDebugCTU())
     m_pcCuEncoder->compressCtu( cs, ctuArea, ctuRsAddr, prevQP, currQP );
+
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+    // Clear the bin counters and prepare for collecting new data for this CTU
+    pCABACWriter->setBinBuffer( getBinVector(ctuXPosInCtus) );
+#endif
 
 #if K0149_BLOCK_STATISTICS
     getAndStoreBlockStatistics(cs, ctuArea);
@@ -2115,6 +2143,11 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
     pCABACWriter->resetBits();
     pCABACWriter->coding_tree_unit( cs, ctuArea, prevQP, ctuRsAddr, true, true );
     const int numberOfWrittenBits = int( pCABACWriter->getEstFracBits() >> SCALE_BITS );
+
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+    // Done with the data collection for this CTU
+    pCABACWriter->setBinBuffer( nullptr );
+#endif
 
 #if ENABLE_SPLIT_PARALLELISM
 #pragma omp critical
@@ -2217,7 +2250,6 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
 //  m_uiPicDist       = cs.dist;
 
 }
-
 void EncSlice::encodeSlice   ( Picture* pcPic, OutputBitstream* pcSubstreams, uint32_t &numBinsCoded )
 {
 
@@ -2302,7 +2334,24 @@ void EncSlice::encodeSlice   ( Picture* pcPic, OutputBitstream* pcSubstreams, ui
 #endif
     }
 #endif
+
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+    // Final writing of the bitstream - update the CABAC states based on CTU above
+    if ( ctuYPosInCtus )
+    {
+      m_CABACWriter->updateCtxs( getBinVector(ctuXPosInCtus) );
+    }
+
+    // Clear the bin counters and prepare for collecting new data for this CTU
+    m_CABACWriter->setBinBuffer( getBinVector(ctuXPosInCtus) );
+#endif
+
     m_CABACWriter->coding_tree_unit( cs, ctuArea, pcPic->m_prevQP, ctuRsAddr );
+
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+    // Done with data collection for this CTU
+    m_CABACWriter->setBinBuffer( nullptr );
+#endif
 
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
     // store CABAC context to be used in next frames

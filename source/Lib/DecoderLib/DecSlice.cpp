@@ -56,12 +56,28 @@ DecSlice::~DecSlice()
 {
 }
 
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+void DecSlice::create(int width, int iMaxCUWidth)
+{
+  int numBinBuffers = width / iMaxCUWidth + 1;
+  
+  for ( int i = 0; i < numBinBuffers; i++ )
+  {
+    m_binVectors.push_back( BinStoreVector() );
+    m_binVectors[i].reserve( CABAC_SPATIAL_MAX_BINS );
+  }
+}
+#else
 void DecSlice::create()
 {
 }
+#endif
 
 void DecSlice::destroy()
 {
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+  m_binVectors.clear();
+#endif
 }
 
 void DecSlice::init( CABACDecoder* cabacDecoder, DecCu* pcCuDecoder )
@@ -402,7 +418,24 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
 #endif
     }
 #endif
+
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+    // Update the CABAC states based on CTU above
+    if ( ctuYPosInCtus )
+    {
+      cabacReader.updateCtxs( getBinVector(ctuXPosInCtus) );
+    }
+
+    // Clear the bin counters and prepare for collecting new data for this CTU
+    cabacReader.setBinBuffer( getBinVector(ctuXPosInCtus) );
+#endif
+
     cabacReader.coding_tree_unit( cs, ctuArea, pic->m_prevQP, ctuRsAddr );
+
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+    // Done with data collection for this CTU
+    cabacReader.setBinBuffer( nullptr );
+#endif
 
     m_pcCuDecoder->decompressCtu( cs, ctuArea );
 

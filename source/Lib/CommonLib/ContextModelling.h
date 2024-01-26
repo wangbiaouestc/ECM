@@ -44,6 +44,10 @@
 #include "Slice.h"
 #include "Unit.h"
 #include "UnitPartitioner.h"
+#if JVET_AG0143_INTER_INTRA
+#include "CodingStructure.h"
+#endif
+
 
 #include <bitset>
 
@@ -95,11 +99,57 @@ public:
   unsigned        posY(int scanPos) const { return m_scan[scanPos].y; }
   unsigned        maxLastPosX     ()                        const { return m_maxLastPosX; }
   unsigned        maxLastPosY     ()                        const { return m_maxLastPosY; }
+#if JVET_AG0143_INTER_INTRA
+  unsigned lastXCtxId(unsigned posLastX, const CodingUnit &cu) const
+  {
+    bool condition = cu.getSwitchCondition(m_chType);
+    if (condition)
+    {
+        return m_ctxSetLastXCtxSetSwitch(m_lastOffsetX + (posLastX >> m_lastShiftX));
+    }
+    else
+    {
+      return m_ctxSetLastX(m_lastOffsetX + (posLastX >> m_lastShiftX));
+    }
+  }
+  unsigned lastYCtxId(unsigned posLastY, const CodingUnit &cu) const
+  {
+    bool condition = cu.getSwitchCondition(m_chType);
+    if (condition)
+    {
+        return m_ctxSetLastYCtxSetSwitch(m_lastOffsetY + (posLastY >> m_lastShiftY));
+    }
+    else
+    {
+      return m_ctxSetLastY(m_lastOffsetY + (posLastY >> m_lastShiftY));
+    }
+  }
+#else
   unsigned        lastXCtxId      ( unsigned  posLastX  )   const { return m_ctxSetLastX( m_lastOffsetX + ( posLastX >> m_lastShiftX ) ); }
   unsigned        lastYCtxId      ( unsigned  posLastY  )   const { return m_ctxSetLastY( m_lastOffsetY + ( posLastY >> m_lastShiftY ) ); }
+#endif
   int             numCtxBins      ()                        const { return   m_remainingContextBins;      }
   void            setNumCtxBins   ( int n )                       {          m_remainingContextBins  = n; }
+#if JVET_AG0143_INTER_INTRA
+  unsigned sigGroupCtxId(bool ts, const CodingUnit &cu) const
+  {
+    bool condition = cu.getSwitchCondition(m_chType);
+    if (condition)
+    {
+      
+        return ts ?
+          m_sigGroupCtxIdTSSwitch
+                  : 
+          m_sigGroupCtxIdSwitch;
+    }
+    else
+    {
+      return ts ? m_sigGroupCtxIdTS : m_sigGroupCtxId;
+    }
+  }
+#else
   unsigned        sigGroupCtxId   ( bool ts = false     )   const { return ts ? m_sigGroupCtxIdTS : m_sigGroupCtxId; }
+#endif
   bool            bdpcm           ()                        const { return m_bdpcm; }
 
   void            decimateNumCtxBins(int n) { m_remainingContextBins -= n; }
@@ -111,9 +161,18 @@ public:
 #endif
 
 #if JVET_AE0102_LFNST_CTX 
+#if JVET_AG0143_INTER_INTRA
+  unsigned sigCtxIdAbs(int scanPos, const TCoeff *coeff, const int state, const CodingUnit &cu, int lfnstIdx = -1)
+#else  
   unsigned sigCtxIdAbs(int scanPos, const TCoeff* coeff, const int state, int lfnstIdx = -1)
+
+#endif
 #else
-  unsigned sigCtxIdAbs(int scanPos, const TCoeff* coeff, const int state)
+#if JVET_AG0143_INTER_INTRA
+  unsigned sigCtxIdAbs(int scanPos, const TCoeff *coeff, const int state, const CodingUnit &cu)
+#else
+  unsigned sigCtxIdAbs( int scanPos, const TCoeff* coeff, const int state )
+#endif
 #endif
   {
     const uint32_t posY      = m_scan[scanPos].y;
@@ -123,7 +182,11 @@ public:
     int           numPos    = 0;
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT_VS
     TCoeff        sumAbs    = 0;
+#if JVET_AG0100_TRANSFORM_COEFFICIENT_CODING
+#define UPDATE(x) {TCoeff a=abs(x);sumAbs+=std::min(GTN_LEVEL+(a&1),a);numPos+=int(!!a);}
+#else
 #define UPDATE(x) {TCoeff a=abs(x);sumAbs+=std::min(4+(a&1),a);numPos+=int(!!a);}
+#endif
 #else
     int           sumAbs    = 0;
 #define UPDATE(x) {int a=abs(x);sumAbs+=std::min(4+(a&1),a);numPos+=!!a;}
@@ -166,41 +229,195 @@ public:
 
 
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT_VS
+#if JVET_AG0100_TRANSFORM_COEFFICIENT_CODING
+    int ctxOfs = int(std::min<TCoeff>((sumAbs + 1) >> 1, NSIGCTX-1)) + (diag < 2 ? NSIGCTX : 0);
+#else
     int ctxOfs = int(std::min<TCoeff>((sumAbs+1)>>1, 3)) + ( diag < 2 ? 4 : 0 );
+#endif
 #else
     int ctxOfs = std::min((sumAbs+1)>>1, 3) + ( diag < 2 ? 4 : 0 );
 #endif
 
     if( m_chType == CHANNEL_TYPE_LUMA )
     {
+#if JVET_AG0100_TRANSFORM_COEFFICIENT_CODING
+      ctxOfs += diag < 5 ? NSIGCTX : 0;
+#else
       ctxOfs += diag < 5 ? 4 : 0;
+#endif
     }
 
     m_tmplCpDiag = diag;
     m_tmplCpSum1 = sumAbs - numPos;
+
+#if JVET_AG0143_INTER_INTRA
+    bool condition = cu.getSwitchCondition(m_chType);
 #if TCQ_8STATES
-		return m_sigFlagCtxSet[state & 3](ctxOfs);
+    if (condition) 
+    {
+      return m_sigFlagCtxSetSwitch[state & 3](ctxOfs);
+    }
+    else
+    {
+      return m_sigFlagCtxSet[state & 3](ctxOfs);
+    }
 #else
-    return m_sigFlagCtxSet[std::max( 0, state-1 )]( ctxOfs );
+    if (condition)
+    {
+      return m_sigFlagCtxSetSwitch[std::max(0, state - 1)](ctxOfs);
+    }
+    else
+    {
+      return m_sigFlagCtxSet[std::max(0, state - 1)](ctxOfs);
+    }
+#endif
+
+
+#else
+#if TCQ_8STATES
+    return m_sigFlagCtxSet[state & 3](ctxOfs);
+#else
+    return m_sigFlagCtxSet[std::max(0, state - 1)](ctxOfs);
+#endif
+
 #endif
   }
+
   uint8_t ctxOffsetAbs()
   {
     int offset = 0;
     if( m_tmplCpDiag != -1 )
     {
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT_VS
+#if JVET_AG0100_TRANSFORM_COEFFICIENT_CODING
+      offset = int(std::min<TCoeff>(m_tmplCpSum1, NGTXCTX-1)) + 1;
+#else
       offset  = int(std::min<TCoeff>( m_tmplCpSum1, 4 )) + 1;
+#endif
 #else
       offset  = std::min( m_tmplCpSum1, 4 ) + 1;
 #endif
+#if JVET_AG0100_TRANSFORM_COEFFICIENT_CODING
+      offset += (!m_tmplCpDiag ? (m_chType == CHANNEL_TYPE_LUMA ? NGTXCTX*3 : NGTXCTX) : m_chType == CHANNEL_TYPE_LUMA ? m_tmplCpDiag < 3 ? NGTXCTX*2 : (m_tmplCpDiag < 10 ? NGTXCTX : 0) : 0);
+#else
       offset += ( !m_tmplCpDiag ? ( m_chType == CHANNEL_TYPE_LUMA ? 15 : 5 ) : m_chType == CHANNEL_TYPE_LUMA ? m_tmplCpDiag < 3 ? 10 : ( m_tmplCpDiag < 10 ? 5 : 0 ) : 0 );
+#endif
     }
     return uint8_t(offset);
   }
-  unsigned parityCtxIdAbs   ( uint8_t offset)  const { return m_parFlagCtxSet   ( offset ); }
+
+
+#if JVET_AG0143_INTER_INTRA
+  unsigned parityCtxIdAbs(uint8_t offset, const CodingUnit &cu) const
+  {
+    bool condition = cu.getSwitchCondition(m_chType);
+    if (condition)
+    {
+      return m_parFlagCtxSetSwitch(offset);
+    }
+    else
+    {
+      return m_parFlagCtxSet(offset);
+    }
+  }
+#else
+  unsigned parityCtxIdAbs   ( uint8_t offset )  const { return m_parFlagCtxSet   ( offset ); }
+#endif
+
+#if JVET_AG0143_INTER_INTRA
+
+#if !JVET_AG0100_TRANSFORM_COEFFICIENT_CODING
+  unsigned greater1CtxIdAbs(uint8_t offset, const CodingUnit &cu) const
+  {
+    bool condition = cu.getSwitchCondition(m_chType);
+    if (condition)
+    {
+      return m_gtxFlagCtxSetSwitch[1](offset);
+    }
+    else
+    {
+      return m_gtxFlagCtxSet[1](offset);
+    }
+  }
+
+  unsigned greater2CtxIdAbs(uint8_t offset, const CodingUnit &cu) const
+  {
+    bool condition = cu.getSwitchCondition(m_chType);
+    if (condition)
+    {
+      return m_gtxFlagCtxSetSwitch[0](offset);
+    }
+    else
+    {
+      return m_gtxFlagCtxSet[0](offset);
+    }
+  }
+#else
+  unsigned greater1CtxIdAbs(uint8_t offset, const CodingUnit &cu) const
+  {
+    bool condition = cu.getSwitchCondition(m_chType);
+    if (condition)
+    {
+      return m_gtxFlagCtxSetSwitch[1](offset);
+    }
+    else
+    {
+      return m_gtxFlagCtxSet[1](offset);
+    }
+  }
+
+  unsigned greater2CtxIdAbs(uint8_t offset, const CodingUnit &cu) const
+  {
+    bool condition = cu.getSwitchCondition(m_chType);
+    if (condition)
+    {
+      return m_gtxFlagCtxSetSwitch[2](offset);
+    }
+    else
+    {
+      return m_gtxFlagCtxSet[2](offset);
+    }
+  }
+  unsigned greater3CtxIdAbs(uint8_t offset, const CodingUnit &cu) const
+  {
+    bool condition = cu.getSwitchCondition(m_chType);
+    if (condition)
+    {
+      return m_gtxFlagCtxSetSwitch[0](offset);
+    }
+    else
+    {
+      return m_gtxFlagCtxSet[0](offset);
+    }
+  }
+
+  unsigned greater4CtxIdAbs(uint8_t offset, const CodingUnit &cu) const
+  {
+    bool condition = cu.getSwitchCondition(m_chType);
+    if (condition)
+    {
+      return m_gtxFlagCtxSetSwitch[3](offset);
+    }
+    else
+    {
+      return m_gtxFlagCtxSet[3](offset);
+    }
+  }
+#endif
+
+#else
+
+#if !TEST_EE2_3_2
   unsigned greater1CtxIdAbs ( uint8_t offset )  const { return m_gtxFlagCtxSet[1]( offset ); }
   unsigned greater2CtxIdAbs ( uint8_t offset )  const { return m_gtxFlagCtxSet[0]( offset ); }
+#else
+  unsigned greater1CtxIdAbs(uint8_t offset)  const { return m_gtxFlagCtxSet[1](offset); }
+  unsigned greater2CtxIdAbs(uint8_t offset)  const { return m_gtxFlagCtxSet[2](offset); }
+  unsigned greater3CtxIdAbs(uint8_t offset)  const { return m_gtxFlagCtxSet[0](offset); }
+  unsigned greater4CtxIdAbs(uint8_t offset)  const { return m_gtxFlagCtxSet[3](offset); }
+#endif
+#endif
+
 #if JVET_AE0102_LFNST_CTX
   void updateCtxSets()
   {
@@ -212,7 +429,30 @@ public:
     m_parFlagCtxSet    = Ctx::ParFlag[m_chType];
     m_gtxFlagCtxSet[0] = Ctx::GtxFlag[m_chType];
     m_gtxFlagCtxSet[1] = Ctx::GtxFlag[m_chType + 2];
+
+#if JVET_AG0143_INTER_INTRA
+    m_sigFlagCtxSetSwitch[0] = Ctx::SigFlagCtxSetSwitch[m_chType];
+    m_sigFlagCtxSetSwitch[1] = Ctx::SigFlagCtxSetSwitch[m_chType + 2];
+    m_sigFlagCtxSetSwitch[2] = Ctx::SigFlagCtxSetSwitch[m_chType];
+    m_sigFlagCtxSetSwitch[3] = Ctx::SigFlagCtxSetSwitch[m_chType + 4];
+    m_parFlagCtxSetSwitch    = Ctx::ParFlagCtxSetSwitch[m_chType];
+    m_gtxFlagCtxSetSwitch[0] = Ctx::GtxFlagCtxSetSwitch[m_chType];
+    m_gtxFlagCtxSetSwitch[1] = Ctx::GtxFlagCtxSetSwitch[m_chType + 2];
+#endif
+#if JVET_AG0100_TRANSFORM_COEFFICIENT_CODING
+    m_gtxFlagCtxSet[2] = Ctx::GtxFlag[m_chType + 4];
+    m_gtxFlagCtxSet[3] = Ctx::GtxFlag[m_chType + 6];
+
+#if JVET_AG0143_INTER_INTRA
+    m_gtxFlagCtxSetSwitch[2] = Ctx::GtxFlagCtxSetSwitch[m_chType + 4];
+    m_gtxFlagCtxSetSwitch[3] = Ctx::GtxFlagCtxSetSwitch[m_chType + 6];
+#endif
+
+
+#endif
+
   }
+
   unsigned templateAbsSum(int scanPos, const TCoeff* coeff, int baseLevel, int lfnstIdx = 0)
 #else
   unsigned templateAbsSum(int scanPos, const TCoeff* coeff, int baseLevel)
@@ -267,38 +507,144 @@ public:
 #endif
   }
 
-  unsigned sigCtxIdAbsTS( int scanPos, const TCoeff* coeff )
-  {
-    const uint32_t  posY   = m_scan[scanPos].y;
-    const uint32_t  posX   = m_scan[scanPos].x;
-    const TCoeff*   posC   = coeff + posX + posY * m_width;
-    int             numPos = 0;
-#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT_VS
-#define UPDATE(x) {TCoeff a=abs(x);numPos+=int(!!a);}
-#else
-#define UPDATE(x) {int a=abs(x);numPos+=!!a;}
-#endif
-    if( posX > 0 )
-    {
-      UPDATE( posC[-1] );
-    }
-    if( posY > 0 )
-    {
-      UPDATE( posC[-(int)m_width] );
-    }
-#undef UPDATE
-
-    return m_tsSigFlagCtxSet( numPos );
-  }
-
-  unsigned parityCtxIdAbsTS   ()                  const { return m_tsParFlagCtxSet(      0 ); }
-  unsigned greaterXCtxIdAbsTS ( uint8_t offset )  const { return m_tsGtxFlagCtxSet( offset ); }
-
-  unsigned lrg1CtxIdAbsTS(int scanPos, const TCoeff* coeff, int bdpcm)
+#if JVET_AG0100_TRANSFORM_COEFFICIENT_CODING
+  unsigned templateAbsSum2(int scanPos, const TCoeff* coeff, int baseLevel, int lfnstIdx = 0)
   {
     const uint32_t  posY = m_scan[scanPos].y;
     const uint32_t  posX = m_scan[scanPos].x;
-    const TCoeff*   posC = coeff + posX + posY * m_width;
+    const TCoeff* pData = coeff + posX + posY * m_width;
+    TCoeff          sum = 0;
+    TCoeff c = 0;
+
+#if JVET_AE0102_LFNST_CTX
+    if (lfnstIdx == 0)
+    {
+#endif
+      if (posX < m_width - 1)
+      {
+        c = abs(pData[1]);
+        sum += (c-(TCoeff)!!c);
+        if (posX < m_width - 2)
+        {
+          c = abs(pData[2]);
+          sum += (c - (TCoeff)!!c);
+        }
+        if (posY < m_height - 1)
+        {
+          c = abs(pData[m_width + 1]);
+          sum += (c - (TCoeff)!!c);
+        }
+      }
+      if (posY < m_height - 1)
+      {
+        c = abs(pData[m_width]);
+        sum += (c - (TCoeff)!!c);
+        if (posY < m_height - 2)
+        {
+          c= abs(pData[m_width << 1]);
+          sum += (c - (TCoeff)!!c);
+        }
+      }
+#if JVET_AE0102_LFNST_CTX
+    }
+    else if (lfnstIdx > 0)
+    {
+      for (int k = 1; k <= std::min(5, scanPosLast() - scanPos); k++)
+      {
+        c = abs(coeff[blockPos(scanPos + k)]);
+        sum += (c - (TCoeff)!!c);
+      }
+    }
+#endif
+    return unsigned(std::max<TCoeff>(std::min<TCoeff>(sum , GTN_MAXSUM-1), 0));
+  }
+#endif
+
+#if JVET_AG0143_INTER_INTRA
+  unsigned sigCtxIdAbsTS(int scanPos, const TCoeff *coeff, const CodingUnit &cu)
+#else
+         unsigned sigCtxIdAbsTS(int scanPos, const TCoeff *coeff)
+#endif
+  {
+    const uint32_t posY   = m_scan[scanPos].y;
+    const uint32_t posX   = m_scan[scanPos].x;
+    const TCoeff * posC   = coeff + posX + posY * m_width;
+    int            numPos = 0;
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT_VS
+#define UPDATE(x) {TCoeff a=abs(x);numPos+=int(!!a);}
+#else
+#define UPDATE(x) {int a=abs(x);numPos+=!!a;}
+#endif
+    if (posX > 0)
+    {
+      UPDATE(posC[-1]);
+    }
+    if (posY > 0)
+    {
+      UPDATE(posC[-(int) m_width]);
+    }
+#undef UPDATE
+
+#if JVET_AG0143_INTER_INTRA
+    bool condition = cu.getSwitchCondition(m_chType);
+    if (condition)
+    {
+      return m_tsSigFlagCtxSetSwitch(numPos);
+    }
+    else
+    {
+      return m_tsSigFlagCtxSet(numPos);
+    }
+
+#else
+    return m_tsSigFlagCtxSet(numPos);
+#endif
+  }
+
+#if JVET_AG0143_INTER_INTRA
+  unsigned parityCtxIdAbsTS(const CodingUnit &cu) const
+  {
+    bool condition = cu.getSwitchCondition(m_chType);
+    if (condition)
+    {
+      return m_tsParFlagCtxSetSwitch(0);
+    }
+    else
+    {
+      return m_tsParFlagCtxSet(0);
+    }
+  }
+#else
+  unsigned parityCtxIdAbsTS() const { return m_tsParFlagCtxSet(0); }
+#endif
+
+#if JVET_AG0143_INTER_INTRA
+  unsigned greaterXCtxIdAbsTS(uint8_t offset, const CodingUnit &cu) const
+  {
+    bool condition = cu.getSwitchCondition(m_chType);
+    if (condition)
+    {
+      return m_tsGtxFlagCtxSetSwitch(offset);
+    }
+    else
+    {
+      return m_tsGtxFlagCtxSet(offset);
+    }
+  }
+#else
+  unsigned greaterXCtxIdAbsTS(uint8_t offset) const { return m_tsGtxFlagCtxSet(offset); }
+#endif
+
+
+#if JVET_AG0143_INTER_INTRA
+  unsigned lrg1CtxIdAbsTS(int scanPos, const TCoeff *coeff, int bdpcm, const CodingUnit &cu)
+#else
+  unsigned        lrg1CtxIdAbsTS(int scanPos, const TCoeff *coeff, int bdpcm)
+#endif
+  {
+    const uint32_t posY = m_scan[scanPos].y;
+    const uint32_t posX = m_scan[scanPos].x;
+    const TCoeff * posC = coeff + posX + posY * m_width;
 
     int             numPos = 0;
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT_VS
@@ -306,7 +652,6 @@ public:
 #else
 #define UPDATE(x) {int a=abs(x);numPos+=!!a;}
 #endif
-
     if (bdpcm)
     {
       numPos = 3;
@@ -319,12 +664,23 @@ public:
       }
       if (posY > 0)
       {
-        UPDATE(posC[-(int)m_width]);
+        UPDATE(posC[-(int) m_width]);
       }
     }
-
 #undef UPDATE
+#if JVET_AG0143_INTER_INTRA
+    bool condition = cu.getSwitchCondition(m_chType);
+    if (condition)
+    {
+      return m_tsLrg1FlagCtxSetSwitch(numPos);
+    }
+    else
+    {
+      return m_tsLrg1FlagCtxSet(numPos);
+    }
+#else
     return m_tsLrg1FlagCtxSet(numPos);
+#endif
   }
 
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
@@ -332,15 +688,20 @@ public:
   {
     return (T(0) < val) - (val < T(0));
   }
-
 #endif
-  unsigned signCtxIdAbsTS(int scanPos, const TCoeff* coeff, int bdpcm)
-  {
-    const uint32_t  posY = m_scan[scanPos].y;
-    const uint32_t  posX = m_scan[scanPos].x;
-    const TCoeff*   pData = coeff + posX + posY * m_width;
 
-    int rightSign = 0, belowSign = 0;
+
+#if JVET_AG0143_INTER_INTRA
+  unsigned signCtxIdAbsTS(int scanPos, const TCoeff *coeff, int bdpcm, const CodingUnit &cu)
+#else
+  unsigned signCtxIdAbsTS(int scanPos, const TCoeff *coeff, int bdpcm)
+#endif
+  {
+    const uint32_t posY  = m_scan[scanPos].y;
+    const uint32_t posX  = m_scan[scanPos].x;
+    const TCoeff * pData = coeff + posX + posY * m_width;
+
+    int      rightSign = 0, belowSign = 0;
     unsigned signCtx = 0;
 
     if (posX > 0)
@@ -354,13 +715,13 @@ public:
     if (posY > 0)
     {
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
-      belowSign = sgn(pData[-(int)m_width]);
+      belowSign = sgn(pData[-(int) m_width]);
 #else
-      belowSign = pData[-(int)m_width];
+      belowSign = pData[-(int) m_width];
 #endif
     }
 
-    if ((rightSign == 0 && belowSign == 0) || ((rightSign*belowSign) < 0))
+    if ((rightSign == 0 && belowSign == 0) || ((rightSign * belowSign) < 0))
     {
       signCtx = 0;
     }
@@ -376,7 +737,21 @@ public:
     {
       signCtx += 3;
     }
+
+#if JVET_AG0143_INTER_INTRA
+    bool condition = cu.getSwitchCondition(m_chType);
+    if (condition)
+    {
+      return m_tsSignFlagCtxSetSwitch(signCtx);
+    }
+    else
+    {
+      return m_tsSignFlagCtxSet(signCtx);
+    }
+
+#else
     return m_tsSignFlagCtxSet(signCtx);
+#endif
   }
 
   void neighTS(int &rightPixel, int &belowPixel, int scanPos, const TCoeff* coeff)
@@ -538,13 +913,39 @@ private:
   CtxSet                    m_sigFlagCtxSet[3];
 #endif
   CtxSet                    m_parFlagCtxSet;
+#if JVET_AG0100_TRANSFORM_COEFFICIENT_CODING
+  CtxSet                    m_gtxFlagCtxSet[4];
+#else
   CtxSet                    m_gtxFlagCtxSet[2];
+#endif
   unsigned                  m_sigGroupCtxIdTS;
   CtxSet                    m_tsSigFlagCtxSet;
   CtxSet                    m_tsParFlagCtxSet;
   CtxSet                    m_tsGtxFlagCtxSet;
   CtxSet                    m_tsLrg1FlagCtxSet;
   CtxSet                    m_tsSignFlagCtxSet;
+#if JVET_AG0143_INTER_INTRA
+  #if TCQ_8STATES
+  CtxSet                    m_sigFlagCtxSetSwitch[4];
+#else
+  CtxSet m_sigFlagCtxSetSwitch[3];
+#endif
+  unsigned                  m_sigGroupCtxIdSwitch;
+  CtxSet                    m_parFlagCtxSetSwitch;
+#if JVET_AG0100_TRANSFORM_COEFFICIENT_CODING
+  CtxSet                    m_gtxFlagCtxSetSwitch[4];
+#else
+  CtxSet                    m_gtxFlagCtxSetSwitch[2];
+#endif
+  const CtxSet              m_ctxSetLastXCtxSetSwitch;
+  const CtxSet              m_ctxSetLastYCtxSetSwitch;
+  unsigned                  m_sigGroupCtxIdTSSwitch;
+  CtxSet                    m_tsSigFlagCtxSetSwitch;
+  CtxSet                    m_tsParFlagCtxSetSwitch;
+  CtxSet                    m_tsGtxFlagCtxSetSwitch;
+  CtxSet                    m_tsLrg1FlagCtxSetSwitch;
+  CtxSet                    m_tsSignFlagCtxSetSwitch;
+#endif
   int                       m_remainingContextBins;
   std::bitset<MLS_GRP_NUM>  m_sigCoeffGroupFlag;
   const bool                m_bdpcm;

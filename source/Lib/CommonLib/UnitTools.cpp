@@ -156,6 +156,20 @@ void CS::saveTemporalCcpModel(CodingStructure &cs)
 #endif
 // CU tools
 
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+bool CU::isOnCtuBottom( const CodingUnit& cu )
+{
+  const CodingStructure &cs = *cu.cs;
+  const ComponentID compID  = cu.chType == CHANNEL_TYPE_CHROMA ? COMPONENT_Cb : COMPONENT_Y;
+  const Area& cuArea        = cu.chType == CHANNEL_TYPE_CHROMA ? cu.Cb() : cu.Y();
+
+  const int ctuHeight = cs.pcv->maxCUHeight >> getComponentScaleY(compID, cs.pcv->chrFormat);
+  const int cuBottomY = cuArea.y + cuArea.height;
+
+  return cuBottomY % ctuHeight == 0;
+}
+#endif
+
 bool CU::getRprScaling( const SPS* sps, const PPS* curPPS, Picture* refPic, int& xScale, int& yScale )
 {
   const Window& curScalingWindow = curPPS->getScalingWindow();

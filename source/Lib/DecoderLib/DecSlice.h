@@ -64,13 +64,21 @@ private:
 
   Ctx             m_entropyCodingSyncContextState;      ///< context storage for state of contexts at the wavefront/WPP/entropy-coding-sync second CTU of tile-row
   PLTBuf          m_palettePredictorSyncState;      /// palette predictor storage at wavefront/WPP
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+  std::vector<BinStoreVector> m_binVectors;
+#endif
 
 public:
   DecSlice();
   virtual ~DecSlice();
 
   void  init              ( CABACDecoder* cabacDecoder, DecCu* pcMbDecoder );
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+  BinStoreVector* getBinVector ( int id ) { return &m_binVectors[id]; }
+  void  create                 ( int width, int iMaxCUWidth );
+#else
   void  create            ();
+#endif
   void  destroy           ();
 
   void  decompressSlice   ( Slice* slice, InputBitstream* bitstream, int debugCTU );

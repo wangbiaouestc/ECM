@@ -125,6 +125,9 @@ Slice::Slice()
 , m_substreamSizes                ( )
 , m_numEntryPoints                ( 0 )
 , m_cabacInitFlag                 ( false )
+#if JVET_AG0196_CABAC_RETRAIN
+, m_cabacInitSliceType            ( I_SLICE )
+#endif
  , m_sliceSubPicId               ( 0 )
 , m_encCABACTableIdx              (I_SLICE)
 , m_iProcessingStartTime          ( 0 )
@@ -244,6 +247,9 @@ void Slice::initSlice()
   m_tileGroupCcAlfCrEnabledFlag = 0;
   m_tileGroupCcAlfCbApsId = -1;
   m_tileGroupCcAlfCrApsId = -1;
+#if JVET_AG0196_CABAC_RETRAIN
+  m_cabacInitSliceType = I_SLICE;
+#endif
 }
 
 #if JVET_Y0128_NON_CTC
@@ -1739,6 +1745,11 @@ void Slice::copySliceInfo(Slice *pSrc, bool cpyAlmostAll)
 #endif
 
   m_cabacInitFlag                 = pSrc->m_cabacInitFlag;
+
+#if JVET_AG0196_CABAC_RETRAIN
+  m_cabacInitSliceType = pSrc->m_cabacInitSliceType;
+#endif
+
   memcpy(m_alfApss, pSrc->m_alfApss, sizeof(m_alfApss)); // this might be quite unsafe
 #if ALF_IMPROVEMENT
   m_tileGroupAlfFixedFilterSetIdx          = pSrc->m_tileGroupAlfFixedFilterSetIdx;

@@ -96,6 +96,9 @@ private:
 #if SHARP_LUMA_DELTA_QP || ENABLE_QPA_SUB_CTU
   int                     m_gopID;
 #endif
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+  std::vector<BinStoreVector> m_binVectors;
+#endif
 
 public:
   double  initializeLambda(const Slice* slice, const int GOPid, const int refQP, const double dQP); // called by calculateLambda() and updateLambda()
@@ -104,6 +107,9 @@ public:
   double  calculateLambda( const Slice* slice, const int GOPid, const double refQP, const double dQP, int &iQP );
 #endif
   void    setUpLambda( Slice* slice, const double dLambda, int iQP );
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+  BinStoreVector* getBinVector(int id) { return &m_binVectors[id]; }
+#endif
 
 #if ENABLE_QPA
   int                     m_adaptedLumaQP;

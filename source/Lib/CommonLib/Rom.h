@@ -124,6 +124,9 @@ extern const uint32_t   g_uiGroupIdx[];
 extern const uint32_t   g_uiGroupIdx[ MAX_TB_SIZEY ];
 #endif
 extern const uint32_t   g_uiMinInGroup[ LAST_SIGNIFICANT_GROUPS ];
+#if JVET_AG0100_TRANSFORM_COEFFICIENT_CODING
+extern const uint32_t g_auiGoRiceParsCoeffGTN[GTN_MAXSUM];
+#endif
 extern const uint32_t   g_auiGoRiceParsCoeff     [ 32 ];
 inline uint32_t g_auiGoRicePosCoeff0(int st, uint32_t ricePar)
 {

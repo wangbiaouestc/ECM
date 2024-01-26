@@ -2013,7 +2013,11 @@ public:
   BIFCabacEstImp(CABACWriter* _CABACEstimator) : CABACEstimator(_CABACEstimator) {};
   virtual ~BIFCabacEstImp() {};
 
+#if JVET_AG0196_CABAC_RETRAIN
+  virtual uint64_t getBits( const ComponentID compID, Slice& slice, const BifParams& htdfParams )
+#else
   virtual uint64_t getBits(const ComponentID compID, const Slice& slice, const BifParams& htdfParams)
+#endif
   {
     CABACEstimator->initCtxModels(slice);
     CABACEstimator->resetBits();
