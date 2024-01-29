@@ -97,6 +97,9 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   cabacReader.m_CABACDataStore->updateBufferState( slice );
 #endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  clearAmvpSbTmvpStatArea(slice);
+#endif
 
   // setup coding structure
   CodingStructure& cs = *pic->cs;
@@ -240,6 +243,68 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
     }
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
     }
+#endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  if (!slice->isIntra())
+  {
+    int minPoc = abs(slice->getRefPic(RefPicList(1 - slice->getColFromL0Flag()), slice->getColRefIdx())->getPOC() - slice->getPOC());
+    if (slice->isInterB() && slice->getCheckLDC())
+    {
+      int min2ndPoc = abs(slice->getRefPic(RefPicList(1 - slice->getColFromL0Flag2nd()), slice->getColRefIdx2nd())->getPOC() - slice->getPOC());
+      minPoc = std::min(minPoc, min2ndPoc);
+    }
+    if (minPoc > 4)
+    {
+      slice->setAmvpSbTmvpEnabledFlag(false);
+    }
+    else
+    {
+      slice->setAmvpSbTmvpEnabledFlag(true);
+      g_picAmvpSbTmvpEnabledArea = 0;
+      uint32_t prevEnabledArea;
+      bool isExist = loadAmvpSbTmvpStatArea(slice->getTLayer(), prevEnabledArea);
+      if (isExist)
+      {
+        int ratio = int(prevEnabledArea * 100.0 / (slice->getPic()->getPicWidthInLumaSamples() * slice->getPic()->getPicHeightInLumaSamples()));
+        if (ratio < 4)
+        {
+          slice->setAmvpSbTmvpNumOffset(1);
+        }
+        else if (ratio < 7)
+        {
+          slice->setAmvpSbTmvpNumOffset(2);
+        }
+        else
+        {
+          slice->setAmvpSbTmvpNumOffset(3);
+        }
+      }
+      else
+      {
+        slice->setAmvpSbTmvpNumOffset(2);
+      }
+      if (slice->isInterB() && slice->getCheckLDC())
+      {
+        if (slice->getRefPic(RefPicList(1 - slice->getColFromL0Flag()), slice->getColRefIdx())->getPOC() == slice->getRefPic(RefPicList(1 - slice->getColFromL0Flag2nd()), slice->getColRefIdx2nd())->getPOC())
+        {
+          slice->setAmvpSbTmvpNumColPic(1);
+        }
+        else
+        {
+          slice->setAmvpSbTmvpNumColPic(2);
+        }
+      }
+      else
+      {
+        slice->setAmvpSbTmvpNumColPic(1);
+      }
+      slice->setAmvpSbTmvpAmvrEnabledFlag(slice->getPic()->getPicWidthInLumaSamples() * slice->getPic()->getPicHeightInLumaSamples() < 3840*2160 ? false : true);
+    }
+  }
+  else
+  {
+    slice->setAmvpSbTmvpEnabledFlag(false);
+  }
 #endif
   }
 #endif
@@ -505,6 +570,12 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
   if( slice->getPPS()->pcv->sizeInCtus - 1 == slice->getCtuAddrInSlice( slice->getNumCtuInSlice() - 1 ) )
   {
     cabacReader.m_CABACDataStore->storeCtxStates( slice, storedCtx );
+  }
+#endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  if (!slice->isIntra())
+  {
+    storeAmvpSbTmvpStatArea(slice->getTLayer(), g_picAmvpSbTmvpEnabledArea);
   }
 #endif
 

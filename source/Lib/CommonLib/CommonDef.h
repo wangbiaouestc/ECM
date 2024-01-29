@@ -1256,6 +1256,14 @@ static const int ATMVP_SUB_BLOCK_SIZE =                             2; ///< sub-
 #else
 static const int ATMVP_SUB_BLOCK_SIZE =                             3; ///< sub-block size for ATMVP
 #endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+static const int AMVP_SBTMVP_NUM_DIR =                              4;
+static const int AMVP_SBTMVP_NUM_OFFSET =                           3;
+static const int AMVP_SBTMVP_BUF_STRIDE = ((MAX_CU_SIZE >> ATMVP_SUB_BLOCK_SIZE) + (AMVP_SBTMVP_NUM_OFFSET << 3));
+static const int AMVP_SBTMVP_BUF_SIZE = AMVP_SBTMVP_BUF_STRIDE * AMVP_SBTMVP_BUF_STRIDE;
+static const int SUB_BUFFER_SIZE =                    SUB_TMVP_NUM + 1;
+static const int AMVP_SBTMVP_BUFFER_IDX =                 SUB_TMVP_NUM;
+#endif
 
 #if NON_ADJACENT_MRG_CAND
 static const int GEO_MAX_NUM_UNI_CANDS =                            15;

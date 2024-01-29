@@ -1253,6 +1253,15 @@ void CABACWriter::obmc_flag(const CodingUnit& cu)
   {
     return;
   }
+
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  if (cu.firstPU->amvpSbTmvpFlag)
+  {
+    CHECK(!cu.obmcFlag, "obmc flag should be true for AMVP with SbTMVP mode");
+    return;
+  }
+#endif
+
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
   bool ctxCond = cu.affine == false || cu.firstPU->addHypData.size() > 0;
   m_BinEncoder.encodeBin(cu.obmcFlag ? 1 : 0, ctxCond ? Ctx::ObmcFlag(0) : Ctx::ObmcFlag(1));
@@ -3150,6 +3159,11 @@ void CABACWriter::prediction_unit( const PredictionUnit& pu )
 #endif
     inter_pred_idc( pu );
     affine_flag   ( *pu.cu );
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+    amvpSbTmvpFlag(pu);
+    if (!pu.amvpSbTmvpFlag)
+    {
+#endif
     smvd_mode( pu );
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
@@ -3163,6 +3177,9 @@ void CABACWriter::prediction_unit( const PredictionUnit& pu )
 #endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
     refPairIdx(pu);
+#endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+    } 
 #endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
     }
@@ -3226,6 +3243,12 @@ void CABACWriter::prediction_unit( const PredictionUnit& pu )
 #endif
         }
       }
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+      else if (pu.amvpSbTmvpFlag)
+      {
+        amvpSbTmvpMvdCoding(pu);
+      }
+#endif
       else
       {
         Mv mvd = pu.mvd[REF_PIC_LIST_0];
@@ -3316,6 +3339,12 @@ void CABACWriter::prediction_unit( const PredictionUnit& pu )
 #endif
           }
         }
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+        else if (pu.amvpSbTmvpFlag)
+        {
+          amvpSbTmvpMvdCoding(pu);
+        }
+#endif
         else
         {
           Mv mvd = pu.mvd[REF_PIC_LIST_1];
@@ -3383,6 +3412,13 @@ void    CABACWriter::mvsd_data(const PredictionUnit&  pu)
   {
     return;
   }
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  if (pu.amvpSbTmvpFlag)
+  {
+    return;
+  }
+#endif
+
   if (pu.interDir != 2 /* PRED_L1 */)
   {
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
@@ -3436,6 +3472,73 @@ void CABACWriter::smvd_mode( const PredictionUnit& pu )
   
   DTRACE( g_trace_ctx, D_SYNTAX, "symmvd_flag() symmvd=%d pos=(%d,%d) size=%dx%d\n", pu.cu->smvdMode ? 1 : 0, pu.lumaPos().x, pu.lumaPos().y, pu.lumaSize().width, pu.lumaSize().height );
 }
+
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+void CABACWriter::amvpSbTmvpFlag(const PredictionUnit& pu)
+{
+  if (!pu.cs->sps->getSbTMVPEnabledFlag())
+  {
+    return;
+  }
+
+  if (!pu.cs->slice->getAmvpSbTmvpEnabledFlag())
+  {
+    return;
+  }
+
+  if (pu.cu->affine)
+  {
+    return;
+  }
+  if (pu.interDir == 3)
+  {
+    return;
+  }
+  
+  m_BinEncoder.encodeBin(pu.amvpSbTmvpFlag ? 1 : 0, Ctx::amvpSbTmvpFlag(0));
+  
+  DTRACE(g_trace_ctx, D_SYNTAX, "amvpSbTmvpFlag() amvpSbTmvpFlag=%d interDir:%d colIdx:%d pos=(%d,%d) size=%dx%d\n", pu.amvpSbTmvpFlag ? 1 : 0, pu.interDir, pu.colIdx ? 1 : 0, pu.lumaPos().x, pu.lumaPos().y, pu.lumaSize().width, pu.lumaSize().height);
+  if (pu.amvpSbTmvpFlag)
+  {
+    if (pu.cs->slice->getAmvpSbTmvpNumColPic() > 1)
+    {
+      m_BinEncoder.encodeBin((pu.interDir == 2), Ctx::amvpSbTmvpFlag(1));
+    }
+    if (isEncoding())
+    {
+      g_picAmvpSbTmvpEnabledArea += pu.lwidth() * pu.lheight();
+    }
+  }
+}
+
+void CABACWriter::amvpSbTmvpMvdCoding(const PredictionUnit &pu)
+{
+  if (pu.amvpSbTmvpMvdIdx < 0)
+  {
+    m_BinEncoder.encodeBin(1, Ctx::amvpSbTmvpMvdIdx(0));
+    DTRACE(g_trace_ctx, D_SYNTAX, "amvpSbTmvpMvdCoding() pos=(%d,%d) size=(%d,%d) amvpSbTmvpMvdIdx:%d\n", pu.lx(), pu.ly(), pu.lwidth(), pu.lheight(), -1);
+  }
+  else
+  {
+    m_BinEncoder.encodeBin(0, Ctx::amvpSbTmvpMvdIdx(0));
+
+    int numStepCandMinus1 = pu.cs->slice->getAmvpSbTmvpNumOffset() - 1;
+    unsigned int amvpSbTmvpMvdIdx = (unsigned int)pu.amvpSbTmvpMvdIdx;
+    m_BinEncoder.encodeBinsEP(amvpSbTmvpMvdIdx % (1 << 2), 2);
+    amvpSbTmvpMvdIdx >>= 2;
+    for (unsigned int uiUnaryIdx = 0; uiUnaryIdx < numStepCandMinus1; ++uiUnaryIdx)
+    {
+      unsigned int uiSymbol = amvpSbTmvpMvdIdx == uiUnaryIdx ? 0 : 1;
+      m_BinEncoder.encodeBin(uiSymbol, Ctx::amvpSbTmvpMvdIdx(uiUnaryIdx + 1));
+      if (uiSymbol == 0)
+      {
+        break;
+      }
+    }
+    DTRACE(g_trace_ctx, D_SYNTAX, "amvpSbTmvpMvdCoding() pos=(%d,%d) size=(%d,%d) amvpSbTmvpMvdIdx:%d numStepCandMinus1:%d\n", pu.lx(), pu.ly(), pu.lwidth(), pu.lheight(), pu.amvpSbTmvpMvdIdx, numStepCandMinus1);
+  }
+}
+#endif
 
 void CABACWriter::subblock_merge_flag( const CodingUnit& cu )
 {
@@ -4459,6 +4562,13 @@ void CABACWriter::imv_mode( const CodingUnit& cu )
     return;
   }
 
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  if (cu.firstPU->amvpSbTmvpFlag && !cu.cs->slice->getAmvpSbTmvpAmvrEnabledFlag())
+  {
+    return;
+  }
+#endif
+
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   auto &pu = *cu.firstPU;
 #if JVET_AE0169_BIPREDICTIVE_IBC
@@ -4514,6 +4624,12 @@ void CABACWriter::imv_mode( const CodingUnit& cu )
     );
   DTRACE( g_trace_ctx, D_SYNTAX, "imv_mode() value=%d ctx=%d\n", (cu.imv > 0), 0 );
 
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  if (cu.firstPU->amvpSbTmvpFlag)
+  {
+    return;
+  }
+#endif
   if( sps->getAMVREnabledFlag() && cu.imv > 0 )
   {
     if (!CU::isIBC(cu))
@@ -5511,6 +5627,12 @@ void CABACWriter::ref_idx( const PredictionUnit& pu, RefPicList eRefList )
     return;
   }
 #endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  if (pu.amvpSbTmvpFlag)
+  {
+    return;
+  }
+#endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   if (pu.amvpMergeModeFlag[1 - eRefList])
   {
@@ -5643,6 +5765,13 @@ void CABACWriter::mh_pred_data(const PredictionUnit& pu)
   {
     return;
   }
+
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  if (pu.amvpSbTmvpFlag)
+  {
+    return;
+  }
+#endif
 
   if (pu.Y().area() <= MULTI_HYP_PRED_RESTRICT_BLOCK_SIZE || std::min(pu.Y().width, pu.Y().height) < MULTI_HYP_PRED_RESTRICT_MIN_WH)
   {

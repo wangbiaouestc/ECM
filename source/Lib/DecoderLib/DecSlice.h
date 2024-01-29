@@ -82,6 +82,30 @@ public:
   void  destroy           ();
 
   void  decompressSlice   ( Slice* slice, InputBitstream* bitstream, int debugCTU );
+
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  std::map<int, uint32_t> m_amvpSbTmvpArea;
+  void clearAmvpSbTmvpStatArea(const Slice* slice)
+  {
+    if (slice->getPendingRasInit() || slice->isInterGDR())
+    {
+      m_amvpSbTmvpArea.clear();
+    }
+  }
+  void storeAmvpSbTmvpStatArea(const int Tlayer, const uint32_t enabledArea)
+  {
+    m_amvpSbTmvpArea[Tlayer] = enabledArea;
+  }
+  bool loadAmvpSbTmvpStatArea(const int Tlayer, uint32_t& enabledArea)
+  {
+    if (m_amvpSbTmvpArea.find(Tlayer) != m_amvpSbTmvpArea.end())
+    {
+      enabledArea = m_amvpSbTmvpArea[Tlayer];
+      return true;
+    }
+    return false;
+  }
+#endif
 };
 
 //! \}

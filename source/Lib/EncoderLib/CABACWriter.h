@@ -256,6 +256,10 @@ public:
 
   void        Ciip_flag                 ( const PredictionUnit&         pu );
   void        smvd_mode                 ( const PredictionUnit&         pu );
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  void        amvpSbTmvpFlag            ( const PredictionUnit&         pu );
+  void        amvpSbTmvpMvdCoding       ( const PredictionUnit&         pu );
+#endif
 
 #if MULTI_HYP_PRED
   void        ref_idx_mh                (const int numRef, const int refIdx);

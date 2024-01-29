@@ -225,6 +225,10 @@ public:
   void        mvp_flag                ( PredictionUnit&               pu,     RefPicList      eRefList );
   void        Ciip_flag               ( PredictionUnit&               pu );
   void        smvd_mode               ( PredictionUnit&               pu );
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  void        amvpSbTmvpFlag          ( PredictionUnit&               pu );
+  void        amvpSbTmvpMvdCoding     ( PredictionUnit&               pu,     Mv &rMvd );
+#endif
 #if MULTI_HYP_PRED
   int         ref_idx_mh              ( const int                     numRef);
   void        mh_pred_data            ( PredictionUnit&               pu);

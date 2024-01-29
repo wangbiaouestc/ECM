@@ -605,6 +605,10 @@ namespace PU
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
   void getTMVPCandOpt(const PredictionUnit &pu, RefPicList refList, int refIdx, MergeCtx &mrgCtx, MergeCtx mergeCtx, int col = 0);
 #endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  void getAmvpSbTmvp(PredictionUnit &pu, MergeCtx& mrgCtx, const Mv mvShift, const bool useAmvpSbTmvpBuf = false, const Position bufTL = Position(0, 0), bool* tmvpBufValid = nullptr, MotionInfo* tmvpMotionBuf = nullptr);
+  void clipColPos(int& posX, int& posY, const PredictionUnit& pu);
+#endif
 #if JVET_Y0128_NON_CTC
   bool isBiRefScaled(const CodingStructure& cs, const int refIdx0, const int refIdx1);
 #endif

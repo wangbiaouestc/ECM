@@ -3074,6 +3074,10 @@ private:
   bool                        m_picColFromL0Flag2nd;                                    //!< syntax element collocated_from_l0_flag
   uint32_t                    m_colRefIdx2nd;
 #endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  uint8_t                     m_amvpSbTmvpNumOffset;
+  uint8_t                     m_amvpSbTmvpNumDir;
+#endif
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
   uint32_t                    m_costForARMC;                                            //!< Cost for diversity criterion
 #endif
@@ -3484,6 +3488,12 @@ private:
   bool                       m_colFromL0Flag2nd;  // collocated picture from List0 flag
   uint32_t                   m_colRefIdx2nd;
 #endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  uint8_t                    m_amvpSbTmvpNumOffset;
+  uint8_t                    m_amvpSbTmvpNumColPic;
+  bool                       m_amvpSbTmvpAmvrEnabledFlag;
+  bool                       m_amvpSbTmvpEnabledFlag;
+#endif
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
   uint32_t                   m_costForARMC;
 #endif
@@ -3664,6 +3674,12 @@ public:
   bool                        getColFromL0Flag2nd() const                            { return m_colFromL0Flag2nd;                                    }
   uint32_t                    getColRefIdx2nd() const                                { return m_colRefIdx2nd;                                        }
 #endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  uint8_t                     getAmvpSbTmvpNumOffset() const                         { return m_amvpSbTmvpNumOffset;                                     }
+  uint8_t                     getAmvpSbTmvpNumColPic() const                         { return m_amvpSbTmvpNumColPic;                                     }
+  bool                        getAmvpSbTmvpAmvrEnabledFlag() const                   { return m_amvpSbTmvpAmvrEnabledFlag;                               }
+  bool                        getAmvpSbTmvpEnabledFlag() const                       { return m_amvpSbTmvpEnabledFlag;                                   }
+#endif
   void                        checkColRefIdx(uint32_t curSliceSegmentIdx, const Picture* pic);
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
   uint32_t                    getCostForARMC() const                                 { return m_costForARMC;                                         }
@@ -3804,6 +3820,12 @@ public:
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   void                        setColFromL0Flag2nd(bool colFromL0)                    { m_colFromL0Flag2nd = colFromL0;                               }
   void                        setColRefIdx2nd(uint32_t refIdx)                       { m_colRefIdx2nd = refIdx;                                      }
+#endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  void                        setAmvpSbTmvpEnabledFlag(bool b)                       { m_amvpSbTmvpEnabledFlag = b;                                      }
+  void                        setAmvpSbTmvpNumOffset(uint8_t numOffset)              { m_amvpSbTmvpNumOffset = numOffset;                                }
+  void                        setAmvpSbTmvpNumColPic(uint8_t numPic)                 { m_amvpSbTmvpNumColPic = numPic;                                   }
+  void                        setAmvpSbTmvpAmvrEnabledFlag(bool b)                   { m_amvpSbTmvpAmvrEnabledFlag = b;                                  }
 #endif
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
   void                        setCostForARMC(uint32_t cost)                          { m_costForARMC = cost;                                         }

@@ -1060,7 +1060,11 @@ public:
 #endif
 
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  MotionBuf     subPuMvpMiBuf[SUB_BUFFER_SIZE];
+#else
   MotionBuf     subPuMvpMiBuf[SUB_TMVP_NUM];
+#endif
 #else
   MotionBuf     subPuMvpMiBuf;
 #endif

@@ -5531,4 +5531,11 @@ const int8_t g_ibcGpmSecondSetSplitDir[GEO_NUM_PARTITION_MODE] = {
 
 #endif
 
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+const int8_t g_amvpSbTmvp_mvd_dir[2][8] = { { 1, -1,  0,  0,  1, -1,  1, -1 },
+                                            { 0,  0,  1, -1,  1, -1, -1,  1 } };
+const int8_t g_amvpSbTmvp_mvd_offset[6] = { 4, 8, 12, 16, 24, 32 };
+uint32_t g_picAmvpSbTmvpEnabledArea = 0;
+#endif
+
 //! \}

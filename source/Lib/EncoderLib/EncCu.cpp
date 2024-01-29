@@ -18509,6 +18509,9 @@ void EncCu::xCheckRDCostInterWoOBMC(CodingStructure *&tempCS, CodingStructure *&
 #if INTER_LIC && !JVET_AD0213_LIC_IMP
     || cu->licFlag
 #endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+    || cu->firstPU->amvpSbTmvpFlag
+#endif
     )
   {
     return;

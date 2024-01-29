@@ -642,6 +642,10 @@ struct InterPredictionData
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   bool      amvpMergeModeFlag[NUM_REF_PIC_LIST_01];
 #endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  bool      amvpSbTmvpFlag;
+  int8_t    amvpSbTmvpMvdIdx;
+#endif
   int8_t     refIdx  [NUM_REF_PIC_LIST_01];
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   int8_t    refIdxLC;

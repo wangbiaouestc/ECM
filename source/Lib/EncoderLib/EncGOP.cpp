@@ -3811,6 +3811,9 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT 
       m_pcSliceEncoder->getCABACDataStore()->updateBufferState( pcSlice );
 #endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+      m_pcSliceEncoder->clearAmvpSbTmvpStatArea(pcSlice);
+#endif
 
 #if ENABLE_QPA
       if (m_pcCfg->getUsePerceptQPA() && !m_pcCfg->getUseRateCtrl() && pcSlice->getPPS()->getUseDQP())
