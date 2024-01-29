@@ -443,6 +443,7 @@
 #endif
 
 #define JVET_AC0096                                       1 // JVET-AC0096: RPR functionality testing
+#define JVET_AG0116                                       1 // JVET-AG0116: GOP-based RPR encoder control from VTM
 
 
 
