@@ -747,6 +747,10 @@ public:
   static const CtxSet   CcAlfFilterControlFlag;
   static const CtxSet   CiipFlag;
   static const CtxSet   SmvdFlag;
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  static const CtxSet   amvpSbTmvpFlag;
+  static const CtxSet   amvpSbTmvpMvdIdx;
+#endif
   static const CtxSet   IBCFlag;
 #if JVET_AE0169_BIPREDICTIVE_IBC
   static const CtxSet   BiPredIbcFlag;

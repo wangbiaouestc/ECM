@@ -501,6 +501,13 @@ void CU::saveMotionInHMVP( const CodingUnit& cu, const bool isToBeDone )
   }
 #endif
 
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  if (cu.firstPU->amvpSbTmvpFlag)
+  {
+    return;
+  }
+#endif
+
   if (!cu.geoFlag && !cu.affine && !isToBeDone)
   {
     MotionInfo mi = pu.getMotionInfo();
@@ -20085,7 +20092,11 @@ void PU::setAffineBdofRefinedMotion(PredictionUnit &pu, Mv* mvBufDecAffineBDOF)
 }
 bool PU::checkDoAffineBdofRefine(const PredictionUnit &pu, InterPrediction *interPred)
 {
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  if (pu.mergeType == MRG_TYPE_SUBPU_ATMVP || pu.amvpSbTmvpFlag)
+#else
   if (pu.mergeType == MRG_TYPE_SUBPU_ATMVP)
+#endif
   {
     return true;
   }
@@ -20126,7 +20137,11 @@ bool PU::checkDoAffineBdofRefine(const PredictionUnit &pu, InterPrediction *inte
 }
 #endif
 
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+void PU::clipColPos(int& posX, int& posY, const PredictionUnit& pu)
+#else
 void clipColPos(int& posX, int& posY, const PredictionUnit& pu)
+#endif
 {
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   Position puPos = pu.lumaPos();
@@ -20289,6 +20304,211 @@ void PU::getTMVPCandOpt(const PredictionUnit &pu, RefPicList refList, int refIdx
 #endif
     }
 #endif
+
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+void PU::getAmvpSbTmvp(PredictionUnit &pu, MergeCtx& mrgCtx, const Mv mvShift, const bool useAmvpSbTmvpBuf, const Position bufTL, bool* tmvpBufValid, MotionInfo* tmvpMotionBuf)
+{
+  const Slice   &slice = *pu.cs->slice;
+  const unsigned scale = 4 * std::max<int>(1, 4 * AMVP_DECIMATION_FACTOR / 4);
+  const unsigned mask = ~(scale - 1);
+  const RefPicList colRefList = RefPicList(pu.colIdx == 0 ? (slice.isInterB() ? 1 - slice.getColFromL0Flag() : 0) : (slice.isInterB() ? 1 - slice.getColFromL0Flag2nd() : 0));
+  const Picture *pColPic = slice.getRefPic(colRefList, pu.colIdx == 0 ? slice.getColRefIdx() : slice.getColRefIdx2nd());
+
+  Position puPos = pu.lumaPos();
+  Size puSize = pu.lumaSize();
+  Mv intMvShift = mvShift;
+  intMvShift.changePrecision(MV_PRECISION_SIXTEENTH, MV_PRECISION_INT);
+  
+  // get CU center tmvp
+  Position centerPos;
+  centerPos.x = puPos.x + (puSize.width >> 1) + intMvShift.hor;
+  centerPos.y = puPos.y + (puSize.height >> 1) + intMvShift.ver;
+  clipColPos(centerPos.x, centerPos.y, pu);
+  centerPos = Position{ PosType(centerPos.x & mask), PosType(centerPos.y & mask) };
+  const MotionInfo &mi = pColPic->cs->getMotionInfo(centerPos);
+  Mv cColMv;
+  int refIdx = 0;
+  MotionInfo centerMi;
+
+  if (useAmvpSbTmvpBuf)
+  {
+    int bufIdx = (centerPos.x >> ATMVP_SUB_BLOCK_SIZE) - bufTL.x + ((centerPos.y >> ATMVP_SUB_BLOCK_SIZE) - bufTL.y) * AMVP_SBTMVP_BUF_STRIDE;
+    if (tmvpBufValid[bufIdx])
+    {
+      if (tmvpMotionBuf[bufIdx].isInter)
+      {
+        centerMi = tmvpMotionBuf[bufIdx];
+      }
+      else
+      {
+        centerMi.isInter = true;
+        centerMi.sliceIdx = slice.getIndependentSliceIdx();
+        centerMi.isIBCmot = false;
+        centerMi.interDir = colRefList == REF_PIC_LIST_0 ? 1 : 2;
+        centerMi.mv[colRefList] = mvShift;
+        centerMi.mv[1 - colRefList] = Mv(0, 0);
+        centerMi.refIdx[colRefList] = 0;
+        centerMi.refIdx[1 - colRefList] = NOT_VALID;
+      }
+    }
+    else
+    {
+      const MotionInfo &mi = pColPic->cs->getMotionInfo(centerPos);
+      centerMi.isInter = true;
+      centerMi.sliceIdx = slice.getIndependentSliceIdx();
+      centerMi.isIBCmot = false;
+      if (mi.isInter && mi.isIBCmot == false)
+      {
+        for (unsigned currRefListId = 0; currRefListId < (slice.isInterB() ? 2 : 1); currRefListId++)
+        {
+          RefPicList  currRefPicList = RefPicList(currRefListId);
+          refIdx = 0;
+          if (getColocatedMVP(pu, currRefPicList, centerPos, cColMv, refIdx, true, pu.colIdx))
+          {
+            centerMi.interDir |= (1 << currRefListId);
+            centerMi.mv[currRefPicList] = cColMv;
+            centerMi.refIdx[currRefPicList] = refIdx;
+          }
+        }
+        tmvpMotionBuf[bufIdx] = centerMi;
+      }
+      else
+      {
+        centerMi.interDir = colRefList == REF_PIC_LIST_0 ? 1 : 2;
+        centerMi.mv[colRefList] = mvShift;
+        centerMi.mv[1 - colRefList] = Mv(0, 0);
+        centerMi.refIdx[colRefList] = 0;
+        centerMi.refIdx[1 - colRefList] = NOT_VALID;
+        tmvpMotionBuf[bufIdx].isInter = false;
+      }
+      tmvpBufValid[bufIdx] = true;
+    }
+  }
+  else
+  {
+    centerMi.isInter = true;
+    centerMi.sliceIdx = slice.getIndependentSliceIdx();
+    centerMi.isIBCmot = false;
+    if (mi.isInter && mi.isIBCmot == false)
+    {
+      for (unsigned currRefListId = 0; currRefListId < (slice.isInterB() ? 2 : 1); currRefListId++)
+      {
+        RefPicList  currRefPicList = RefPicList(currRefListId);
+        refIdx = 0;
+        if (getColocatedMVP(pu, currRefPicList, centerPos, cColMv, refIdx, true, pu.colIdx))
+        {
+          centerMi.interDir |= (1 << currRefListId);
+          centerMi.mv[currRefPicList] = cColMv;
+          centerMi.refIdx[currRefPicList] = refIdx;
+        }
+      }
+    }
+    else
+    {
+      centerMi.interDir = colRefList == REF_PIC_LIST_0 ? 1 : 2;
+      centerMi.mv[colRefList] = mvShift;
+      centerMi.mv[1 - colRefList] = Mv(0, 0);
+      centerMi.refIdx[colRefList] = 0;
+      centerMi.refIdx[1 - colRefList] = NOT_VALID;
+    }
+  }
+  
+  int numPartLine = std::max(puSize.width >> ATMVP_SUB_BLOCK_SIZE, 1u);
+  int numPartCol = std::max(puSize.height >> ATMVP_SUB_BLOCK_SIZE, 1u);
+  int puHeight = numPartCol == 1 ? puSize.height : 1 << ATMVP_SUB_BLOCK_SIZE;
+  int puWidth = numPartLine == 1 ? puSize.width : 1 << ATMVP_SUB_BLOCK_SIZE;
+  int xOff = (puWidth >> 1) + intMvShift.hor;
+  int yOff = (puHeight >> 1) + intMvShift.ver;
+  if (useAmvpSbTmvpBuf)
+  {
+    MotionBuf mb = pu.getMotionBuf();
+    for (int y = puPos.y; y < puPos.y + puSize.height; y += puHeight)
+    {
+      for (int x = puPos.x; x < puPos.x + puSize.width; x += puWidth)
+      {
+        Position colPos{ x + xOff, y + yOff };
+        clipColPos(colPos.x, colPos.y, pu);
+        colPos = Position{ PosType(colPos.x & mask), PosType(colPos.y & mask) };
+        int bufIdx = (colPos.x >> ATMVP_SUB_BLOCK_SIZE) - bufTL.x + ((colPos.y >> ATMVP_SUB_BLOCK_SIZE) - bufTL.y) * AMVP_SBTMVP_BUF_STRIDE;
+        MotionInfo mi;
+        if (tmvpBufValid[bufIdx])
+        {
+          mi = tmvpMotionBuf[bufIdx].isInter ? tmvpMotionBuf[bufIdx] : centerMi;
+        }
+        else
+        {
+          const MotionInfo &colMi = pColPic->cs->getMotionInfo(colPos);
+          if (colMi.isInter && colMi.isIBCmot == false)
+          {
+            mi.isInter = true;
+            mi.sliceIdx = slice.getIndependentSliceIdx();
+            mi.isIBCmot = false;
+            for (unsigned currRefListId = 0; currRefListId < (slice.isInterB() ? 2 : 1); currRefListId++)
+            {
+              RefPicList currRefPicList = RefPicList(currRefListId);
+              refIdx = 0;
+              if (getColocatedMVP(pu, currRefPicList, colPos, cColMv, refIdx, true, pu.colIdx))
+              {
+                mi.refIdx[currRefListId] = refIdx;
+                mi.mv[currRefListId] = cColMv;
+              }
+            }
+            mi.interDir = (mi.refIdx[0] != -1 ? 1 : 0) + (mi.refIdx[1] != -1 ? 2 : 0);
+            tmvpMotionBuf[bufIdx] = mi;
+          }
+          else
+          {
+            mi = centerMi;
+            tmvpMotionBuf[bufIdx].isInter = false;
+          }
+          tmvpBufValid[bufIdx] = true;
+        }
+        mb.subBuf(g_miScaling.scale(Position{ x, y } -pu.lumaPos()), g_miScaling.scale(Size(puWidth, puHeight))).fill(mi);
+      }
+    }
+  }
+  else
+  {
+    MotionBuf &mb = mrgCtx.subPuMvpMiBuf[AMVP_SBTMVP_BUFFER_IDX];
+    for (int y = puPos.y; y < puPos.y + puSize.height; y += puHeight)
+    {
+      for (int x = puPos.x; x < puPos.x + puSize.width; x += puWidth)
+      {
+        Position colPos{ x + xOff, y + yOff };
+        clipColPos(colPos.x, colPos.y, pu);
+        colPos = Position{ PosType(colPos.x & mask), PosType(colPos.y & mask) };
+        const MotionInfo &colMi = pColPic->cs->getMotionInfo(colPos);
+
+        MotionInfo mi;
+
+        if (colMi.isInter && colMi.isIBCmot == false)
+        {
+          mi.isInter = true;
+          mi.sliceIdx = slice.getIndependentSliceIdx();
+          mi.isIBCmot = false;
+          for (unsigned currRefListId = 0; currRefListId < (slice.isInterB() ? 2 : 1); currRefListId++)
+          {
+            RefPicList currRefPicList = RefPicList(currRefListId);
+            refIdx = 0;
+            if (getColocatedMVP(pu, currRefPicList, colPos, cColMv, refIdx, true, pu.colIdx))
+            {
+              mi.refIdx[currRefListId] = refIdx;
+              mi.mv[currRefListId] = cColMv;
+            }
+          }
+          mi.interDir = (mi.refIdx[0] != -1 ? 1 : 0) + (mi.refIdx[1] != -1 ? 2 : 0);
+        }
+        else
+        {
+          mi = centerMi;
+        }
+        mb.subBuf(g_miScaling.scale(Position{ x, y } -pu.lumaPos()), g_miScaling.scale(Size(puWidth, puHeight))).fill(mi);
+      }
+    }
+  }
+}
+#endif
+
 bool PU::getInterMergeSubPuMvpCand(const PredictionUnit &pu, MergeCtx& mrgCtx, bool& LICFlag, const int count
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION && JVET_AF0163_TM_SUBBLOCK_REFINEMENT
   , bool isRefined
@@ -20648,6 +20868,19 @@ void PU::spanMotionInfo( PredictionUnit &pu, const MergeCtx &mrgCtx )
       spanIpmInfoInter(pu, mb, ib);
 #endif
     }
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+    else if (pu.amvpSbTmvpFlag)
+    {
+      CHECK(mrgCtx.subPuMvpMiBuf[AMVP_SBTMVP_BUFFER_IDX].area() == 0 || !mrgCtx.subPuMvpMiBuf[AMVP_SBTMVP_BUFFER_IDX].buf, "Buffer not initialized");
+#if MULTI_PASS_DMVR
+      MotionBuf mb = pu.getMotionBuf();
+#endif
+      mb.copyFrom(mrgCtx.subPuMvpMiBuf[AMVP_SBTMVP_BUFFER_IDX]);
+#if JVET_W0123_TIMD_FUSION
+      spanIpmInfoInter(pu, mb, ib);
+#endif
+    }
+#endif
     else
     {
       mb.fill(mi);
@@ -22907,6 +23140,12 @@ bool PU::useRefCombList(const PredictionUnit &pu)
   {
     return false;
   }
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  if (pu.amvpSbTmvpFlag)
+  {
+    return false;
+  }
+#endif
   if (!pu.mergeFlag && (pu.interDir == 1 || pu.interDir == 2))
   {
     return true;
@@ -23027,7 +23266,11 @@ void CU::saveProCcpInfoInter(CodingUnit &cu, TransformUnit &tu)
       cMv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
       posY.x = tu.Y().x + cMv.getHor();
       posY.y = tu.Y().y + cMv.getVer();
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+      PU::clipColPos(posY.x, posY.y, pu);
+#else
       clipColPos(posY.x, posY.y, pu);
+#endif
 #if RPR_ENABLE
       scalePositionInRef( pu, *pu.cs->pps, refList, refIdx, posY );
 #endif
@@ -23067,7 +23310,11 @@ void CU::saveProCcpInfoInter(CodingUnit &cu, TransformUnit &tu)
     cMv0.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
     posY0.x = tu.Y().x + cMv0.getHor();
     posY0.y = tu.Y().y + cMv0.getVer();
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+    PU::clipColPos(posY0.x, posY0.y, pu);
+#else
     clipColPos(posY0.x, posY0.y, pu);
+#endif
 #if RPR_ENABLE
     scalePositionInRef( pu, *pu.cs->pps, REF_PIC_LIST_0, tempMi.refIdx[0], posY0 );
 #endif
@@ -23090,7 +23337,11 @@ void CU::saveProCcpInfoInter(CodingUnit &cu, TransformUnit &tu)
     cMv1.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
     posY1.x = tu.Y().x + cMv1.getHor();
     posY1.y = tu.Y().y + cMv1.getVer();
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+    PU::clipColPos(posY1.x, posY1.y, pu);
+#else
     clipColPos(posY1.x, posY1.y, pu);
+#endif
 #if RPR_ENABLE
     scalePositionInRef( pu, *pu.cs->pps, REF_PIC_LIST_1, tempMi.refIdx[1], posY1 );
 #endif
@@ -23147,6 +23398,12 @@ void CU::saveProCcpInfoInter(CodingUnit &cu, TransformUnit &tu)
 
 bool CU::hasSubCUNonZeroMVd( const CodingUnit& cu )
 {
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  if (cu.firstPU->amvpSbTmvpFlag)
+  {
+    return (cu.firstPU->amvpSbTmvpMvdIdx == -1) ? false : true;
+  }
+#endif
   bool bNonZeroMvd = false;
 
   for( const auto &pu : CU::traversePUs( cu ) )
@@ -23448,6 +23705,13 @@ bool CU::isBcwIdxCoded( const CodingUnit &cu )
   {
     return false;
   }
+
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  if (cu.firstPU->amvpSbTmvpFlag)
+  {
+    return false;
+  }
+#endif
 
   if( !cu.firstPU->mergeFlag )
   {
@@ -24141,6 +24405,12 @@ bool CU::isLICFlagPresent(const CodingUnit& cu)
   }
 #if JVET_X0083_BM_AMVP_MERGE_MODE && JVET_AD0213_LIC_IMP
   if (cu.firstPU->amvpMergeModeFlag[0] || cu.firstPU->amvpMergeModeFlag[1])
+  {
+    return false;
+  }
+#endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  if (cu.firstPU->amvpSbTmvpFlag)
   {
     return false;
   }

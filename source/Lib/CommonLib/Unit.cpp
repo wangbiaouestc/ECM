@@ -972,6 +972,10 @@ void PredictionUnit::initData()
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   reduceTplSize = false;
 #endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  amvpSbTmvpFlag = false;
+  amvpSbTmvpMvdIdx = -1;
+#endif
 #if JVET_AC0112_IBC_GPM
   ibcGpmFlag = false;
   ibcGpmSplitDir = MAX_UCHAR;
@@ -1164,6 +1168,10 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
 #endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   reduceTplSize = predData.reduceTplSize;
+#endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  amvpSbTmvpFlag = predData.amvpSbTmvpFlag;
+  amvpSbTmvpMvdIdx = predData.amvpSbTmvpMvdIdx;
 #endif
 #if JVET_AC0112_IBC_GPM
   ibcGpmFlag = predData.ibcGpmFlag;
@@ -1358,6 +1366,10 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 #endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   reduceTplSize = other.reduceTplSize;
+#endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  amvpSbTmvpFlag = other.amvpSbTmvpFlag;
+  amvpSbTmvpMvdIdx = other.amvpSbTmvpMvdIdx;
 #endif
 #if JVET_AC0112_IBC_GPM
   ibcGpmFlag = other.ibcGpmFlag;

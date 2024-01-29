@@ -1063,6 +1063,28 @@ const CtxSet ContextSetCfg::SmvdFlag = ContextSetCfg::addCtxSet
     { 5 }
   });
 
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+const CtxSet ContextSetCfg::amvpSbTmvpFlag = ContextSetCfg::addCtxSet
+  ({
+    {  33,  33 },
+    {  25,  49 },
+    {  35,  35 },
+    {   2,   1 },
+    {   2,   1 },
+    {   8,   8 }
+  });
+
+const CtxSet ContextSetCfg::amvpSbTmvpMvdIdx = ContextSetCfg::addCtxSet
+  ({
+    {   4,   4,  59 },
+    {  58,  19,  33 },
+    {  35,  35,  35 },
+    {   3,   2,   3 },
+    {   2,   3,   0 },
+    {   8,   8,   8 }
+  });
+#endif
+
 const CtxSet ContextSetCfg::SaoMergeFlag = ContextSetCfg::addCtxSet
   ({
     { 2 },

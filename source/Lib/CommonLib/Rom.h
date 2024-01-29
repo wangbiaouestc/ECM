@@ -438,5 +438,10 @@ extern int g_ibcMbvdCandOffsets[IBC_MBVD_AD_STEP_NUM];
 extern int g_ibcMbvdStepCandIdxList[IBC_MBVD_AD_NUM >> IBC_MBVD_LOG2_START_STEP];
 extern int g_ibcMbvdNeiOffsets[IBC_MBVD_NEI_NUM * 2];
 #endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+extern const int8_t g_amvpSbTmvp_mvd_dir[2][8];
+extern const int8_t g_amvpSbTmvp_mvd_offset[6];
+extern uint32_t g_picAmvpSbTmvpEnabledArea;
+#endif
 #endif  //__TCOMROM__
 

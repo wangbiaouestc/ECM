@@ -978,7 +978,12 @@ void InterPrediction::xSubPuMC( PredictionUnit& pu, PelUnitBuf& predBuf, const R
 
   bool isAffine = pu.cu->affine;
   subPu.cu->affine = false;
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  subPu.amvpSbTmvpFlag = false;
 
+  if( !pu.amvpSbTmvpFlag || pu.availableBdofRefinedMv != AFFINE_SUBPU_BDOF_NOT_APPLY )
+  {
+#endif
 #if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
   m_subPuMC = true;
   subPu.mmvdEncOptMode = 0;
@@ -1035,13 +1040,21 @@ void InterPrediction::xSubPuMC( PredictionUnit& pu, PelUnitBuf& predBuf, const R
   }
   subPu.bdmvrRefine = false;
   pu.availableBdofRefinedMv = AFFINE_SUBPU_BDOF_NOT_APPLY;
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  if (pu.mergeType != MRG_TYPE_SUBPU_ATMVP && !pu.amvpSbTmvpFlag)
+#else
   if (pu.mergeType != MRG_TYPE_SUBPU_ATMVP)
+#endif
   {
     m_subPuMC = false;
     pu.cu->affine = isAffine;
     return;
   }
 #endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  }
+#endif
+
   // join sub-pus containing the same motion
   bool verMC = puSize.height > puSize.width;
   int  fstStart = (!verMC ? puPos.y : puPos.x);
@@ -1162,7 +1175,11 @@ bool InterPrediction::xGetSubPuGroupArea2D(PredictionUnit& pu, PredictionUnit& s
             incrR = false;
             break;
           }
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+          if (xCheckIdenticalMotionInfo(wwMi, pu.getMotionInfo(incRightDirPos.offset(0, posOffsetY)), pu.amvpSbTmvpFlag ? MRG_TYPE_SUBPU_ATMVP : pu.mergeType) == false)
+#else
           if (xCheckIdenticalMotionInfo(wwMi, pu.getMotionInfo(incRightDirPos.offset(0, posOffsetY)), pu.mergeType) == false)
+#endif
           {
             incrR = false;
             break;
@@ -1189,7 +1206,11 @@ bool InterPrediction::xGetSubPuGroupArea2D(PredictionUnit& pu, PredictionUnit& s
             incrB = false;
             break;
           }
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+          if (xCheckIdenticalMotionInfo(wwMi, pu.getMotionInfo(incBottomDirPos.offset(posOffsetX, 0)), pu.amvpSbTmvpFlag ? MRG_TYPE_SUBPU_ATMVP : pu.mergeType) == false)
+#else
           if (xCheckIdenticalMotionInfo(wwMi, pu.getMotionInfo(incBottomDirPos.offset(posOffsetX, 0)), pu.mergeType) == false)
+#endif
           {
             incrB = false;
             break;
@@ -1213,7 +1234,11 @@ bool InterPrediction::xGetSubPuGroupArea2D(PredictionUnit& pu, PredictionUnit& s
         }
         else
         {
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+          incrBR = xCheckIdenticalMotionInfo(wwMi, pu.getMotionInfo(subPuStartPos.offset(subPuWidth, subPuHeight)), pu.amvpSbTmvpFlag ? MRG_TYPE_SUBPU_ATMVP : pu.mergeType);
+#else
           incrBR = xCheckIdenticalMotionInfo(wwMi, pu.getMotionInfo(subPuStartPos.offset(subPuWidth, subPuHeight)), pu.mergeType);
+#endif
         }
       }
     }
@@ -1270,7 +1295,11 @@ bool InterPrediction::xGetSubPuGroupAreaStartPos(PredictionUnit& pu, Position& s
           continue;
         }
         subPuStartPos = pu.lumaPos().offset(curX, curY);
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+        if (pu.mergeType == MRG_TYPE_SUBPU_ATMVP || pu.amvpSbTmvpFlag)
+#else
         if (pu.mergeType == MRG_TYPE_SUBPU_ATMVP)
+#endif
         {
           const MotionInfo &tmpMi = pu.getMotionInfo(subPuStartPos);
           const WPScalingParam *wp0 = pu.cu->slice->getWpScaling( REF_PIC_LIST_0, tmpMi.refIdx[0] );
@@ -1315,7 +1344,11 @@ bool InterPrediction::xGetSubPuGroupAreaStartPos(PredictionUnit& pu, Position& s
           continue;
         }
         subPuStartPos = pu.lumaPos().offset(curX, curY);
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+        if (pu.mergeType == MRG_TYPE_SUBPU_ATMVP || pu.amvpSbTmvpFlag)
+#else
         if (pu.mergeType == MRG_TYPE_SUBPU_ATMVP)
+#endif
         {
           const MotionInfo &tmpMi = pu.getMotionInfo(subPuStartPos);
           const WPScalingParam *wp0 = pu.cu->slice->getWpScaling( REF_PIC_LIST_0, tmpMi.refIdx[0] );
@@ -6959,7 +6992,11 @@ void InterPrediction::motionCompensation( PredictionUnit &pu, PelUnitBuf &predBu
     else
 #endif
 #if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+      if ((pu.mergeType != MRG_TYPE_DEFAULT_N && pu.mergeType != MRG_TYPE_IBC) || pu.availableBdofRefinedMv == AFFINE_SUBPU_BDOF_APPLY_AND_STORE_MV || pu.availableBdofRefinedMv == AFFINE_SUBPU_BDOF_APPLY_WITHOUT_STORE_MV || pu.amvpSbTmvpFlag)
+#else
       if( (pu.mergeType != MRG_TYPE_DEFAULT_N && pu.mergeType != MRG_TYPE_IBC) || pu.availableBdofRefinedMv == AFFINE_SUBPU_BDOF_APPLY_AND_STORE_MV || pu.availableBdofRefinedMv == AFFINE_SUBPU_BDOF_APPLY_WITHOUT_STORE_MV)
+#endif
 #else
       if( pu.mergeType != MRG_TYPE_DEFAULT_N && pu.mergeType != MRG_TYPE_IBC )
 #endif
@@ -7103,7 +7140,11 @@ void InterPrediction::subBlockOBMC(PredictionUnit  &pu, PelUnitBuf* pDst)
   const uint32_t uiWidthInBlock = uiWidth / uiMinCUW;
 
 #if MULTI_PASS_DMVR
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  const bool bSubMotion = pu.cu->affine || pu.bdmvrRefine || pu.amvpSbTmvpFlag;
+#else
   const bool bSubMotion = pu.cu->affine || pu.bdmvrRefine;
+#endif
 #else
   const bool bSubMotion = pu.cu->affine || PU::checkDMVRCondition(pu);
 #endif
@@ -7140,6 +7181,9 @@ void InterPrediction::subBlockOBMC(PredictionUnit  &pu, PelUnitBuf* pDst)
 #endif
   subPu.mvRefine = false;
   subPu.mmvdMergeFlag = false;
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  subPu.amvpSbTmvpFlag = false;
+#endif
   PelUnitBuf pcYuvPred = pDst == nullptr ? pu.cs->getPredBuf(pu) : *pDst;
 
   PelUnitBuf pcYuvTmpPredL0 = m_tmpObmcBufL0.subBuf(UnitAreaRelative(*pu.cu, pu));

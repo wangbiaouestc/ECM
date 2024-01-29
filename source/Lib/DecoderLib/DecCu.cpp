@@ -2179,7 +2179,11 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
   for( auto &pu : CU::traversePUs( cu ) )
   {
 #if JVET_AC0144_AFFINE_DMVR_REGRESSION
-    if (cu.cs->pcv->isEncoder && !cu.geoFlag && !(!pu.cu->affine && PU::checkBDMVRCondition(pu)) && pu.mergeType != MRG_TYPE_SUBPU_ATMVP)
+    if (cu.cs->pcv->isEncoder && !cu.geoFlag && !(!pu.cu->affine && PU::checkBDMVRCondition(pu)) && pu.mergeType != MRG_TYPE_SUBPU_ATMVP
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+      && !pu.amvpSbTmvpFlag
+#endif
+    )
     {
 #if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
       if (PU::checkDoAffineBdofRefine(pu, m_pcInterPred))
@@ -3817,7 +3821,33 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
           {
             if (pu.interDir & (1 << uiRefListIdx))
             {
+#if JVET_AG0098_AMVP_WITH_SBTMVP 
+              if (pu.amvpSbTmvpFlag)
+              {
+                if (pu.amvpSbTmvpMvdIdx >= 0)
+                {
+                  int tempDir = pu.amvpSbTmvpMvdIdx % AMVP_SBTMVP_NUM_DIR;
+                  int tempOffset = pu.amvpSbTmvpMvdIdx / AMVP_SBTMVP_NUM_DIR;
+                  int mvdDirOffset = ((tempOffset % 2) == 0) ? 0 : AMVP_SBTMVP_NUM_DIR;
+                  if (pu.cu->imv)
+                  {
+                    mvdDirOffset = ((tempOffset % 2) == 1) ? 0 : AMVP_SBTMVP_NUM_DIR;
+                    tempOffset += AMVP_SBTMVP_NUM_OFFSET;
+                  }
+                  int dirX = g_amvpSbTmvp_mvd_dir[0][tempDir + mvdDirOffset];
+                  int dirY = g_amvpSbTmvp_mvd_dir[1][tempDir + mvdDirOffset];
+                  int step = g_amvpSbTmvp_mvd_offset[tempOffset];
+                  pu.mvd[uiRefListIdx].set(dirX * step, dirY * step);
+                  pu.mvd[uiRefListIdx].changeTransPrecAmvr2Internal(IMV_FPEL);
+                }
+              }
+              else
+              {
+                pu.mvd[uiRefListIdx].changeTransPrecAmvr2Internal(pu.cu->imv);
+              }
+#else
               pu.mvd[uiRefListIdx].changeTransPrecAmvr2Internal(pu.cu->imv);
+#endif
             }
           }
         }
@@ -4234,7 +4264,11 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
               }
 #endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+              if (pu.isMvdPredApplicable() && pu.mvd[eRefList].isMvdPredApplicable() && !pu.amvpSbTmvpFlag)
+#else
               if (pu.isMvdPredApplicable() && pu.mvd[eRefList].isMvdPredApplicable())
+#endif
               {
                 if (pu.cu->smvdMode)
                 {
@@ -4314,6 +4348,36 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
 #endif
             }
           }
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+          if (pu.amvpSbTmvpFlag)
+          {
+            if (mrgCtx.subPuMvpMiBuf[AMVP_SBTMVP_BUFFER_IDX].area() == 0 || !mrgCtx.subPuMvpMiBuf[AMVP_SBTMVP_BUFFER_IDX].buf)
+            {
+              Size bufSize = g_miScaling.scale(pu.lumaSize());
+              mrgCtx.subPuMvpMiBuf[AMVP_SBTMVP_BUFFER_IDX] = MotionBuf(m_subPuMiBuf[AMVP_SBTMVP_BUFFER_IDX], bufSize);
+            }
+            PU::getAmvpSbTmvp(pu, mrgCtx, pu.interDir == 1 ? pu.mv[0] : pu.mv[1]);
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+            if (PU::checkDoAffineBdofRefine(pu, m_pcInterPred))
+            {
+              pu.availableBdofRefinedMv = AFFINE_SUBPU_BDOF_APPLY_AND_STORE_MV;
+              m_pcInterPred->setDoAffineSubPuBdof(false);
+              m_pcInterPred->setBdofSubPuMvBuf(m_mvBufDecAffineBDOF);
+              int bioSubPuIdx = 0;
+              const int bioSubPuStrideIncr = BDOF_SUBPU_STRIDE - (int)(pu.lumaSize().width >> BDOF_SUBPU_DIM_LOG2);
+              for (int yy = 0; yy < pu.lumaSize().height; yy += 4)
+              {
+                for (int xx = 0; xx < pu.lumaSize().width; xx += 4)
+                {
+                  m_mvBufDecAffineBDOF[bioSubPuIdx].setZero();
+                  bioSubPuIdx++;
+                }
+                bioSubPuIdx += bioSubPuStrideIncr;
+              }
+            }
+#endif
+          }
+#endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
           if ((pu.amvpMergeModeFlag[0] || pu.amvpMergeModeFlag[1]) && PU::checkBDMVRCondition(pu))
           {

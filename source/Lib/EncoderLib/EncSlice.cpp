@@ -1572,6 +1572,9 @@ void EncSlice::compressSlice( Picture* pcPic, const bool bCompressEntireSlice, c
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT 
   m_CABACEstimator->m_CABACDataStore->updateBufferState( pcSlice );
 #endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  clearAmvpSbTmvpStatArea(pcSlice);
+#endif
 
   m_CABACEstimator->initCtxModels( *pcSlice );
 
@@ -1627,6 +1630,70 @@ void EncSlice::compressSlice( Picture* pcPic, const bool bCompressEntireSlice, c
   }
 #endif
 
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  if (pcSlice->getPicHeader()->getEnableTMVPFlag() && !pcSlice->isIntra())
+  {
+    int minPoc = abs(pcSlice->getRefPic(RefPicList(1 - pcSlice->getColFromL0Flag()), pcSlice->getColRefIdx())->getPOC() - pcSlice->getPOC());
+    if (pcSlice->isInterB() && pcSlice->getCheckLDC())
+    {
+      int min2ndPoc = abs(pcSlice->getRefPic(RefPicList(1 - pcSlice->getColFromL0Flag2nd()), pcSlice->getColRefIdx2nd())->getPOC() - pcSlice->getPOC());
+      minPoc = min(minPoc, min2ndPoc);
+    }
+    if (minPoc > 4)
+    {
+      pcSlice->setAmvpSbTmvpEnabledFlag(false);
+    }
+    else
+    {
+      pcSlice->setAmvpSbTmvpEnabledFlag(true);
+
+      g_picAmvpSbTmvpEnabledArea = 0;
+      uint32_t prevEnabledArea;
+      bool isExist = loadAmvpSbTmvpStatArea(pcSlice->getTLayer(), prevEnabledArea);
+      if (isExist)
+      {
+        int ratio = int(prevEnabledArea * 100.0 / (pcSlice->getPic()->getPicWidthInLumaSamples() * pcSlice->getPic()->getPicHeightInLumaSamples()));
+        if (ratio < 4)
+        {
+          pcSlice->setAmvpSbTmvpNumOffset(1);
+        }
+        else if (ratio < 7)
+        {
+          pcSlice->setAmvpSbTmvpNumOffset(2);
+        }
+        else
+        {
+          pcSlice->setAmvpSbTmvpNumOffset(3);
+        }
+      }
+      else
+      {
+        pcSlice->setAmvpSbTmvpNumOffset(2);
+      }
+      if (pcSlice->isInterB() && pcSlice->getCheckLDC())
+      {
+        if (pcSlice->getRefPic(RefPicList(1 - pcSlice->getColFromL0Flag()), pcSlice->getColRefIdx())->getPOC() == pcSlice->getRefPic(RefPicList(1 - pcSlice->getColFromL0Flag2nd()), pcSlice->getColRefIdx2nd())->getPOC())
+        {
+          pcSlice->setAmvpSbTmvpNumColPic(1);
+        }
+        else
+        {
+          pcSlice->setAmvpSbTmvpNumColPic(2);
+        }
+      }
+      else
+      {
+        pcSlice->setAmvpSbTmvpNumColPic(1);
+      }
+      pcSlice->setAmvpSbTmvpAmvrEnabledFlag(pcSlice->getPic()->getPicWidthInLumaSamples() * pcSlice->getPic()->getPicHeightInLumaSamples() < 3840*2160 ? false : true);
+    }
+  }
+  else
+  {
+    pcSlice->setAmvpSbTmvpEnabledFlag(false);
+  }
+#endif
+
   if ( bWp_explicit )
   {
 
@@ -1663,6 +1730,9 @@ void EncSlice::compressSlice( Picture* pcPic, const bool bCompressEntireSlice, c
     {
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT 
       m_CABACEstimator->m_CABACDataStore->updateBufferState( pcSlice );
+#endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+      clearAmvpSbTmvpStatArea(pcSlice);
 #endif
       m_CABACEstimator->initCtxModels (*pcSlice);
 #if ENABLE_SPLIT_PARALLELISM
@@ -2409,6 +2479,12 @@ void EncSlice::encodeSlice   ( Picture* pcPic, OutputBitstream* pcSubstreams, ui
   if( pcSlice->getPPS()->pcv->sizeInCtus - 1 == pcSlice->getCtuAddrInSlice( pcSlice->getNumCtuInSlice() - 1 ) )
   {
     m_CABACWriter->m_CABACDataStore->storeCtxStates( pcSlice, storedCtx );
+  }
+#endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  if (!pcSlice->isIntra())
+  {
+    storeAmvpSbTmvpStatArea(pcSlice->getTLayer(), g_picAmvpSbTmvpEnabledArea);
   }
 #endif
 }
