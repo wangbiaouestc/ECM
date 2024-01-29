@@ -1450,7 +1450,7 @@ static const int PLT_FAST_RATIO = 100;
 static const int  EPBIN_WEIGHT_FACTOR =                           4;
 #endif
 static const int ENC_PPS_ID_RPR =                                 3;
-#if JVET_AC0096
+#if JVET_AC0096 || JVET_AG0116
 static const int ENC_PPS_ID_RPR2 =                                5;
 static const int ENC_PPS_ID_RPR3 =                                7;
 #endif

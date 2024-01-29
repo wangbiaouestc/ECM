@@ -1012,6 +1012,19 @@ protected:
   double      m_scalingRatioHor3;
   double      m_scalingRatioVer3;
 #endif
+#if JVET_AG0116
+  bool        m_gopBasedRPREnabledFlag;
+  int         m_gopBasedRPRQPThreshold;
+  double      m_psnrThresholdRPR;
+  double      m_psnrThresholdRPR2;
+  double      m_psnrThresholdRPR3;
+  int         m_qpOffsetRPR;
+  int         m_qpOffsetRPR2;
+  int         m_qpOffsetRPR3;
+  int         m_qpOffsetChromaRPR;
+  int         m_qpOffsetChromaRPR2;
+  int         m_qpOffsetChromaRPR3;
+#endif
 #if JVET_AB0082
   int         m_upscaleFilterForDisplay;
 #endif

@@ -1066,6 +1066,19 @@ protected:
   double      m_scalingRatioHor3;
   double      m_scalingRatioVer3;
 #endif
+#if JVET_AG0116
+  bool        m_gopBasedRPREnabledFlag;
+  int         m_gopBasedRPRQPThreshold;
+  double      m_psnrThresholdRPR;
+  double      m_psnrThresholdRPR2;
+  double      m_psnrThresholdRPR3;
+  int         m_qpOffsetRPR;
+  int         m_qpOffsetRPR2;
+  int         m_qpOffsetRPR3;
+  int         m_qpOffsetChromaRPR;
+  int         m_qpOffsetChromaRPR2;
+  int         m_qpOffsetChromaRPR3;
+#endif
   int         m_upscaledOutput;
 #if JVET_AB0082
   int         m_upscaleFilterForDisplay;
@@ -2730,6 +2743,21 @@ public:
                                                                         return res2ppsid[m_rprSwitchingResolutionOrderList[rprSegment]];}
   void        setScalingRatio2(double hor, double ver)                 { m_scalingRatioHor2 = hor, m_scalingRatioVer2 = ver; }
   void        setScalingRatio3(double hor, double ver)                 { m_scalingRatioHor3 = hor, m_scalingRatioVer3 = ver; }
+#endif
+#if JVET_AG0116
+  void        setGOPBasedRPREnabledFlag(bool b)                             { m_gopBasedRPREnabledFlag = b; }
+  bool        getGOPBasedRPREnabledFlag()                             const { return m_gopBasedRPREnabledFlag; }
+  void        setGOPBasedRPRQPThreshold(int qp)                             { m_gopBasedRPRQPThreshold = qp; }
+  int         getGOPBasedRPRQPThreshold()                             const { return m_gopBasedRPRQPThreshold; }
+  void        setPsnrThresholdRPR(double psnr, double psnr2, double psnr3)  { m_psnrThresholdRPR = psnr, m_psnrThresholdRPR2 = psnr2, m_psnrThresholdRPR3 = psnr3; }
+  void        setQpOffsetRPR(int qpOffset, int qpOffset2, int qpOffset3)    { m_qpOffsetRPR = qpOffset, m_qpOffsetRPR2 = qpOffset2, m_qpOffsetRPR3 = qpOffset3; }
+  int         getQpOffsetRPR()                                        const { return m_qpOffsetRPR; }
+  int         getQpOffsetRPR2()                                       const { return m_qpOffsetRPR2; }
+  int         getQpOffsetRPR3()                                       const { return m_qpOffsetRPR3; }
+  void        setQpOffsetChromaRPR(int qpOffsetChroma, int qpOffsetChroma2, int qpOffsetChroma3) { m_qpOffsetChromaRPR = qpOffsetChroma, m_qpOffsetChromaRPR2 = qpOffsetChroma2, m_qpOffsetChromaRPR3 = qpOffsetChroma3; }
+  int         getQpOffsetChromaRPR()                                  const { return m_qpOffsetChromaRPR; }
+  int         getQpOffsetChromaRPR2()                                 const { return m_qpOffsetChromaRPR2; }
+  int         getQpOffsetChromaRPR3()                                 const { return m_qpOffsetChromaRPR3; }
 #endif
   void        setUpscaledOutput( int b )                             { m_upscaledOutput = b; }
   int         getUpscaledOutput()                              const { return m_upscaledOutput; }
