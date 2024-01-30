@@ -5169,19 +5169,42 @@ void CABACReader::merge_data( PredictionUnit& pu )
         pu.ciipFlag = true;
 #if JVET_X0141_CIIP_TIMD_TM && TM_MRG
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
-        tm_merge_flag(pu);
+#if JVET_AG0135_AFFINE_CIIP
+          ciipAffineFlag(pu);
+          if (!pu.ciipAffine)
+          {
+#endif
+            tm_merge_flag(pu);
+#if JVET_AG0135_AFFINE_CIIP
+          }
+          else
+          {
+            pu.cu->affine = true;
+          }
+#endif
+#endif
 #else
         if (pu.cs->slice->getSPS()->getUseCiipTmMrg())
         {
-          RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__MERGE_FLAG, pu.lumaSize()); 
+          RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__MERGE_FLAG, pu.lumaSize());
           pu.tmMergeFlag = (m_BinDecoder.decodeBin(Ctx::CiipTMMergeFlag()));
           DTRACE(g_trace_ctx, D_SYNTAX, "merge_data() ciip_tm_merge_flag=%d\n", pu.tmMergeFlag);
         }
 #endif
-#endif
 #if CIIP_PDPC
         RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__INTRA_PDPC_FLAG, pu.lumaSize()); 
-        pu.ciipPDPC = ( m_BinDecoder.decodeBin( Ctx::CiipFlag( 1 ) ) );
+#if JVET_AG0135_AFFINE_CIIP
+        if (!pu.ciipAffine)
+        {
+#endif
+          pu.ciipPDPC = (m_BinDecoder.decodeBin(Ctx::CiipFlag(1)));
+#if JVET_AG0135_AFFINE_CIIP
+        }
+        else
+        {
+          pu.ciipPDPC = false;
+        }
+#endif
         DTRACE(g_trace_ctx, D_SYNTAX, "merge_data() ciip_pdpc_flag=%d\n", pu.ciipPDPC);
 #endif
       }
@@ -5197,6 +5220,9 @@ void CABACReader::merge_data( PredictionUnit& pu )
       else
       {
         pu.cu->geoFlag = true;
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+        pu.cu->geoBlendFlag = false;
+#endif
 #if JVET_AE0046_BI_GPM
         PU::setGpmDirMode(pu);
 #endif
@@ -5271,8 +5297,40 @@ void CABACReader::merge_idx( PredictionUnit& pu )
     if (pu.cu->geoFlag)
     {
       RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE(STATS__CABAC_BITS__GEO_INDEX, pu.lumaSize());
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+      bool bUseOnlyOneVector1 = pu.cs->slice->isInterP() || pu.cs->sps->getMaxNumGeoCand() == 1;
+      CHECK(bUseOnlyOneVector1, "CABACReader::merge_idx( bUseOnlyOneVector=1 ) failed.");
+
+      pu.cu->geoBlendFlag = false;
+      if ( CU::isGeoBlendAvailable(*pu.cu) )
+      {
+        pu.cu->geoBlendFlag = m_BinDecoder.decodeBin(Ctx::GeoBlendFlag());
+        DTRACE( g_trace_ctx, D_SYNTAX, "geoBlendFlag() geoBlendFlag=%d\n", pu.cu->geoBlendFlag ? 1 : 0 );
+      }
+
+      if ( pu.cu->geoBlendFlag )
+      {
+        if ( m_BinDecoder.decodeBin(Ctx::MergeIdx()) )
+        {
+          const int maxNumGeoCand = pu.cs->sps->getMaxNumGeoBlendCand() - 2;
+          pu.mergeIdx += unary_max_eqprob(maxNumGeoCand) + 1;
+        }
+        DTRACE( g_trace_ctx, D_SYNTAX, "merge_idx() merge_idx=%d\n", pu.mergeIdx );
+
+        pu.geoMergeIdx0 = (uint8_t)pu.mergeIdx;
+        pu.geoMergeIdx1 = (uint8_t)pu.mergeIdx;
+        pu.gpmIntraFlag = false;
+        return;
+      }
+#endif
 #if JVET_AA0058_GPM_ADAPTIVE_BLENDING
       geoAdaptiveBlendingIdx(pu);
+#endif
+#if JVET_AG0164_AFFINE_GPM
+      bool isAffGPMValid = PU::isAffineGPMValid(pu);
+      int  affGPMFlagCtxOffset = 0;
+
+      affGPMFlagCtxOffset = PU::getAffGPMCtxOffset(pu);
 #endif
 #if JVET_W0097_GPM_MMVD_TM
 #if JVET_Y0065_GPM_INTRA
@@ -5285,7 +5343,17 @@ void CABACReader::merge_idx( PredictionUnit& pu )
       {
         geo_mmvd_idx(pu, REF_PIC_LIST_0);
       }
-
+#if JVET_AG0164_AFFINE_GPM
+      else
+      if (isAffGPMValid)
+      {
+        pu.affineGPM[0] = m_BinDecoder.decodeBin(Ctx::AffineFlag(affGPMFlagCtxOffset));
+      }
+      if (pu.geoMMVDFlag0 || pu.affineGPM[0])
+      {
+        isIntra0 = false;
+      }
+#endif
 #if JVET_Y0065_GPM_INTRA
       else
       {
@@ -5300,6 +5368,17 @@ void CABACReader::merge_idx( PredictionUnit& pu )
       {
         geo_mmvd_idx(pu, REF_PIC_LIST_1);
       }
+#if JVET_AG0164_AFFINE_GPM
+      else
+      if (isAffGPMValid)
+      {
+        pu.affineGPM[1] = m_BinDecoder.decodeBin(Ctx::AffineFlag(affGPMFlagCtxOffset));
+      }
+      if (pu.geoMMVDFlag1 || pu.affineGPM[1])
+      {
+        isIntra1 = false;
+      }
+#endif
 #if JVET_Y0065_GPM_INTRA
       else if (!isIntra0)
       {
@@ -5318,6 +5397,13 @@ void CABACReader::merge_idx( PredictionUnit& pu )
       {
 #if JVET_Y0065_GPM_INTRA
         if (isIntra0 || isIntra1)
+        {
+          pu.tmMergeFlag = false;
+        }
+        else
+#endif
+#if JVET_AG0164_AFFINE_GPM
+        if (pu.affineGPM[0] || pu.affineGPM[1])
         {
           pu.tmMergeFlag = false;
         }
@@ -5633,25 +5719,71 @@ void CABACReader::geo_merge_idx(PredictionUnit& pu)
   xReadTruncBinCode(splitDir, GEO_NUM_PARTITION_MODE);
   pu.geoSplitDir = splitDir;
 #endif
+#if JVET_AG0164_AFFINE_GPM
+  int maxNumGeoCand = pu.affineGPM[0] ? pu.cs->sps->getMaxNumGpmAffCand() : pu.cs->sps->getMaxNumGeoCand();
+#else
   const int maxNumGeoCand = pu.cs->sps->getMaxNumGeoCand();
+#endif
   CHECK(maxNumGeoCand < 2, "Incorrect max number of geo candidates");
   CHECK(pu.cu->lheight() > 64 || pu.cu->lwidth() > 64, "Incorrect block size of geo flag");
   int numCandminus2 = maxNumGeoCand - 2;
   pu.mergeIdx = 0;
   int mergeCand0 = 0;
   int mergeCand1 = 0;
+#if JVET_AG0164_AFFINE_GPM
+  CtxSet mrgIdxCtxSet = Ctx::MergeIdx;
+  mrgIdxCtxSet = pu.affineGPM[0]? Ctx::GpmAffMergeIdx: Ctx::GpmMergeIdx;
+  for (; mergeCand0 < numCandminus2 + 1; ++mergeCand0)
+  {
+    if (!m_BinDecoder.decodeBin(mrgIdxCtxSet((mergeCand0 > LAST_MERGE_IDX_CABAC - 1 ? LAST_MERGE_IDX_CABAC - 1 : mergeCand0))))
+    {
+      break;
+    }
+  }
+#else
   if (m_BinDecoder.decodeBin(Ctx::MergeIdx()))
   {
     mergeCand0 += unary_max_eqprob(numCandminus2) + 1;
   }
-  if (numCandminus2 > 0)
+#endif
+
+#if JVET_AG0164_AFFINE_GPM
+  maxNumGeoCand = pu.affineGPM[1] ? pu.cs->sps->getMaxNumGpmAffCand() : pu.cs->sps->getMaxNumGeoCand();
+  numCandminus2 = maxNumGeoCand - 2;
+#endif
+
+  if (numCandminus2 > 0
+#if JVET_AG0164_AFFINE_GPM
+    || (pu.affineGPM[0] != pu.affineGPM[1])
+#endif
+    )
   {
+#if JVET_AG0164_AFFINE_GPM
+    CtxSet mrgIdxCtxSet = Ctx::MergeIdx;
+    mrgIdxCtxSet = pu.affineGPM[1] ? Ctx::GpmAffMergeIdx : Ctx::GpmMergeIdx;
+    for (; mergeCand1 < numCandminus2 + ((pu.affineGPM[0] != pu.affineGPM[1]) ? 1 : 0); ++mergeCand1)
+    {
+      if (!m_BinDecoder.decodeBin(mrgIdxCtxSet((mergeCand1 > LAST_MERGE_IDX_CABAC - 1 ? LAST_MERGE_IDX_CABAC - 1 : mergeCand1))))
+      {
+        break;
+      }
+    }
+#else
     if (m_BinDecoder.decodeBin(Ctx::MergeIdx()))
     {
+#if JVET_AG0164_AFFINE_GPM
+      mergeCand1 += unary_max_eqprob(numCandminus2 - ((pu.affineGPM[0] != pu.affineGPM[1]) ? 0 : 1)) + 1;
+#else
       mergeCand1 += unary_max_eqprob(numCandminus2 - 1) + 1;
+#endif
     }
+#endif
   }
+#if JVET_AG0164_AFFINE_GPM
+  mergeCand1 += ((mergeCand1 >= mergeCand0) && (pu.affineGPM[0] == pu.affineGPM[1]) )? 1 : 0;
+#else
   mergeCand1 += mergeCand1 >= mergeCand0 ? 1 : 0;
+#endif
   pu.geoMergeIdx0 = mergeCand0;
   pu.geoMergeIdx1 = mergeCand1;
   DTRACE(g_trace_ctx, D_SYNTAX, "geo_merge_idx() geo_merge_idx0=%d geo_merge_idx1=%d\n", pu.geoMergeIdx0, pu.geoMergeIdx1);
@@ -5671,7 +5803,11 @@ void CABACReader::geo_merge_idx1(PredictionUnit& pu)
   xReadTruncBinCode(splitDir, GEO_NUM_PARTITION_MODE);
   pu.geoSplitDir = splitDir;
 #endif
+#if JVET_AG0164_AFFINE_GPM
+  int maxNumGeoCand = pu.affineGPM[0] ? pu.cs->sps->getMaxNumGpmAffCand() : pu.cs->sps->getMaxNumGeoCand();
+#else
   const int maxNumGeoCand = pu.cs->sps->getMaxNumGeoCand();
+#endif
 #if JVET_Y0065_GPM_INTRA
   CHECK(maxNumGeoCand < 1, "Incorrect max number of geo candidates");
 #else
@@ -5685,28 +5821,66 @@ void CABACReader::geo_merge_idx1(PredictionUnit& pu)
 #if JVET_Y0065_GPM_INTRA
   if (isIntra0)
   {
+#if JVET_AG0164_AFFINE_GPM
+    mergeCand0 = GEO_MAX_ALL_INTER_UNI_CANDS + unary_max_eqprob(GEO_MAX_NUM_INTRA_CANDS-1);
+#else
     mergeCand0 = GEO_MAX_NUM_UNI_CANDS + unary_max_eqprob(GEO_MAX_NUM_INTRA_CANDS-1);
+#endif
   }
   else if (numCandminus2 >= 0)
   {
 #endif
+#if JVET_AG0164_AFFINE_GPM
+    CtxSet mrgIdxCtxSet = Ctx::MergeIdx;
+    mrgIdxCtxSet = pu.affineGPM[0] ? Ctx::GpmAffMergeIdx : Ctx::GpmMergeIdx;
+    for (; mergeCand0 < numCandminus2 + 1; ++mergeCand0)
+    {
+      if (!m_BinDecoder.decodeBin(mrgIdxCtxSet((mergeCand0 > LAST_MERGE_IDX_CABAC - 1 ? LAST_MERGE_IDX_CABAC - 1 : mergeCand0))))
+      {
+        break;
+      }
+    }
+#else
   if (m_BinDecoder.decodeBin(Ctx::MergeIdx()))
   {
     mergeCand0 += unary_max_eqprob(numCandminus2) + 1;
   }
+#endif
 #if JVET_Y0065_GPM_INTRA
   }
+
+#if JVET_AG0164_AFFINE_GPM
+  maxNumGeoCand = pu.affineGPM[1] ? pu.cs->sps->getMaxNumGpmAffCand() : pu.cs->sps->getMaxNumGeoCand();
+  numCandminus2 = maxNumGeoCand - 2;
+#endif
+
   if (isIntra1)
   {
+#if JVET_AG0164_AFFINE_GPM
+    mergeCand1 = GEO_MAX_ALL_INTER_UNI_CANDS + unary_max_eqprob(GEO_MAX_NUM_INTRA_CANDS - 1);
+#else
     mergeCand1 = GEO_MAX_NUM_UNI_CANDS + unary_max_eqprob(GEO_MAX_NUM_INTRA_CANDS-1);
+#endif
   }
   else if (numCandminus2 >= 0)
   {
 #endif
+#if JVET_AG0164_AFFINE_GPM
+    CtxSet mrgIdxCtxSet = Ctx::MergeIdx;
+    mrgIdxCtxSet = pu.affineGPM[1] ? Ctx::GpmAffMergeIdx : Ctx::GpmMergeIdx;
+    for (; mergeCand1 < numCandminus2 + 1; ++mergeCand1)
+    {
+      if (!m_BinDecoder.decodeBin(mrgIdxCtxSet((mergeCand1 > LAST_MERGE_IDX_CABAC - 1 ? LAST_MERGE_IDX_CABAC - 1 : mergeCand1))))
+      {
+        break;
+      }
+    }
+#else
   if (m_BinDecoder.decodeBin(Ctx::MergeIdx()))
   {
     mergeCand1 += unary_max_eqprob(numCandminus2) + 1;
   }
+#endif
 #if JVET_Y0065_GPM_INTRA
   }
 #endif
@@ -6253,7 +6427,20 @@ void CABACReader::mvp_flag( PredictionUnit& pu, RefPicList eRefList )
   DTRACE( g_trace_ctx, D_SYNTAX, "mvpIdx(refList:%d)=%d\n", eRefList, mvpIdx );
 #endif
 }
-
+#if JVET_AG0135_AFFINE_CIIP
+void CABACReader::ciipAffineFlag(PredictionUnit& pu)
+{
+  if (!pu.cu->slice->isIntra() && pu.cs->sps->getUseCiipAffine() && (pu.cu->slice->getPicHeader()->getMaxNumAffineMergeCand() > 0) && pu.cu->lumaSize().width >= 8 && pu.cu->lumaSize().height >= 8)
+  {
+    unsigned ctxId = DeriveCtx::CtxCiipAffineFlag(*pu.cu);
+    pu.ciipAffine = m_BinDecoder.decodeBin(Ctx::CiipAffineFlag(ctxId));
+  }
+  else
+  {
+    pu.ciipAffine = false;
+  }
+}
+#endif
 void CABACReader::Ciip_flag(PredictionUnit& pu)
 {
   if (!pu.cs->sps->getUseCiip())
@@ -6262,6 +6449,9 @@ void CABACReader::Ciip_flag(PredictionUnit& pu)
 #if CIIP_PDPC
     pu.ciipPDPC = false;
 #endif
+#if JVET_AG0135_AFFINE_CIIP
+    pu.ciipAffine = false;
+#endif
     return;
   }
   if (pu.cu->skip)
@@ -6269,6 +6459,9 @@ void CABACReader::Ciip_flag(PredictionUnit& pu)
     pu.ciipFlag = false;
 #if CIIP_PDPC
     pu.ciipPDPC = false;
+#endif
+#if JVET_AG0135_AFFINE_CIIP
+    pu.ciipAffine = false;
 #endif
     return;
   }
@@ -6282,7 +6475,19 @@ void CABACReader::Ciip_flag(PredictionUnit& pu)
   {
 #if JVET_X0141_CIIP_TIMD_TM && TM_MRG
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
-    tm_merge_flag(pu);
+#if JVET_AG0135_AFFINE_CIIP
+      ciipAffineFlag(pu);
+      if (!pu.ciipAffine)
+      {
+#endif
+        tm_merge_flag(pu);
+#if JVET_AG0135_AFFINE_CIIP
+      }
+      else
+      {
+        pu.cu->affine = true;
+      }
+#endif
 #else
     if (pu.cs->slice->getSPS()->getUseCiipTmMrg())
     {
@@ -6291,7 +6496,18 @@ void CABACReader::Ciip_flag(PredictionUnit& pu)
     }
 #endif
 #endif
-    pu.ciipPDPC = (m_BinDecoder.decodeBin(Ctx::CiipFlag(1)));
+#if JVET_AG0135_AFFINE_CIIP
+    if (!pu.ciipAffine)
+    {
+#endif
+      pu.ciipPDPC = (m_BinDecoder.decodeBin(Ctx::CiipFlag(1)));
+#if JVET_AG0135_AFFINE_CIIP
+    }
+    else
+    {
+      pu.ciipPDPC = false;
+    }
+#endif
     DTRACE(g_trace_ctx, D_SYNTAX, "ciip_flag() ciip_pdpc_flag=%d pos=(%d,%d) size=%dx%d\n", pu.ciipPDPC ? 1 : 0, pu.lumaPos().x, pu.lumaPos().y, pu.lumaSize().width, pu.lumaSize().height);
   }
 #else

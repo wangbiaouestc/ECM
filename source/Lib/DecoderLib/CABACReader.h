@@ -224,6 +224,9 @@ public:
 #endif
   void        mvp_flag                ( PredictionUnit&               pu,     RefPicList      eRefList );
   void        Ciip_flag               ( PredictionUnit&               pu );
+#if JVET_AG0135_AFFINE_CIIP
+  void        ciipAffineFlag          ( PredictionUnit&               pu);
+#endif
   void        smvd_mode               ( PredictionUnit&               pu );
 #if JVET_AG0098_AMVP_WITH_SBTMVP
   void        amvpSbTmvpFlag          ( PredictionUnit&               pu );

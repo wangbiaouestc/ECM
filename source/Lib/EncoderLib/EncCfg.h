@@ -412,6 +412,9 @@ protected:
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
   bool      m_useAffineTM; 
 #endif
+#if JVET_AG0135_AFFINE_CIIP
+  bool      m_useCiipAffine;
+#endif
 #if AFFINE_MMVD
   bool      m_AffineMmvdMode;
 #endif
@@ -891,6 +894,9 @@ protected:
 #endif
   uint32_t      m_maxNumAffineMergeCand;              ///< Maximum number of affine merge candidates
   uint32_t      m_maxNumGeoCand;
+#if JVET_AG0164_AFFINE_GPM
+  uint32_t      m_maxNumGpmAffCand;
+#endif
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
   uint32_t      m_maxNumMHPCand;
 #endif
@@ -1495,6 +1501,10 @@ public:
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
   void      setUseAffineTM( bool b )                         { m_useAffineTM = b; }
   bool      getUseAffineTM()                           const { return  m_useAffineTM; }
+#endif
+#if JVET_AG0135_AFFINE_CIIP
+  void      setUseCIIPAffine(bool b)                         { m_useCiipAffine = b; }
+  bool      getUseCIIPAffine()                         const { return  m_useCiipAffine; }
 #endif
 #if AFFINE_MMVD
   void      setAffineMmvdMode               ( bool b )       { m_AffineMmvdMode = b; }
@@ -2463,6 +2473,10 @@ public:
   uint32_t     getMaxNumAffineMergeCand          ()                  { return m_maxNumAffineMergeCand; }
   void         setMaxNumGeoCand                  ( uint32_t u )      { m_maxNumGeoCand = u;    }
   uint32_t     getMaxNumGeoCand                  ()                  { return m_maxNumGeoCand; }
+#if JVET_AG0164_AFFINE_GPM
+  void         setMaxNumGpmAffCand(uint32_t u)                       { m_maxNumGpmAffCand = u; }
+  uint32_t     getMaxNumGpmAffCand()                                 { return m_maxNumGpmAffCand; }
+#endif
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
   void         setMaxNumMHPCand                  ( uint32_t u )      { m_maxNumMHPCand = u;    }
   uint32_t     getMaxNumMHPCand                  ()                  { return m_maxNumMHPCand; }

@@ -2495,12 +2495,26 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
     pcSPS->setUseCiipTmMrg(false);
   }
 #endif
+#if JVET_AG0135_AFFINE_CIIP
+  if (pcSPS->getUseCiip() && pcSPS->getUseAffine())
+  {
+    READ_FLAG(uiCode, "sps_ciip_affine_flag");  pcSPS->setUseCiipAffine(uiCode != 0);
+  }
+  else
+  {
+    pcSPS->setUseCiipAffine(false);
+  }
+#endif
   if (pcSPS->getMaxNumMergeCand() >= 2)
   {
     READ_FLAG(uiCode, "sps_gpm_enabled_flag");
     pcSPS->setUseGeo(uiCode != 0);
     if (pcSPS->getUseGeo())
     {
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+      READ_FLAG(uiCode, "sps_gpm_blend_flag");
+      pcSPS->setUseGeoBlend(uiCode != 0);
+#endif
       if (pcSPS->getMaxNumMergeCand() >= 3)
       {
         READ_UVLC(uiCode, "max_num_merge_cand_minus_max_num_gpm_cand");
@@ -2512,6 +2526,15 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
       {
         pcSPS->setMaxNumGeoCand(2);
       }
+
+#if JVET_AG0164_AFFINE_GPM
+      if (pcSPS->getUseAffine() && pcSPS->getMaxNumGeoCand() != 0 && pcSPS->getMaxNumAffineMergeCand() >= 3)
+      {
+        READ_UVLC(uiCode, "max_num_aff_merge_cand_minus_max_num_gpm_aff_cand");
+        pcSPS->setMaxNumGpmAffCand((uint32_t)(pcSPS->getMaxNumAffineMergeCand() - uiCode));
+      }
+#endif
+
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_W0097_GPM_MMVD_TM && TM_MRG
       pcSPS->setUseGPMTMMode( false );
       if (pcSPS->getTMToolsEnableFlag())

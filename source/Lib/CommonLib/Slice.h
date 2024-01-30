@@ -1602,6 +1602,9 @@ private:
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   bool              m_useARL;
 #endif
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  bool              m_useGeoBlend;
+#endif
   bool              m_SBT;
   bool              m_ISP;
   ChromaFormat      m_chromaFormatIdc;
@@ -1808,6 +1811,9 @@ private:
 #if JVET_X0141_CIIP_TIMD_TM && TM_MRG
   bool              m_ciipTmMrg;
 #endif
+#if JVET_AG0135_AFFINE_CIIP
+  bool              m_ciipAffine;
+#endif
   bool              m_Geo;
 #if INTER_LIC
   bool              m_licEnabledFlag;
@@ -1873,6 +1879,9 @@ private:
   uint32_t          m_maxNumAffineMergeCand;
   uint32_t          m_maxNumIBCMergeCand;
   uint32_t          m_maxNumGeoCand;
+#if JVET_AG0164_AFFINE_GPM
+  uint32_t          m_maxNumGpmAffCand;
+#endif
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
   uint32_t          m_maxNumMHPCand;
 #endif
@@ -2297,6 +2306,13 @@ void                    setCCALFEnabledFlag( bool b )                           
   void                    setMaxNumIBCMergeCand(uint32_t u) { m_maxNumIBCMergeCand = u; }
   uint32_t                getMaxNumGeoCand() const                                                        { CHECK( m_maxNumGeoCand >= GEO_MAX_NUM_UNI_CANDS, "Number of GEO candidates exceed GEO_MAX_NUM_CANDS" ); return m_maxNumGeoCand; }
   void                    setMaxNumGeoCand(uint32_t u)                                                    { CHECK( m_maxNumGeoCand >= GEO_MAX_NUM_UNI_CANDS, "Number of GEO candidates exceed GEO_MAX_NUM_CANDS" ); m_maxNumGeoCand = u; }
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  uint32_t                getMaxNumGeoBlendCand() const                                                   { return getMaxNumGeoCand(); }
+#endif
+#if JVET_AG0164_AFFINE_GPM
+  uint32_t                getMaxNumGpmAffCand() const                                                     { CHECK(m_maxNumGpmAffCand > GEO_MAX_NUM_UNI_AFF_CANDS, "Number of GPM Affine candidates exceed GEO_MAX_NUM_UNI_AFF_CANDS"); return m_maxNumGpmAffCand; }
+  void                    setMaxNumGpmAffCand(uint32_t u)                                                 { CHECK(m_maxNumGpmAffCand > GEO_MAX_NUM_UNI_AFF_CANDS, "Number of GPM Affine  candidates exceed GEO_MAX_NUM_UNI_AFF_CANDS"); m_maxNumGpmAffCand = u; }
+#endif
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
   uint32_t                getMaxNumMHPCand() const                                                        { CHECK( m_maxNumMHPCand >= GEO_MAX_NUM_UNI_CANDS, "Number of MHP candidates exceed GEO_MAX_NUM_CANDS" ); return m_maxNumMHPCand; }
   void                    setMaxNumMHPCand(uint32_t u)                                                    { CHECK( m_maxNumMHPCand >= GEO_MAX_NUM_UNI_CANDS, "Number of MHP candidates exceed GEO_MAX_NUM_CANDS" ); m_maxNumMHPCand = u; }
@@ -2448,6 +2464,10 @@ void                    setCCALFEnabledFlag( bool b )                           
   void      setUseOBMC         ( bool b )                                        { m_OBMC = b; }
   bool      getUseOBMC         ()                                      const     { return m_OBMC; }
 #endif
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  bool      getUseGeoBlend     ()                                      const     { return m_useGeoBlend; }
+  void      setUseGeoBlend     ( bool b )                                        { m_useGeoBlend = b; }
+#endif
   void      setUseCiip         ( bool b )                                        { m_ciip = b; }
   bool      getUseCiip         ()                                      const     { return m_ciip; }
 #if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
@@ -2476,7 +2496,10 @@ void                    setCCALFEnabledFlag( bool b )                           
   bool      getUseMRL             ()                                      const     { return m_MRL; }
   void      setUseMIP             ( bool b )                                        { m_MIP = b; }
   bool      getUseMIP             ()                                      const     { return m_MIP; }
-
+#if JVET_AG0135_AFFINE_CIIP
+  void      setUseCiipAffine      ( bool b )                                        { m_ciipAffine = b; }
+  bool      getUseCiipAffine      ()                                      const     { return m_ciipAffine; }
+#endif
 #if JVET_W0090_ARMC_TM || JVET_Y0058_IBC_LIST_MODIFY || JVET_Z0075_IBC_HMVP_ENLARGE
   void      setUseAML             ( bool b )                                        { m_AML = b; }
   bool      getUseAML             ()                                      const     { return m_AML; }

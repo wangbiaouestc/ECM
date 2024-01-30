@@ -64,7 +64,6 @@ class Reshape;
 //! \ingroup CommonLib
 //! \{
 
-
 // ====================================================================================================================
 // Class definition
 // ====================================================================================================================
@@ -82,6 +81,84 @@ struct BMSubBlkInfo : Area
   PosType  m_cYInPU; // y coordinate of center relative to PU's top left sample
 };
 #endif
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+class TplMatchingBuffers
+{
+  static const int nbCandMax = GEO_MAX_NUM_UNI_CANDS;
+  std::vector<Pel> m_acYuvRefAMLTemplate[nbCandMax][2];   // [idxCand][0: top, 1: left]  predicted samples
+  bool  m_availRec;
+  bool  m_availPred[nbCandMax];
+  int   m_idxCand[2];  // the current 2 idx candidates of the 2 partitions
+
+public:
+  TplMatchingBuffers()
+  {
+    reset();
+  }
+
+  void reset()
+  {
+    std::memset( m_availPred, false, sizeof(bool) * nbCandMax );
+    m_availRec    = false;
+    m_idxCand[0]  = -1;
+    m_idxCand[1]  = -1;
+  }
+
+  void set( int idx0, int idx1, Size cuSize )
+  {
+    if ( idx0 >= nbCandMax || idx1 >= nbCandMax )
+    {
+      return;
+    }
+
+    m_idxCand[0] = idx0;
+    m_idxCand[1] = idx1;
+    for (int iPart = 0; iPart < 2; iPart++)
+    {
+      int idxCand = m_idxCand[iPart];
+      if ( idxCand < 0 || idxCand >= nbCandMax )
+      {
+        continue;
+      }
+      if ( m_acYuvRefAMLTemplate[idxCand][0].size() < cuSize.width )
+      {
+        m_acYuvRefAMLTemplate[idxCand][0].resize(cuSize.width);
+      }
+      if ( m_acYuvRefAMLTemplate[idxCand][1].size() < cuSize.height )
+      {
+        m_acYuvRefAMLTemplate[idxCand][1].resize(cuSize.height);
+      }
+    }
+  }
+
+  bool getAvailRec() { return m_availRec; }
+  bool getAvailPred( const int iPart )
+  {
+    int idxCand = m_idxCand[iPart];
+    return m_availPred[idxCand];
+  }
+  void  setAvailRec() { m_availRec = true;}
+  void  setAvailPred( const int iPart )
+  {
+    int idxCand = m_idxCand[iPart];
+    m_availPred[idxCand] = true;
+  }
+
+  Pel* getPred( const int iPart, const int iTopLeft, bool checkAvail=true ) 
+  { 
+    int idxCand = m_idxCand[iPart];
+    if ( (checkAvail && !m_availPred[idxCand]) || idxCand == (-1) )
+    {
+      return nullptr;
+    }
+    else
+    {
+      return m_acYuvRefAMLTemplate[idxCand][iTopLeft].data();
+    }
+  }
+};
+#endif
+
 #if JVET_AD0213_LIC_IMP
 class TplMatchingCtrl;
 #endif
@@ -321,6 +398,10 @@ protected:
 #endif
 #if JVET_AC0158_PIXEL_AFFINE_MC
   Mv                   m_pixelAffineMotionBuf[MAX_CU_SIZE][MAX_CU_SIZE];
+#endif
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  std::vector <int16_t> m_bcwBlendBuf;
+  std::vector<Pel>      m_tempPel[2];
 #endif
 
 #if JVET_AD0140_MVD_PREDICTION
@@ -686,16 +767,34 @@ public:
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG
                            , MergeCtx(&geoTmMrgCtx)[GEO_NUM_TM_MV_CAND]
 #endif
+#if JVET_AG0164_AFFINE_GPM
+                           , AffineMergeCtx& affGeoMrgCtx
+#endif
 #if JVET_Y0065_GPM_INTRA
                            , IntraPrediction* pcIntraPred
 #endif
   );
+#endif
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  std::pair<int8_t,int8_t> getGeoBlendCandIndexes( const int idxCand, std::vector<int8_t>& listMergeCand0, std::vector<int8_t>& listMergeCand1, int8_t* nbZscanPairList = 0 );
+  bool    getGeoBlendCand( const CodingUnit& cu, MergeCtx& geoMrgCtx, const int idxCand, GeoBlendInfo& geoBIdst, GeoBlendInfo* geoBlendInfoList=nullptr, int* numGeoBlendInfoList=nullptr );
+  void    motionCompensationGeoBlend( CodingUnit& cu, MergeCtx& geoMrgCtx
+#if JVET_AE0046_BI_GPM
+                              , Mv(&subMvBuf)[MRG_MAX_NUM_CANDS << 1][MAX_NUM_SUBCU_DMVR]
+                              , Mv(&subBdofBuf)[MRG_MAX_NUM_CANDS][BDOF_SUBPU_MAX_NUM]
+#endif
+    );
+
+  TplMatchingBuffers  m_tplBuffers;
 #endif
 
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   void    motionCompensationGeo(CodingUnit &cu, MergeCtx &geoMrgCtx
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG
                               , MergeCtx (&geoTmMrgCtx)[GEO_NUM_TM_MV_CAND]
+#endif
+#if JVET_AG0164_AFFINE_GPM
+                              , AffineMergeCtx &gpmAffMrgCtx
 #endif
 #if JVET_AE0046_BI_GPM
                               , Mv(&subMvBuf)[MRG_MAX_NUM_CANDS << 1][MAX_NUM_SUBCU_DMVR]
@@ -737,6 +836,11 @@ public:
 #if JVET_Y0065_GPM_INTRA
   void    weightedGeoBlkRounded( PredictionUnit &pu, const uint8_t splitDir, int32_t channel, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1);
 #endif
+#endif
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  void    weightedBlendBlk( const PredictionUnit& pu, int32_t channel, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1, WeightBuf& weightBuf, const int log2WeightBase, const bool roundOutputBD);
+  void    weightedBlend( const PredictionUnit& pu, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1, const bool chromaOnly, const bool lumaOnly, const bool roundOutputBD = false);
+  void    weightedAffineBlk( const PredictionUnit& pu, WeightBuf& weightBuf, const int log2WeightBase, AffineBlendingModel& blendModel );
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG
@@ -922,7 +1026,8 @@ public:
 #endif
 #if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
 #if JVET_AA0093_ENHANCED_MMVD_EXTENSION
-  void    getBlkAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft, int8_t posList0 = -1, int8_t posList1 = -1, bool load0 = false, bool load1 = false);
+  void    getBlkAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft,
+    int8_t posList0 = -1, int8_t posList1 = -1, bool load0 = false, bool load1 = false);
 #else
   void    getBlkAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft);
 #endif
@@ -995,6 +1100,14 @@ public:
   void    getAffAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft);
 #endif
 
+#if JVET_AG0164_AFFINE_GPM
+  bool getAffAMLRefTemplateImp(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+                            ,bool isBilinear, AffineMergeCtx affMrgCtx
+#endif
+);
+#endif
+
 #if JVET_AD0140_MVD_PREDICTION
   template <int iAbove1Left2All3 = 3>
   bool    getAffAMLRefTemplateMvdPredUni(PredictionUnit& pu, PelUnitBuf& pcBufPredRefTop, PelUnitBuf& pcBufPredRefLeft,
@@ -1018,6 +1131,10 @@ public:
 #endif
 #if JVET_AF0128_LIC_MERGE_TM
   void adjustMergeCandidatesLicFlag(PredictionUnit& pu, MergeCtx& mrgCtx, const int mergeIdx = -1);
+#endif
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  Distortion  deriveBcwBlending( PredictionUnit& pu, bool bUniDir[2] );
+  Distortion  deriveBcwBlendingBiDir( PredictionUnit& pu, MvField mvfld0[2], MvField mvfld1[2] );
 #endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
   void    adjustMergeCandidatesInOneCandidateGroup(PredictionUnit &pu, MergeCtx& smvpMergeCandCtx, int numRetrievedMergeCand, int mrgCandIdx = -1);
@@ -1071,17 +1188,43 @@ public:
     }
     PelUnitBuf pcBufPredRefTop  = (PelUnitBuf(pu.chromaFormat, PelBuf(bufTop,  pu.lwidth(),          GEO_MODE_SEL_TM_SIZE)));
     PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(bufLeft, GEO_MODE_SEL_TM_SIZE, pu.lheight()        )));
+
+#if JVET_AG0164_AFFINE_GPM
+    if (pu.cu->affine)
+    {
+      CHECK(pu.mergeType == MRG_TYPE_SUBPU_ATMVP, "Invalid merge type");
+      getAffAMLRefTemplateImp(pu, pcBufPredRefTop, pcBufPredRefLeft, false, AffineMergeCtx());
+      return;
+    }
+#endif
     getBlkAMLRefTemplate(pu, pcBufPredRefTop, pcBufPredRefLeft);
   }
 
   template <uint8_t partIdx, bool useDefaultPelBuffer = true>
+
+#if JVET_AG0164_AFFINE_GPM
+  void    fillPartGPMRefTemplate(PredictionUnit &pu, MergeCtx& geoMrgCtx, int candIdx, int geoMmvdIdx = -1, Pel* bufTop = nullptr, Pel* bufLeft = nullptr, const AffineMergeCtx* affGeoMrgCtx = nullptr)
+#else
   void    fillPartGPMRefTemplate(PredictionUnit &pu, MergeCtx& geoMrgCtx, int candIdx, int geoMmvdIdx = -1, Pel* bufTop = nullptr, Pel* bufLeft = nullptr)
+#endif
   {
 #if JVET_Y0065_GPM_INTRA
+#if JVET_AG0164_AFFINE_GPM
+    if (candIdx >= GEO_MAX_ALL_INTER_UNI_CANDS)
+#else
     if (candIdx >= GEO_MAX_NUM_UNI_CANDS)
+#endif
     {
       return;
     }
+#endif
+#if JVET_AG0164_AFFINE_GPM
+    if (pu.affineGPM[partIdx])
+    {
+      CHECK(affGeoMrgCtx == nullptr, "Invalid affine merge ctx!");
+      affGeoMrgCtx->setAffMergeInfo( pu, candIdx, geoMmvdIdx);
+    }
+    else
 #endif
 #if JVET_W0097_GPM_MMVD_TM
     if (geoMmvdIdx >= 0)
@@ -1095,6 +1238,9 @@ public:
     }
     
     fillPartGPMRefTemplate<partIdx, useDefaultPelBuffer>(pu, bufTop, bufLeft);
+#if JVET_AG0164_AFFINE_GPM
+    pu.cu->affine = false;
+#endif
   }
 #endif
 #if INTER_LIC || JVET_AC0112_IBC_LIC

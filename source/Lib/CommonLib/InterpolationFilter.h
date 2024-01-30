@@ -196,6 +196,12 @@ public:
   void weightedGeoBlkRounded(const PredictionUnit &pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, const uint8_t splitDir, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1);
 #endif
 #endif
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  static void xWeightedBlendBlk(const PredictionUnit& pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1, WeightBuf& weightBuf, const int log2WeightBase, const bool roundOutputBD);
+  void weightedBlendBlk(const PredictionUnit& pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1, WeightBuf& weightBuf, const int log2WeightBase, const bool roundOutputBD);
+  static void xWeightAffineBlk(const PredictionUnit& pu, WeightBuf& bufWeight, const int log2WeightBase, AffineBlendingModel& blendModel);
+  void weightAffineBlk(const PredictionUnit& pu, WeightBuf& bufWeight, const int log2WeightBase, AffineBlendingModel& blendModel);
+#endif
 protected:
 #if JVET_J0090_MEMORY_BANDWITH_MEASURE
   static CacheModel* m_cacheModel;
@@ -244,6 +250,10 @@ public:
 #else
   void( *m_weightedGeoBlkRounded )(const PredictionUnit &pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, const uint8_t splitDir, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1);
 #endif
+#endif
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  void ( *m_weightedBlendBlk )(const PredictionUnit& pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1, WeightBuf& weightBuf, const int log2WeightBase, const bool roundOutputBD);
+  void ( *m_weightAffineBlk )(const PredictionUnit& pu, WeightBuf& weightBuf, const int log2WeightBase, AffineBlendingModel& blendModel );
 #endif
 #if JVET_AB0155_SGPM
   void (*m_weightedSgpm)(const PredictionUnit &pu, const uint32_t width, const uint32_t height,

@@ -3737,6 +3737,9 @@ SPS::SPS()
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   , m_useARL(false)
 #endif
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  , m_useGeoBlend(true)
+#endif
 #endif
 , m_SBT                       ( false )
 , m_ISP                       ( false )
@@ -3874,6 +3877,9 @@ SPS::SPS()
 #if JVET_X0141_CIIP_TIMD_TM && TM_MRG
 , m_ciipTmMrg                 ( false )
 #endif
+#if JVET_AG0135_AFFINE_CIIP
+, m_ciipAffine                ( false )
+#endif
 , m_Geo                       ( false )
 #if INTER_LIC
 , m_licEnabledFlag            ( false )
@@ -3916,6 +3922,9 @@ SPS::SPS()
 , m_maxNumAffineMergeCand(AFFINE_MRG_MAX_NUM_CANDS)
 , m_maxNumIBCMergeCand(IBC_MRG_MAX_NUM_CANDS)
 , m_maxNumGeoCand(0)
+#if JVET_AG0164_AFFINE_GPM
+, m_maxNumGpmAffCand(0)
+#endif
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
 , m_maxNumMHPCand(0)
 #endif

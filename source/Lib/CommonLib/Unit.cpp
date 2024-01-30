@@ -267,6 +267,10 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   affineType        = other.affineType;
   colorTransform = other.colorTransform;
   geoFlag           = other.geoFlag;
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  geoBlendFlag      = other.geoBlendFlag;
+  blendModel.copy( other.blendModel );
+#endif
   bdpcmMode         = other.bdpcmMode;
   bdpcmModeChroma   = other.bdpcmModeChroma;
   qp                = other.qp;
@@ -458,6 +462,9 @@ void CodingUnit::initData()
   affineType        = 0;
   colorTransform = false;
   geoFlag           = false;
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  geoBlendFlag      = false;
+#endif
   bdpcmMode         = 0;
   bdpcmModeChroma   = 0;
   qp                = 0;
@@ -1008,11 +1015,24 @@ void PredictionUnit::initData()
     for ( uint32_t j = 0; j < 3; j++ )
     {
       mvAffi[i][j].setZero();
+#if JVET_AG0164_AFFINE_GPM
+      gpmPartmvAffi[0][i][j].setZero();
+      gpmPartmvAffi[1][i][j].setZero();
+#endif
     }
   }
+#if JVET_AG0164_AFFINE_GPM
+  affineGPM[0] = affineGPM[1] = 0;
+  gpmPartRefIdx[0][0]  = gpmPartRefIdx[0][1]  = gpmPartRefIdx[1][0] = gpmPartRefIdx[1][1] = -1;
+  gpmPartAffType[0] = gpmPartAffType[1] = AFFINE_MODEL_NUM;
+#endif
+
   ciipFlag = false;
 #if CIIP_PDPC
   ciipPDPC = false;
+#endif
+#if JVET_AG0135_AFFINE_CIIP
+  ciipAffine = false;
 #endif
 #if JVET_AC0112_IBC_CIIP
   ibcCiipFlag = false;
@@ -1201,8 +1221,25 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
     for ( uint32_t j = 0; j < 3; j++ )
     {
       mvAffi[i][j] = predData.mvAffi[i][j];
+#if JVET_AG0164_AFFINE_GPM
+      gpmPartmvAffi[0][i][j] = predData.gpmPartmvAffi[0][i][j];
+      gpmPartmvAffi[1][i][j] = predData.gpmPartmvAffi[1][i][j];
+#endif
     }
   }
+#if JVET_AG0164_AFFINE_GPM
+  affineGPM[0] = predData.affineGPM[0];
+  affineGPM[1] = predData.affineGPM[1];
+
+  gpmPartRefIdx[0][0]  = predData.gpmPartRefIdx[0][0];
+  gpmPartRefIdx[0][1]  = predData.gpmPartRefIdx[0][1];
+  gpmPartRefIdx[1][0]  = predData.gpmPartRefIdx[1][0];
+  gpmPartRefIdx[1][1]  = predData.gpmPartRefIdx[1][1];
+
+  gpmPartAffType[0] = predData.gpmPartAffType[0];
+  gpmPartAffType[1] = predData.gpmPartAffType[1];
+#endif
+
 #if JVET_AD0140_MVD_PREDICTION
   mvdSuffixInfo = predData.mvdSuffixInfo;
 #endif
@@ -1216,6 +1253,9 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
   ciipFlag = predData.ciipFlag;
 #if CIIP_PDPC
   ciipPDPC = predData.ciipPDPC;
+#endif
+#if JVET_AG0135_AFFINE_CIIP
+  ciipAffine = predData.ciipAffine;
 #endif
 #if JVET_AC0112_IBC_CIIP
   ibcCiipFlag = predData.ibcCiipFlag;
@@ -1399,8 +1439,26 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
     for ( uint32_t j = 0; j < 3; j++ )
     {
       mvAffi[i][j] = other.mvAffi[i][j];
+#if JVET_AG0164_AFFINE_GPM
+      gpmPartmvAffi[0][i][j] = other.gpmPartmvAffi[0][i][j];
+      gpmPartmvAffi[1][i][j] = other.gpmPartmvAffi[1][i][j];
+#endif
     }
   }
+
+#if JVET_AG0164_AFFINE_GPM
+  affineGPM[0] = other.affineGPM[0];
+  affineGPM[1] = other.affineGPM[1];
+
+  gpmPartRefIdx[0][0] = other.gpmPartRefIdx[0][0];
+  gpmPartRefIdx[0][1] = other.gpmPartRefIdx[0][1];
+  gpmPartRefIdx[1][0] = other.gpmPartRefIdx[1][0];
+  gpmPartRefIdx[1][1] = other.gpmPartRefIdx[1][1];
+
+  gpmPartAffType[0] = other.gpmPartAffType[0];
+  gpmPartAffType[1] = other.gpmPartAffType[1];
+#endif
+
 #if JVET_AD0140_MVD_PREDICTION
   mvdSuffixInfo = other.mvdSuffixInfo;
 #endif
@@ -1415,6 +1473,9 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   ciipFlag = other.ciipFlag;
 #if CIIP_PDPC
   ciipPDPC = other.ciipPDPC;
+#endif
+#if JVET_AG0135_AFFINE_CIIP
+  ciipAffine = other.ciipAffine;
 #endif
 #if JVET_AC0112_IBC_CIIP
   ibcCiipFlag = other.ibcCiipFlag;
@@ -1450,9 +1511,54 @@ PredictionUnit& PredictionUnit::operator=( const MotionInfo& mi )
 }
 
 #if JVET_Z0139_HIST_AFF
+#if JVET_AG0164_AFFINE_GPM
+void PredictionUnit::getAffineMotionInfo(AffineMotionInfo affineMiOut[2], int refIdxOut[2], MvField baseMv[2]) const
+#else
 void PredictionUnit::getAffineMotionInfo(AffineMotionInfo affineMiOut[2], int refIdxOut[2]) const
+#endif
 {
+#if JVET_AG0164_AFFINE_GPM
+  baseMv[0] = MvField( Mv(), -1);
+  baseMv[1] = MvField( Mv(), -1);
 
+  if (cu->geoFlag)
+  {
+    CHECK( !affineGPM[0] && !affineGPM[1], "Not GPM-affine");
+    for (int list = 0; list < 2; list++)
+    {
+      refIdxOut[list] = NOT_VALID;
+      affineMiOut[list].oneSetAffineParametersPattern = 0;
+
+      for (int gpmPartIdx = 0; gpmPartIdx < 2; gpmPartIdx++)
+      {
+        if (affineGPM[gpmPartIdx])
+        {
+          CHECK(gpmPartAffType[gpmPartIdx] == AFFINE_MODEL_NUM, "Invalid affine type");
+
+          if (gpmPartRefIdx[gpmPartIdx][list] == -1)
+          {
+            continue;
+          }
+
+          refIdxOut[list] = gpmPartRefIdx[gpmPartIdx][list];
+
+          int affpara[4];
+          PU::deriveAffineParametersFromMVs(*this, gpmPartmvAffi[gpmPartIdx][list], affpara, gpmPartAffType[gpmPartIdx]);
+          PU::storeAffParas(affpara);
+
+          affineMiOut[list].oneSetAffineParameters[0] = (short)(affpara[0]);
+          affineMiOut[list].oneSetAffineParameters[1] = (short)(affpara[1]);
+          affineMiOut[list].oneSetAffineParameters[2] = (short)(affpara[2]);
+          affineMiOut[list].oneSetAffineParameters[3] = (short)(affpara[3]);
+
+          baseMv[list] = MvField(gpmPartmvAffi[gpmPartIdx][list][0], gpmPartRefIdx[gpmPartIdx][list]);
+          break;
+        }
+      }
+    }
+    return;
+  }
+#endif
   for (int list = 0; list < 2; list++)
   {
     RefPicList eRefList = (list == 0) ? REF_PIC_LIST_0 : REF_PIC_LIST_1;
@@ -1473,6 +1579,10 @@ void PredictionUnit::getAffineMotionInfo(AffineMotionInfo affineMiOut[2], int re
     affineMiOut[list].oneSetAffineParameters[1] = (short)(affpara[1]);
     affineMiOut[list].oneSetAffineParameters[2] = (short)(affpara[2]);
     affineMiOut[list].oneSetAffineParameters[3] = (short)(affpara[3]);
+
+#if JVET_AG0164_AFFINE_GPM
+    baseMv[list] = MvField(mvAffi[list][0], refIdxOut[list]);
+#endif
   }
 }
 #endif

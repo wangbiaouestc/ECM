@@ -284,6 +284,10 @@ struct AreaBuf : public Size
 typedef AreaBuf<      Pel>  PelBuf;
 typedef AreaBuf<const Pel> CPelBuf;
 
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+typedef AreaBuf<      int16_t> WeightBuf;
+#endif
+
 #if JVET_Y0141_SIGN_PRED_IMPROVE
 typedef AreaBuf<      unsigned> IdxBuf;
 typedef AreaBuf<const unsigned> CIdxBuf;

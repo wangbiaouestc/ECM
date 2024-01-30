@@ -1972,6 +1972,18 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
     hashBlkHitPerc = (hashBlkHitPerc == -1) ? m_pcCuEncoder->getIbcHashMap().calHashBlkMatchPerc(cs.area.Y()) : hashBlkHitPerc;
     bool isSCC = hashBlkHitPerc >= 20;
     spsTmp->setUseIbcFilter(isSCC);   
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+    if (cs.slice->getPOC() == 0 || cs.slice->getSliceType() == I_SLICE) // ensure sequential and parallel simulation generate same output
+    {
+      spsTmp->setUseGeoBlend(!isSCC);
+    }
+#endif
+#if JVET_AG0164_AFFINE_GPM
+    if (m_pcCuEncoder->getEncCfg()->getMaxNumGpmAffCand() > 0 && isSCC)
+    {
+      spsTmp->setMaxNumGpmAffCand(m_pcCuEncoder->getEncCfg()->getMaxNumGpmAffCand());
+    }
+#endif
   }
 #endif
 #if JVET_AD0188_CCP_MERGE

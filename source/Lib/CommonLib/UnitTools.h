@@ -167,6 +167,9 @@ namespace CU
   void saveProCcpInfoInter            (CodingUnit &cu, TransformUnit &tu);
   bool interCcpMergeSearchAllowed     (const CodingUnit& cu);
 #endif
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  bool isGeoBlendAvailable(const CodingUnit& cu);
+#endif
 }
 // PU tools
 namespace PU
@@ -500,6 +503,9 @@ namespace PU
 #if JVET_Z0139_HIST_AFF
     , int aiNeibeInherited[5]
 #endif
+#if JVET_AG0164_AFFINE_GPM
+    , int checkAffGPM = 0
+#endif
   );
   bool isBipredRestriction            (const PredictionUnit &pu);
 #if JVET_AE0046_BI_GPM
@@ -572,6 +578,9 @@ namespace PU
 #endif
 #if JVET_Z0139_NA_AFF && JVET_W0090_ARMC_TM
                          , bool isZeroCandIdx = false 
+#endif
+#if JVET_AG0164_AFFINE_GPM
+                          , bool noSbTMVP = false
 #endif
   );
 #if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
@@ -662,6 +671,13 @@ namespace PU
   void setGpmDirMode(PredictionUnit& pu);
 #endif
 
+#if JVET_AG0164_AFFINE_GPM
+  void getGeoAffMergeCandidates(PredictionUnit& pu, AffineMergeCtx& gpmAffMrgCtx, InterPrediction* pcInterPred, AffineMergeCtx* affMergeCtx = NULL);
+  bool isAffineGPMValid(const PredictionUnit& pu);
+  bool isAffineGPMSizeValid(const PredictionUnit& pu);
+
+  int  getAffGPMCtxOffset(const PredictionUnit& pu);
+#endif
 #if JVET_W0097_GPM_MMVD_TM
 #if TM_MRG
 #if JVET_AE0046_BI_GPM
@@ -679,12 +695,20 @@ namespace PU
 #else
   void getGeoMergeCandidates          (const PredictionUnit &pu, MergeCtx &GeoMrgCtx);
 #endif
-  void spanGeoMotionInfo              (      PredictionUnit &pu, MergeCtx &geoMrgCtx, const uint8_t splitDir, const uint8_t candIdx0, const uint8_t candIdx1, const uint8_t *intraMPM);
+  void spanGeoMotionInfo              (      PredictionUnit &pu, MergeCtx &GeoMrgCtx, const uint8_t splitDir, const uint8_t candIdx0, const uint8_t candIdx1, const uint8_t* intraMPM
+#if JVET_AG0164_AFFINE_GPM
+    , AffineMergeCtx& geoAffMrgCtx
+#endif
+  );
 #if JVET_W0097_GPM_MMVD_TM
 #if TM_MRG
 #if JVET_AA0058_GPM_ADAPTIVE_BLENDING
 #if JVET_AE0046_BI_GPM
-  void spanGeoMMVDMotionInfo(PredictionUnit& pu, MergeCtx& geoMrgCtx, MergeCtx& geoTmMrgCtx0, MergeCtx& geoTmMrgCtx1, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool tmFlag0, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool tmFlag1, const bool mmvdFlag1, const uint8_t mmvdIdx1, const uint8_t bldIdx, const uint8_t *intraMPM,
+  void spanGeoMMVDMotionInfo(PredictionUnit& pu, MergeCtx& geoMrgCtx 
+#if JVET_AG0164_AFFINE_GPM
+     , AffineMergeCtx& geoAffMrgCtx
+#endif
+    , MergeCtx& geoTmMrgCtx0, MergeCtx& geoTmMrgCtx1, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool tmFlag0, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool tmFlag1, const bool mmvdFlag1, const uint8_t mmvdIdx1, const uint8_t bldIdx,const uint8_t *intraMPM,
     const bool dmvrPart0 = false, const bool dmvrPart1 = false, Mv* bdofSubPuMvOffsetPart0 = nullptr, Mv* bdofSubPuMvOffsetPart1 = nullptr);
 #else
   void spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &geoMrgCtx, MergeCtx &geoTmMrgCtx0, MergeCtx &geoTmMrgCtx1, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool tmFlag0, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool tmFlag1, const bool mmvdFlag1, const uint8_t mmvdIdx1, const uint8_t bldIdx, const uint8_t *intraMPM);
@@ -722,6 +746,9 @@ namespace PU
 #endif
 #if MULTI_PASS_DMVR
 #if JVET_AE0046_BI_GPM
+#if JVET_AG0135_AFFINE_CIIP
+  bool checkBDMVRConditionCIIPAffine(const PredictionUnit& pu, bool disgardGpmFlag = false);
+#endif
   bool checkBDMVRCondition(const PredictionUnit& pu, bool disgardGpmFlag = false);
 #else
   bool checkBDMVRCondition(const PredictionUnit& pu);
@@ -734,6 +761,9 @@ namespace PU
   bool checkTmEnableCondition(const SPS* sps, const PPS* pps, const Picture* refPic);
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+#if JVET_AG0164_AFFINE_GPM
+  bool checkRprRefExistingInGpm(const PredictionUnit& pu, const MergeCtx& geoMrgCtx0, uint8_t candIdx0, const MergeCtx& geoMrgCtx1, uint8_t candIdx1, const AffineMergeCtx& affMergeCtx);
+#endif
   bool checkRprRefExistingInGpm(const PredictionUnit& pu, const MergeCtx& geoMrgCtx0, uint8_t candIdx0, const MergeCtx& geoMrgCtx1, uint8_t candIdx1);
 #endif
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT

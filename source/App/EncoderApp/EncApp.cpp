@@ -828,6 +828,9 @@ void EncApp::xInitLibCfg()
 #if JVET_X0141_CIIP_TIMD_TM && TM_MRG
   m_cEncLib.setUseCIIPTMMode                                     ( m_tmCIIPMode );
 #endif
+#if JVET_AG0135_AFFINE_CIIP
+  m_cEncLib.setUseCIIPAffine                                     ( m_useCiipAffine );
+#endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
   m_cEncLib.setUseTmvpNmvpReordering                             ( m_useTmvpNmvpReorder );
 #endif
@@ -1117,6 +1120,9 @@ void EncApp::xInitLibCfg()
 #endif
   m_cEncLib.setMaxNumAffineMergeCand                             ( m_maxNumAffineMergeCand );
   m_cEncLib.setMaxNumGeoCand                                     ( m_maxNumGeoCand );
+#if JVET_AG0164_AFFINE_GPM
+  m_cEncLib.setMaxNumGpmAffCand                                  ( m_maxNumGpmAffCand );
+#endif
   m_cEncLib.setMaxNumIBCMergeCand                                ( m_maxNumIBCMergeCand );
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
   m_cEncLib.setMaxNumMHPCand                                     ( m_maxNumMHPCand );
