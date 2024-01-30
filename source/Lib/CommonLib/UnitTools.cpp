@@ -6788,6 +6788,173 @@ void PU::getIBCMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const
 #endif
   }
 
+#if JVET_AG0091_ARBVP
+  if (cnt > 0 && cnt < maxNumMergeCand)
+  {
+    MotionInfo miCascaded;
+    int        offsetX = 0;
+    int        offsetY = 0;
+    Mv         cMv;
+    Position posCand[5] = { pu.Y().center(), pu.Y().topLeft(), pu.Y().topRight(), pu.Y().bottomLeft(), pu.Y().bottomRight() };
+#if JVET_AA0070_RRIBC
+    int cPosCurX = pu.lx() + (pu.lwidth() >> 1);
+    int cPosCurY = pu.ly() + (pu.lheight() >> 1);
+    int thW = (pu.lwidth() >> 1) * 3;
+    int thH = (pu.lheight() >> 1) * 3;
+#endif
+    int checkNum = cnt;
+    for (int mergeIndex = 0; mergeIndex < checkNum; mergeIndex++)
+    {
+      cMv = mrgCtx.mvFieldNeighbours[mergeIndex << 1].mv;
+      cMv.changePrecision(MV_PRECISION_SIXTEENTH, MV_PRECISION_INT);
+      offsetX = cMv.getHor();
+      offsetY = cMv.getVer();
+      for (int n = 0; n < 5; n++)
+      {
+        const PredictionUnit* puCascaded = cs.getPURestricted(posCand[n].offset(offsetX, offsetY), pu, pu.chType);
+        bool                  isAvailableCascaded =
+          puCascaded && pu.cu != puCascaded->cu && (CU::isIBC(*puCascaded->cu) || puCascaded->cu->tmpFlag);
+        if (isGt4x4 && isAvailableCascaded)
+        {
+          miCascaded = puCascaded->getMotionInfo(posCand[n].offset(offsetX, offsetY));
+#if JVET_AA0070_RRIBC
+          Position cPos(puCascaded->lx() + (puCascaded->lwidth() >> 1),
+            puCascaded->ly() + (puCascaded->lheight() >> 1));
+          if (pu.mergeFlag || ((abs(cPosCurX - (int)cPos.x) <= thW) && (abs(cPosCurY - (int)cPos.y) <= thH)))
+          {
+            rribcAdjustMotion(pu, &cPos, miCascaded);
+          }
+#endif
+          MotionInfo miCascadedL0 = miCascaded;
+          miCascadedL0.mv[0] += mrgCtx.mvFieldNeighbours[mergeIndex << 1].mv;
+          if ((miCascaded.refIdx[0] != -1) && checkIsIBCCandidateValid(pu, miCascadedL0))
+          {
+            // get Inter Dir
+#if JVET_AE0169_BIPREDICTIVE_IBC
+            mrgCtx.interDirNeighbours[cnt] = 1;
+#else
+            mrgCtx.interDirNeighbours[cnt] = miCascaded.interDir;
+#endif
+            mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miCascadedL0.mv[0], miCascaded.refIdx[0]);
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+            mrgCtx.useAltHpelIf[cnt] = pu.mergeFlag ? false : (pu.cu->imv == IMV_HPEL);
+#endif
+#if JVET_AA0070_RRIBC
+            mrgCtx.rribcFlipTypes[cnt] = 0;
+#endif
+#if JVET_AC0112_IBC_LIC
+#if JVET_AA0070_RRIBC
+            mrgCtx.ibcLicFlags[cnt] =
+              miCascaded.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miCascaded.useIbcLic : false;
+#else
+            mrgCtx.ibcLicFlags[cnt] = miCascaded.isIBCmot ? miCascaded.useIbcLic : false;
+#endif
+            mrgCtx.ibcLicFlags[cnt] |= mrgCtx.ibcLicFlags[mergeIndex];
+#endif
+#if JVET_AE0159_FIBC
+#if JVET_AA0070_RRIBC
+            mrgCtx.ibcFilterFlags[cnt] = miCascaded.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miCascaded.useIbcFilter : false;
+#else
+            mrgCtx.ibcFilterFlags[cnt] = miCascaded.isIBCmot ? miCascaded.useIbcFilter : false;
+#endif
+            mrgCtx.ibcFilterFlags[cnt] |= mrgCtx.ibcFilterFlags[mergeIndex];
+#endif
+#if JVET_Z0084_IBC_TM
+            if (!mrgCtx.xCheckSimilarIBCMotion(cnt, mvdSimilarityThresh))
+#endif
+            {
+              if (mrgCandIdx == cnt)
+              {
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+                mrgCtx.numAMVPMergeCand = cnt;
+#endif
+                return;
+              }
+              cnt++;
+              // early termination
+              if (cnt == maxNumMergeCand)
+              {
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+                mrgCtx.numAMVPMergeCand = cnt;
+#endif
+                return;
+              }
+            }
+          }
+#if JVET_AE0169_BIPREDICTIVE_IBC
+          if (miCascaded.isIBCmot && miCascaded.interDir == 3)
+          {
+            MotionInfo miCascadedL1 = miCascaded;
+            miCascadedL1.mv[0] = miCascadedL1.mv[1];
+            miCascadedL1.refIdx[1] = -1;
+#if JVET_AA0070_RRIBC
+            if (pu.mergeFlag || ((abs(cPosCurX - (int)cPos.x) <= thW) && (abs(cPosCurY - (int)cPos.y) <= thH)))
+            {
+              rribcAdjustMotion(pu, &cPos, miCascadedL1);
+            }
+#endif
+            miCascadedL1.mv[0] += mrgCtx.mvFieldNeighbours[mergeIndex << 1].mv;
+
+            if (checkIsIBCCandidateValid(pu, miCascadedL1))
+            {
+              // get Inter Dir
+              mrgCtx.interDirNeighbours[cnt] = 1;
+              mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(miCascadedL1.mv[0], miCascadedL1.refIdx[0]);
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+              mrgCtx.useAltHpelIf[cnt] = pu.mergeFlag ? false : (pu.cu->imv == IMV_HPEL);
+#endif
+#if JVET_AA0070_RRIBC
+              mrgCtx.rribcFlipTypes[cnt] = 0;
+#endif
+#if JVET_AC0112_IBC_LIC
+#if JVET_AA0070_RRIBC
+              mrgCtx.ibcLicFlags[cnt] =
+                miCascadedL1.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miCascadedL1.useIbcLic : false;
+#else
+              mrgCtx.ibcLicFlags[cnt] = miCascadedL1.isIBCmot ? miCascadedL1.useIbcLic : false;
+#endif
+              mrgCtx.ibcLicFlags[cnt] |= mrgCtx.ibcLicFlags[mergeIndex];
+#endif
+#if JVET_AE0159_FIBC
+#if JVET_AA0070_RRIBC
+              mrgCtx.ibcFilterFlags[cnt] = miCascadedL1.isIBCmot && mrgCtx.rribcFlipTypes[cnt] == 0 ? miCascadedL1.useIbcFilter : false;
+#else
+              mrgCtx.ibcFilterFlags[cnt] = miCascadedL1.isIBCmot ? miCascadedL1.useIbcFilter : false;
+#endif
+              mrgCtx.ibcFilterFlags[cnt] |= mrgCtx.ibcFilterFlags[mergeIndex];
+#endif
+
+#if JVET_Z0084_IBC_TM
+              if (!mrgCtx.xCheckSimilarIBCMotion(cnt, mvdSimilarityThresh))
+#endif
+              {
+                if (mrgCandIdx == cnt)
+                {
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+                  mrgCtx.numAMVPMergeCand = cnt;
+#endif
+                  return;
+                }
+                cnt++;
+
+                // early termination
+                if (cnt == maxNumMergeCand)
+                {
+#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+                  mrgCtx.numAMVPMergeCand = cnt;
+#endif
+                  return;
+                }
+              }
+            }
+          }
+#endif
+        } // if (isGt4x4 && isAvailableCascaded)
+      }
+    } // mergeIndex
+  }
+#endif
+
 #if JVET_Y0058_IBC_LIST_MODIFY
   // pairwise-average candidates
   if (cnt>1 && cnt <maxNumMergeCand)
