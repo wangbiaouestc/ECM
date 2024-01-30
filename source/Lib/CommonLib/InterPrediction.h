@@ -303,6 +303,10 @@ protected:
   int32_t*             m_piDotProduct5;
   int32_t*             m_piDotProduct6;
 #endif
+#if JVET_AG0067_DMVR_EXTENSIONS
+  Pel*                 m_Gx;
+  Pel*                 m_Gy;
+#endif
   bool                 m_subPuMC;
 
   int                  m_ibcBufferWidth;

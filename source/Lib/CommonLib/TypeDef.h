@@ -311,6 +311,7 @@
 #define JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT          1 // JVET-AF0159: Affine subblock BDOF refinement
 #define JVET_AF0057                                       1 // JVET-AF0057: Encoder only. DMVR with robust MV derivation.
 #define JVET_AG0098_AMVP_WITH_SBTMVP                      1 // JVET-AG0098: AMVP with SbTMVP mode
+#define JVET_AG0067_DMVR_EXTENSIONS                       1 // JVET-AG0067: On DMVR Extensions
 
 // Inter template matching tools
 #define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction

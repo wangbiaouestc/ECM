@@ -851,8 +851,15 @@ static const int MAX_TU_LEVEL_CTX_CODED_BIN_CONSTRAINT_CHROMA =    28;
 #if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
 static const int BDOF_SUBPU_DIM_LOG2          =                     2;
 #if JVET_AE0091_ITERATIVE_BDOF
+#if JVET_AG0067_DMVR_EXTENSIONS
+static const int BDOF_SUBPU_AREA_THRESHOLD16  =                   512;
+static const int BDOF_SUBPU_AREA_THRESHOLD0   =                   256;
+static const int BDOF_SUBPU_AREA_THRESHOLD1   =                  2048;
+static const int BDOF_SUBPU_AREA_THRESHOLDAFFINE0   =               0;
+#else
 static const int BDOF_SUBPU_AREA_THRESHOLD0   =                     0;
 static const int BDOF_SUBPU_AREA_THRESHOLD1   =                  1024;
+#endif
 #if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
 static const int BDOF_SUBPU_AREA_THRESHOLD2   =                   256;
 enum AFFINE_SUBPU_BDOF_USAGE
@@ -880,7 +887,11 @@ static const int BIO_EXTEND_SIZE              =                     1;
 static const int BIO_TEMP_BUFFER_SIZE         =                     (MAX_CU_SIZE + 2 * BIO_EXTEND_SIZE) * (MAX_CU_SIZE + 2 * BIO_EXTEND_SIZE);
 
 #if JVET_AE0091_ITERATIVE_BDOF
+#if JVET_AG0067_DMVR_EXTENSIONS
+static const int BDOF_DMVR_MAX_ITER           =                     3;
+#else
 static const int BDOF_DMVR_MAX_ITER           =                     2;
+#endif
 #endif
 static const int PROF_BORDER_EXT_W            =                     1;
 static const int PROF_BORDER_EXT_H            =                     1;
