@@ -364,7 +364,13 @@ struct CodingUnit : public UnitArea
 #endif
   int            timdModeSecondary;
   bool           timdIsBlended;
+#if JVET_AG0092_ENHANCED_TIMD_FUSION
+  int            timdModeNonAng;
+  int8_t         timdFusionWeight[TIMD_FUSION_NUM];
+  int8_t         timdLocDep[TIMD_FUSION_NUM];
+#else
   int8_t         timdFusionWeight[2];
+#endif
 #endif
 #if JVET_AB0155_SGPM
   int            timdHor;

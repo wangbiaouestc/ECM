@@ -340,8 +340,17 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   timdModeSecondaryCheckWA = other.timdModeSecondaryCheckWA;
 #endif
   timdIsBlended     = other.timdIsBlended;
+#if JVET_AG0092_ENHANCED_TIMD_FUSION
+  timdModeNonAng    = other.timdModeNonAng;
+  for( int i = 0; i < TIMD_FUSION_NUM; i++ )
+  {
+    timdFusionWeight[i] = other.timdFusionWeight[i];
+    timdLocDep[i]       = other.timdLocDep[i];
+  }
+#else
   timdFusionWeight[0] = other.timdFusionWeight[0];
   timdFusionWeight[1] = other.timdFusionWeight[1];
+#endif
 #endif
 #if JVET_AB0155_SGPM
   timdHor      = other.timdHor;
@@ -534,8 +543,17 @@ void CodingUnit::initData()
   timdModeSecondary = -1;
 #endif
   timdIsBlended     = false;
+#if JVET_AG0092_ENHANCED_TIMD_FUSION
+  timdModeNonAng    = INVALID_TIMD_IDX;
+  for( int i = 0; i < TIMD_FUSION_NUM; i++ )
+  {
+    timdFusionWeight[i] = -1;
+    timdLocDep[i]       = 0;
+  }
+#else
   timdFusionWeight[0] = -1;
   timdFusionWeight[1] = -1;
+#endif
 #endif
 #if JVET_AB0155_SGPM
   timdHor      = -1;

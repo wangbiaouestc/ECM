@@ -594,6 +594,9 @@ static const int EXT_VDIA_IDX =                                   130;
 static const int INVALID_TIMD_IDX =                                -1;
 static const int NUM_MODES_REMOVED_POSITIVE =                       5;
 #endif
+#if JVET_AG0092_ENHANCED_TIMD_FUSION
+static const int TIMD_FUSION_NUM =                                  3;
+#endif
 #define MAP131TO67( mode )                 (mode<2?mode:((mode>>1)+1))
 #define MAP67TO131( mode )                 (mode<2?mode:((mode<<1)-2))
 #endif
