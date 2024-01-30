@@ -1,4 +1,4 @@
-﻿/* The copyright in this software is being made available under the BSD
+/* The copyright in this software is being made available under the BSD
  * License, included below. This software may be subject to other third party
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
@@ -136,6 +136,10 @@ InterPrediction::InterPrediction()
 , m_piDotProduct3(nullptr)
 , m_piDotProduct5(nullptr)
 , m_piDotProduct6(nullptr)
+#if JVET_AG0067_DMVR_EXTENSIONS
+, m_Gx(nullptr)
+, m_Gy(nullptr)
+#endif
 #endif
 , m_subPuMC(false)
 {
@@ -425,6 +429,10 @@ void InterPrediction::destroy()
   xFree(m_piDotProduct5);    m_piDotProduct5 = nullptr;
   xFree(m_piDotProduct6);    m_piDotProduct6 = nullptr;
 #endif
+#if JVET_AG0067_DMVR_EXTENSIONS
+  xFree(m_Gx);    m_Gx = nullptr;
+  xFree(m_Gy);    m_Gy = nullptr;
+#endif
 #if ENABLE_OBMC
   m_tmpObmcBufL0.destroy();
   m_tmpObmcBufT0.destroy();
@@ -658,6 +666,15 @@ void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, cons
     m_dI = (Pel*)xMalloc(Pel, BIO_TEMP_BUFFER_SIZE);
     m_signGxGy = (Pel*)xMalloc(Pel, BIO_TEMP_BUFFER_SIZE);
 #if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+#if JVET_AG0067_DMVR_EXTENSIONS
+    m_tmpxSample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE << 4);
+    m_tmpySample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE << 4);
+    m_sumAbsGxSample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE << 4);
+    m_sumAbsGySample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE << 4);
+    m_sumDIXSample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE << 4);
+    m_sumDIYSample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE << 4);
+    m_sumSignGyGxSample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE << 4);
+#else
     m_tmpxSample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE << 2);
     m_tmpySample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE << 2);
     m_sumAbsGxSample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE << 2);
@@ -665,6 +682,7 @@ void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, cons
     m_sumDIXSample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE << 2);
     m_sumDIYSample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE << 2);
     m_sumSignGyGxSample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE << 2);
+#endif
 #else
     m_tmpxSample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE);
     m_tmpySample32bit = (int*)xMalloc(int, BDOF_SUBPU_SIZE);
@@ -681,6 +699,10 @@ void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, cons
     m_piDotProduct3 = (int32_t*)xMalloc(int32_t, BIO_TEMP_BUFFER_SIZE);
     m_piDotProduct5 = (int32_t*)xMalloc(int32_t, BIO_TEMP_BUFFER_SIZE);
     m_piDotProduct6 = (int32_t*)xMalloc(int32_t, BIO_TEMP_BUFFER_SIZE);
+#endif
+#if JVET_AG0067_DMVR_EXTENSIONS
+    m_Gx = (Pel*)xMalloc(Pel, BIO_TEMP_BUFFER_SIZE);
+    m_Gy = (Pel*)xMalloc(Pel, BIO_TEMP_BUFFER_SIZE);
 #endif
 #if ENABLE_OBMC
     m_tmpObmcBufL0.create(UnitArea(chromaFormatIDC, Area(0, 0, 4, MAX_CU_SIZE)));
@@ -978,7 +1000,12 @@ void InterPrediction::xSubPuMC( PredictionUnit& pu, PelUnitBuf& predBuf, const R
 
   bool isAffine = pu.cu->affine;
   subPu.cu->affine = false;
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  subPu.amvpSbTmvpFlag = false;
 
+  if( !pu.amvpSbTmvpFlag || pu.availableBdofRefinedMv != AFFINE_SUBPU_BDOF_NOT_APPLY )
+  {
+#endif
 #if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
   m_subPuMC = true;
   subPu.mmvdEncOptMode = 0;
@@ -1035,13 +1062,21 @@ void InterPrediction::xSubPuMC( PredictionUnit& pu, PelUnitBuf& predBuf, const R
   }
   subPu.bdmvrRefine = false;
   pu.availableBdofRefinedMv = AFFINE_SUBPU_BDOF_NOT_APPLY;
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  if (pu.mergeType != MRG_TYPE_SUBPU_ATMVP && !pu.amvpSbTmvpFlag)
+#else
   if (pu.mergeType != MRG_TYPE_SUBPU_ATMVP)
+#endif
   {
     m_subPuMC = false;
     pu.cu->affine = isAffine;
     return;
   }
 #endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  }
+#endif
+
   // join sub-pus containing the same motion
   bool verMC = puSize.height > puSize.width;
   int  fstStart = (!verMC ? puPos.y : puPos.x);
@@ -1162,7 +1197,11 @@ bool InterPrediction::xGetSubPuGroupArea2D(PredictionUnit& pu, PredictionUnit& s
             incrR = false;
             break;
           }
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+          if (xCheckIdenticalMotionInfo(wwMi, pu.getMotionInfo(incRightDirPos.offset(0, posOffsetY)), pu.amvpSbTmvpFlag ? MRG_TYPE_SUBPU_ATMVP : pu.mergeType) == false)
+#else
           if (xCheckIdenticalMotionInfo(wwMi, pu.getMotionInfo(incRightDirPos.offset(0, posOffsetY)), pu.mergeType) == false)
+#endif
           {
             incrR = false;
             break;
@@ -1189,7 +1228,11 @@ bool InterPrediction::xGetSubPuGroupArea2D(PredictionUnit& pu, PredictionUnit& s
             incrB = false;
             break;
           }
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+          if (xCheckIdenticalMotionInfo(wwMi, pu.getMotionInfo(incBottomDirPos.offset(posOffsetX, 0)), pu.amvpSbTmvpFlag ? MRG_TYPE_SUBPU_ATMVP : pu.mergeType) == false)
+#else
           if (xCheckIdenticalMotionInfo(wwMi, pu.getMotionInfo(incBottomDirPos.offset(posOffsetX, 0)), pu.mergeType) == false)
+#endif
           {
             incrB = false;
             break;
@@ -1213,7 +1256,11 @@ bool InterPrediction::xGetSubPuGroupArea2D(PredictionUnit& pu, PredictionUnit& s
         }
         else
         {
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+          incrBR = xCheckIdenticalMotionInfo(wwMi, pu.getMotionInfo(subPuStartPos.offset(subPuWidth, subPuHeight)), pu.amvpSbTmvpFlag ? MRG_TYPE_SUBPU_ATMVP : pu.mergeType);
+#else
           incrBR = xCheckIdenticalMotionInfo(wwMi, pu.getMotionInfo(subPuStartPos.offset(subPuWidth, subPuHeight)), pu.mergeType);
+#endif
         }
       }
     }
@@ -1270,7 +1317,11 @@ bool InterPrediction::xGetSubPuGroupAreaStartPos(PredictionUnit& pu, Position& s
           continue;
         }
         subPuStartPos = pu.lumaPos().offset(curX, curY);
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+        if (pu.mergeType == MRG_TYPE_SUBPU_ATMVP || pu.amvpSbTmvpFlag)
+#else
         if (pu.mergeType == MRG_TYPE_SUBPU_ATMVP)
+#endif
         {
           const MotionInfo &tmpMi = pu.getMotionInfo(subPuStartPos);
           const WPScalingParam *wp0 = pu.cu->slice->getWpScaling( REF_PIC_LIST_0, tmpMi.refIdx[0] );
@@ -1315,7 +1366,11 @@ bool InterPrediction::xGetSubPuGroupAreaStartPos(PredictionUnit& pu, Position& s
           continue;
         }
         subPuStartPos = pu.lumaPos().offset(curX, curY);
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+        if (pu.mergeType == MRG_TYPE_SUBPU_ATMVP || pu.amvpSbTmvpFlag)
+#else
         if (pu.mergeType == MRG_TYPE_SUBPU_ATMVP)
+#endif
         {
           const MotionInfo &tmpMi = pu.getMotionInfo(subPuStartPos);
           const WPScalingParam *wp0 = pu.cu->slice->getWpScaling( REF_PIC_LIST_0, tmpMi.refIdx[0] );
@@ -1595,8 +1650,8 @@ void InterPrediction::xPredInterBiSubPuBDOF(PredictionUnit &pu, PelUnitBuf &pcYu
   int scaleBDOF = 2;
 #if JVET_AE0091_ITERATIVE_BDOF
 #if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
-  int BDOF_SUBPU_AREA_THRE = (m_subPuMC == true) ? BDOF_SUBPU_AREA_THRESHOLD2 : BDOF_SUBPU_AREA_THRESHOLD1;
-  if (pu.lumaSize().width * pu.lumaSize().height < BDOF_SUBPU_AREA_THRE)
+  int bdofSubPuAreaThre = (m_subPuMC == true) ? BDOF_SUBPU_AREA_THRESHOLD2 : BDOF_SUBPU_AREA_THRESHOLD1;
+  if (pu.lumaSize().width * pu.lumaSize().height < bdofSubPuAreaThre)
 #else
   if (pu.lumaSize().width * pu.lumaSize().height < BDOF_SUBPU_AREA_THRESHOLD1)
 #endif
@@ -1854,17 +1909,25 @@ void InterPrediction::xPredInterBiSubPuBDOF(PredictionUnit &pu, PelUnitBuf &pcYu
         }
       }
 #if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+#if JVET_AG0067_DMVR_EXTENSIONS
+      bioSubPuIdx += std::max(1, (bioDx2 >> BDOF_SUBPU_DIM_LOG2));
+#else
       bioSubPuIdx += (bioDx2 >> BDOF_SUBPU_DIM_LOG2);
+#endif
 #else
       bioSubPuIdx += 1;
 #endif
     }
     bioSubPuIdx += bioSubPuStrideIncr;
 #if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+#if JVET_AG0067_DMVR_EXTENSIONS
+    bioSubPuIdx += (std::max (1, bioDy >> BDOF_SUBPU_DIM_LOG2) - 1)  * BDOF_SUBPU_STRIDE;
+#else
     if (bioDy == 8)
     {
       bioSubPuIdx += (scaleBDOF - 1) * BDOF_SUBPU_STRIDE;
     }
+#endif
 #endif
   }
 }
@@ -1874,6 +1937,9 @@ void InterPrediction::xPredInterBiSubPuBDOF(PredictionUnit &pu, PelUnitBuf &pcYu
 void InterPrediction::xPredInterBiBDMVR(PredictionUnit &pu, PelUnitBuf &pcYuvPred, const bool luma, const bool chroma, PelUnitBuf *yuvPredTmp /*= NULL*/)
 {
 #if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+#if JVET_AG0067_DMVR_EXTENSIONS
+  m_skipAffineFirstIterBdof = false;
+#endif
   if (m_subPuMC)
   {
     m_skipAffineFirstIterBdof = (((pu.lumaSize().width % 8) == 4) || ((pu.lumaSize().height % 8) == 4));
@@ -1979,7 +2045,32 @@ void InterPrediction::xPredInterBiBDMVR(PredictionUnit &pu, PelUnitBuf &pcYuvPre
   const bool refIsScaled = isResamplingPossible && ( ( refIdx0 < 0 ? false : pu.cu->slice->getRefPic( REF_PIC_LIST_0, refIdx0 )->isRefScaled( pu.cs->pps ) ) || ( refIdx1 < 0 ? false : pu.cu->slice->getRefPic( REF_PIC_LIST_1, refIdx1 )->isRefScaled( pu.cs->pps ) ) );
   dmvrApplied = dmvrApplied && !refIsScaled;
   bioApplied = bioApplied && !refIsScaled;
-#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+#if JVET_AG0067_DMVR_EXTENSIONS
+  if (!m_subPuMC)
+  {
+    Slice* slice = pu.cu->slice;
+    bool alwCond = pu.ciipFlag && pu.cu->licFlag && (((slice->getPOC() - slice->getRefPOC(REF_PIC_LIST_0, 0)) == 1) && slice->getCheckLDC());
+    bool dontGo =  (pu.cu->bcwIdx != BCW_DEFAULT && (yuvPredTmp || (!pu.ciipFlag || alwCond)));
+    if ( bioApplied && !dontGo && (pu.refIdx[0] >=0) && (pu.refIdx[1]>=0) && ((pu.lwidth() * pu.lheight() < BDOF_SUBPU_AREA_THRESHOLD16) || pu.lwidth() == 4 || pu.lheight() == 4))
+    {
+      m_bdofMvRefined = true;
+      if (!m_lumaBdofReady)
+      {
+        for (int i = 0; i <  pu.lheight() >> BDOF_SUBPU_DIM_LOG2; i++)
+        {
+          for (int j = 0; j < pu.lwidth() >> BDOF_SUBPU_DIM_LOG2; j++)
+          {
+            m_bdofSubPuMvOffset[ i * BDOF_SUBPU_STRIDE + j].setZero();
+            m_bdofSubPuMvOffse2[ i * BDOF_SUBPU_STRIDE + j].setZero();
+          }
+        }
+      }
+      
+      return;
+    }
+  }
+#endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT && !JVET_AG0067_DMVR_EXTENSIONS
   if (bioApplied == true)
   {
     m_skipAffineFirstIterBdof = (pu.bdmvrRefine == true && (((pu.lumaSize().width % 8) == 4) || ((pu.lumaSize().height % 8) == 4)));
@@ -2544,7 +2635,12 @@ void InterPrediction::xPredInterBiBDMVR2(PredictionUnit &pu, PelUnitBuf &pcYuvPr
   // common variable for all subPu
   const bool lumaOnly = (luma && !chroma), chromaOnly = (!luma && chroma);
   int scaleBDOF = 2;
+#if JVET_AG0067_DMVR_EXTENSIONS
+  int bdofSubPuAreaThre = (m_subPuMC == true) ? BDOF_SUBPU_AREA_THRESHOLDAFFINE0 : BDOF_SUBPU_AREA_THRESHOLD0;
+  if (pu.lumaSize().width * pu.lumaSize().height < bdofSubPuAreaThre)
+#else
   if (pu.lumaSize().width * pu.lumaSize().height < BDOF_SUBPU_AREA_THRESHOLD0)
+#endif
   {
     scaleBDOF = 1;
   }
@@ -2552,6 +2648,12 @@ void InterPrediction::xPredInterBiBDMVR2(PredictionUnit &pu, PelUnitBuf &pcYuvPr
   else if (m_subPuMC && ((((pu.lumaSize().width % 8) == 4) && (pu.lumaSize().width != 4)) || (((pu.lumaSize().height % 8) == 4) && (pu.lumaSize().height != 4))))
   {
     scaleBDOF = 1;
+  }
+#endif
+#if JVET_AG0067_DMVR_EXTENSIONS
+  if (iter == 1 && !m_subPuMC)
+  {
+    scaleBDOF = 4;
   }
 #endif
   const int dy = std::min<int>(pu.lumaSize().height, BDOF_SUBPU_DIM * scaleBDOF);
@@ -2603,6 +2705,9 @@ void InterPrediction::xPredInterBiBDMVR2(PredictionUnit &pu, PelUnitBuf &pcYuvPr
 #endif
       while (((x + dx2) <  (puPos.x + pu.lumaSize().width)) &&
              (m_bdofSubPuMvOffset[bioSubPuIdx] == m_bdofSubPuMvOffset[bioSubPuIdx + (dx2 >> BDOF_SUBPU_DIM_LOG2)])
+#if JVET_AG0067_DMVR_EXTENSIONS
+             && (m_bdofSubPuMvOffse2[bioSubPuIdx] == m_bdofSubPuMvOffse2[bioSubPuIdx + (dx2 >> BDOF_SUBPU_DIM_LOG2)])
+#endif
              && ( ((xStart >> DMVR_SUBCU_WIDTH_LOG2) == ((xStart + dx2) >> DMVR_SUBCU_WIDTH_LOG2)) || ((m_bdmvrSubPuMvBuf[0][bdmvrSubPuIdxtemp + (xStart >> DMVR_SUBCU_WIDTH_LOG2)] == m_bdmvrSubPuMvBuf[0][bdmvrSubPuIdxtemp + ((xStart + dx2) >> DMVR_SUBCU_WIDTH_LOG2)]) && (m_bdmvrSubPuMvBuf[1][bdmvrSubPuIdxtemp + (xStart >> DMVR_SUBCU_WIDTH_LOG2)] == m_bdmvrSubPuMvBuf[1][bdmvrSubPuIdxtemp + ((xStart + dx2) >> DMVR_SUBCU_WIDTH_LOG2)])))
              )
       {
@@ -2617,9 +2722,17 @@ void InterPrediction::xPredInterBiBDMVR2(PredictionUnit &pu, PelUnitBuf &pcYuvPr
       Mv bioMv = m_bdofSubPuMvOffset[bioSubPuIdx];
 #endif
 
+#if JVET_AG0067_DMVR_EXTENSIONS
+      if (((iter == BDOF_DMVR_MAX_ITER - 1) || m_subPuMC) && m_bdofSubPuMvOffse2[bioSubPuIdx].hor == 0 && m_bdofSubPuMvOffse2[bioSubPuIdx].ver == 0)
+#else
       if (bioMv.hor == 0 && bioMv.ver == 0)
+#endif
       {
+#if JVET_AG0067_DMVR_EXTENSIONS
+        bioSubPuIdx += std::max(1, (dx2 >> BDOF_SUBPU_DIM_LOG2));
+#else
         bioSubPuIdx += (dx2 >> BDOF_SUBPU_DIM_LOG2);
+#endif
         continue;
       }
 #if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
@@ -2761,13 +2874,21 @@ void InterPrediction::xPredInterBiBDMVR2(PredictionUnit &pu, PelUnitBuf &pcYuvPr
                        slice.getSPS()->getBitDepths(), slice.clpRngs(), bioApplied, lumaOnly, chromaOnly, yuvPredTmp);
 #endif
       
+#if JVET_AG0067_DMVR_EXTENSIONS
+      bioSubPuIdx += std::max(1, (dx2 >> BDOF_SUBPU_DIM_LOG2));
+#else
       bioSubPuIdx += (dx2 >> BDOF_SUBPU_DIM_LOG2); //new
+#endif
     }
     bioSubPuIdx += bioSubPuStrideIncr;
+#if JVET_AG0067_DMVR_EXTENSIONS
+    bioSubPuIdx += (std::max (1, dy >> BDOF_SUBPU_DIM_LOG2) - 1)  * BDOF_SUBPU_STRIDE;
+#else
     if (dy == 8)
     {
       bioSubPuIdx += (scaleBDOF - 1) * BDOF_SUBPU_STRIDE;
     }
+#endif
   }
 }
 #endif
@@ -2878,6 +2999,12 @@ void InterPrediction::xPredInterBi(PredictionUnit &pu, PelUnitBuf &pcYuvPred, co
 #if JVET_AE0091_ITERATIVE_BDOF
     for(int i = 1; i < BDOF_DMVR_MAX_ITER; i++)
     {
+#if JVET_AG0067_DMVR_EXTENSIONS
+      if (m_subPuMC && (i > 1))
+      {
+        continue;
+      }
+#endif
       if (m_bdofMvRefined)
       {
         yuvPredTmp = nullptr;
@@ -5375,11 +5502,20 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
   int scaleBDOFLog2 = 1;
 #if JVET_AE0091_ITERATIVE_BDOF
 #if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
-  int BDOF_SUBPU_AREA_THRE = (iter == 0) ? BDOF_SUBPU_AREA_THRESHOLD0 : ((m_subPuMC == true) ? BDOF_SUBPU_AREA_THRESHOLD2 : BDOF_SUBPU_AREA_THRESHOLD1);
+#if JVET_AG0067_DMVR_EXTENSIONS
+  int iteIdx = 0;
+  if (!m_subPuMC)
+  {
+    iteIdx = 1;
+  }
+  int bdofSubPuAreaThre = (iter == iteIdx) ? ((m_subPuMC == true) ? BDOF_SUBPU_AREA_THRESHOLDAFFINE0 : BDOF_SUBPU_AREA_THRESHOLD0) : ((m_subPuMC == true) ? BDOF_SUBPU_AREA_THRESHOLD2 : BDOF_SUBPU_AREA_THRESHOLD1);
 #else
-  int BDOF_SUBPU_AREA_THRE = (iter == 0) ? BDOF_SUBPU_AREA_THRESHOLD0 : BDOF_SUBPU_AREA_THRESHOLD1;
+  int bdofSubPuAreaThre = (iter == 0) ? BDOF_SUBPU_AREA_THRESHOLD0 : ((m_subPuMC == true) ? BDOF_SUBPU_AREA_THRESHOLD2 : BDOF_SUBPU_AREA_THRESHOLD1);
 #endif
-  if ((isBdofMvRefine && pu.bdmvrRefine && (ww*hh < BDOF_SUBPU_AREA_THRE)) || (!isBdofMvRefine && ((width % 8 == 4) && (width != 4) )))
+#else
+  int bdofSubPuAreaThre = (iter == 0) ? BDOF_SUBPU_AREA_THRESHOLD0 : BDOF_SUBPU_AREA_THRESHOLD1;
+#endif
+  if ((isBdofMvRefine && pu.bdmvrRefine && (ww*hh < bdofSubPuAreaThre)) || (!isBdofMvRefine && ((width % 8 == 4) && (width != 4) )))
 #else
     if ((isBdofMvRefine && pu.bdmvrRefine && (ww*hh < BDOF_SUBPU_AREA_THRESHOLD)) || (!isBdofMvRefine && ((width % 8 == 4) && (width != 4) )))
 #endif
@@ -5392,6 +5528,13 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
   {
     scaleBDOF = 1;
     scaleBDOFLog2 = 0;
+  }
+#endif
+#if JVET_AG0067_DMVR_EXTENSIONS
+  if (iter == 0 && isBdofMvRefine && !m_subPuMC)
+  {
+    scaleBDOF = 4;
+    scaleBDOFLog2 = 2;
   }
 #endif
   const int bioDx = (width < BDOF_SUBPU_DIM*scaleBDOF) ? width : BDOF_SUBPU_DIM*scaleBDOF;
@@ -5415,7 +5558,11 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
     if (pu.bdmvrRefine)
     {
       g_pelBufOP.calcBIOParameterHighPrecision(srcY0, srcY1, gradX0, gradX1, gradY0, gradY1, widthG, heightG, src0Stride, src1Stride, widthG,
-                                               bitDepth, m_piDotProduct1, m_piDotProduct2, m_piDotProduct3, m_piDotProduct5, m_piDotProduct6, m_dI);
+                                               bitDepth, m_piDotProduct1, m_piDotProduct2, m_piDotProduct3, m_piDotProduct5, m_piDotProduct6, m_dI
+#if JVET_AG0067_DMVR_EXTENSIONS
+                                               ,m_Gx, m_Gy
+#endif
+                                               );
     }
     else
     {
@@ -5431,7 +5578,11 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
     int bioSubPuMvIndex = 0;
     const int bioSubPuMvIndexIncrementY = BDOF_SUBPU_STRIDE - std::max(1, (width >> BDOF_SUBPU_DIM_LOG2));
 #if JVET_AE0091_ITERATIVE_BDOF
+#if JVET_AG0067_DMVR_EXTENSIONS
+    const int   bioBlockDistTh = (m_subPuMC || (iter == 2)) ? ((bioDx * bioDy) << (6 - 4)) : ((bioDx * bioDy) << (6 - 4 + ((pu.cu->slice->getPPS()->getPicInitQPMinus26() + 26) >> 5)));
+#else
     const int   bioBlockDistTh = (iter == 0) ? ((bioDx * bioDy) << (6 - 4)) : ((bioDx * bioDy) << (6 - 4));
+#endif
 #else
     const int   bioBlockDistTh = (bioDx * bioDy) << (5 - 4); //4 is to compensate the shift4 of dI in calcBIOParameter
 #endif
@@ -5469,6 +5620,29 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
               }
             }
           }
+#if JVET_AG0067_DMVR_EXTENSIONS
+          if (iter == 0)
+          {
+            for (int i = 0; i < std::max (1, bioDy >> BDOF_SUBPU_DIM_LOG2); i++)
+            {
+              for (int j = 0; j < std::max (1, bioDx >> BDOF_SUBPU_DIM_LOG2); j++)
+              {
+                m_bdofSubPuMvOffset[bdofBlockOffset + bioSubPuMvIndex + i * BDOF_SUBPU_STRIDE + j].setZero();
+                m_bdofSubPuMvOffse2[bdofBlockOffset + bioSubPuMvIndex + i * BDOF_SUBPU_STRIDE + j].setZero();
+              }
+            }
+          }
+          else
+          {
+            for (int i = 0; i < std::max (1, bioDy >> BDOF_SUBPU_DIM_LOG2); i++)
+            {
+              for (int j = 0; j < std::max (1, bioDx >> BDOF_SUBPU_DIM_LOG2); j++)
+              {
+                m_bdofSubPuMvOffse2[bdofBlockOffset + bioSubPuMvIndex + i * BDOF_SUBPU_STRIDE + j].setZero();
+              }
+            }
+          }
+#else
 #if JVET_AE0091_ITERATIVE_BDOF
           if (iter == 0)
           {
@@ -5520,16 +5694,24 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
             }
           }
 #endif
-          if (bioDx == 4)
+#endif
+#if JVET_AG0067_DMVR_EXTENSIONS
+          if ((iter != 0) || !pu.bdmvrRefine || m_subPuMC)
           {
-            g_pelBufOP.addAvg4(srcY0Temp, src0Stride, srcY1Temp, src1Stride, dstY + dstBlockOffset,
-              dstStride, bioDx, bioDy, shiftNum, offset, clpRng, pSubMcMask, width, isOOBTmp);
+#endif
+            if (bioDx == 4)
+            {
+              g_pelBufOP.addAvg4(srcY0Temp, src0Stride, srcY1Temp, src1Stride, dstY + dstBlockOffset,
+                                 dstStride, bioDx, bioDy, shiftNum, offset, clpRng, pSubMcMask, width, isOOBTmp);
+            }
+            else
+            {
+              g_pelBufOP.addAvg8(srcY0Temp, src0Stride, srcY1Temp, src1Stride, dstY + dstBlockOffset,
+                                 dstStride, bioDx, bioDy, shiftNum, offset, clpRng, pSubMcMask, width, isOOBTmp);
+            }
+#if JVET_AG0067_DMVR_EXTENSIONS
           }
-          else
-          {
-            g_pelBufOP.addAvg8(srcY0Temp, src0Stride, srcY1Temp, src1Stride, dstY + dstBlockOffset,
-              dstStride, bioDx, bioDy, shiftNum, offset, clpRng, pSubMcMask, width, isOOBTmp);
-          }
+#endif
 #else
           m_bdofSubPuMvOffset[bdofBlockOffset + bioSubPuMvIndex].setZero();
           if (bioDx == 4)
@@ -5548,15 +5730,42 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
           bioBlockParamOffset += bioDx;
           bioSubPuMvIndex += 1;
 #if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+#if JVET_AG0067_DMVR_EXTENSIONS
+          bioSubPuMvIndex += std::max (1, bioDx >> BDOF_SUBPU_DIM_LOG2) - 1;
+#else
           if (bioDx == 8)
           {
             bioSubPuMvIndex += scaleBDOF - 1;
           }
 #endif
+#endif
           continue;
         }
         if (!pu.bdmvrRefine)
         {
+#if JVET_AG0067_DMVR_EXTENSIONS
+          if (iter == 0)
+          {
+            for (int i = 0; i < std::max (1, bioDy >> BDOF_SUBPU_DIM_LOG2); i++)
+            {
+              for (int j = 0; j < std::max (1, bioDx >> BDOF_SUBPU_DIM_LOG2); j++)
+              {
+                m_bdofSubPuMvOffset[bdofBlockOffset + bioSubPuMvIndex + i * BDOF_SUBPU_STRIDE + j].setZero();
+                m_bdofSubPuMvOffse2[bdofBlockOffset + bioSubPuMvIndex + i * BDOF_SUBPU_STRIDE + j].setZero();
+              }
+            }
+          }
+          else
+          {
+            for (int i = 0; i < std::max (1, bioDy >> BDOF_SUBPU_DIM_LOG2); i++)
+            {
+              for (int j = 0; j < std::max (1, bioDx >> BDOF_SUBPU_DIM_LOG2); j++)
+              {
+                m_bdofSubPuMvOffse2[bdofBlockOffset + bioSubPuMvIndex + i * BDOF_SUBPU_STRIDE + j].setZero();
+              }
+            }
+          }
+#else
 #if JVET_AE0091_ITERATIVE_BDOF
           if (iter == 0)
           {
@@ -5594,6 +5803,7 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
               m_bdofSubPuMvOffse2[bdofBlockOffset + bioSubPuMvIndex + BDOF_SUBPU_STRIDE + 1].setZero();
             }
           }
+#endif
 #endif
           
 #if JVET_Z0136_OOB
@@ -5626,18 +5836,38 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
           bioBlockParamOffset += bioDx;
           bioSubPuMvIndex += 1;
 #if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+#if JVET_AG0067_DMVR_EXTENSIONS
+          bioSubPuMvIndex += std::max (1, bioDx >> BDOF_SUBPU_DIM_LOG2) - 1;
+#else
           if (bioDx == 8)
           {
             bioSubPuMvIndex += scaleBDOF - 1;
           }
 #endif
+#endif
           continue;
         }
 #if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
         int32_t sumS1 = 0, sumS2 = 0,  sumS3 = 0, sumS5 = 0, sumS6 = 0;
-        g_pelBufOP.calcBIOParamSum4HighPrecision(m_piDotProduct1 + bioBlockParamOffset, m_piDotProduct2 + bioBlockParamOffset, m_piDotProduct3 + bioBlockParamOffset, m_piDotProduct5 + bioBlockParamOffset, m_piDotProduct6 + bioBlockParamOffset, bioDx + 4, bioDy + 4, widthG, &sumS1, &sumS2, &sumS3, &sumS5, &sumS6);
-#if JVET_AE0091_ITERATIVE_BDOF 
+#if JVET_AG0067_DMVR_EXTENSIONS
+        if (bioDx == 4)
+          g_pelBufOP.calcBIOParamSum4HighPrecision4(m_piDotProduct1 + bioBlockParamOffset, m_piDotProduct2 + bioBlockParamOffset, m_piDotProduct3 + bioBlockParamOffset, m_piDotProduct5 + bioBlockParamOffset, m_piDotProduct6 + bioBlockParamOffset, bioDx + 4, bioDy + 4, widthG, &sumS1, &sumS2, &sumS3, &sumS5, &sumS6, m_dI + bioBlockParamOffset  ,m_Gx + bioBlockParamOffset, m_Gy + bioBlockParamOffset, pu.cu->geoFlag, m_subPuMC);
+        else if (bioDx == 8)
+          g_pelBufOP.calcBIOParamSum4HighPrecision8(m_piDotProduct1 + bioBlockParamOffset, m_piDotProduct2 + bioBlockParamOffset, m_piDotProduct3 + bioBlockParamOffset, m_piDotProduct5 + bioBlockParamOffset, m_piDotProduct6 + bioBlockParamOffset, bioDx + 4, bioDy + 4, widthG, &sumS1, &sumS2, &sumS3, &sumS5, &sumS6, m_dI + bioBlockParamOffset ,m_Gx + bioBlockParamOffset, m_Gy + bioBlockParamOffset, pu.cu->geoFlag, m_subPuMC);
+        else
+          g_pelBufOP.calcBIOParamSum4HighPrecision16(m_piDotProduct1 + bioBlockParamOffset, m_piDotProduct2 + bioBlockParamOffset, m_piDotProduct3 + bioBlockParamOffset, m_piDotProduct5 + bioBlockParamOffset, m_piDotProduct6 + bioBlockParamOffset, bioDx + 4, bioDy + 4, widthG, &sumS1, &sumS2, &sumS3, &sumS5, &sumS6, m_dI + bioBlockParamOffset   ,m_Gx + bioBlockParamOffset, m_Gy + bioBlockParamOffset, pu.cu->geoFlag, m_subPuMC);
+#else
+        g_pelBufOP.calcBIOParamSum4HighPrecision(m_piDotProduct1 + bioBlockParamOffset, m_piDotProduct2 + bioBlockParamOffset, m_piDotProduct3 + bioBlockParamOffset, m_piDotProduct5 + bioBlockParamOffset, m_piDotProduct6 + bioBlockParamOffset, bioDx + 4, bioDy + 4, widthG, &sumS1, &sumS2, &sumS3, &sumS5, &sumS6
+#if JVET_AG0067_DMVR_EXTENSIONS // m_sub
+                   ,m_dI + bioBlockParamOffset ,m_Gx + bioBlockParamOffset, m_Gy + bioBlockParamOffset, pu.cu->geoFlag, m_subPuMC
+#endif
+                                                 );
+#endif
+#if JVET_AE0091_ITERATIVE_BDOF
         int regVxVy = (1 << 10);
+#if JVET_AG0067_DMVR_EXTENSIONS
+        regVxVy <<= 1;
+#endif
         if (bioDx == 4)
         {
           regVxVy >>= 1;
@@ -5721,6 +5951,37 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
           bioMv.ver = (-1) * ((((-1) * tmpYblock) + 4) >> 3);
         }
 #endif
+#if JVET_AG0067_DMVR_EXTENSIONS
+          if (iter == 0)
+          {
+            bioMv >>= 1;
+            for (int i = 0; i < std::max (1, bioDy >> BDOF_SUBPU_DIM_LOG2); i++)
+            {
+              for (int j = 0; j < std::max (1, bioDx >> BDOF_SUBPU_DIM_LOG2); j++)
+              {
+                m_bdofSubPuMvOffset[bdofBlockOffset + bioSubPuMvIndex + i * BDOF_SUBPU_STRIDE + j] = bioMv;
+                m_bdofSubPuMvOffse2[bdofBlockOffset + bioSubPuMvIndex + i * BDOF_SUBPU_STRIDE + j] = bioMv;
+              }
+            }
+          }
+          else
+          {
+#if JVET_AG0067_DMVR_EXTENSIONS
+            if (iter == 1 && !m_subPuMC)
+            {
+              bioMv >>= 1;
+            }
+#endif
+            for (int i = 0; i < std::max (1, bioDy >> BDOF_SUBPU_DIM_LOG2); i++)
+            {
+              for (int j = 0; j < std::max (1, bioDx >> BDOF_SUBPU_DIM_LOG2); j++)
+              {
+                m_bdofSubPuMvOffset[bdofBlockOffset + bioSubPuMvIndex + i * BDOF_SUBPU_STRIDE + j] += bioMv;
+                m_bdofSubPuMvOffse2[bdofBlockOffset + bioSubPuMvIndex + i * BDOF_SUBPU_STRIDE + j]  = bioMv;
+              }
+            }
+          }
+#else
 #if JVET_AE0091_ITERATIVE_BDOF
         if (iter == 0)
         {
@@ -5775,9 +6036,10 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
           }
         }
 #endif
+#endif
         if (bioMv.hor == 0 && bioMv.ver == 0)
         {
-#if JVET_AE0091_ITERATIVE_BDOF
+#if JVET_AE0091_ITERATIVE_BDOF && !JVET_AG0067_DMVR_EXTENSIONS
 #if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
           if (iter == 0)
           {
@@ -5798,6 +6060,10 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
 #if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
           }
 #endif
+#endif
+#if JVET_AG0067_DMVR_EXTENSIONS
+          if (iter != 0 || m_subPuMC)
+          {
 #endif
           // by doing this, we do not need to do second LUMA MC
 #if JVET_Z0136_OOB
@@ -5834,16 +6100,23 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
           subBlockBiOptFlow(dstY + dstBlockOffset, dstStride, srcY0Temp, src0Stride, srcY1Temp, src1Stride,
                             bioBlockParamOffset, widthG, bioDx, bioDy, clpRng, shiftNum, offset, limit);
 #endif
+#if JVET_AG0067_DMVR_EXTENSIONS
+          }
+#endif
         }
         srcBlockOffset += bioDx;
         dstBlockOffset += bioDx;
         bioBlockParamOffset += bioDx;
         bioSubPuMvIndex += 1;
 #if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+#if JVET_AG0067_DMVR_EXTENSIONS
+        bioSubPuMvIndex += std::max (1, bioDx >> BDOF_SUBPU_DIM_LOG2) - 1;
+#else
         if (bioDx == 8)
         {
           bioSubPuMvIndex += scaleBDOF - 1;
         }
+#endif
 #endif
       }
       srcBlockOffset += srcBlockOffsetIncrementY;
@@ -5851,10 +6124,14 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
       bioBlockParamOffset += bioBlockParamOffsetIncrementY;
       bioSubPuMvIndex += bioSubPuMvIndexIncrementY;
 #if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+#if JVET_AG0067_DMVR_EXTENSIONS
+      bioSubPuMvIndex += (std::max (1, bioDy >> BDOF_SUBPU_DIM_LOG2) - 1)  * BDOF_SUBPU_STRIDE;
+#else
       if (bioDy == 8)
       {
         bioSubPuMvIndex += (scaleBDOF - 1) * BDOF_SUBPU_STRIDE;
       }
+#endif
 #endif
     }
     return;
@@ -6959,7 +7236,11 @@ void InterPrediction::motionCompensation( PredictionUnit &pu, PelUnitBuf &predBu
     else
 #endif
 #if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+      if ((pu.mergeType != MRG_TYPE_DEFAULT_N && pu.mergeType != MRG_TYPE_IBC) || pu.availableBdofRefinedMv == AFFINE_SUBPU_BDOF_APPLY_AND_STORE_MV || pu.availableBdofRefinedMv == AFFINE_SUBPU_BDOF_APPLY_WITHOUT_STORE_MV || pu.amvpSbTmvpFlag)
+#else
       if( (pu.mergeType != MRG_TYPE_DEFAULT_N && pu.mergeType != MRG_TYPE_IBC) || pu.availableBdofRefinedMv == AFFINE_SUBPU_BDOF_APPLY_AND_STORE_MV || pu.availableBdofRefinedMv == AFFINE_SUBPU_BDOF_APPLY_WITHOUT_STORE_MV)
+#endif
 #else
       if( pu.mergeType != MRG_TYPE_DEFAULT_N && pu.mergeType != MRG_TYPE_IBC )
 #endif
@@ -7103,7 +7384,11 @@ void InterPrediction::subBlockOBMC(PredictionUnit  &pu, PelUnitBuf* pDst)
   const uint32_t uiWidthInBlock = uiWidth / uiMinCUW;
 
 #if MULTI_PASS_DMVR
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  const bool bSubMotion = pu.cu->affine || pu.bdmvrRefine || pu.amvpSbTmvpFlag;
+#else
   const bool bSubMotion = pu.cu->affine || pu.bdmvrRefine;
+#endif
 #else
   const bool bSubMotion = pu.cu->affine || PU::checkDMVRCondition(pu);
 #endif
@@ -7140,6 +7425,9 @@ void InterPrediction::subBlockOBMC(PredictionUnit  &pu, PelUnitBuf* pDst)
 #endif
   subPu.mvRefine = false;
   subPu.mmvdMergeFlag = false;
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  subPu.amvpSbTmvpFlag = false;
+#endif
   PelUnitBuf pcYuvPred = pDst == nullptr ? pu.cs->getPredBuf(pu) : *pDst;
 
   PelUnitBuf pcYuvTmpPredL0 = m_tmpObmcBufL0.subBuf(UnitAreaRelative(*pu.cu, pu));
@@ -20001,7 +20289,7 @@ void InterPrediction::processBDMVRSubPU(PredictionUnit& pu, bool subPURefine)
         mvFinal[0] = mvInitial[0] + mvOffset;
         mvFinal[1] = mvInitial[1] - mvOffset;
       }
-
+      
       m_bdmvrSubPuMvBuf[REF_PIC_LIST_0][subPuIdx] = mvFinal[0];
       m_bdmvrSubPuMvBuf[REF_PIC_LIST_1][subPuIdx] = mvFinal[1];
 
@@ -21766,6 +22054,24 @@ bool InterPrediction::processBDMVR(PredictionUnit& pu)
   CHECK( !pu.mergeFlag, "Merge mode must be used here" );
   CHECK( pu.refIdx[0] < 0 || pu.refIdx[1] < 0, "Bilateral DMVR is performed for bi-prediction" );
 
+#if JVET_AG0067_DMVR_EXTENSIONS
+    const int poc0 = pu.cu->slice->getRefPOC(REF_PIC_LIST_0, pu.refIdx[0]);
+    const int poc1 = pu.cu->slice->getRefPOC(REF_PIC_LIST_1, pu.refIdx[1]);
+    const int poc = pu.cu->slice->getPOC();
+    int scale0 = 256;
+    int scale1 = 256;
+    if (pu.bmDir == 0)
+    {
+      if (abs(poc1 - poc) > abs(poc0 - poc))
+      {
+        scale0 = (abs(poc0 - poc) << 8 ) / abs(poc1 - poc);
+      }
+      else if (abs(poc1 - poc) < abs(poc0 - poc))
+      {
+        scale1 = (abs(poc1 - poc) << 8 ) / abs(poc0 - poc);
+      }
+    }
+#endif
   const int lumaArea = pu.lumaSize().area();
   bool subPURefine = true;
   Mv puOrgMv[2] = { pu.mv[0], pu.mv[1] };
@@ -21811,8 +22117,13 @@ bool InterPrediction::processBDMVR(PredictionUnit& pu)
 #endif
 
     subPURefine = minCost >= lumaArea;
+#if JVET_AG0067_DMVR_EXTENSIONS
+    pu.mv[REF_PIC_LIST_0] = (mvFinal_PU[0] - puOrgMv[0]).scaleMv(scale0) + puOrgMv[0];
+    pu.mv[REF_PIC_LIST_1] = (mvFinal_PU[1] - puOrgMv[1]).scaleMv(scale1) + puOrgMv[1];
+#else
     pu.mv[REF_PIC_LIST_0] = mvFinal_PU[0];
     pu.mv[REF_PIC_LIST_1] = mvFinal_PU[1];
+#endif
   }
 
 #if TM_MRG
@@ -22054,8 +22365,13 @@ bool InterPrediction::processBDMVR(PredictionUnit& pu)
       minCost = xBDMVRMvSquareSearch( mvFinal, minCost, subPu, mvInitial, 2, MV_FRACTIONAL_BITS_INTERNAL - 1, false,  true);
 #endif
 
+#if JVET_AG0067_DMVR_EXTENSIONS
+      m_bdmvrSubPuMvBuf[REF_PIC_LIST_0][subPuIdx] = (mvFinal[0] - mvInitial[0]).scaleMv(scale0) + mvInitial[0];
+      m_bdmvrSubPuMvBuf[REF_PIC_LIST_1][subPuIdx] = (mvFinal[1] - mvInitial[1]).scaleMv(scale1) + mvInitial[1];
+#else
       m_bdmvrSubPuMvBuf[REF_PIC_LIST_0][subPuIdx] = mvFinal[0];
       m_bdmvrSubPuMvBuf[REF_PIC_LIST_1][subPuIdx] = mvFinal[1];
+#endif
 
 #if JVET_AF0057
       if (xDmvrGetEncoderCheckFlag())

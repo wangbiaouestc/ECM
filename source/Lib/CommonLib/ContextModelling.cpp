@@ -83,6 +83,7 @@ CoeffCodingContext::CoeffCodingContext( const TransformUnit& tu, ComponentID com
   , m_sigGroupCtxId             (-1)
   , m_tmplCpSum1                (-1)
   , m_tmplCpDiag                (-1)
+
 #if TCQ_8STATES
 #if JVET_AE0102_LFNST_CTX
   , m_sigFlagCtxSet             { (tu.cu->lfnstIdx == 0) ? Ctx::SigFlag[m_chType]     : Ctx::SigFlagL[m_chType],
@@ -97,7 +98,17 @@ CoeffCodingContext::CoeffCodingContext( const TransformUnit& tu, ComponentID com
 #endif
 #if JVET_AE0102_LFNST_CTX
   , m_parFlagCtxSet             { (tu.cu->lfnstIdx == 0) ? Ctx::ParFlag[m_chType] : Ctx::ParFlagL[m_chType] }
+#if JVET_AG0100_TRANSFORM_COEFFICIENT_CODING
+  , m_gtxFlagCtxSet
+{ 
+  (tu.cu->lfnstIdx == 0) ? Ctx::GtxFlag[m_chType] : Ctx::GtxFlagL[m_chType] , 
+  (tu.cu->lfnstIdx == 0) ? Ctx::GtxFlag[m_chType + 2] : Ctx::GtxFlagL[m_chType + 2],
+  (tu.cu->lfnstIdx == 0) ? Ctx::GtxFlag[m_chType + 4] : Ctx::GtxFlagL[m_chType + 4],
+  (tu.cu->lfnstIdx == 0) ? Ctx::GtxFlag[m_chType + 6] : Ctx::GtxFlagL[m_chType + 6],
+}
+#else
   , m_gtxFlagCtxSet             { (tu.cu->lfnstIdx == 0) ? Ctx::GtxFlag[m_chType] : Ctx::GtxFlagL[m_chType] , (tu.cu->lfnstIdx == 0) ? Ctx::GtxFlag[m_chType + 2] : Ctx::GtxFlagL[m_chType + 2] }
+#endif
 #else
   , m_parFlagCtxSet             ( Ctx::ParFlag[m_chType] )
   , m_gtxFlagCtxSet             { Ctx::GtxFlag[m_chType], Ctx::GtxFlag[m_chType+2] }
@@ -108,7 +119,58 @@ CoeffCodingContext::CoeffCodingContext( const TransformUnit& tu, ComponentID com
   , m_tsGtxFlagCtxSet           ( Ctx::TsGtxFlag )
   , m_tsLrg1FlagCtxSet          (Ctx::TsLrg1Flag)
   , m_tsSignFlagCtxSet          (Ctx::TsResidualSign)
-  , m_sigCoeffGroupFlag         ()
+
+#if JVET_AG0143_INTER_INTRA
+#if TCQ_8STATES
+#if JVET_AE0102_LFNST_CTX
+  , m_sigFlagCtxSetSwitch{
+      (tu.cu->lfnstIdx == 0) ? Ctx::SigFlagCtxSetSwitch[m_chType] : Ctx::SigFlagL[m_chType],
+      (tu.cu->lfnstIdx == 0) ? Ctx::SigFlagCtxSetSwitch[m_chType + 2] : Ctx::SigFlagL[m_chType + 2],
+      (tu.cu->lfnstIdx == 0) ? Ctx::SigFlagCtxSetSwitch[m_chType] : Ctx::SigFlagL[m_chType],
+      (tu.cu->lfnstIdx == 0) ? Ctx::SigFlagCtxSetSwitch[m_chType + 4] : Ctx::SigFlagL[m_chType + 4]
+    }
+#else
+                                                                              ,
+   , m_sigFlagCtxSetSwitch{ Ctx::SigFlagCtxSetSwitch[m_chType], Ctx::SigFlagCtxSetSwitch[m_chType + 2], Ctx::SigFlagCtxSetSwitch[m_chType],
+                           Ctx::SigFlagCtxSetSwitch[m_chType + 4] }
+#endif
+
+#else
+                                                                            ,
+ , m_sigFlagCtxSetSwitch{ Ctx::SigFlagCtxSetSwitch[m_chType], Ctx::SigFlagCtxSetSwitch[m_chType + 2],
+                         Ctx::SigFlagCtxSetSwitch[m_chType + 4] }
+#endif
+#if JVET_AE0102_LFNST_CTX
+,m_parFlagCtxSetSwitch{ (tu.cu->lfnstIdx == 0) ? Ctx::ParFlagCtxSetSwitch[m_chType] : Ctx::ParFlagL[m_chType] }
+#if JVET_AG0100_TRANSFORM_COEFFICIENT_CODING
+, m_gtxFlagCtxSetSwitch
+  { 
+    (tu.cu->lfnstIdx == 0) ? Ctx::GtxFlagCtxSetSwitch[m_chType] : Ctx::GtxFlagL[m_chType] ,
+    (tu.cu->lfnstIdx == 0) ? Ctx::GtxFlagCtxSetSwitch[m_chType + 2] : Ctx::GtxFlagL[m_chType + 2],
+    (tu.cu->lfnstIdx == 0) ? Ctx::GtxFlagCtxSetSwitch[m_chType + 4] : Ctx::GtxFlagL[m_chType + 4],
+    (tu.cu->lfnstIdx == 0) ? Ctx::GtxFlagCtxSetSwitch[m_chType + 6] : Ctx::GtxFlagL[m_chType + 6],
+  }
+#else
+,m_gtxFlagCtxSetSwitch{ (tu.cu->lfnstIdx == 0) ? Ctx::GtxFlagCtxSetSwitch[m_chType] : Ctx::GtxFlagL[m_chType],
+(tu.cu->lfnstIdx == 0) ? Ctx::GtxFlagCtxSetSwitch[m_chType + 2]
+  : Ctx::GtxFlagL[m_chType + 2] }
+#endif
+
+#else
+m_parFlagCtxSetSwitch(Ctx::ParFlagCtxSetSwitch[m_chType]),
+m_gtxFlagCtxSetSwitch{ Ctx::GtxFlagCtxSetSwitch[m_chType], Ctx::GtxFlagCtxSetSwitch[m_chType + 2] },
+#endif
+, m_ctxSetLastXCtxSetSwitch(Ctx::LastXCtxSetSwitch[m_chType])
+, m_ctxSetLastYCtxSetSwitch(Ctx::LastYCtxSetSwitch[m_chType])
+, m_tsSigFlagCtxSetSwitch(Ctx::TsSigFlagCtxSetSwitch)
+, m_tsParFlagCtxSetSwitch(Ctx::TsParFlagCtxSetSwitch)
+, m_tsGtxFlagCtxSetSwitch(Ctx::TsGtxFlagCtxSetSwitch)
+, m_tsLrg1FlagCtxSetSwitch(Ctx::TsLrg1FlagCtxSetSwitch)
+, m_tsSignFlagCtxSetSwitch(Ctx::TsResidualSignCtxSetSwitch)
+
+#endif
+
+   ,m_sigCoeffGroupFlag         ()
   , m_bdpcm                     (bdpcm)
 #if SIGN_PREDICTION
   , m_bSignPredQualified        (TU::getDelayedSignCoding(tu, component))
@@ -156,6 +218,10 @@ void CoeffCodingContext::initSubblock( int SubsetId, bool sigGroupFlag )
   unsigned  sigLeft   = unsigned( CGPosX > 0 ? m_sigCoeffGroupFlag[m_subSetPos - 1              ] : false );
   unsigned  sigAbove  = unsigned( CGPosY > 0 ? m_sigCoeffGroupFlag[m_subSetPos - m_widthInGroups] : false );
   m_sigGroupCtxIdTS   = Ctx::TsSigCoeffGroup( sigLeft  + sigAbove );
+#if JVET_AG0143_INTER_INTRA 
+  m_sigGroupCtxIdSwitch = Ctx::SigCoeffGroupCtxSetSwitch[m_chType](sigRight | sigLower);
+  m_sigGroupCtxIdTSSwitch = Ctx::TsSigCoeffGroupCtxSetSwitch(sigLeft + sigAbove);
+#endif
 }
 
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS

@@ -73,6 +73,9 @@ namespace CU
   bool isSameSubPic                   (const CodingUnit &cu, const CodingUnit &cu2);
   bool isLastSubCUOfCtu               (const CodingUnit &cu);
   uint32_t getCtuAddr                     (const CodingUnit &cu);
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+  bool isOnCtuBottom                  (const CodingUnit& cu);
+#endif
 #if JVET_V0130_INTRA_TMP
   Position getCtuXYAddr               (const CodingUnit& cu);
 #endif
@@ -602,6 +605,10 @@ namespace PU
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
   void getTMVPCandOpt(const PredictionUnit &pu, RefPicList refList, int refIdx, MergeCtx &mrgCtx, MergeCtx mergeCtx, int col = 0);
 #endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  void getAmvpSbTmvp(PredictionUnit &pu, MergeCtx& mrgCtx, const Mv mvShift, const bool useAmvpSbTmvpBuf = false, const Position bufTL = Position(0, 0), bool* tmvpBufValid = nullptr, MotionInfo* tmvpMotionBuf = nullptr);
+  void clipColPos(int& posX, int& posY, const PredictionUnit& pu);
+#endif
 #if JVET_Y0128_NON_CTC
   bool isBiRefScaled(const CodingStructure& cs, const int refIdx0, const int refIdx1);
 #endif
@@ -632,6 +639,9 @@ namespace PU
 #endif
   bool getInterMergeSubPuRecurCand(const PredictionUnit &pu, MergeCtx &mrgCtx, const int count);
   bool isBiPredFromDifferentDirEqDistPoc(const PredictionUnit &pu);
+#if JVET_AG0067_DMVR_EXTENSIONS
+  bool isBiPredFromDifferentDirGenDistPoc(const PredictionUnit &pu);
+#endif
   void restrictBiPredMergeCandsOne    (PredictionUnit &pu);
 #if ENABLE_OBMC
   unsigned int getSameNeigMotion(PredictionUnit &pu, MotionInfo& mi, Position off, int  iDir, int& iLength, int iMaxLength);

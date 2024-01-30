@@ -56,12 +56,28 @@ DecSlice::~DecSlice()
 {
 }
 
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+void DecSlice::create(int width, int iMaxCUWidth)
+{
+  int numBinBuffers = width / iMaxCUWidth + 1;
+  
+  for ( int i = 0; i < numBinBuffers; i++ )
+  {
+    m_binVectors.push_back( BinStoreVector() );
+    m_binVectors[i].reserve( CABAC_SPATIAL_MAX_BINS );
+  }
+}
+#else
 void DecSlice::create()
 {
 }
+#endif
 
 void DecSlice::destroy()
 {
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+  m_binVectors.clear();
+#endif
 }
 
 void DecSlice::init( CABACDecoder* cabacDecoder, DecCu* pcCuDecoder )
@@ -80,6 +96,9 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
   CABACReader&   cabacReader  = *m_CABACDecoder->getCABACReader( 0 );
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   cabacReader.m_CABACDataStore->updateBufferState( slice );
+#endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  clearAmvpSbTmvpStatArea(slice);
 #endif
 
   // setup coding structure
@@ -224,6 +243,68 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
     }
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
     }
+#endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  if (!slice->isIntra())
+  {
+    int minPoc = abs(slice->getRefPic(RefPicList(1 - slice->getColFromL0Flag()), slice->getColRefIdx())->getPOC() - slice->getPOC());
+    if (slice->isInterB() && slice->getCheckLDC())
+    {
+      int min2ndPoc = abs(slice->getRefPic(RefPicList(1 - slice->getColFromL0Flag2nd()), slice->getColRefIdx2nd())->getPOC() - slice->getPOC());
+      minPoc = std::min(minPoc, min2ndPoc);
+    }
+    if (minPoc > 4)
+    {
+      slice->setAmvpSbTmvpEnabledFlag(false);
+    }
+    else
+    {
+      slice->setAmvpSbTmvpEnabledFlag(true);
+      g_picAmvpSbTmvpEnabledArea = 0;
+      uint32_t prevEnabledArea;
+      bool isExist = loadAmvpSbTmvpStatArea(slice->getTLayer(), prevEnabledArea);
+      if (isExist)
+      {
+        int ratio = int(prevEnabledArea * 100.0 / (slice->getPic()->getPicWidthInLumaSamples() * slice->getPic()->getPicHeightInLumaSamples()));
+        if (ratio < 4)
+        {
+          slice->setAmvpSbTmvpNumOffset(1);
+        }
+        else if (ratio < 7)
+        {
+          slice->setAmvpSbTmvpNumOffset(2);
+        }
+        else
+        {
+          slice->setAmvpSbTmvpNumOffset(3);
+        }
+      }
+      else
+      {
+        slice->setAmvpSbTmvpNumOffset(2);
+      }
+      if (slice->isInterB() && slice->getCheckLDC())
+      {
+        if (slice->getRefPic(RefPicList(1 - slice->getColFromL0Flag()), slice->getColRefIdx())->getPOC() == slice->getRefPic(RefPicList(1 - slice->getColFromL0Flag2nd()), slice->getColRefIdx2nd())->getPOC())
+        {
+          slice->setAmvpSbTmvpNumColPic(1);
+        }
+        else
+        {
+          slice->setAmvpSbTmvpNumColPic(2);
+        }
+      }
+      else
+      {
+        slice->setAmvpSbTmvpNumColPic(1);
+      }
+      slice->setAmvpSbTmvpAmvrEnabledFlag(slice->getPic()->getPicWidthInLumaSamples() * slice->getPic()->getPicHeightInLumaSamples() < 3840*2160 ? false : true);
+    }
+  }
+  else
+  {
+    slice->setAmvpSbTmvpEnabledFlag(false);
+  }
 #endif
   }
 #endif
@@ -402,7 +483,24 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
 #endif
     }
 #endif
+
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+    // Update the CABAC states based on CTU above
+    if ( ctuYPosInCtus )
+    {
+      cabacReader.updateCtxs( getBinVector(ctuXPosInCtus) );
+    }
+
+    // Clear the bin counters and prepare for collecting new data for this CTU
+    cabacReader.setBinBuffer( getBinVector(ctuXPosInCtus) );
+#endif
+
     cabacReader.coding_tree_unit( cs, ctuArea, pic->m_prevQP, ctuRsAddr );
+
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+    // Done with data collection for this CTU
+    cabacReader.setBinBuffer( nullptr );
+#endif
 
     m_pcCuDecoder->decompressCtu( cs, ctuArea );
 
@@ -472,6 +570,12 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
   if( slice->getPPS()->pcv->sizeInCtus - 1 == slice->getCtuAddrInSlice( slice->getNumCtuInSlice() - 1 ) )
   {
     cabacReader.m_CABACDataStore->storeCtxStates( slice, storedCtx );
+  }
+#endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  if (!slice->isIntra())
+  {
+    storeAmvpSbTmvpStatArea(slice->getTLayer(), g_picAmvpSbTmvpEnabledArea);
   }
 #endif
 

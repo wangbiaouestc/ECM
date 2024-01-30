@@ -939,6 +939,10 @@ void writeAllData(const CodingStructure& cs, const UnitArea& ctuArea)
           }
         }
         break;
+      case MODE_IBC:
+      case MODE_PLT:
+        // TODO add relevant statistics
+        break;
       default:
         THROW( "Invalid prediction mode" );
         break;
@@ -1186,6 +1190,10 @@ void writeAllCodedData(const CodingStructure & cs, const UnitArea & ctuArea)
 #endif
             break;
           }
+          case MODE_IBC:
+          case MODE_PLT:
+            // TODO add relevant statistics
+            break;
           default:
           {
             CHECK(1, "Invalid prediction mode");

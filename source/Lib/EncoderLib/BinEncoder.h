@@ -95,6 +95,9 @@ private:
 
 
 class BinEncIf : public Ctx
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+, public BinBufferer
+#endif
 {
 protected:
   template <class BinProbModel>
@@ -215,6 +218,10 @@ public:
   void            setBinStorage     ( bool b )          { m_BinStore.setUse(b); }
   const BinStore* getBinStore       ()          const   { return &m_BinStore; }
   BinEncIf*       getTestBinEncoder ()          const;
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+  void            updateCtxs        ( BinStoreVector *bb ) { m_ctx.updateCtxs(bb); }
+#endif
+
 private:
   CtxStore<BinProbModel>& m_ctx;
 };
@@ -267,7 +274,17 @@ class TBitEstimator : public BitEstimatorBase
 public:
   TBitEstimator ();
   ~TBitEstimator() {}
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+  void updateCtxs ( BinStoreVector *bb ) { m_ctx.updateCtxs(bb); }
+  
+  void encodeBin ( unsigned bin, unsigned ctxId )
+  {
+    m_ctx[ctxId].estFracBitsUpdate( bin, m_EstFracBits );
+    m_binBuffer.addBin(bin, ctxId);
+  }
+#else
   void encodeBin    ( unsigned bin, unsigned ctxId )  { m_ctx[ctxId].estFracBitsUpdate( bin, m_EstFracBits ); }
+#endif
   void encodeBinTrm ( unsigned bin )                  { m_EstFracBits += BinProbModel::estFracBitsTrm( bin ); }
   void            setBinStorage     ( bool b )        {}
   const BinStore* getBinStore       ()          const { return 0; }

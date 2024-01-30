@@ -809,6 +809,23 @@ uint8_t CodingUnit::getSbtTuSplit() const
   return sbtTuSplitType;
 }
 
+#if JVET_AG0143_INTER_INTRA
+bool CodingUnit::getSwitchCondition(ChannelType channelType) const
+{
+  bool            condition     = 
+    predMode == MODE_INTRA && slice->getSliceType() != I_SLICE && 
+      ((!tmpFlag && channelType == CHANNEL_TYPE_LUMA)||(channelType == CHANNEL_TYPE_CHROMA && firstPU->intraDir[1] != DBV_CHROMA_IDX));
+ assert(slice->getSliceType() != I_SLICE || channelType == chType);
+  int tmpMaxSize = cs->sps->getIntraTMPMaxSize();
+  condition = condition || (predMode == MODE_IBC && channelType == CHANNEL_TYPE_LUMA && slice->getSliceType() == I_SLICE)
+    || (predMode == MODE_INTRA && ((channelType == CHANNEL_TYPE_LUMA && tmpFlag && !bdpcmMode && !dimd
+      && lwidth() <= tmpMaxSize && lheight() <= tmpMaxSize) || 
+      (channelType == CHANNEL_TYPE_CHROMA && firstPU->intraDir[1] == DBV_CHROMA_IDX)) && slice->getSliceType() == I_SLICE);
+  return condition;
+}
+#endif
+
+
 // ---------------------------------------------------------------------------
 // prediction unit method definitions
 // ---------------------------------------------------------------------------
@@ -954,6 +971,10 @@ void PredictionUnit::initData()
 #endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   reduceTplSize = false;
+#endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  amvpSbTmvpFlag = false;
+  amvpSbTmvpMvdIdx = -1;
 #endif
 #if JVET_AC0112_IBC_GPM
   ibcGpmFlag = false;
@@ -1148,6 +1169,10 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   reduceTplSize = predData.reduceTplSize;
 #endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  amvpSbTmvpFlag = predData.amvpSbTmvpFlag;
+  amvpSbTmvpMvdIdx = predData.amvpSbTmvpMvdIdx;
+#endif
 #if JVET_AC0112_IBC_GPM
   ibcGpmFlag = predData.ibcGpmFlag;
   ibcGpmSplitDir = predData.ibcGpmSplitDir;
@@ -1341,6 +1366,10 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 #endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   reduceTplSize = other.reduceTplSize;
+#endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  amvpSbTmvpFlag = other.amvpSbTmvpFlag;
+  amvpSbTmvpMvdIdx = other.amvpSbTmvpMvdIdx;
 #endif
 #if JVET_AC0112_IBC_GPM
   ibcGpmFlag = other.ibcGpmFlag;

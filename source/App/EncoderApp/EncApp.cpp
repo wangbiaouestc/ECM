@@ -270,6 +270,13 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setScalingRatio2                                     (m_scalingRatioHor2, m_scalingRatioVer2);
   m_cEncLib.setScalingRatio3                                     (m_scalingRatioHor3, m_scalingRatioVer3);
 #endif
+#if JVET_AG0116
+  m_cEncLib.setGOPBasedRPREnabledFlag                            (m_gopBasedRPREnabledFlag);
+  m_cEncLib.setGOPBasedRPRQPThreshold                            (m_gopBasedRPRQPThreshold);
+  m_cEncLib.setPsnrThresholdRPR                                  (m_psnrThresholdRPR, m_psnrThresholdRPR2, m_psnrThresholdRPR3);
+  m_cEncLib.setQpOffsetRPR                                       (m_qpOffsetRPR, m_qpOffsetRPR2, m_qpOffsetRPR3);
+  m_cEncLib.setQpOffsetChromaRPR                                 (m_qpOffsetChromaRPR, m_qpOffsetChromaRPR2, m_qpOffsetChromaRPR3);
+#endif
 #if JVET_AB0082
   m_cEncLib.setUpscaleFilerForDisplay                            (m_upscaleFilterForDisplay);
 #endif
@@ -1392,6 +1399,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setReshapeIntraCMD                                   ( m_intraCMD );
   m_cEncLib.setReshapeCW                                         ( m_reshapeCW );
   m_cEncLib.setReshapeCSoffset                                   ( m_CSoffset );
+#if JVET_AG0116
+  m_cEncLib.setGOPBasedRPRQPThreshold                            (m_gopBasedRPRQPThreshold);
+#endif
 #if INTER_LIC
   m_cEncLib.setUseLIC                                            ( m_lic );
   m_cEncLib.setFastPicLevelLIC                                   ( m_lic ? m_fastPicLevelLIC : false );
@@ -1617,6 +1627,17 @@ void EncApp::createLib( const int layerIdx )
   m_orgPic->create( unitArea );
   m_trueOrgPic->create( unitArea );
 
+#if JVET_AG0116
+  if (m_resChangeInClvsEnabled && m_gopBasedRPREnabledFlag)
+  {
+      UnitArea unitAreaRPR10(m_chromaFormatIDC, Area(0, 0, m_sourceWidth, sourceHeight));
+      UnitArea unitAreaRPR20(m_chromaFormatIDC, Area(0, 0, m_sourceWidth / 2, sourceHeight / 2));
+      m_rprPic[0] = new PelStorage;
+      m_rprPic[0]->create(unitAreaRPR10);
+      m_rprPic[1] = new PelStorage;
+      m_rprPic[1]->create(unitAreaRPR20);
+  }
+#endif
   if( !m_bitstream.is_open() )
   {
     m_bitstream.open( m_bitstreamFileName.c_str(), fstream::binary | fstream::out );
@@ -1694,7 +1715,16 @@ void EncApp::destroyLib()
   m_trueOrgPic->destroy();
   delete m_trueOrgPic;
   delete m_orgPic;
-
+#if JVET_AG0116
+  if (m_resChangeInClvsEnabled && m_gopBasedRPREnabledFlag)
+  {
+    for (int i = 0; i < 2; i++)
+    {
+      m_rprPic[i]->destroy();
+      delete m_rprPic[i];
+  }
+}
+#endif
 #if JVET_Y0240_BIM
   if ( m_bimEnabled )
   {
@@ -1764,7 +1794,11 @@ bool EncApp::encodePrep( bool& eos )
   }
   else
   {
-    keepDoing = m_cEncLib.encodePrep( eos, m_flush ? 0 : m_orgPic, snrCSC, m_recBufList, m_numEncoded );
+    keepDoing = m_cEncLib.encodePrep(eos, m_flush ? 0 : m_orgPic, snrCSC, m_recBufList, m_numEncoded
+#if JVET_AG0116
+      , m_rprPic
+#endif
+    );
   }
 
   return keepDoing;
@@ -1865,7 +1899,11 @@ void EncApp::xWriteOutput( int iNumEncoded, std::list<PelUnitBuf*>& recBufList )
 #if JVET_AC0096
         const SPS& sps = *m_cEncLib.getSPS(0);
         int ppsID = 0;
+#if JVET_AG0116
+        if (m_rprFunctionalityTestingEnabledFlag || m_gopBasedRPREnabledFlag)
+#else
         if (m_rprFunctionalityTestingEnabledFlag)
+#endif
         {
           const PPS& pps1 = *m_cEncLib.getPPS(ENC_PPS_ID_RPR);
           const PPS& pps2 = *m_cEncLib.getPPS(ENC_PPS_ID_RPR2);

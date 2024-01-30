@@ -117,18 +117,65 @@ typedef int64_t TCccmCoeff;
 #define FIXED_DIV(x, y)  TCccmCoeff((int64_t(x)    << CCCM_DECIM_BITS ) / (y) )
 #endif
 
+enum CccmType
+{
+  CCCM_TYPE_BASE,
+#if JVET_AC0054_GLCCCM
+  CCCM_TYPE_GRADLOC,
+#endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+  CCCM_TYPE_NOSUBS,
+#endif
+#if JVET_AD0202_CCCM_MDF
+  CCCM_TYPE_MULTIF_1,
+  CCCM_TYPE_MULTIF_2,
+  CCCM_TYPE_MULTIF_3,
+#endif
+  CCCM_TYPE_UNDEFINED
+};
+
 struct CccmModel
 {
   CccmModel( int num, int bitdepth )
   {
-    bd = bitdepth;
-    midVal = ( 1 << ( bitdepth - 1 ) );
-    params.resize( num );
+    initModel( num, bitdepth, CCCM_TYPE_UNDEFINED );
   }
 
+  CccmModel( CccmType type, int bitdepth )
+  {
+    switch (type)
+    {
+      case CCCM_TYPE_BASE: initModel( CCCM_NUM_PARAMS, bitdepth, type ); break;
+#if JVET_AC0054_GLCCCM
+      case CCCM_TYPE_GRADLOC: initModel( CCCM_NUM_PARAMS, bitdepth, type ); break;
+#endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+      case CCCM_TYPE_NOSUBS: initModel( CCCM_NO_SUB_NUM_PARAMS, bitdepth, type ); break;
+#endif
+#if JVET_AD0202_CCCM_MDF
+      case CCCM_TYPE_MULTIF_1: initModel( CCCM_MULTI_PRED_FILTER_NUM_PARAMS,  bitdepth, type ); break;
+      case CCCM_TYPE_MULTIF_2: initModel( CCCM_MULTI_PRED_FILTER_NUM_PARAMS2, bitdepth, type ); break;
+      case CCCM_TYPE_MULTIF_3: initModel( CCCM_MULTI_PRED_FILTER_NUM_PARAMS2, bitdepth, type ); break;
+#endif
+      default:
+        fprintf(stdout, "No initializer for CCCM model type: %d\n", int(type));
+        exit(0);
+    }
+  }
+
+  void initModel( int num, int bitdepth, CccmType type )
+  {
+    cccmType = type;
+    bd       = bitdepth;
+    midVal   = ( 1 << ( bitdepth - 1 ) );
+
+    params.resize( num );
+  }
+  
   ~CccmModel() {}
 
   std::vector<TCccmCoeff> params;
+  CccmType   cccmType;
   int        bd;
   int        midVal;
   

@@ -1860,6 +1860,9 @@ private:
   int               m_rprSwitchingResolutionOrderList[MAX_RPR_SWITCHING_ORDER_LIST_SIZE];
   int               m_rprSwitchingQPOffsetOrderList[MAX_RPR_SWITCHING_ORDER_LIST_SIZE];
 #endif
+#if JVET_AG0116
+  bool              m_gopBasedRPREnabledFlag;
+#endif
   uint32_t          m_log2ParallelMergeLevelMinus2;
   bool              m_ppsValidFlag[64];
   Size              m_scalingWindowSizeInPPS[64];
@@ -2517,6 +2520,10 @@ void                    setCCALFEnabledFlag( bool b )                           
   void      setRprSwitchingQPOffsetOrderList(int value, int idx)                    { m_rprSwitchingQPOffsetOrderList[idx] = value; }
   int       getRprSwitchingQPOffsetOrderList(int idx)                    const { return m_rprSwitchingQPOffsetOrderList[idx]; }
 #endif
+#if JVET_AG0116
+  bool      getGOPBasedRPREnabledFlag()                                   const { return m_gopBasedRPREnabledFlag; }
+  void      setGOPBasedRPREnabledFlag(bool flag)                                { m_gopBasedRPREnabledFlag = flag; }
+#endif
   uint32_t  getLog2ParallelMergeLevelMinus2() const { return m_log2ParallelMergeLevelMinus2; }
   void      setLog2ParallelMergeLevelMinus2(uint32_t mrgLevel) { m_log2ParallelMergeLevelMinus2 = mrgLevel; }
   void          setPPSValidFlag(int i, bool b) { m_ppsValidFlag[i] = b; }
@@ -3074,6 +3081,10 @@ private:
   bool                        m_picColFromL0Flag2nd;                                    //!< syntax element collocated_from_l0_flag
   uint32_t                    m_colRefIdx2nd;
 #endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  uint8_t                     m_amvpSbTmvpNumOffset;
+  uint8_t                     m_amvpSbTmvpNumDir;
+#endif
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
   uint32_t                    m_costForARMC;                                            //!< Cost for diversity criterion
 #endif
@@ -3484,6 +3495,12 @@ private:
   bool                       m_colFromL0Flag2nd;  // collocated picture from List0 flag
   uint32_t                   m_colRefIdx2nd;
 #endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  uint8_t                    m_amvpSbTmvpNumOffset;
+  uint8_t                    m_amvpSbTmvpNumColPic;
+  bool                       m_amvpSbTmvpAmvrEnabledFlag;
+  bool                       m_amvpSbTmvpEnabledFlag;
+#endif
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
   uint32_t                   m_costForARMC;
 #endif
@@ -3523,6 +3540,10 @@ private:
   uint32_t                   m_numSubstream;
 
   bool                       m_cabacInitFlag;
+
+#if JVET_AG0196_CABAC_RETRAIN
+  SliceType                  m_cabacInitSliceType;
+#endif
 
   uint32_t                   m_sliceSubPicId;
 
@@ -3660,6 +3681,12 @@ public:
   bool                        getColFromL0Flag2nd() const                            { return m_colFromL0Flag2nd;                                    }
   uint32_t                    getColRefIdx2nd() const                                { return m_colRefIdx2nd;                                        }
 #endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  uint8_t                     getAmvpSbTmvpNumOffset() const                         { return m_amvpSbTmvpNumOffset;                                     }
+  uint8_t                     getAmvpSbTmvpNumColPic() const                         { return m_amvpSbTmvpNumColPic;                                     }
+  bool                        getAmvpSbTmvpAmvrEnabledFlag() const                   { return m_amvpSbTmvpAmvrEnabledFlag;                               }
+  bool                        getAmvpSbTmvpEnabledFlag() const                       { return m_amvpSbTmvpEnabledFlag;                                   }
+#endif
   void                        checkColRefIdx(uint32_t curSliceSegmentIdx, const Picture* pic);
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
   uint32_t                    getCostForARMC() const                                 { return m_costForARMC;                                         }
@@ -3733,7 +3760,11 @@ public:
   void                        checkSTSA(PicList& rcListPic);
   void                        checkRPL(const ReferencePictureList* pRPL0, const ReferencePictureList* pRPL1, const int associatedIRAPDecodingOrderNumber, PicList& rcListPic);
   void                        decodingRefreshMarking(int& pocCRA, bool& bRefreshPending, PicList& rcListPic, const bool bEfficientFieldIRAPEnabled);
+#if JVET_AG0196_CABAC_RETRAIN
+  void                        setSliceType( SliceType e )                            { m_eSliceType        = e; m_cabacInitSliceType = m_eSliceType; }
+#else
   void                        setSliceType( SliceType e )                            { m_eSliceType        = e;                                      }
+#endif
   void                        setSliceQp( int i )                                    { m_iSliceQp          = i;                                      }
   void                        setSliceQpDelta( int i )                               { m_iSliceQpDelta     = i;                                      }
   void                        setSliceChromaQpDelta( ComponentID compID, int i )     { m_iSliceChromaQpDelta[compID] = isLuma(compID) ? 0 : i;       }
@@ -3796,6 +3827,12 @@ public:
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   void                        setColFromL0Flag2nd(bool colFromL0)                    { m_colFromL0Flag2nd = colFromL0;                               }
   void                        setColRefIdx2nd(uint32_t refIdx)                       { m_colRefIdx2nd = refIdx;                                      }
+#endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  void                        setAmvpSbTmvpEnabledFlag(bool b)                       { m_amvpSbTmvpEnabledFlag = b;                                      }
+  void                        setAmvpSbTmvpNumOffset(uint8_t numOffset)              { m_amvpSbTmvpNumOffset = numOffset;                                }
+  void                        setAmvpSbTmvpNumColPic(uint8_t numPic)                 { m_amvpSbTmvpNumColPic = numPic;                                   }
+  void                        setAmvpSbTmvpAmvrEnabledFlag(bool b)                   { m_amvpSbTmvpAmvrEnabledFlag = b;                                  }
 #endif
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
   void                        setCostForARMC(uint32_t cost)                          { m_costForARMC = cost;                                         }
@@ -3933,6 +3970,11 @@ public:
 
   void                        setCabacInitFlag( bool val )                           { m_cabacInitFlag = val;                                        } //!< set CABAC initial flag
   bool                        getCabacInitFlag()                               const { return m_cabacInitFlag;                                       } //!< get CABAC initial flag
+
+#if JVET_AG0196_CABAC_RETRAIN
+  void                        setCabacInitSliceType( SliceType val )                 { m_cabacInitSliceType = val; }
+  SliceType                   getCabacInitSliceType()                          const { return m_cabacInitSliceType; }
+#endif
 
   void                        setEncCABACTableIdx( SliceType idx )                   { m_encCABACTableIdx = idx;                                     }
   SliceType                   getEncCABACTableIdx() const                            { return m_encCABACTableIdx;                                    }

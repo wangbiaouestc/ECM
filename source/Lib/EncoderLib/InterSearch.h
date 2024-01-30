@@ -762,6 +762,11 @@ private:
   int             m_uniMvListIdxLIC;
   int             m_uniMvListSizeLIC;
 #endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  bool*           m_amvpSbTmvpBufValid;
+  MotionInfo*     m_amvpSbTmvpMotionBuf;
+  Position        m_amvpSbTmvpBufTLPos;
+#endif
   Distortion      m_hevcCost;
   EncAffineMotion m_affineMotion;
   PatentBvCand    m_defaultCachedBvs;
@@ -1407,6 +1412,11 @@ protected:
                                     Distortion& ruiCost
                                     ,
                                     const uint8_t  imv
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+                                  , const bool amvpSbTmvp = false
+                                  , const int amvpSbTmvpMvdIdx = -1
+                                  , const int numAmvpSbTmvpOffset = -1
+#endif
                                   );
 
   Distortion xGetTemplateCost     ( const PredictionUnit& pu,
@@ -1445,6 +1455,23 @@ protected:
                                   , const int             weight = 0
 #endif
                                   );
+
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  void xAmvpSbTmvpMotionEstimation( PredictionUnit&       pu,
+                                    PelUnitBuf&           origBuf,
+                                    RefPicList            eRefPicList,
+                                    Mv&                   rcMvPred,
+                                    int                   iRefIdxPred,
+                                    Mv&                   rcMv,
+                                    int&                  amvpSbTmvpIdx,
+                                    bool                  useAmvpSbTmvpBuf,
+                                    MergeCtx&             mrgCtx,
+                                    int&                  riMVPIdx,
+                                    uint32_t&             ruiBits,
+                                    Distortion&           ruiCost,
+                                    const Distortion      normalCost
+                                  );
+#endif
 
   void xTZSearch                  ( const PredictionUnit& pu,
                                     RefPicList            eRefPicList,

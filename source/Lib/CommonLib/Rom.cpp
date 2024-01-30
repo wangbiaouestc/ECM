@@ -3889,6 +3889,9 @@ TMatrixCoeff g_trCoreDCT2P256[256][256];
 TMatrixCoeff g_trCoreDCT8P256[256][256];
 TMatrixCoeff g_trCoreDST7P256[256][256];
 #endif
+#if JVET_AG0067_DMVR_EXTENSIONS
+int g_bdofWeight[1600];
+#endif
 #if JVET_W0103_INTRA_MTS
 TMatrixCoeff g_aiTr2[NUM_TRANS_TYPE][2][2];
 TMatrixCoeff g_aiTr4[NUM_TRANS_TYPE][4][4];
@@ -4499,7 +4502,25 @@ void initROM()
     }
   }
 #endif
-
+#if JVET_AG0067_DMVR_EXTENSIONS
+  int bdofWidth[]  =   {8,  8,  8,   12,  12,  12,  20,  20,   20};
+  int bdofHeight[] =   {8, 12, 20,    8,  12,  20,   8,  12,   20};
+  int weightOffset[] = {0, 64, 160, 320, 416, 560, 800, 960, 1200};
+  for (int i = 0; i < 9; i++)
+  {
+    int offset = weightOffset[i];
+    int width  = bdofWidth[i];
+    int height = bdofHeight[i];
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x++)
+      {
+        g_bdofWeight[y * width + x + offset] = (x >= (width/2) ? width - x : x + 1) * (y >= (height/2) ? height - y : y + 1);
+      }
+    }
+  }
+#endif
+  
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   memset(&g_resiBorderTemplate[0][0][0], 0, sizeof(g_resiBorderTemplate));
   memset(&g_resiBorderTemplateLFNST[0][0][0], 0, sizeof(g_resiBorderTemplateLFNST));
@@ -4965,6 +4986,15 @@ const uint32_t g_uiGroupIdx[] = { 0,1,2,3,4,4,5,5,6,6,6,6,7,7,7,7,8,8,8,8,8,8,8,
 };
 #else
 const uint32_t g_uiGroupIdx[MAX_TB_SIZEY] = { 0,1,2,3,4,4,5,5,6,6,6,6,7,7,7,7,8,8,8,8,8,8,8,8,9,9,9,9,9,9,9,9, 10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11 };
+#endif
+#if JVET_AG0100_TRANSFORM_COEFFICIENT_CODING
+const uint32_t g_auiGoRiceParsCoeffGTN[GTN_MAXSUM] =
+{
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1,
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2,
+  2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+  2, 3, 3, 3, 3, 3, 3, 3
+};
 #endif
 const uint32_t g_auiGoRiceParsCoeff[32] =
 {
@@ -5520,6 +5550,13 @@ const int8_t g_ibcGpmSecondSetSplitDir[GEO_NUM_PARTITION_MODE] = {
 0,1,1,0,1,1,0,1
 };
 
+#endif
+
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+const int8_t g_amvpSbTmvp_mvd_dir[2][8] = { { 1, -1,  0,  0,  1, -1,  1, -1 },
+                                            { 0,  0,  1, -1,  1, -1, -1,  1 } };
+const int8_t g_amvpSbTmvp_mvd_offset[6] = { 4, 8, 12, 16, 24, 32 };
+uint32_t g_picAmvpSbTmvpEnabledArea = 0;
 #endif
 
 //! \}

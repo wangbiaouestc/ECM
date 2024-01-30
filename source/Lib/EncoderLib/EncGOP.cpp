@@ -2013,7 +2013,11 @@ public:
   BIFCabacEstImp(CABACWriter* _CABACEstimator) : CABACEstimator(_CABACEstimator) {};
   virtual ~BIFCabacEstImp() {};
 
+#if JVET_AG0196_CABAC_RETRAIN
+  virtual uint64_t getBits( const ComponentID compID, Slice& slice, const BifParams& htdfParams )
+#else
   virtual uint64_t getBits(const ComponentID compID, const Slice& slice, const BifParams& htdfParams)
+#endif
   {
     CABACEstimator->initCtxModels(slice);
     CABACEstimator->resetBits();
@@ -3806,6 +3810,9 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
 
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT 
       m_pcSliceEncoder->getCABACDataStore()->updateBufferState( pcSlice );
+#endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+      m_pcSliceEncoder->clearAmvpSbTmvpStatArea(pcSlice);
 #endif
 
 #if ENABLE_QPA

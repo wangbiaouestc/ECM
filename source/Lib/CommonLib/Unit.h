@@ -475,6 +475,9 @@ struct CodingUnit : public UnitArea
   const bool        isConsInter() const { return modeType == MODE_TYPE_INTER; }
   const bool        isConsIntra() const { return modeType == MODE_TYPE_INTRA; }
 #endif
+#if JVET_AG0143_INTER_INTRA
+  bool getSwitchCondition(ChannelType channelType) const;
+#endif
 };
 
 // ---------------------------------------------------------------------------
@@ -638,6 +641,10 @@ struct InterPredictionData
 #endif
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   bool      amvpMergeModeFlag[NUM_REF_PIC_LIST_01];
+#endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  bool      amvpSbTmvpFlag;
+  int8_t    amvpSbTmvpMvdIdx;
 #endif
   int8_t     refIdx  [NUM_REF_PIC_LIST_01];
 #if JVET_Z0054_BLK_REF_PIC_REORDER

@@ -113,6 +113,13 @@
 #define NULL              0
 #endif
 
+#if JVET_AG0100_TRANSFORM_COEFFICIENT_CODING
+#define GTN                                               7
+#define GTN_LEVEL                                         (GTN + 1)
+#define GTN_MAXSUM                                        80
+#define NSIGCTX                                           6
+#define NGTXCTX                                           7
+#endif
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
 static const double REFINE_THRESHOLD_AFFINE_MERGE = 0.75;
 #endif
@@ -844,8 +851,15 @@ static const int MAX_TU_LEVEL_CTX_CODED_BIN_CONSTRAINT_CHROMA =    28;
 #if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
 static const int BDOF_SUBPU_DIM_LOG2          =                     2;
 #if JVET_AE0091_ITERATIVE_BDOF
+#if JVET_AG0067_DMVR_EXTENSIONS
+static const int BDOF_SUBPU_AREA_THRESHOLD16  =                   512;
+static const int BDOF_SUBPU_AREA_THRESHOLD0   =                   256;
+static const int BDOF_SUBPU_AREA_THRESHOLD1   =                  2048;
+static const int BDOF_SUBPU_AREA_THRESHOLDAFFINE0   =               0;
+#else
 static const int BDOF_SUBPU_AREA_THRESHOLD0   =                     0;
 static const int BDOF_SUBPU_AREA_THRESHOLD1   =                  1024;
+#endif
 #if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
 static const int BDOF_SUBPU_AREA_THRESHOLD2   =                   256;
 enum AFFINE_SUBPU_BDOF_USAGE
@@ -873,7 +887,11 @@ static const int BIO_EXTEND_SIZE              =                     1;
 static const int BIO_TEMP_BUFFER_SIZE         =                     (MAX_CU_SIZE + 2 * BIO_EXTEND_SIZE) * (MAX_CU_SIZE + 2 * BIO_EXTEND_SIZE);
 
 #if JVET_AE0091_ITERATIVE_BDOF
+#if JVET_AG0067_DMVR_EXTENSIONS
+static const int BDOF_DMVR_MAX_ITER           =                     3;
+#else
 static const int BDOF_DMVR_MAX_ITER           =                     2;
+#endif
 #endif
 static const int PROF_BORDER_EXT_W            =                     1;
 static const int PROF_BORDER_EXT_H            =                     1;
@@ -1249,6 +1267,14 @@ static const int ATMVP_SUB_BLOCK_SIZE =                             2; ///< sub-
 #else
 static const int ATMVP_SUB_BLOCK_SIZE =                             3; ///< sub-block size for ATMVP
 #endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+static const int AMVP_SBTMVP_NUM_DIR =                              4;
+static const int AMVP_SBTMVP_NUM_OFFSET =                           3;
+static const int AMVP_SBTMVP_BUF_STRIDE = ((MAX_CU_SIZE >> ATMVP_SUB_BLOCK_SIZE) + (AMVP_SBTMVP_NUM_OFFSET << 3));
+static const int AMVP_SBTMVP_BUF_SIZE = AMVP_SBTMVP_BUF_STRIDE * AMVP_SBTMVP_BUF_STRIDE;
+static const int SUB_BUFFER_SIZE =                    SUB_TMVP_NUM + 1;
+static const int AMVP_SBTMVP_BUFFER_IDX =                 SUB_TMVP_NUM;
+#endif
 
 #if NON_ADJACENT_MRG_CAND
 static const int GEO_MAX_NUM_UNI_CANDS =                            15;
@@ -1443,7 +1469,7 @@ static const int PLT_FAST_RATIO = 100;
 static const int  EPBIN_WEIGHT_FACTOR =                           4;
 #endif
 static const int ENC_PPS_ID_RPR =                                 3;
-#if JVET_AC0096
+#if JVET_AC0096 || JVET_AG0116
 static const int ENC_PPS_ID_RPR2 =                                5;
 static const int ENC_PPS_ID_RPR3 =                                7;
 #endif
@@ -1531,6 +1557,11 @@ static const int MAX_NUM_CANDS =                                64;
 // max number of parameters used in CCCM related methods
 static const int CCCM_NUM_PARAMS_MAX =      CCCM_NO_SUB_NUM_PARAMS;
 static const int CCCM_REF_SAMPLES_MAX =       CCCM_MAX_REF_SAMPLES;
+#endif
+
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+static constexpr int CABAC_SPATIAL_MAX_BINS                  = 128;
+static constexpr int CABAC_SPATIAL_MAX_BINS_PER_CTX          =   4;
 #endif
 
 // ====================================================================================================================
