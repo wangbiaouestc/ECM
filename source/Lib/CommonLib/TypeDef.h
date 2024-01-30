@@ -310,6 +310,9 @@
 #define JVET_AF0073_INTER_CCP_MERGE                       1 // JVET-AF0073: Cross-component prediction merge mode for inter prediction
 #define JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT          1 // JVET-AF0159: Affine subblock BDOF refinement
 #define JVET_AF0057                                       1 // JVET-AF0057: Encoder only. DMVR with robust MV derivation.
+#define JVET_AG0112_REGRESSION_BASED_GPM_BLENDING         1 // JVET-AG0112: Regression-based GPM blending
+#define JVET_AG0135_AFFINE_CIIP                           1 // JVET-AG0135: CIIP with affine prediction 
+#define JVET_AG0164_AFFINE_GPM                            1 // JVET-AG0164: GPM with affine prediction
 #define JVET_AG0098_AMVP_WITH_SBTMVP                      1 // JVET-AG0098: AMVP with SbTMVP mode
 #define JVET_AG0067_DMVR_EXTENSIONS                       1 // JVET-AG0067: On DMVR Extensions
 
@@ -1829,6 +1832,82 @@ struct SgpmInfo
   }
 };
 #endif
+
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+struct AffineBlendingModel
+{
+  bool  valid;
+  int params[3];
+  int shift;
+  int offset;
+  int min, max;
+
+  void init()
+  {
+    valid = false;
+    shift = 1;
+    params[0] = 1 << (shift - 1);
+    params[1] = 1 << (shift - 1);
+    params[2] = 0;
+  }
+
+  AffineBlendingModel()
+  {
+    init();
+  }
+
+  AffineBlendingModel( const int s, const int _min, const int _max )
+  {
+    shift = s;
+    params[0] = 1 << (shift - 1);
+    params[1] = 1 << (shift - 1);
+    params[2] = 0;
+    min = _min;
+    max = _max;
+  }
+  void copy( const AffineBlendingModel& other )
+  {
+    if ( other.valid )
+    {
+      *this = other;
+    }
+    else
+    {
+      init();
+    }
+  }
+
+  int compute( const int x, const int y, bool bClip=true )
+  {
+    int weight = (params[0] * x + params[1] * y + params[2] + offset) >> shift ;
+    if ( bClip )
+    {
+      return (weight > max ? max : (weight < min ? min : weight));
+    }
+    else
+    {
+      return weight;
+    }
+  }
+
+  bool isSame( const AffineBlendingModel& other )
+  {
+    bool  bSame = true;
+
+    bSame &= other.valid == valid;
+    bSame &= other.params[0] == params[0];
+    bSame &= other.params[1] == params[1];
+    bSame &= other.params[2] == params[2];
+    bSame &= other.shift == shift;
+    bSame &= other.offset == offset;
+    bSame &= other.min == min;
+    bSame &= other.max == max;
+
+    return bSame;
+  }
+};
+#endif
+
 // ---------------------------------------------------------------------------
 // exception class
 // ---------------------------------------------------------------------------

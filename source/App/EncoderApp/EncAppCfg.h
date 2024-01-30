@@ -397,6 +397,9 @@ protected:
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
   bool      m_useAffineTM;
 #endif
+#if JVET_AG0135_AFFINE_CIIP
+  bool      m_useCiipAffine;
+#endif
 #if AFFINE_MMVD
   bool      m_AffineMmvdMode;
 #endif
@@ -899,6 +902,9 @@ protected:
 #endif
   uint32_t      m_maxNumAffineMergeCand;                          ///< Max number of affine merge candidates
   uint32_t      m_maxNumGeoCand;
+#if JVET_AG0164_AFFINE_GPM
+  uint32_t      m_maxNumGpmAffCand;
+#endif
   uint32_t      m_maxNumIBCMergeCand;                             ///< Max number of IBC merge candidates
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
   uint32_t      m_maxNumMHPCand;

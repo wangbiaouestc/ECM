@@ -968,10 +968,19 @@ struct CodedCUInfo
 #if JVET_W0097_GPM_MMVD_TM
   bool     skipGPM;
   char     isGPMTested;
+
+#if JVET_AG0164_AFFINE_GPM
+  int      geoDirCandList[GEO_MAX_TRY_WEIGHTED_SATD + 3];
+  int      numGeoDirCand;
+  int      geoMrgIdx0List[GEO_MAX_TRY_WEIGHTED_SATD + 3];
+  int      geoMrgIdx1List[GEO_MAX_TRY_WEIGHTED_SATD + 3];
+#else
   int      geoDirCandList[GEO_MAX_TRY_WEIGHTED_SATD];
   int      numGeoDirCand;
   int      geoMrgIdx0List[GEO_MAX_TRY_WEIGHTED_SATD];
   int      geoMrgIdx1List[GEO_MAX_TRY_WEIGHTED_SATD];
+#endif
+
 #endif
 #if JVET_AD0213_LIC_IMP
   bool    skipLIC;

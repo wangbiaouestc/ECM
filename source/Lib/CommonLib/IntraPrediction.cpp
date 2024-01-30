@@ -866,17 +866,26 @@ void IntraPrediction::xIntraPredPlanarDcPdpc(const CPelBuf &pSrc, Pel* pDst, int
 template <uint8_t partIdx>
 bool IntraPrediction::xFillIntraGPMRefTemplateAll(PredictionUnit& pu, TemplateType eTempType, bool readBufferedMPMList, bool doInitMPMList, bool loadIntraRef, std::vector<Pel>* lut, uint8_t candIdx)
 {
+#if JVET_AG0164_AFFINE_GPM
+  if (eTempType == NO_NEIGHBOR || candIdx < GEO_MAX_ALL_INTER_UNI_CANDS)
+  {
+    return false;
+  }
+#else
   if (eTempType == NO_NEIGHBOR || candIdx < GEO_MAX_NUM_UNI_CANDS)
   {
     return false;
   }
-
+#endif
   doInitMPMList &= !readBufferedMPMList; // No MPM list derivation needed, since MPM list is read from buffer assuming it is already buffered
   const bool doInitAL = true;
   const bool doInitA  = partIdx == 0;
   const bool doInitL  = partIdx == 1;
-
+#if JVET_AG0164_AFFINE_GPM
+  uint8_t startIdx = candIdx == std::numeric_limits<uint8_t>::max() ? 0                       : (candIdx - GEO_MAX_ALL_INTER_UNI_CANDS);
+#else
   uint8_t startIdx = candIdx == std::numeric_limits<uint8_t>::max() ? 0                       : (candIdx - GEO_MAX_NUM_UNI_CANDS);
+#endif
   uint8_t endIdx   = candIdx == std::numeric_limits<uint8_t>::max() ? GEO_MAX_NUM_INTRA_CANDS : (startIdx + 1                   );
   for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++)
   {
@@ -1028,7 +1037,11 @@ uint8_t IntraPrediction::prefillIntraGPMReferenceSamples(PredictionUnit& pu, int
 
 bool IntraPrediction::fillIntraGPMRefTemplateAll(PredictionUnit& pu, bool hasAboveTemplate, bool hasLeftTemplate, bool readBufferedMPMList, bool doInitMPMList, bool loadIntraRef, std::vector<Pel>* lut, uint8_t candIdx0, uint8_t candIdx1)
 {
+#if JVET_AG0164_AFFINE_GPM
+  if (candIdx0 < GEO_MAX_ALL_INTER_UNI_CANDS && candIdx1 < GEO_MAX_ALL_INTER_UNI_CANDS)
+#else
   if (candIdx0 < GEO_MAX_NUM_UNI_CANDS && candIdx1 < GEO_MAX_NUM_UNI_CANDS)
+#endif
   {
     return false;
   }
@@ -1038,14 +1051,21 @@ bool IntraPrediction::fillIntraGPMRefTemplateAll(PredictionUnit& pu, bool hasAbo
   {
     return false;
   }
-
+#if JVET_AG0164_AFFINE_GPM
+  if (candIdx0 >= GEO_MAX_ALL_INTER_UNI_CANDS)
+#else
   if (candIdx0 >= GEO_MAX_NUM_UNI_CANDS)
+#endif
   {
     xFillIntraGPMRefTemplateAll<0>(pu, templateType, readBufferedMPMList, doInitMPMList, loadIntraRef, lut, candIdx0);
     doInitMPMList = false; // to prevent duplicating initialization
     loadIntraRef  = false; // to prevent duplicating initialization
   }
+#if JVET_AG0164_AFFINE_GPM
+  if (candIdx1 >= GEO_MAX_ALL_INTER_UNI_CANDS)
+#else
   if (candIdx1 >= GEO_MAX_NUM_UNI_CANDS)
+#endif
   {
     xFillIntraGPMRefTemplateAll<1>(pu, templateType, readBufferedMPMList, doInitMPMList, loadIntraRef, lut, candIdx1);
   }
@@ -3593,8 +3613,8 @@ void IntraPrediction::geneChromaFusionPred(const ComponentID compId, PelBuf &piP
     static CclmModel                  cclmModelCb;
     static CclmModel                  cclmModelCr;
     static int                        modelThr       = 0;
-    static CccmModel cccmModelCb[2] = { CccmModel( CCCM_TYPE_BASE, bitDepth), CccmModel( CCCM_TYPE_BASE, bitDepth) };
-    static CccmModel cccmModelCr[2] = { CccmModel( CCCM_TYPE_BASE, bitDepth), CccmModel( CCCM_TYPE_BASE, bitDepth) };
+    static CccmModel cccmModelCb[2] = { CccmModel( CCCM_NUM_PARAMS, bitDepth), CccmModel( CCCM_NUM_PARAMS, bitDepth) };
+    static CccmModel cccmModelCr[2] = { CccmModel( CCCM_NUM_PARAMS, bitDepth), CccmModel( CCCM_NUM_PARAMS, bitDepth) };
 
     if (compId == COMPONENT_Cb)
     {
@@ -4022,7 +4042,67 @@ void IntraPrediction::geneWeightedPred( const ComponentID compId, PelBuf& pred, 
   }
 #endif
 }
+#if JVET_AG0135_AFFINE_CIIP
+template void IntraPrediction::geneWeightedCIIPAffinePred<false>(const ComponentID compId, AreaBuf<Pel>& pred, const PredictionUnit &pu, const AreaBuf<Pel> &interPred, const AreaBuf<Pel> &intraPred, const Pel* pLUT);
+template void IntraPrediction::geneWeightedCIIPAffinePred<true>(const ComponentID compId, AreaBuf<Pel>& pred, const PredictionUnit &pu, const AreaBuf<Pel> &interPred, const AreaBuf<Pel> &intraPred, const Pel* pLUT);
 
+template<bool lmcs>
+void IntraPrediction::geneWeightedCIIPAffinePred(const ComponentID compId, PelBuf& pred, const PredictionUnit &pu, const PelBuf& interPred, const PelBuf& intraPred, const Pel* pLUT)
+{
+  const int            width = pred.width;
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+  CHECK(width == 2, "Width of 2 is not supported");
+#endif
+  const int            height = pred.height;
+  Pel*                 interPredBuf = interPred.buf;
+  const int            interPredStride = interPred.stride;
+  Pel*                 intraPredBuf = intraPred.buf;
+  const int            intraPredStride = intraPred.stride;
+  const int            dstStride = pred.stride;
+  Pel*                 dstBuf = pred.buf;
+
+  const Position posBL = pu.Y().bottomLeft();
+  const Position posTR = pu.Y().topRight();
+  const PredictionUnit *neigh0 = pu.cs->getPURestricted(posBL.offset(-1, 0), pu, CHANNEL_TYPE_LUMA);
+  const PredictionUnit *neigh1 = pu.cs->getPURestricted(posTR.offset(0, -1), pu, CHANNEL_TYPE_LUMA);
+  bool isNeigh0Intra = neigh0 && (CU::isIntra(*neigh0->cu));
+  bool isNeigh1Intra = neigh1 && (CU::isIntra(*neigh1->cu));
+  int wIntra, wMerge;
+  if (isNeigh0Intra && isNeigh1Intra)
+  {
+    wIntra = 3; wMerge = 1;
+  }
+  else
+  {
+    if (!isNeigh0Intra && !isNeigh1Intra)
+    {
+      wIntra = 1; wMerge = 3;
+    }
+    else
+    {
+      wIntra = 2; wMerge = 2;
+    }
+  }
+
+  for (int y = 0; y < height; y++)
+  {
+    for (int x = 0; x < width; x++)
+    {
+      if (lmcs)
+      {
+        dstBuf[x] = (wMerge * pLUT[interPredBuf[x]] + wIntra * intraPredBuf[x] + 2) >> 2;
+      }
+      else
+      {
+        dstBuf[x] = (wMerge * interPredBuf[x] + wIntra * intraPredBuf[x] + 2) >> 2;
+      }
+    }
+    dstBuf += dstStride;
+    interPredBuf += interPredStride;
+    intraPredBuf += intraPredStride;
+  }
+}
+#endif
 #if JVET_AC0112_IBC_CIIP
 void IntraPrediction::geneWeightedPred( const ComponentID compId, PelBuf& pred, const PredictionUnit &pu, const PelBuf& interPred, const PelBuf& intraPred)
 {
@@ -14034,14 +14114,13 @@ void IntraPrediction::predCCPCandidate(PredictionUnit &pu, PelBuf &predCb, PelBu
     CompArea                   chromaArea = pu.Cb();
     int                        cWidth     = chromaArea.width;
     int                        cHeight    = chromaArea.height;
-    
+    CccmModel cccmModelCb[2] = { CccmModel( CCCM_NUM_PARAMS, bitDepth), CccmModel( CCCM_NUM_PARAMS, bitDepth ) };
+    CccmModel cccmModelCr[2] = { CccmModel( CCCM_NUM_PARAMS, bitDepth), CccmModel( CCCM_NUM_PARAMS, bitDepth ) };
+
     CHECK(pu.curCand.type == CCP_TYPE_NONE, "CCP model with no type")
     {
       if (pu.curCand.type & (CCP_TYPE_CCCM | CCP_TYPE_GLCCCM))
       {
-        CccmType  cccmType       = pu.curCand.type & CCP_TYPE_CCCM ? CCCM_TYPE_BASE : CCCM_TYPE_GRADLOC;
-        CccmModel cccmModelCb[2] = { CccmModel( cccmType, bitDepth), CccmModel( cccmType, bitDepth ) };
-        CccmModel cccmModelCr[2] = { CccmModel( cccmType, bitDepth), CccmModel( cccmType, bitDepth ) };
 #if JVET_AB0174_CCCM_DIV_FREE
         int lumaOffset = m_cccmLumaOffset - pu.curCand.lumaOffset;
 #else
@@ -14102,8 +14181,8 @@ void IntraPrediction::predCCPCandidate(PredictionUnit &pu, PelBuf &predCb, PelBu
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
       else if (pu.curCand.type & CCP_TYPE_NSCCCM)
       {
-        CccmModel nscccmModelCb[2] = { CccmModel( CCCM_TYPE_NOSUBS, bitDepth ), CccmModel( CCCM_TYPE_NOSUBS, bitDepth ) };
-        CccmModel nscccmModelCr[2] = { CccmModel( CCCM_TYPE_NOSUBS, bitDepth ), CccmModel( CCCM_TYPE_NOSUBS, bitDepth ) };
+        CccmModel nscccmModelCb[2] = { CccmModel( CCCM_NO_SUB_NUM_PARAMS, bitDepth ), CccmModel( CCCM_NO_SUB_NUM_PARAMS, bitDepth ) };
+        CccmModel nscccmModelCr[2] = { CccmModel( CCCM_NO_SUB_NUM_PARAMS, bitDepth ), CccmModel( CCCM_NO_SUB_NUM_PARAMS, bitDepth ) };
 #if JVET_AB0174_CCCM_DIV_FREE
         int lumaOffset = m_cccmLumaOffset - pu.curCand.lumaOffset;
 #else
@@ -14158,13 +14237,11 @@ void IntraPrediction::predCCPCandidate(PredictionUnit &pu, PelBuf &predCb, PelBu
         int offsetCb[2] = { 0, 0 };
         int offsetCr[2] = { 0, 0 };
 
-        CccmType cccmType = pu.curCand.cccmMultiFilterIdx == 1 ? CCCM_TYPE_MULTIF_1 :
-                            pu.curCand.cccmMultiFilterIdx == 2 ? CCCM_TYPE_MULTIF_2 : CCCM_TYPE_MULTIF_3;
-        CccmModel mfcccmModelCb[2] = { CccmModel( cccmType, bitDepth), CccmModel( cccmType, bitDepth ) };
-        CccmModel mfcccmModelCr[2] = { CccmModel( cccmType, bitDepth), CccmModel( cccmType, bitDepth ) };
-        
         if (pu.curCand.cccmMultiFilterIdx == 1)
         {
+          CccmModel mfcccmModelCb[2] = { CccmModel( CCCM_MULTI_PRED_FILTER_NUM_PARAMS, bitDepth), CccmModel( CCCM_MULTI_PRED_FILTER_NUM_PARAMS, bitDepth) };
+          CccmModel mfcccmModelCr[2] = { CccmModel( CCCM_MULTI_PRED_FILTER_NUM_PARAMS, bitDepth), CccmModel( CCCM_MULTI_PRED_FILTER_NUM_PARAMS, bitDepth) };
+
           PU::ccpParamsToCccmModel(pu.curCand, mfcccmModelCb, mfcccmModelCr);
 
           if (!(pu.curCand.type & CCP_TYPE_MMLM))
@@ -14193,6 +14270,9 @@ void IntraPrediction::predCCPCandidate(PredictionUnit &pu, PelBuf &predCb, PelBu
         }
         else // if (pu.curCand.cccmMultiFilterIdx == 2 || pu.curCand.cccmMultiFilterIdx == 3)
         {
+          CccmModel mfcccmModelCb[2] = { CccmModel( CCCM_MULTI_PRED_FILTER_NUM_PARAMS2, bitDepth), CccmModel( CCCM_MULTI_PRED_FILTER_NUM_PARAMS2, bitDepth) };
+          CccmModel mfcccmModelCr[2] = { CccmModel( CCCM_MULTI_PRED_FILTER_NUM_PARAMS2, bitDepth), CccmModel( CCCM_MULTI_PRED_FILTER_NUM_PARAMS2, bitDepth) };
+
           PU::ccpParamsToCccmModel(pu.curCand, mfcccmModelCb, mfcccmModelCr);
 
           if (!(pu.curCand.type & CCP_TYPE_MMLM))
@@ -15136,20 +15216,13 @@ void IntraPrediction::predIntraCCCM( PredictionUnit &pu, PelBuf &predCb, PelBuf 
 void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, PelBuf &predCr, int intraDir )
 #endif
 {
-  const int bitDepth     = pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA);
-#if JVET_AB0143_CCCM_TS
-  const bool singleModel = intraDir == LM_CHROMA_IDX || intraDir == MDLM_L_IDX || intraDir == MDLM_T_IDX;
-#else
-  const bool singleModel = PU::cccmSingleModeAvail(pu, intraDir);
-#endif
-  
 #if JVET_AE0100_BVGCCCM
   if (pu.bvgCccmFlag)
   {
-    CccmModel cccmModelCb[2] = { CccmModel( BVG_CCCM_NUM_PARAMS, bitDepth), CccmModel( BVG_CCCM_NUM_PARAMS, bitDepth) };
-    CccmModel cccmModelCr[2] = { CccmModel( BVG_CCCM_NUM_PARAMS, bitDepth), CccmModel( BVG_CCCM_NUM_PARAMS, bitDepth) };
+    CccmModel cccmModelCb[2] = { CccmModel( BVG_CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)), CccmModel( BVG_CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)) };
+    CccmModel cccmModelCr[2] = { CccmModel( BVG_CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)), CccmModel( BVG_CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)) };
     
-    if ( singleModel )
+    if (intraDir == LM_CHROMA_IDX || intraDir == MDLM_L_IDX || intraDir == MDLM_T_IDX)
     {
       int minVal = 0, maxVal = 0;
       xBvgCccmCalcBlkRange(pu, minVal, maxVal);
@@ -15175,125 +15248,117 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
     return;
   }
 #endif
-  
-  CccmType cccmType = CCCM_TYPE_BASE;
- 
-#if JVET_AC0054_GLCCCM
-  cccmType = pu.glCccmFlag ? CCCM_TYPE_GRADLOC : cccmType;
-#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
-  cccmType = pu.cccmNoSubFlag ? CCCM_TYPE_NOSUBS : cccmType;
-#endif
-#if JVET_AD0202_CCCM_MDF
-  cccmType = pu.cccmMultiFilterIdx == 1 ? CCCM_TYPE_MULTIF_1 : cccmType;
-  cccmType = pu.cccmMultiFilterIdx == 2 ? CCCM_TYPE_MULTIF_2 : cccmType;
-  cccmType = pu.cccmMultiFilterIdx == 3 ? CCCM_TYPE_MULTIF_3 : cccmType;
-#endif
-  
-#if JVET_AD0188_CCP_MERGE
-  pu.curCand.type = CCP_TYPE_CCCM;
-#if JVET_AC0054_GLCCCM
-  pu.curCand.type = cccmType == CCCM_TYPE_GRADLOC ? CCP_TYPE_GLCCCM : pu.curCand.type;
-#endif
-#if JVET_AC0147_CCCM_NO_SUBSAMPLING
-  pu.curCand.type = cccmType == CCCM_TYPE_NOSUBS ? CCP_TYPE_NSCCCM : pu.curCand.type;
-#endif
-#if JVET_AD0202_CCCM_MDF
-  pu.curCand.type = pu.cccmMultiFilterIdx ? CCP_TYPE_MDFCCCM : pu.curCand.type;
-  pu.curCand.cccmMultiFilterIdx = pu.cccmMultiFilterIdx;
-#endif
-#if JVET_AC0054_GLCCCM || JVET_AD0202_CCCM_MDF
-  bool needCorOffs = pu.curCand.type == CCP_TYPE_GLCCCM || pu.curCand.type == CCP_TYPE_MDFCCCM;
-  pu.curCand.corOffX = needCorOffs ? m_cccmBlkArea.x - m_cccmRefArea.x : 0;
-  pu.curCand.corOffY = needCorOffs ? m_cccmBlkArea.y - m_cccmRefArea.y : 0;
-#endif
-  pu.curCand.type = singleModel ? pu.curCand.type : (pu.curCand.type | CCP_TYPE_MMLM);
-#endif
-  
-#if JVET_AD0120_LBCCP
-  // Local boosting (template based CCCM model selection in intra slices)
-  if ( pu.cs->slice->isIntra() && cccmType == CCCM_TYPE_BASE
-#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
-       && pu.cs->sps->getTMnoninterToolsEnableFlag()
-#endif
-    )
+  if( pu.cccmNoSubFlag )
   {
-    CccmModel cccmModelCb[4] = { CccmModel( cccmType, bitDepth), CccmModel( cccmType, bitDepth),
-                                 CccmModel( cccmType, bitDepth), CccmModel( cccmType, bitDepth) };
-    CccmModel cccmModelCr[4] = { CccmModel( cccmType, bitDepth), CccmModel( cccmType, bitDepth),
-                                 CccmModel( cccmType, bitDepth), CccmModel( cccmType, bitDepth) };
-    
-    int selectedModel = 0;
-    int selectedThr   = 0;
+#if JVET_AD0188_CCP_MERGE
+    CccmModel cccmModelCb[2] = { CccmModel( CCCM_NO_SUB_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)), CccmModel( CCCM_NO_SUB_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)) };
+    CccmModel cccmModelCr[2] = { CccmModel( CCCM_NO_SUB_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)), CccmModel( CCCM_NO_SUB_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)) };
+#else
+    CccmModel cccmModelCb( CCCM_NO_SUB_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth( CHANNEL_TYPE_LUMA ) );
+    CccmModel cccmModelCr( CCCM_NO_SUB_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth( CHANNEL_TYPE_LUMA ) );
+#endif
 
-    if ( singleModel )
+#if JVET_AB0143_CCCM_TS
+    if( intraDir == LM_CHROMA_IDX || intraDir == MDLM_L_IDX || intraDir == MDLM_T_IDX )
+#else
+    if( PU::cccmSingleModeAvail( pu, intraDir ) )
+#endif
     {
+#if JVET_AD0188_CCP_MERGE
       xCccmCalcModels(pu, cccmModelCb[0], cccmModelCr[0], 0, 0);
-      int cccmSAD = xCalculateCCCMcost(pu, COMPONENT_Cb, intraDir, pu.blocks[COMPONENT_Cb], &cccmModelCb[0], 0);
-      cccmSAD    += xCalculateCCCMcost(pu, COMPONENT_Cr, intraDir, pu.blocks[COMPONENT_Cr], &cccmModelCr[0], 0);
+      xCccmApplyModel(pu, COMPONENT_Cb,   cccmModelCb[0], 0, 0, predCb);
+      xCccmApplyModel(pu, COMPONENT_Cr,   cccmModelCr[0], 0, 0, predCr);
 
-      xCccmCalcModels(pu, cccmModelCb[2], cccmModelCr[2], 0, 0, 2);
-      int cccmSADtmp = xCalculateCCCMcost(pu, COMPONENT_Cb, intraDir, pu.blocks[COMPONENT_Cb], &cccmModelCb[2], 0);
-      cccmSADtmp    += xCalculateCCCMcost(pu, COMPONENT_Cr, intraDir, pu.blocks[COMPONENT_Cr], &cccmModelCr[2], 0);
-      
-      selectedModel = cccmSADtmp < cccmSAD ? 2 : 0;
-      
-      xCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb[selectedModel], 0, 0, predCb);
-      xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr[selectedModel], 0, 0, predCr);
+      pu.curCand.type = CCP_TYPE_NSCCCM;
+      PU::cccmModelToCcpParams(pu.curCand, cccmModelCb, cccmModelCr, 0
+#if JVET_AB0174_CCCM_DIV_FREE
+                               , m_cccmLumaOffset
+#endif
+                               );
+#else
+      xCccmCalcModels( pu, cccmModelCb, cccmModelCr, 0, 0 );
+      xCccmApplyModel( pu, COMPONENT_Cb, cccmModelCb, 0, 0, predCb );
+      xCccmApplyModel( pu, COMPONENT_Cr, cccmModelCr, 0, 0, predCr );
+#endif
+    }
+    else
+    {
+      // Multimode case
+      int modelThr = xCccmCalcRefAver( pu );
+
+#if JVET_AD0188_CCP_MERGE
+      xCccmCalcModels( pu, cccmModelCb[0], cccmModelCr[0], 1, modelThr );
+      xCccmApplyModel( pu, COMPONENT_Cb,   cccmModelCb[0], 1, modelThr, predCb );
+      xCccmApplyModel( pu, COMPONENT_Cr,   cccmModelCr[0], 1, modelThr, predCr );
+
+      xCccmCalcModels( pu, cccmModelCb[1], cccmModelCr[1], 2, modelThr );
+      xCccmApplyModel( pu, COMPONENT_Cb,   cccmModelCb[1], 2, modelThr, predCb );
+      xCccmApplyModel( pu, COMPONENT_Cr,   cccmModelCr[1], 2, modelThr, predCr );
+
+      pu.curCand.type = (CCP_TYPE_NSCCCM | CCP_TYPE_MMLM);
+      PU::cccmModelToCcpParams(pu.curCand, cccmModelCb, cccmModelCr, modelThr
+#if JVET_AB0174_CCCM_DIV_FREE
+                               , m_cccmLumaOffset
+#endif
+                               );
+#else
+      xCccmCalcModels( pu, cccmModelCb, cccmModelCr, 1, modelThr );
+      xCccmApplyModel( pu, COMPONENT_Cb, cccmModelCb, 1, modelThr, predCb );
+      xCccmApplyModel( pu, COMPONENT_Cr, cccmModelCr, 1, modelThr, predCr );
+
+      xCccmCalcModels( pu, cccmModelCb, cccmModelCr, 2, modelThr );
+      xCccmApplyModel( pu, COMPONENT_Cb, cccmModelCb, 2, modelThr, predCb );
+      xCccmApplyModel( pu, COMPONENT_Cr, cccmModelCr, 2, modelThr, predCr );
+#endif
+    }
+  }
+  else
+#endif
+#if JVET_AD0202_CCCM_MDF
+  if (pu.cccmMultiFilterIdx == 1)
+  {
+#if JVET_AD0188_CCP_MERGE
+    CccmModel cccmModelCb[2] = { CccmModel( CCCM_MULTI_PRED_FILTER_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)), CccmModel( CCCM_MULTI_PRED_FILTER_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)) };
+    CccmModel cccmModelCr[2] = { CccmModel( CCCM_MULTI_PRED_FILTER_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)), CccmModel( CCCM_MULTI_PRED_FILTER_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)) };
+#else
+    CccmModel cccmModelCb( CCCM_MULTI_PRED_FILTER_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA));
+    CccmModel cccmModelCr( CCCM_MULTI_PRED_FILTER_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA));
+#endif
+
+#if JVET_AB0143_CCCM_TS
+    if (intraDir == LM_CHROMA_IDX || intraDir == MDLM_L_IDX || intraDir == MDLM_T_IDX)
+#else
+    if (PU::cccmSingleModeAvail(pu, intraDir))
+#endif
+    {
+#if JVET_AD0188_CCP_MERGE
+      xCccmCalcModels(pu, cccmModelCb[0], cccmModelCr[0], 0, 0);
+      xCccmApplyModel(pu, COMPONENT_Cb,   cccmModelCb[0], 0, 0, predCb);
+      xCccmApplyModel(pu, COMPONENT_Cr,   cccmModelCr[0], 0, 0, predCr);
+
+      pu.curCand.type = CCP_TYPE_MDFCCCM;
+      pu.curCand.cccmMultiFilterIdx = pu.cccmMultiFilterIdx;
+      pu.curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
+      pu.curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
+
+      PU::cccmModelToCcpParams(pu.curCand, cccmModelCb, cccmModelCr, 0
+#if JVET_AB0174_CCCM_DIV_FREE
+                               , m_cccmLumaOffset
+#endif
+                               );
+#else
+      xCccmCalcModels(pu, cccmModelCb, cccmModelCr, 0, 0);
+      xCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb, 0, 0, predCb);
+      xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr, 0, 0, predCr);
+#endif
     }
     else
     {
       // Multimode case
       int modelThr = xCccmCalcRefAver(pu);
-      xCccmCalcModels(pu, cccmModelCb[0], cccmModelCr[0], 1, modelThr);
-      xCccmCalcModels(pu, cccmModelCb[1], cccmModelCr[1], 2, modelThr);
-      int cccmSAD = xCalculateCCCMcost(pu, COMPONENT_Cb, pu.intraDir[1], pu.blocks[COMPONENT_Cb], &cccmModelCb[0], modelThr);
-      cccmSAD    += xCalculateCCCMcost(pu, COMPONENT_Cr, pu.intraDir[1], pu.blocks[COMPONENT_Cr], &cccmModelCr[0], modelThr);
-
-      int modelThrTmp = xCccmCalcRefAver(pu, 2);
-      xCccmCalcModels(pu, cccmModelCb[2], cccmModelCr[2], 1, modelThrTmp);
-      xCccmCalcModels(pu, cccmModelCb[3], cccmModelCr[3], 2, modelThrTmp);
-      int cccmSADtmp = xCalculateCCCMcost(pu, COMPONENT_Cb, pu.intraDir[1], pu.blocks[COMPONENT_Cb], &cccmModelCb[2], modelThrTmp);
-      cccmSADtmp    += xCalculateCCCMcost(pu, COMPONENT_Cr, pu.intraDir[1], pu.blocks[COMPONENT_Cr], &cccmModelCr[2], modelThrTmp);
-
-      selectedModel = cccmSADtmp < cccmSAD ? 2 : 0;
-      selectedThr   = cccmSADtmp < cccmSAD ? modelThrTmp : modelThr;
-
-      xCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb[selectedModel  ], 1, selectedThr, predCb);
-      xCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb[selectedModel+1], 2, selectedThr, predCb);
-
-      xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr[selectedModel  ], 1, selectedThr, predCr);
-      xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr[selectedModel+1], 2, selectedThr, predCr);
-    }
 
 #if JVET_AD0188_CCP_MERGE
-    PU::cccmModelToCcpParams(pu.curCand, &cccmModelCb[selectedModel], &cccmModelCr[selectedModel], selectedThr
-#if JVET_AB0174_CCCM_DIV_FREE
-                             , m_cccmLumaOffset
-#endif
-                            );
-#endif
-  }
-  else
-#endif
-  if ( pu.cccmFlag )
-  {
-    CccmModel cccmModelCb[2] = { CccmModel(cccmType, bitDepth), CccmModel(cccmType, bitDepth) };
-    CccmModel cccmModelCr[2] = { CccmModel(cccmType, bitDepth), CccmModel(cccmType, bitDepth) };
-
-    int modelThr = 0;
-
-    if ( singleModel )
-    {
-      xCccmCalcModels(pu, cccmModelCb[0], cccmModelCr[0], 0, 0);
-      xCccmApplyModel(pu, COMPONENT_Cb,   cccmModelCb[0], 0, 0, predCb);
-      xCccmApplyModel(pu, COMPONENT_Cr,   cccmModelCr[0], 0, 0, predCr);
-    }
-    else
-    {
-      // Multimode case
-      modelThr = xCccmCalcRefAver(pu);
-      
       xCccmCalcModels(pu, cccmModelCb[0], cccmModelCr[0], 1, modelThr);
       xCccmApplyModel(pu, COMPONENT_Cb,   cccmModelCb[0], 1, modelThr, predCb);
       xCccmApplyModel(pu, COMPONENT_Cr,   cccmModelCr[0], 1, modelThr, predCr);
@@ -15301,17 +15366,301 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
       xCccmCalcModels(pu, cccmModelCb[1], cccmModelCr[1], 2, modelThr);
       xCccmApplyModel(pu, COMPONENT_Cb,   cccmModelCb[1], 2, modelThr, predCb);
       xCccmApplyModel(pu, COMPONENT_Cr,   cccmModelCr[1], 2, modelThr, predCr);
-    }
 
-#if JVET_AD0188_CCP_MERGE
+      pu.curCand.type = CCP_TYPE_MDFCCCM | CCP_TYPE_MMLM;
+      pu.curCand.cccmMultiFilterIdx = pu.cccmMultiFilterIdx;
+      pu.curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
+      pu.curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
+
       PU::cccmModelToCcpParams(pu.curCand, cccmModelCb, cccmModelCr, modelThr
 #if JVET_AB0174_CCCM_DIV_FREE
                                , m_cccmLumaOffset
 #endif
                                );
-#endif
-  }
+#else
+      xCccmCalcModels(pu, cccmModelCb, cccmModelCr, 1, modelThr);
+      xCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb, 1, modelThr, predCb);
+      xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr, 1, modelThr, predCr);
 
+      xCccmCalcModels(pu, cccmModelCb, cccmModelCr, 2, modelThr);
+      xCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb, 2, modelThr, predCb);
+      xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr, 2, modelThr, predCr);
+#endif
+    }
+  }
+  else if (pu.cccmMultiFilterIdx > 1)
+  {
+#if JVET_AD0188_CCP_MERGE
+    CccmModel cccmModelCb[2] = { CccmModel( CCCM_MULTI_PRED_FILTER_NUM_PARAMS2, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)), CccmModel( CCCM_MULTI_PRED_FILTER_NUM_PARAMS2, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)) };
+    CccmModel cccmModelCr[2] = { CccmModel( CCCM_MULTI_PRED_FILTER_NUM_PARAMS2, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)), CccmModel( CCCM_MULTI_PRED_FILTER_NUM_PARAMS2, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)) };
+#else
+    CccmModel cccmModelCb(CCCM_MULTI_PRED_FILTER_NUM_PARAMS2, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA));
+    CccmModel cccmModelCr(CCCM_MULTI_PRED_FILTER_NUM_PARAMS2, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA));
+#endif
+
+#if JVET_AB0143_CCCM_TS
+    if (intraDir == LM_CHROMA_IDX || intraDir == MDLM_L_IDX || intraDir == MDLM_T_IDX)
+#else
+    if (PU::cccmSingleModeAvail(pu, intraDir))
+#endif
+    {
+#if JVET_AD0188_CCP_MERGE
+      xCccmCalcModels(pu, cccmModelCb[0], cccmModelCr[0], 0, 0);
+      xCccmApplyModel(pu, COMPONENT_Cb,   cccmModelCb[0], 0, 0, predCb);
+      xCccmApplyModel(pu, COMPONENT_Cr,   cccmModelCr[0], 0, 0, predCr);
+
+      pu.curCand.type = CCP_TYPE_MDFCCCM;
+      pu.curCand.cccmMultiFilterIdx = pu.cccmMultiFilterIdx;
+      pu.curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
+      pu.curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
+
+      PU::cccmModelToCcpParams(pu.curCand, cccmModelCb, cccmModelCr, 0
+#if JVET_AB0174_CCCM_DIV_FREE
+                               , m_cccmLumaOffset
+#endif
+                               );
+#else
+      xCccmCalcModels(pu, cccmModelCb, cccmModelCr, 0, 0);
+      xCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb, 0, 0, predCb);
+      xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr, 0, 0, predCr);
+#endif
+    }
+    else
+    {
+      // Multimode case
+      int modelThr = xCccmCalcRefAver(pu);
+
+#if JVET_AD0188_CCP_MERGE
+      xCccmCalcModels(pu, cccmModelCb[0], cccmModelCr[0], 1, modelThr);
+      xCccmApplyModel(pu, COMPONENT_Cb,   cccmModelCb[0], 1, modelThr, predCb);
+      xCccmApplyModel(pu, COMPONENT_Cr,   cccmModelCr[0], 1, modelThr, predCr);
+
+      xCccmCalcModels(pu, cccmModelCb[1], cccmModelCr[1], 2, modelThr);
+      xCccmApplyModel(pu, COMPONENT_Cb,   cccmModelCb[1], 2, modelThr, predCb);
+      xCccmApplyModel(pu, COMPONENT_Cr,   cccmModelCr[1], 2, modelThr, predCr);
+
+      pu.curCand.type = CCP_TYPE_MDFCCCM | CCP_TYPE_MMLM;
+      pu.curCand.cccmMultiFilterIdx = pu.cccmMultiFilterIdx;
+      pu.curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
+      pu.curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
+
+      PU::cccmModelToCcpParams(pu.curCand, cccmModelCb, cccmModelCr, modelThr
+#if JVET_AB0174_CCCM_DIV_FREE
+                               , m_cccmLumaOffset
+#endif
+                               );
+#else
+      xCccmCalcModels(pu, cccmModelCb, cccmModelCr, 1, modelThr);
+      xCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb, 1, modelThr, predCb);
+      xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr, 1, modelThr, predCr);
+
+      xCccmCalcModels(pu, cccmModelCb, cccmModelCr, 2, modelThr);
+      xCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb, 2, modelThr, predCb);
+      xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr, 2, modelThr, predCr);
+#endif
+    }
+  }
+  else
+#endif
+#if JVET_AD0120_LBCCP
+    if (pu.cs->slice->isIntra() && pu.cccmFlag
+#if JVET_AC0054_GLCCCM
+        && !pu.glCccmFlag
+#endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+        && !pu.cccmNoSubFlag
+#endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+      && pu.cs->sps->getTMnoninterToolsEnableFlag()
+#endif
+    )
+  {
+    const int                  bitDepth       = pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA);
+    CccmModel cccmModelCb[4] = { CccmModel( CCCM_NUM_PARAMS, bitDepth), CccmModel( CCCM_NUM_PARAMS, bitDepth), CccmModel( CCCM_NUM_PARAMS, bitDepth), CccmModel( CCCM_NUM_PARAMS, bitDepth) };
+    CccmModel cccmModelCr[4] = { CccmModel( CCCM_NUM_PARAMS, bitDepth), CccmModel( CCCM_NUM_PARAMS, bitDepth), CccmModel( CCCM_NUM_PARAMS, bitDepth), CccmModel( CCCM_NUM_PARAMS, bitDepth) };
+
+#if JVET_AB0143_CCCM_TS
+    if (intraDir == LM_CHROMA_IDX || intraDir == MDLM_L_IDX || intraDir == MDLM_T_IDX)
+#else
+    if (PU::cccmSingleModeAvail(pu, intraDir))
+#endif
+    {
+      xCccmCalcModels(pu,cccmModelCb[0], cccmModelCr[0], 0, 0);
+      int cccmSAD = xCalculateCCCMcost(pu, COMPONENT_Cb, intraDir, pu.blocks[COMPONENT_Cb], &cccmModelCb[0], 0);
+      cccmSAD += xCalculateCCCMcost(pu, COMPONENT_Cr, intraDir, pu.blocks[COMPONENT_Cr], &cccmModelCr[0], 0);
+
+      xCccmCalcModels(pu, cccmModelCb[2], cccmModelCr[2], 0, 0, 2);
+      int cccmSADtmp = xCalculateCCCMcost(pu, COMPONENT_Cb, intraDir, pu.blocks[COMPONENT_Cb], &cccmModelCb[2], 0);
+      cccmSADtmp += xCalculateCCCMcost(pu, COMPONENT_Cr, intraDir, pu.blocks[COMPONENT_Cr], &cccmModelCr[2], 0);
+#if JVET_AD0188_CCP_MERGE
+#if JVET_AC0054_GLCCCM
+      pu.curCand.type = (pu.glCccmFlag ? CCP_TYPE_GLCCCM : CCP_TYPE_CCCM);
+      pu.curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
+      pu.curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
+#else
+      pu.curCand.type = CCP_TYPE_CCCM;
+#endif
+#endif
+      if (cccmSADtmp < cccmSAD)
+      {
+        xCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb[2], 0, 0, predCb);
+        xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr[2], 0, 0, predCr);
+#if JVET_AD0188_CCP_MERGE
+        PU::cccmModelToCcpParams(pu.curCand, &cccmModelCb[2], &cccmModelCr[2], 0
+#if JVET_AB0174_CCCM_DIV_FREE
+                                 , m_cccmLumaOffset
+#endif
+        );
+#endif
+      }
+      else
+      {
+        xCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb[0], 0, 0, predCb);
+        xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr[0], 0, 0, predCr);
+#if JVET_AD0188_CCP_MERGE
+        PU::cccmModelToCcpParams(pu.curCand, &cccmModelCb[0], &cccmModelCr[0], 0
+#if JVET_AB0174_CCCM_DIV_FREE
+                                 , m_cccmLumaOffset
+#endif
+        );
+#endif
+      }
+    }
+    else
+    {
+      // Multimode case
+      int modelThr = 0, modelThrTmp = 0;
+      int cccmSAD = MAX_INT, cccmSADtmp = MAX_INT;
+
+      modelThr = xCccmCalcRefAver(pu);
+      xCccmCalcModels(pu, cccmModelCb[0], cccmModelCr[0], 1, modelThr);
+      xCccmCalcModels(pu, cccmModelCb[1], cccmModelCr[1], 2, modelThr);
+      cccmSAD = xCalculateCCCMcost(pu, COMPONENT_Cb, pu.intraDir[1], pu.blocks[COMPONENT_Cb], &cccmModelCb[0], modelThr);
+      cccmSAD += xCalculateCCCMcost(pu, COMPONENT_Cr, pu.intraDir[1], pu.blocks[COMPONENT_Cr], &cccmModelCr[0], modelThr);
+
+      modelThrTmp = xCccmCalcRefAver(pu, 2);
+      xCccmCalcModels(pu, cccmModelCb[2], cccmModelCr[2], 1, modelThrTmp);
+      xCccmCalcModels(pu, cccmModelCb[3], cccmModelCr[3], 2, modelThrTmp);
+      cccmSADtmp = xCalculateCCCMcost(pu, COMPONENT_Cb, pu.intraDir[1], pu.blocks[COMPONENT_Cb], &cccmModelCb[2], modelThrTmp);
+      cccmSADtmp += xCalculateCCCMcost(pu, COMPONENT_Cr, pu.intraDir[1], pu.blocks[COMPONENT_Cr], &cccmModelCr[2], modelThrTmp);
+#if JVET_AD0188_CCP_MERGE
+#if JVET_AC0054_GLCCCM
+      pu.curCand.type = ((pu.glCccmFlag ? CCP_TYPE_GLCCCM : CCP_TYPE_CCCM) | CCP_TYPE_MMLM);
+      pu.curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
+      pu.curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
+#else
+      pu.curCand.type = (CCP_TYPE_CCCM | CCP_TYPE_MMLM);
+#endif
+#endif
+      if (cccmSADtmp < cccmSAD)
+      {
+        xCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb[2], 1, modelThrTmp, predCb);
+        xCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb[3], 2, modelThrTmp, predCb);
+
+        xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr[2], 1, modelThrTmp, predCr);
+        xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr[3], 2, modelThrTmp, predCr);
+#if JVET_AD0188_CCP_MERGE
+        PU::cccmModelToCcpParams(pu.curCand, &cccmModelCb[2], &cccmModelCr[2], modelThrTmp
+#if JVET_AB0174_CCCM_DIV_FREE
+                                 , m_cccmLumaOffset
+#endif
+        );
+#endif
+      }
+      else
+      {
+        xCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb[0], 1, modelThr, predCb);
+        xCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb[1], 2, modelThr, predCb);
+
+        xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr[0], 1, modelThr, predCr);
+        xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr[1], 2, modelThr, predCr);
+#if JVET_AD0188_CCP_MERGE
+        PU::cccmModelToCcpParams(pu.curCand, &cccmModelCb[0], &cccmModelCr[0], modelThr
+#if JVET_AB0174_CCCM_DIV_FREE
+                                 , m_cccmLumaOffset
+#endif
+        );
+#endif
+      }
+    }
+  }
+  else
+#endif
+  if ( pu.cccmFlag )
+  {
+#if JVET_AD0188_CCP_MERGE
+    CccmModel cccmModelCb[2] = { CccmModel( CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)), CccmModel( CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)) };
+    CccmModel cccmModelCr[2] = { CccmModel( CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)), CccmModel( CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)) };
+#else
+    CccmModel cccmModelCb( CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA) );
+    CccmModel cccmModelCr( CCCM_NUM_PARAMS, pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA) );
+#endif
+
+#if JVET_AB0143_CCCM_TS
+    if ( intraDir == LM_CHROMA_IDX || intraDir == MDLM_L_IDX || intraDir == MDLM_T_IDX )
+#else
+    if ( PU::cccmSingleModeAvail(pu, intraDir) )
+#endif
+    {
+#if JVET_AD0188_CCP_MERGE
+      xCccmCalcModels(pu, cccmModelCb[0], cccmModelCr[0], 0, 0);
+      xCccmApplyModel(pu, COMPONENT_Cb,   cccmModelCb[0], 0, 0, predCb);
+      xCccmApplyModel(pu, COMPONENT_Cr,   cccmModelCr[0], 0, 0, predCr);
+
+#if JVET_AC0054_GLCCCM
+      pu.curCand.type = (pu.glCccmFlag ? CCP_TYPE_GLCCCM : CCP_TYPE_CCCM);
+      pu.curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
+      pu.curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
+#else
+      pu.curCand.type = CCP_TYPE_CCCM;
+#endif
+      PU::cccmModelToCcpParams(pu.curCand, cccmModelCb, cccmModelCr, 0
+#if JVET_AB0174_CCCM_DIV_FREE
+                               , m_cccmLumaOffset
+#endif
+                               );
+#else
+      xCccmCalcModels(pu, cccmModelCb,  cccmModelCr, 0, 0);
+      xCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb, 0, 0, predCb);
+      xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr, 0, 0, predCr);
+#endif
+    }
+    else
+    {
+      // Multimode case
+      int modelThr = xCccmCalcRefAver(pu);
+#if JVET_AD0188_CCP_MERGE
+      xCccmCalcModels(pu, cccmModelCb[0], cccmModelCr[0], 1, modelThr);
+      xCccmApplyModel(pu, COMPONENT_Cb,   cccmModelCb[0], 1, modelThr, predCb);
+      xCccmApplyModel(pu, COMPONENT_Cr,   cccmModelCr[0], 1, modelThr, predCr);
+
+      xCccmCalcModels(pu, cccmModelCb[1], cccmModelCr[1], 2, modelThr);
+      xCccmApplyModel(pu, COMPONENT_Cb,   cccmModelCb[1], 2, modelThr, predCb);
+      xCccmApplyModel(pu, COMPONENT_Cr,   cccmModelCr[1], 2, modelThr, predCr);
+
+#if JVET_AC0054_GLCCCM
+      pu.curCand.type = ((pu.glCccmFlag ? CCP_TYPE_GLCCCM : CCP_TYPE_CCCM) | CCP_TYPE_MMLM);
+      pu.curCand.corOffX = m_cccmBlkArea.x - m_cccmRefArea.x;
+      pu.curCand.corOffY = m_cccmBlkArea.y - m_cccmRefArea.y;
+#else
+      pu.curCand.type = (CCP_TYPE_CCCM | CCP_TYPE_MMLM);
+#endif
+      PU::cccmModelToCcpParams(pu.curCand, cccmModelCb, cccmModelCr, modelThr
+#if JVET_AB0174_CCCM_DIV_FREE
+                               , m_cccmLumaOffset
+#endif
+                               );
+#else
+      xCccmCalcModels(pu, cccmModelCb,  cccmModelCr, 1, modelThr);
+      xCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb, 1, modelThr, predCb);
+      xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr, 1, modelThr, predCr);
+
+      xCccmCalcModels(pu, cccmModelCb,  cccmModelCr, 2, modelThr);
+      xCccmApplyModel(pu, COMPONENT_Cb, cccmModelCb, 2, modelThr, predCb);
+      xCccmApplyModel(pu, COMPONENT_Cr, cccmModelCr, 2, modelThr, predCr);
+#endif
+    }
+  }
 #if JVET_AD0120_LBCCP
   if (pu.ccInsideFilter)
   {
@@ -15538,16 +15887,9 @@ void IntraPrediction::xCccmCalcModels(const PredictionUnit& pu, CccmModel& cccmM
 
 #if JVET_AB0143_CCCM_TS
   int yStart = pu.cccmFlag == 2 ? refSizeY : 0;
-  int yEnd   = pu.cccmFlag == 3 ? refSizeY : areaHeight;
+  int yEnd = pu.cccmFlag == 3 ? refSizeY : areaHeight;
   int xStart = pu.cccmFlag == 3 ? refSizeX : 0;
-  int xEnd   = pu.cccmFlag == 2 ? refSizeX : areaWidth;
-#else
-  int yStart = 0;
-  int yEnd   = areaHeight;
-  int xStart = 0;
-  int xEnd   = areaWidth;
-#endif
-
+  int xEnd = pu.cccmFlag == 2 ? refSizeX : areaWidth;
 #if JVET_AD0120_LBCCP
   if( trainingRange != -1 )
   {
@@ -15564,10 +15906,19 @@ void IntraPrediction::xCccmCalcModels(const PredictionUnit& pu, CccmModel& cccmM
 
   for (int y = yStart; y < yEnd; y += stepY )
   {
-    int xLineEnd = y >= refSizeY ? std::min(xEnd, refSizeX) : xEnd; // Don't go to current block's area
-    
-    for (int x = xStart; x < xLineEnd; x += stepX )
+    for (int x = xStart; x < xEnd; x += stepX )
     {
+#else
+  for (int y = 0; y < areaHeight; y += stepY )
+  {
+    for (int x = 0; x < areaWidth; x += stepX )
+    {
+#endif
+      if ( x >= refSizeX && y >= refSizeY )
+      {
+        continue;
+      }
+      
       const Pel* src0 = refLuma.bufAt( x, y );
 
       if( modelId == 1 && src0[0] > modelThr )   // Model 1: Include only samples below or equal to the threshold

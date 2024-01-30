@@ -1564,11 +1564,20 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
     WRITE_FLAG(pcSPS->getUseCiipTmMrg() ? 1 : 0, "sps_ciip_tm_merge_enabled_flag");
   }
 #endif
+#if JVET_AG0135_AFFINE_CIIP
+  if (pcSPS->getUseCiip() && pcSPS->getUseAffine())
+  {
+    WRITE_FLAG(pcSPS->getUseCiipAffine() ? 1 : 0, "sps_ciip_affine_flag");
+  }
+#endif
   if (pcSPS->getMaxNumMergeCand() >= 2)
   {
     WRITE_FLAG(pcSPS->getUseGeo() ? 1 : 0, "sps_gpm_enabled_flag");
     if (pcSPS->getUseGeo())
     {
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+      WRITE_FLAG(pcSPS->getUseGeoBlend() ? 1 : 0, "sps_gpm_blend_flag");
+#endif
       CHECK(pcSPS->getMaxNumMergeCand() < pcSPS->getMaxNumGeoCand(),
             "The number of GPM candidates must not be greater than the number of merge candidates");
       CHECK(2 > pcSPS->getMaxNumGeoCand(),
@@ -1578,6 +1587,13 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
         WRITE_UVLC(pcSPS->getMaxNumMergeCand() - pcSPS->getMaxNumGeoCand(),
                    "max_num_merge_cand_minus_max_num_gpm_cand");
       }
+#if JVET_AG0164_AFFINE_GPM
+      if (pcSPS->getUseAffine() && pcSPS->getMaxNumGeoCand() != 0 && pcSPS->getMaxNumAffineMergeCand() >= 3)
+      {
+        WRITE_UVLC(pcSPS->getMaxNumAffineMergeCand() - pcSPS->getMaxNumGpmAffCand(), "max_num_aff_merge_cand_minus_max_num_gpm_aff_cand");
+      }
+#endif
+
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_W0097_GPM_MMVD_TM && TM_MRG
       if (pcSPS->getTMToolsEnableFlag())
       {

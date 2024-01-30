@@ -189,6 +189,13 @@ public:
       singleDistList[partIdx] = new SingleGeoMMVDMergeEntry**[GEO_NUM_PARTITION_MODE];
       for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++)
       {
+#if JVET_AG0164_AFFINE_GPM
+        singleDistList[partIdx][splitDir] = new SingleGeoMMVDMergeEntry*[GEO_MAX_ALL_INTER_UNI_CANDS +GEO_MAX_NUM_INTRA_CANDS];
+        for (int candIdx = 0; candIdx < GEO_MAX_ALL_INTER_UNI_CANDS +GEO_MAX_NUM_INTRA_CANDS; candIdx++)
+        {
+          singleDistList[partIdx][splitDir][candIdx] = new SingleGeoMMVDMergeEntry[GPM_EXT_MMVD_MAX_REFINE_NUM + 2];
+        }
+#else
 #if JVET_Y0065_GPM_INTRA
         singleDistList[partIdx][splitDir] = new SingleGeoMMVDMergeEntry*[GEO_MAX_NUM_UNI_CANDS+GEO_MAX_NUM_INTRA_CANDS];
         for (int candIdx = 0; candIdx < GEO_MAX_NUM_UNI_CANDS+GEO_MAX_NUM_INTRA_CANDS; candIdx++)
@@ -203,6 +210,7 @@ public:
           singleDistList[partIdx][splitDir][candIdx] = new SingleGeoMMVDMergeEntry[GPM_EXT_MMVD_MAX_REFINE_NUM + 1];
 #endif
         }
+#endif
       }
     }
   }
@@ -212,6 +220,12 @@ public:
     {
       for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++)
       {
+#if JVET_AG0164_AFFINE_GPM
+        for (int candIdx = 0; candIdx < GEO_MAX_ALL_INTER_UNI_CANDS +GEO_MAX_NUM_INTRA_CANDS; candIdx++)
+        {
+          delete[] singleDistList[partIdx][splitDir][candIdx];
+        }
+#else
 #if JVET_Y0065_GPM_INTRA
         for (int candIdx = 0; candIdx < GEO_MAX_NUM_UNI_CANDS+GEO_MAX_NUM_INTRA_CANDS; candIdx++)
 #else
@@ -220,6 +234,7 @@ public:
         {
           delete[] singleDistList[partIdx][splitDir][candIdx];
         }
+#endif
         delete[] singleDistList[partIdx][splitDir];
       }
       delete[] singleDistList[partIdx];
@@ -299,6 +314,9 @@ private:
 #else
   PelStorage            m_acRealMergeBuffer[MRG_MAX_NUM_CANDS];
 #endif
+#if JVET_AG0135_AFFINE_CIIP
+  PelStorage            m_acMergeAffineBuffer[AFFINE_MRG_MAX_NUM_CANDS];
+#endif 
   PelStorage            m_acMergeTmpBuffer[MRG_MAX_NUM_CANDS
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AC0112_IBC_LIC
                                            + 1
@@ -318,10 +336,17 @@ private:
 #else
   PelStorage            m_acGeoWeightedBuffer[GEO_MAX_TRY_WEIGHTED_SAD]; // to store weighted prediction pixels
 #endif
+#if !JVET_AG0164_AFFINE_GPM
   FastGeoCostList       m_GeoCostList;
+#endif
 #if JVET_W0097_GPM_MMVD_TM
+#if JVET_AG0164_AFFINE_GPM
+  PelStorage            m_acGeoMMVDBuffer[GEO_MAX_ALL_INTER_UNI_CANDS][GPM_EXT_MMVD_MAX_REFINE_NUM];
+  PelStorage            m_acGeoMMVDTmpBuffer[GEO_MAX_ALL_INTER_UNI_CANDS][GPM_EXT_MMVD_MAX_REFINE_NUM];
+#else
   PelStorage            m_acGeoMMVDBuffer[MRG_MAX_NUM_CANDS][GPM_EXT_MMVD_MAX_REFINE_NUM];
   PelStorage            m_acGeoMMVDTmpBuffer[MRG_MAX_NUM_CANDS][GPM_EXT_MMVD_MAX_REFINE_NUM];
+#endif
   FastGeoMMVDCostList   m_geoMMVDCostList;
   bool                  m_fastGpmMmvdSearch;
   bool                  m_fastGpmMmvdRelatedCU;
@@ -523,6 +548,11 @@ protected:
                               );
 #endif
 #endif
+#if JVET_AG0135_AFFINE_CIIP
+  void xCheckSATDCostCiipAffineMerge
+  (CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu, AffineMergeCtx affineMergeCtx, MergeCtx mergeCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer, PelUnitBuf  acMergeAffineBuffer[AFFINE_MRG_MAX_NUM_CANDS]
+    , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &rdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart);
+#endif
   void xCheckSATDCostCiipMerge 
                               ( CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu, MergeCtx mergeCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer, PelUnitBuf  acMergeTmpBuffer[MRG_MAX_NUM_CANDS]
                                 , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &rdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart);
@@ -538,9 +568,15 @@ protected:
                                , uint32_t * mmvdLUT = NULL
 #endif
                                );
+#if JVET_AG0135_AFFINE_CIIP
+  void xCheckSATDCostAffineMerge
+  (CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu, AffineMergeCtx affineMergeCtx, MergeCtx& mrgCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer, PelUnitBuf  acMergeAffineBuffer[AFFINE_MRG_MAX_NUM_CANDS]
+    , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &rdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart);
+#else
   void xCheckSATDCostAffineMerge 
                               ( CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu, AffineMergeCtx affineMergeCtx, MergeCtx& mrgCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer
                                 , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &rdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart);
+#endif
 #if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
   void xCheckSATDCostBMAffineMerge
   (CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu, AffineMergeCtx affineMergeCtxL0, RefPicList reflist, MergeCtx& mrgCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer

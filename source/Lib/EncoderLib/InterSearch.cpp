@@ -8158,10 +8158,14 @@ void InterSearch::predInterSearchAdditionalHypothesis(PredictionUnit& pu, const 
   // buffer recycling
   if (m_pcEncCfg->getNumMHPCandsToTest() > 4 && x.predBufIdx >= 0 && m_mhpTempBufCounter > x.predBufIdx + 1)
   {
+#if !JVET_AG0164_AFFINE_GPM
     if (x.predBufIdx < GEO_MAX_TRY_WEIGHTED_SAD - 1)
     {
+#endif
       ::memcpy(m_mhpTempBuf + x.predBufIdx, m_mhpTempBuf + x.predBufIdx + 1, (m_mhpTempBufCounter - x.predBufIdx - 1) * sizeof(PelUnitBuf));
+#if !JVET_AG0164_AFFINE_GPM
     }
+#endif
     m_mhpTempBufCounter--;
   }
 }
@@ -8215,6 +8219,9 @@ void InterSearch::initGeoAngleSelection(PredictionUnit& pu
 }
 
 void InterSearch::setGeoSplitModeToSyntaxTable(PredictionUnit& pu, MergeCtx& mergeCtx0, int mergeCand0, MergeCtx& mergeCtx1, int mergeCand1
+#if JVET_AG0164_AFFINE_GPM
+                                             , const AffineMergeCtx& affMergeCtx
+#endif
 #if JVET_Y0065_GPM_INTRA
                                              , IntraPrediction* pcIntraPred
 #endif
@@ -8232,6 +8239,9 @@ void InterSearch::setGeoSplitModeToSyntaxTable(PredictionUnit& pu, MergeCtx& mer
     uint8_t numValidInList = 0;
     uint8_t modeList[GEO_NUM_SIG_PARTMODE];
     selectGeoSplitModes(pu
+#if JVET_AG0164_AFFINE_GPM
+                      , affMergeCtx
+#endif
 #if JVET_Y0065_GPM_INTRA
                       , pcIntraPred
 #endif
@@ -8240,12 +8250,20 @@ void InterSearch::setGeoSplitModeToSyntaxTable(PredictionUnit& pu, MergeCtx& mer
                       , mergeCtx0
                       , mergeCand0
 #if JVET_Y0065_GPM_INTRA
+#if JVET_AG0164_AFFINE_GPM
+                      + (isIntra[0] ? GEO_MAX_ALL_INTER_UNI_CANDS : 0)
+#else
                       + (isIntra[0] ? GEO_MAX_NUM_UNI_CANDS : 0)
+#endif
 #endif
                       , mergeCtx1
                       , mergeCand1
 #if JVET_Y0065_GPM_INTRA
+#if JVET_AG0164_AFFINE_GPM
+                      + (isIntra[1] ? GEO_MAX_ALL_INTER_UNI_CANDS : 0)
+#else
                       + (isIntra[1] ? GEO_MAX_NUM_UNI_CANDS : 0)
+#endif
 #endif
                       , numValidInList
                       , modeList
@@ -8296,6 +8314,9 @@ int InterSearch::convertGeoSplitModeToSyntax(int splitDir, int mergeCand0, int m
 }
 
 bool InterSearch::selectGeoSplitModes(PredictionUnit &pu,
+#if JVET_AG0164_AFFINE_GPM
+                                      const AffineMergeCtx& affMergeCtx,
+#endif
 #if JVET_Y0065_GPM_INTRA
                                       IntraPrediction* pcIntraPred,
 #endif
@@ -8308,8 +8329,11 @@ bool InterSearch::selectGeoSplitModes(PredictionUnit &pu,
     getBestGeoModeList(pu, numValidInList, modeList, nullptr, nullptr, nullptr, nullptr);
     return false;
   }
-
+#if JVET_AG0164_AFFINE_GPM
+  if (PU::checkRprRefExistingInGpm(pu, mergeCtx0, mergeCand0, mergeCtx1, mergeCand1, affMergeCtx))
+#else
   if (PU::checkRprRefExistingInGpm(pu, mergeCtx0, mergeCand0, mergeCtx1, mergeCand1))
+#endif
   {
     bool backupTplValid[2] = {m_bAMLTemplateAvailabe[0], m_bAMLTemplateAvailabe[1]};
     m_bAMLTemplateAvailabe[0] = false;
@@ -8330,7 +8354,11 @@ bool InterSearch::selectGeoSplitModes(PredictionUnit &pu,
   // First partition
   if (fillRefTplPart0)
   {
+#if JVET_AG0164_AFFINE_GPM
+    fillPartGPMRefTemplate<0, false>(pu, mergeCtx0, mergeCand0, mmvdCand0, pRefTopPart0, pRefLeftPart0, &affMergeCtx);
+#else
     fillPartGPMRefTemplate<0, false>(pu, mergeCtx0, mergeCand0, mmvdCand0, pRefTopPart0, pRefLeftPart0);
+#endif
 #if JVET_Y0065_GPM_INTRA
     xCollectIntraGeoPartCost<0>(pu, pcIntraPred, mergeCand0, gpmTplCostPart0[0]);
 #endif
@@ -8339,7 +8367,11 @@ bool InterSearch::selectGeoSplitModes(PredictionUnit &pu,
   // Second
   if (fillRefTplPart1)
   {
+#if JVET_AG0164_AFFINE_GPM
+    fillPartGPMRefTemplate<1, false>(pu, mergeCtx1, mergeCand1, mmvdCand1, pRefTopPart1, pRefLeftPart1, &affMergeCtx);
+#else
     fillPartGPMRefTemplate<1, false>(pu, mergeCtx1, mergeCand1, mmvdCand1, pRefTopPart1, pRefLeftPart1);
+#endif
 #if JVET_Y0065_GPM_INTRA
     xCollectIntraGeoPartCost<1>(pu, pcIntraPred, mergeCand1, gpmTplCostPart1[1]);
 #endif
@@ -8678,15 +8710,22 @@ void InterSearch::getBestGeoTMModeListEncoder(PredictionUnit &pu, uint8_t& numVa
 template <uint8_t partIdx>
 void InterSearch::xCollectIntraGeoPartCost(PredictionUnit &pu, IntraPrediction* pcIntraPred, int mergeCand, uint32_t(&gpmTplCost)[GEO_NUM_PARTITION_MODE])
 {
+#if JVET_AG0164_AFFINE_GPM
+  if ((!m_bAMLTemplateAvailabe[0] && !m_bAMLTemplateAvailabe[1]) || gpmTplCost[0] != std::numeric_limits<uint32_t>::max() || mergeCand < GEO_MAX_ALL_INTER_UNI_CANDS)
+#else
   if ((!m_bAMLTemplateAvailabe[0] && !m_bAMLTemplateAvailabe[1]) || gpmTplCost[0] != std::numeric_limits<uint32_t>::max() || mergeCand < GEO_MAX_NUM_UNI_CANDS)
+#endif
   {
     return;
   }
 
   std::vector<Pel>* LUT = m_pcReshape->getSliceReshaperInfo().getUseSliceReshaper() && m_pcReshape->getCTUFlag() ? &m_pcReshape->getInvLUT() : nullptr;
   pcIntraPred->fillIntraGPMRefTemplateAll(pu, m_bAMLTemplateAvailabe[0], m_bAMLTemplateAvailabe[1], true, false, false, LUT, (partIdx == 0 ? mergeCand : 0), (partIdx == 1 ? mergeCand : 0));
-
+#if JVET_AG0164_AFFINE_GPM
+  int  realCandIdx = mergeCand - GEO_MAX_ALL_INTER_UNI_CANDS;
+#else
   int  realCandIdx = mergeCand - GEO_MAX_NUM_UNI_CANDS;
+#endif
   int  bitDepth    = pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA);
   Pel* pDiffTop    = partIdx == 0 ? m_acYuvRefAMLTemplatePart0[0] : m_acYuvRefAMLTemplatePart1[0];
   Pel* pDiffLeft   = partIdx == 0 ? m_acYuvRefAMLTemplatePart0[1] : m_acYuvRefAMLTemplatePart1[1];

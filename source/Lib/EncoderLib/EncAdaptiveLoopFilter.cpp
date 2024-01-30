@@ -3693,6 +3693,8 @@ void EncAdaptiveLoopFilter::deriveStatsForFiltering( PelUnitBuf& orgYuv, PelUnit
 
               for( int shape = 0; shape != m_filterShapes[chType].size(); shape++ )
               {
+              const CompArea& compAreaDst = areaDst.block( compID );
+
 #if ALF_IMPROVEMENT
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                 if (m_filterTypeTest[chType][m_filterShapes[chType][shape].filterType] == false)
@@ -3709,47 +3711,18 @@ void EncAdaptiveLoopFilter::deriveStatsForFiltering( PelUnitBuf& orgYuv, PelUnit
 #if JVET_X0071_ALF_BAND_CLASSIFIER
 #if JVET_AD0222_ALF_RESI_CLASS
                 int classifierIdx = 0;
-                getBlkStats<alfWSSD, false>(
-                  m_alfCovariance[compIdx][shape][ctuRsAddr][fixedFilterSetIdx][classifierIdx], 
-                  m_filterShapes[chType][shape], 
-                  compIdx ? nullptr : m_classifier[classifierIdx], 
-                  org, orgStride, 
-                  rec, recStride, nullptr, nullptr, 
-                  isLuma(compID) ? recBufDb.get(compID).bufAt(compArea) : nullptr, 
-                  isLuma(compID) ? recBufDb.get(compID).stride : 0, 
-                  isLuma(compID) ? resiBuf.get(compID).bufAt(compArea) : nullptr, 
-                  isLuma(compID) ? resiBuf.get(compID).stride : 0, 
-                  compArea, compArea, chType, fixedFilterSetIdx, classifierIdx);
+                getBlkStats<alfWSSD, false>(m_alfCovariance[compIdx][shape][ctuRsAddr][fixedFilterSetIdx][classifierIdx], m_filterShapes[chType][shape], compIdx ? nullptr : m_classifier[classifierIdx], org, orgStride, rec, recStride, nullptr, nullptr, isLuma(compID) ? recBufDb.get(compID).bufAt(compArea) : nullptr, isLuma(compID) ? recBufDb.get(compID).stride : 0, isLuma(compID) ? resiBuf.get(compID).bufAt(compAreaDst) : nullptr, isLuma(compID) ? resiBuf.get(compID).stride : 0, compAreaDst, compArea, chType, fixedFilterSetIdx, classifierIdx);
                 if (isLuma(compID))
                 {
                   classifierIdx = 1;
                   if (cs.slice->isIntra())
                   {
-                    getBlkStats<alfWSSD, false>(
-                      m_alfCovariance[compIdx][shape][ctuRsAddr][fixedFilterSetIdx][classifierIdx], 
-                      m_filterShapes[chType][shape], 
-                      compIdx ? nullptr : m_classifier[classifierIdx], 
-                      org, orgStride, 
-                      rec, recStride, nullptr, nullptr, 
-                      isLuma(compID) ? recBufDb.get(compID).bufAt(compArea) : nullptr, 
-                      isLuma(compID) ? recBufDb.get(compID).stride : 0, 
-                      isLuma(compID) ? resiBuf.get(compID).bufAt(compArea) : nullptr, 
-                      isLuma(compID) ? resiBuf.get(compID).stride : 0, 
-                      compArea, compArea, chType, fixedFilterSetIdx, classifierIdx);
+                    getBlkStats<alfWSSD, false>(m_alfCovariance[compIdx][shape][ctuRsAddr][fixedFilterSetIdx][classifierIdx], m_filterShapes[chType][shape], compIdx ? nullptr : m_classifier[classifierIdx], org, orgStride, rec, recStride, nullptr, nullptr, isLuma(compID) ? recBufDb.get(compID).bufAt(compArea) : nullptr, isLuma(compID) ? recBufDb.get(compID).stride : 0, isLuma(compID) ? resiBuf.get(compID).bufAt(compAreaDst) : nullptr, isLuma(compID) ? resiBuf.get(compID).stride : 0, compAreaDst, compArea, chType, fixedFilterSetIdx, classifierIdx);
                   }
                   else
                   {
-                    getBlkStats<alfWSSD, true>(
-                      m_alfCovariance[compIdx][shape][ctuRsAddr][fixedFilterSetIdx][classifierIdx], 
-                      m_filterShapes[chType][shape], 
-                      compIdx ? nullptr : m_classifier[classifierIdx], 
-                      org, orgStride, 
-                      rec, recStride, m_classifier[2], m_alfCovariance[compIdx][shape][ctuRsAddr][fixedFilterSetIdx][2], 
-                      isLuma(compID) ? recBufDb.get(compID).bufAt(compArea) : nullptr, 
-                      isLuma(compID) ? recBufDb.get(compID).stride : 0, 
-                      isLuma(compID) ? resiBuf.get(compID).bufAt(compArea) : nullptr,
-                      isLuma(compID) ? resiBuf.get(compID).stride : 0, 
-                      compArea, compArea, chType, fixedFilterSetIdx, classifierIdx);
+                    getBlkStats<alfWSSD, true>(m_alfCovariance[compIdx][shape][ctuRsAddr][fixedFilterSetIdx][classifierIdx], m_filterShapes[chType][shape], compIdx ? nullptr : m_classifier[classifierIdx], org, orgStride, rec, recStride, m_classifier[2], m_alfCovariance[compIdx][shape][ctuRsAddr][fixedFilterSetIdx][2], isLuma(compID) ? recBufDb.get(compID).bufAt(compArea) : nullptr, isLuma(compID) ? recBufDb.get(compID).stride : 0, isLuma(compID) ? resiBuf.get(compID).bufAt(compAreaDst) : nullptr,
+                      isLuma(compID) ? resiBuf.get(compID).stride : 0, compAreaDst, compArea, chType, fixedFilterSetIdx, classifierIdx);
                   }
                 }
 #else

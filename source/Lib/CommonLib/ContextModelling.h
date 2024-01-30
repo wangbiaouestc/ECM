@@ -1096,6 +1096,9 @@ public:
   void saveMergeInfo(PredictionUnit& puTmp, PredictionUnit pu);
 #endif
   void setMergeInfo( PredictionUnit& pu, int candIdx );
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  int8_t getDir( Slice* slice, int candIdx, MvField* mvField );
+#endif
 #if JVET_AE0169_BIPREDICTIVE_IBC
   void setIbcL1Info( PredictionUnit& pu, int candIdx );
 #endif
@@ -1130,13 +1133,26 @@ public:
   void setGeoMmvdMergeInfo(PredictionUnit& pu, int mergeIdx, int mmvdIdx);
   void copyMergeCtx(MergeCtx &orgMergeCtx);
 #endif
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  int   pocMrg[NUM_MERGE_CANDS];
+  bool  mrgDuplicated[NUM_MERGE_CANDS];
+  void  setGeoMrgDuplicate( const PredictionUnit& pu );
+#endif
 };
+#if JVET_AG0164_AFFINE_GPM
+class InterPrediction;
+#endif
 
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
 class AffineMergeCtx
 {
 public:
-  AffineMergeCtx() : numValidMergeCand(0) { for (unsigned i = 0; i < RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE; i++) affineType[i] = AFFINEMODEL_4PARAM; }
+  AffineMergeCtx() : numValidMergeCand(0) 
+#if JVET_AG0164_AFFINE_GPM
+               , m_indexOffset(0)
+               , m_isGPMAff(0)
+#endif
+  { for (unsigned i = 0; i < RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE; i++) affineType[i] = AFFINEMODEL_4PARAM; }
   ~AffineMergeCtx() {}
 public:
   MvField       mvFieldNeighbours[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE << 1][3]; // double length for mv of both lists
@@ -1161,6 +1177,11 @@ public:
 #endif
 #if JVET_AB0112_AFFINE_DMVR
   bool          xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1) const;
+#endif
+#if JVET_AG0164_AFFINE_GPM
+  int           m_indexOffset;
+  int           m_isGPMAff;
+  void          setAffMergeInfo(PredictionUnit &pu, int candIdx, int8_t mmvdIdx = -1) const;
 #endif
 };
 #else
@@ -1201,6 +1222,12 @@ unsigned CtxQtCbf     ( const ComponentID compID, const bool prevCbf = false, co
 unsigned CtxInterDir  ( const PredictionUnit& pu );
 unsigned CtxSkipFlag  ( const CodingUnit& cu );
 unsigned CtxAffineFlag( const CodingUnit& cu );
+#if JVET_AG0135_AFFINE_CIIP
+unsigned CtxCiipAffineFlag(const CodingUnit& cu);
+#endif
+#if JVET_AG0164_AFFINE_GPM
+unsigned CtxGPMAffineFlag( const CodingUnit& cu );
+#endif
 #if JVET_X0049_ADAPT_DMVR
 unsigned CtxBMMrgFlag(const CodingUnit& cu);
 #endif

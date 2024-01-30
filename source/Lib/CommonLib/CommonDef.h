@@ -1032,7 +1032,11 @@ static const int    TM_MRG_MAX_NUM_INIT_CANDS =                    10; ///< maxi
 #endif
 static const int    TM_MRG_MAX_NUM_CANDS =                          4; ///< maximum number of TM merge candidates (note: should be at most equal to MRG_MAX_NUM_CANDS)
 #if JVET_X0141_CIIP_TIMD_TM
+#if JVET_AG0135_AFFINE_CIIP
+static const int    CIIP_TM_MRG_MAX_NUM_CANDS =                     4;  ///< maximum number of CIIP TM merge candidates (note: should be at most equal to CIIP_TM_MRG_MAX_NUM_CANDS)
+#else
 static const int    CIIP_TM_MRG_MAX_NUM_CANDS =                     2; ///< maximum number of CIIP TM merge candidates (note: should be at most equal to CIIP_TM_MRG_MAX_NUM_CANDS)
+#endif
 #endif
 #if MERGE_ENC_OPT
 static const int    TM_MAX_NUM_SATD_CAND = std::min((int)2, TM_MRG_MAX_NUM_CANDS);
@@ -1077,6 +1081,9 @@ static const int AFFINE_ADAPTIVE_DMVR_INIT_SIZE                   = 15;
 #endif
 #endif
 static const int    AML_MERGE_TEMPLATE_SIZE                       = 1;
+#endif
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+static const int BCW_MAX_REF_SAMPLES = (MAX_CU_SIZE * AML_MERGE_TEMPLATE_SIZE * 2);
 #endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
 static const int    DECODER_SIDE_MV_WEIGHT =                        4; ///< lambda for decoder-side derived MVs
@@ -1281,13 +1288,26 @@ static const int GEO_MAX_NUM_UNI_CANDS =                            15;
 #else
 static const int GEO_MAX_NUM_UNI_CANDS =                            6;
 #endif
+
+#if JVET_AG0164_AFFINE_GPM
+static const int GEO_MAX_NUM_UNI_AFF_CANDS                          = 11;
+static const int GEO_MAX_ALL_INTER_UNI_CANDS = GEO_MAX_NUM_UNI_CANDS + GEO_MAX_NUM_UNI_AFF_CANDS;
+
+static const int GEO_MAX_NUM_UNI_AFF_CANDS_ARMC                     = 22;
+#endif
+
 #if JVET_Y0065_GPM_INTRA
 static const int GEO_MAX_NUM_INTRA_CANDS =                          3;
 static const int GEO_NUM_INTRA_RDO_BUFFER =                         23;
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+static const int GEO_BLEND_MAX_NUM_CANDS =                        ((GEO_MAX_NUM_UNI_CANDS + 1) >> 1) * ((GEO_MAX_NUM_UNI_CANDS + 1) >> 1) / 2;
+static const int GEO_NUM_RDO_BUFFER =                               GEO_MAX_NUM_UNI_CANDS + 67 + 1 + 1;
+#else
 #if JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_GPM
 static const int GEO_NUM_RDO_BUFFER =                               GEO_MAX_NUM_UNI_CANDS + 67;
 #else
 static const int GEO_NUM_RDO_BUFFER =                               GEO_MAX_NUM_UNI_CANDS + GEO_NUM_INTRA_RDO_BUFFER;
+#endif
 #endif
 static const int GEO_MAX_NUM_CANDS = (GEO_MAX_NUM_UNI_CANDS+GEO_MAX_NUM_INTRA_CANDS) * ((GEO_MAX_NUM_UNI_CANDS+GEO_MAX_NUM_INTRA_CANDS) - 1);
 #else
@@ -1337,7 +1357,11 @@ static const int GEO_ENC_MMVD_MAX_REFINE_NUM_ADJ = 1 // regular merge(1)
 static const int GEO_MV_MASK_SIZE =         GEO_WEIGHT_MASK_SIZE >> 2;
 #endif
 #if JVET_W0097_GPM_MMVD_TM
+#if JVET_AG0164_AFFINE_GPM
+static const int GEO_MAX_TRY_WEIGHTED_SAD =                       140;
+#else
 static const int GEO_MAX_TRY_WEIGHTED_SAD =                        70;
+#endif
 #if TM_MRG
 static const int GEO_TM_MAX_NUM_CANDS = GEO_MAX_NUM_UNI_CANDS * (GEO_NUM_TM_MV_CAND - 1);
 #endif
