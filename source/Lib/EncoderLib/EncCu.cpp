@@ -2422,7 +2422,13 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
   int timdMode = 0;
   int timdModeSecondary = 0;
   bool timdIsBlended = false;
+#if JVET_AG0092_ENHANCED_TIMD_FUSION
+  int timdModeNonAng = 0;
+  int timdFusionWeight[TIMD_FUSION_NUM] = { 0 };
+  int8_t timdLocDep[TIMD_FUSION_NUM] = { 0 };
+#else
   int  timdFusionWeight[2] = { 0 };
+#endif
 #if JVET_AC0094_REF_SAMPLES_OPT
   bool timdModeCheckWA          = true;
   bool timdModeSecondaryCheckWA = true;
@@ -2792,8 +2798,17 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
               timdModeCheckWA          = cu.timdModeCheckWA;
               timdModeSecondaryCheckWA = cu.timdModeSecondaryCheckWA;
 #endif
+#if JVET_AG0092_ENHANCED_TIMD_FUSION
+              timdModeNonAng = cu.timdModeNonAng;
+              for( int i = 0; i < TIMD_FUSION_NUM; i++ )
+              {
+                timdFusionWeight[i] = cu.timdFusionWeight[i];
+                timdLocDep[i] = cu.timdLocDep[i];
+              }
+#else
               timdFusionWeight[0] = cu.timdFusionWeight[0];
               timdFusionWeight[1] = cu.timdFusionWeight[1];
+#endif
 #if JVET_AB0155_SGPM
               timdHorMode = cu.timdHor;
               timdVerMode = cu.timdVer;
@@ -2808,8 +2823,18 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
 #endif
               cu.timdModeSecondary = timdModeSecondary;
               cu.timdIsBlended     = timdIsBlended;
+#if JVET_AG0092_ENHANCED_TIMD_FUSION
+              cu.timdModeNonAng = timdModeNonAng;
+              for( int i = 0; i < TIMD_FUSION_NUM; i++ )
+              {
+                cu.timdFusionWeight[i] = timdFusionWeight[i];
+                cu.timdLocDep[i] = timdLocDep[i];
+              }
+#else
               cu.timdFusionWeight[0] = timdFusionWeight[0];
               cu.timdFusionWeight[1] = timdFusionWeight[1];
+#endif
+
 #if JVET_AB0155_SGPM
               cu.timdHor = timdHorMode;
               cu.timdVer = timdVerMode;
