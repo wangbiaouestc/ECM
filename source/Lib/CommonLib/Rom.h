@@ -187,6 +187,9 @@ extern TMatrixCoeff g_trCoreDCT2P256[256][256];
 extern TMatrixCoeff g_trCoreDCT8P256[256][256];
 extern TMatrixCoeff g_trCoreDST7P256[256][256];
 #endif
+#if JVET_AG0067_DMVR_EXTENSIONS
+extern int g_bdofWeight[1600];
+#endif
 #if JVET_W0103_INTRA_MTS
 extern TMatrixCoeff g_aiTr2[NUM_TRANS_TYPE][2][2];
 extern TMatrixCoeff g_aiTr4[NUM_TRANS_TYPE][4][4];

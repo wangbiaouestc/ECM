@@ -12952,7 +12952,11 @@ bool PU::checkBDMVRCondition(const PredictionUnit& pu)
     return pu.mergeFlag && pu.mergeType == MRG_TYPE_DEFAULT_N && !pu.ciipFlag && !pu.cu->affine && !pu.mmvdMergeFlag
 #endif
       && !pu.cu->mmvdSkip
+#if JVET_AG0067_DMVR_EXTENSIONS
+      && (PU::isBiPredFromDifferentDirEqDistPoc( pu ) || (PU::isBiPredFromDifferentDirGenDistPoc( pu ) && !pu.cu->geoFlag))
+#else
       && PU::isBiPredFromDifferentDirEqDistPoc( pu )
+#endif
 #if JVET_AD0213_LIC_IMP
       && !pu.cu->licFlag
 #endif
@@ -20822,7 +20826,11 @@ void PU::spanMotionInfo( PredictionUnit &pu, const MergeCtx &mrgCtx )
         {
           const int bdmvrSubPuIdx = (yStart >> DMVR_SUBCU_HEIGHT_LOG2) * DMVR_SUBPU_STRIDE + (xStart >> DMVR_SUBCU_WIDTH_LOG2);
 #if JVET_Y0089_DMVR_BCW
+#if JVET_AG0067_DMVR_EXTENSIONS
+          if ((pu.cu->bcwIdx != BCW_DEFAULT) || (PU::isBiPredFromDifferentDirGenDistPoc(pu) && (!PU::isBiPredFromDifferentDirEqDistPoc( pu ))))
+#else
           if (pu.cu->bcwIdx != BCW_DEFAULT)
+#endif
           {
             mi.mv[0] = bdmvrSubPuMv0[bdmvrSubPuIdx];
             mi.mv[1] = bdmvrSubPuMv1[bdmvrSubPuIdx];
@@ -21014,8 +21022,20 @@ void PU::spanMotionInfo2( PredictionUnit &pu, const MergeCtx &mrgCtx )
         for (int xStart = 0; xStart < pu.lwidth(); xStart += dx)
         {
           const int bdmvrSubPuIdx = (yStart >> DMVR_SUBCU_HEIGHT_LOG2) * DMVR_SUBPU_STRIDE + (xStart >> DMVR_SUBCU_WIDTH_LOG2);
-          mi.mv[0] = bdmvrSubPuMv0[bdmvrSubPuIdx] + bdofSubPuMvOffset[subPuIdx];
-          mi.mv[1] = bdmvrSubPuMv1[bdmvrSubPuIdx] - bdofSubPuMvOffset[subPuIdx];
+#if JVET_AG0067_DMVR_EXTENSIONS
+          if ((PU::isBiPredFromDifferentDirGenDistPoc(pu) && (!PU::isBiPredFromDifferentDirEqDistPoc( pu ))))
+          {
+            mi.mv[0] = bdmvrSubPuMv0[bdmvrSubPuIdx];
+            mi.mv[1] = bdmvrSubPuMv1[bdmvrSubPuIdx];
+          }
+          else
+          {
+#endif
+            mi.mv[0] = bdmvrSubPuMv0[bdmvrSubPuIdx] + bdofSubPuMvOffset[subPuIdx];
+            mi.mv[1] = bdmvrSubPuMv1[bdmvrSubPuIdx] - bdofSubPuMvOffset[subPuIdx];
+#if JVET_AG0067_DMVR_EXTENSIONS
+          }
+#endif
 
           subPuIdx++;
           MotionBuf mb = pu.cs->getMotionBuf(Area(pu.lx() + xStart, pu.ly() + yStart, dx, dy));
@@ -21640,6 +21660,41 @@ bool PU::isBiPredFromDifferentDirEqDistPoc(const PredictionUnit& pu)
   }
   return false;
 }
+#if JVET_AG0067_DMVR_EXTENSIONS
+bool PU::isBiPredFromDifferentDirGenDistPoc(const PredictionUnit& pu)
+{
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  if (CU::isIBC(*pu.cu))
+  {
+    return false;
+  }
+#endif
+  if (pu.refIdx[0] >= 0 && pu.refIdx[1] >= 0)
+  {
+    if (pu.cu->slice->getRefPic(REF_PIC_LIST_0, pu.refIdx[0])->longTerm
+        || pu.cu->slice->getRefPic(REF_PIC_LIST_1, pu.refIdx[1])->longTerm)
+    {
+      return false;
+    }
+#if JVET_Y0128_NON_CTC
+    if ( PU::isBiRefScaled( *pu.cs, pu.refIdx[0], pu.refIdx[1] ) )
+    {
+      return false;
+    }
+#endif
+    const int poc0 = pu.cu->slice->getRefPOC(REF_PIC_LIST_0, pu.refIdx[0]);
+    const int poc1 = pu.cu->slice->getRefPOC(REF_PIC_LIST_1, pu.refIdx[1]);
+    const int poc = pu.cu->slice->getPOC();
+    if ((poc - poc0)*(poc - poc1) < 0)
+    {
+      {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+#endif
 
 void PU::restrictBiPredMergeCandsOne(PredictionUnit &pu)
 {

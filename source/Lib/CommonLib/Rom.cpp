@@ -3889,6 +3889,9 @@ TMatrixCoeff g_trCoreDCT2P256[256][256];
 TMatrixCoeff g_trCoreDCT8P256[256][256];
 TMatrixCoeff g_trCoreDST7P256[256][256];
 #endif
+#if JVET_AG0067_DMVR_EXTENSIONS
+int g_bdofWeight[1600];
+#endif
 #if JVET_W0103_INTRA_MTS
 TMatrixCoeff g_aiTr2[NUM_TRANS_TYPE][2][2];
 TMatrixCoeff g_aiTr4[NUM_TRANS_TYPE][4][4];
@@ -4499,7 +4502,25 @@ void initROM()
     }
   }
 #endif
-
+#if JVET_AG0067_DMVR_EXTENSIONS
+  int bdofWidth[]  =   {8,  8,  8,   12,  12,  12,  20,  20,   20};
+  int bdofHeight[] =   {8, 12, 20,    8,  12,  20,   8,  12,   20};
+  int weightOffset[] = {0, 64, 160, 320, 416, 560, 800, 960, 1200};
+  for (int i = 0; i < 9; i++)
+  {
+    int offset = weightOffset[i];
+    int width  = bdofWidth[i];
+    int height = bdofHeight[i];
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x++)
+      {
+        g_bdofWeight[y * width + x + offset] = (x >= (width/2) ? width - x : x + 1) * (y >= (height/2) ? height - y : y + 1);
+      }
+    }
+  }
+#endif
+  
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   memset(&g_resiBorderTemplate[0][0][0], 0, sizeof(g_resiBorderTemplate));
   memset(&g_resiBorderTemplateLFNST[0][0][0], 0, sizeof(g_resiBorderTemplateLFNST));

@@ -639,6 +639,9 @@ namespace PU
 #endif
   bool getInterMergeSubPuRecurCand(const PredictionUnit &pu, MergeCtx &mrgCtx, const int count);
   bool isBiPredFromDifferentDirEqDistPoc(const PredictionUnit &pu);
+#if JVET_AG0067_DMVR_EXTENSIONS
+  bool isBiPredFromDifferentDirGenDistPoc(const PredictionUnit &pu);
+#endif
   void restrictBiPredMergeCandsOne    (PredictionUnit &pu);
 #if ENABLE_OBMC
   unsigned int getSameNeigMotion(PredictionUnit &pu, MotionInfo& mi, Position off, int  iDir, int& iLength, int iMaxLength);
