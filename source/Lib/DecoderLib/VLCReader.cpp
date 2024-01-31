@@ -3486,8 +3486,13 @@ void HLSyntaxReader::parsePictureHeader( PicHeader* picHeader, ParameterSetManag
       if (uiCode)
       {
 #if ALF_IMPROVEMENT
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+        READ_FLAG(uiCode, "ph_alf_fixed_filter_set_idx_luma");
+        picHeader->setAlfFixedFilterSetIdx(COMPONENT_Y, uiCode);
+#else
         READ_FLAG(uiCode, "ph_alf_fixed_filter_set_idx");
         picHeader->setAlfFixedFilterSetIdx(uiCode);
+#endif
 #endif
         READ_CODE(3, uiCode, "ph_num_alf_aps_ids_luma");
         int numAps = uiCode;
@@ -3505,6 +3510,18 @@ void HLSyntaxReader::parsePictureHeader( PicHeader* picHeader, ParameterSetManag
         {
           READ_CODE(1, uiCode, "ph_alf_cb_enabled_flag");   alfCbEnabledFlag = uiCode;
           READ_CODE(1, uiCode, "ph_alf_cr_enabled_flag");   alfCrEnabledFlag = uiCode;
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+          if( alfCbEnabledFlag )
+          {
+            READ_FLAG(uiCode, "ph_alf_fixed_filter_set_idx_cb");
+            picHeader->setAlfFixedFilterSetIdx(COMPONENT_Cb, uiCode);
+          }
+          if( alfCrEnabledFlag )
+          {
+            READ_FLAG(uiCode, "ph_alf_fixed_filter_set_idx_cr");
+            picHeader->setAlfFixedFilterSetIdx(COMPONENT_Cr, uiCode);
+          }
+#endif
         }
         else
         {
@@ -4646,9 +4663,14 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
 
     if (uiCode)
     {
-#if ALF_IMPROVEMENT 
+#if ALF_IMPROVEMENT
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+      READ_FLAG(uiCode, "slice_alf_fixed_filter_set_idx_luma");
+      pcSlice->setTileGroupAlfFixedFilterSetIdx(COMPONENT_Y, uiCode);
+#else
       READ_FLAG(uiCode, "slice_alf_fixed_filter_set_idx");
       pcSlice->setTileGroupAlfFixedFilterSetIdx(uiCode);
+#endif
 #endif
       READ_CODE(3, uiCode, "slice_num_alf_aps_ids_luma");
       int numAps = uiCode;
@@ -4669,6 +4691,18 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
       {
         READ_CODE(1, uiCode, "slice_alf_cb_enabled_flag");   alfCbEnabledFlag = uiCode;
         READ_CODE(1, uiCode, "slice_alf_cr_enabled_flag");   alfCrEnabledFlag = uiCode;
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+        if (alfCbEnabledFlag)
+        {
+          READ_FLAG(uiCode, "slice_alf_fixed_filter_set_idx_cb");
+          pcSlice->setTileGroupAlfFixedFilterSetIdx(COMPONENT_Cb, uiCode);
+        }
+        if (alfCrEnabledFlag)
+        {
+          READ_FLAG(uiCode, "slice_alf_fixed_filter_set_idx_cr");
+          pcSlice->setTileGroupAlfFixedFilterSetIdx(COMPONENT_Cr, uiCode);
+        }
+#endif
       }
       else
       {

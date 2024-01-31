@@ -3776,7 +3776,11 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
           if (pcPic->slices[s]->getTileGroupAlfEnabledFlag(COMPONENT_Y))
           {
 #if ALF_IMPROVEMENT
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+            pcPic->slices[s]->setTileGroupAlfFixedFilterSetIdx(COMPONENT_Y, cs.slice->getTileGroupAlfFixedFilterSetIdx(COMPONENT_Y));
+#else
             pcPic->slices[s]->setTileGroupAlfFixedFilterSetIdx(cs.slice->getTileGroupAlfFixedFilterSetIdx());
+#endif
 #endif
             pcPic->slices[s]->setTileGroupNumAps(cs.slice->getTileGroupNumAps());
             pcPic->slices[s]->setAlfAPSs(cs.slice->getTileGroupApsIdLuma());
@@ -3792,6 +3796,10 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
           pcPic->slices[s]->setTileGroupApsIdChroma(cs.slice->getTileGroupApsIdChroma());
           pcPic->slices[s]->setTileGroupCcAlfCbApsId(cs.slice->getTileGroupCcAlfCbApsId());
           pcPic->slices[s]->setTileGroupCcAlfCrApsId(cs.slice->getTileGroupCcAlfCrApsId());
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+          pcPic->slices[s]->setTileGroupAlfFixedFilterSetIdx(COMPONENT_Cb, cs.slice->getTileGroupAlfFixedFilterSetIdx(COMPONENT_Cb));
+          pcPic->slices[s]->setTileGroupAlfFixedFilterSetIdx(COMPONENT_Cr, cs.slice->getTileGroupAlfFixedFilterSetIdx(COMPONENT_Cr));
+#endif
           pcPic->slices[s]->m_ccAlfFilterParam      = m_pcALF->getCcAlfFilterParam();
           pcPic->slices[s]->m_ccAlfFilterControl[0] = m_pcALF->getCcAlfControlIdc(COMPONENT_Cb);
           pcPic->slices[s]->m_ccAlfFilterControl[1] = m_pcALF->getCcAlfControlIdc(COMPONENT_Cr);
@@ -4180,7 +4188,13 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
             picHeader->setAlfEnabledFlag(COMPONENT_Cb, pcSlice->getTileGroupAlfEnabledFlag(COMPONENT_Cb) );
             picHeader->setAlfEnabledFlag(COMPONENT_Cr, pcSlice->getTileGroupAlfEnabledFlag(COMPONENT_Cr) );
 #if ALF_IMPROVEMENT
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+            picHeader->setAlfFixedFilterSetIdx(COMPONENT_Y, pcSlice->getTileGroupAlfFixedFilterSetIdx(COMPONENT_Y));
+            picHeader->setAlfFixedFilterSetIdx(COMPONENT_Cb, pcSlice->getTileGroupAlfFixedFilterSetIdx(COMPONENT_Cb));
+            picHeader->setAlfFixedFilterSetIdx(COMPONENT_Cr, pcSlice->getTileGroupAlfFixedFilterSetIdx(COMPONENT_Cr));
+#else
             picHeader->setAlfFixedFilterSetIdx(pcSlice->getTileGroupAlfFixedFilterSetIdx());
+#endif
 #endif
             picHeader->setNumAlfAps(pcSlice->getTileGroupNumAps());
             picHeader->setAlfAPSs(pcSlice->getTileGroupApsIdLuma());

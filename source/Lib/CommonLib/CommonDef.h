@@ -420,7 +420,11 @@ static const int MAX_NUM_ALF_LUMA_COEFF      =                     21 + EXT_LENG
 #endif
 static const int MAX_ALF_FILTER_LENGTH       =                      9;
 #endif
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+static const int MAX_NUM_ALF_CHROMA_COEFF    =                     21 + 5;
+#else
 static const int MAX_NUM_ALF_CHROMA_COEFF    =                     21;
+#endif
 #else
 static const int MAX_NUM_ALF_LUMA_COEFF      =                     13;
 static const int MAX_NUM_ALF_CHROMA_COEFF    =                      7;
@@ -1957,6 +1961,9 @@ static const int CCALF_SMALL_TAB[CCALF_CANDS_COEFF_NR] = { 0, 1, 2, 4, 8, 16, 32
 
 //! \}
 #if ALF_IMPROVEMENT
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+static const int ALF_CLASSIFIER_FL_CHROMA       = 1;
+#endif
 static const int NUM_FIXED_FILTERS       = 512;
 static const int ALF_CLASSIFIER_FL       = 5;
 static const int NUM_CLASSIFIER          = 2;
