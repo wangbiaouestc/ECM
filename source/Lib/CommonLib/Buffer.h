@@ -307,7 +307,10 @@ typedef AreaBuf<const uint8_t> CIpmBuf;
 typedef AreaBuf<      int>   CCPModelIdxBuf;
 typedef AreaBuf<const int>  CCCPModelIdxBuf;
 #endif
-
+#if JVET_AG0058_EIP
+typedef AreaBuf<      int>   EipModelIdxBuf;
+typedef AreaBuf<const int>  CEipModelIdxBuf;
+#endif
 typedef AreaBuf<      TCoeff>  PLTescapeBuf;
 typedef AreaBuf<const TCoeff> CPLTescapeBuf;
 

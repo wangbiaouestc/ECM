@@ -612,6 +612,22 @@ static const int TMRL_MPM_SIZE =                                   10;
 static const int TMRL_MODECOST =     NUM_LUMA_MODE * MAX_REF_LINE_IDX;
 static const int EXT_REF_LINE_IDX[] =              { 1, 3, 5, 7, 12 };
 #endif
+#if JVET_AG0058_EIP
+static const int EIP_IDX =                                        201;
+static const int MAX_EIP_SIZE =                                    32;
+static const int EIP_FILTER_TAP =                                  15;
+static const int EIP_FILTER_SIZE =                                  7;
+
+static const int MAX_EIP_REF_SIZE =   EIP_FILTER_SIZE  + MAX_EIP_SIZE;
+
+static const int MAX_NUM_HEIP_CANDS =                               6;
+static const int MAX_MERGE_EIP =                                   12;
+static const int NUM_EIP_MERGE_SIGNAL =                             6;
+static const int EIP_TPL_SIZE =                                     1;
+static const int NUM_EIP_BASE_RECOTYPE =                            3;
+static const int NUM_EIP_COMB = NUM_EIP_SHAPE * NUM_EIP_BASE_RECOTYPE;
+static const int NUM_DERIVED_EIP                  = NUM_EIP_SHAPE * 3;
+#endif
 #if MMLM
 static const int MMLM_CHROMA_IDX = LM_CHROMA_IDX + 1; ///< MDLM_L
 static const int MDLM_L_IDX = LM_CHROMA_IDX + 2; ///< MDLM_L
@@ -1581,8 +1597,13 @@ static const int MAX_NUM_REFIDX =                                5;
 static const int MAX_NUM_CANDS =                                64;
 #endif
 #if JVET_AA0057_CCCM
+#if JVET_AG0058_EIP
+// max number of parameters used in CCCM related methods
+static const int CCCM_NUM_PARAMS_MAX = std::max(EIP_FILTER_TAP, CCCM_NO_SUB_NUM_PARAMS);
+#else
 // max number of parameters used in CCCM related methods
 static const int CCCM_NUM_PARAMS_MAX =      CCCM_NO_SUB_NUM_PARAMS;
+#endif
 static const int CCCM_REF_SAMPLES_MAX =       CCCM_MAX_REF_SAMPLES;
 #endif
 

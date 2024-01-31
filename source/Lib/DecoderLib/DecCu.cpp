@@ -531,6 +531,9 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
 #if JVET_AD0188_CCP_MERGE
         CU::saveModelsInHCCP(currCU);
 #endif
+#if JVET_AG0058_EIP
+        CU::saveModelsInHEIP(currCU);
+#endif
         break;
       default:
         THROW( "Invalid prediction mode" );
@@ -587,6 +590,14 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
   const PredictionUnit &pu  = *tu.cs->getPU( area.pos(), chType );
 #endif
 #if ENABLE_DIMD
+#if JVET_AG0058_EIP
+  if (pu.parseChromaMode && compID == COMPONENT_Cb && !CS::isDualITree(cs))
+  {
+    unsigned chromaCandModes[NUM_CHROMA_MODE];
+    PU::getIntraChromaCandModes(pu, chromaCandModes);
+    pu.intraDir[1] = chromaCandModes[pu.candId];
+  }
+#endif
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
   if (pu.intraDir[1] == DIMD_CHROMA_IDX && compID == COMPONENT_Cb)
   {
@@ -625,6 +636,14 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 #endif
   uint32_t uiChFinalMode = PU::getFinalIntraMode(pu, chType);
 #else
+#if JVET_AG0058_EIP
+  if (pu.parseChromaMode && compID == COMPONENT_Cb && !CS::isDualITree(cs))
+  {
+    unsigned chromaCandModes[NUM_CHROMA_MODE];
+    PU::getIntraChromaCandModes(pu, chromaCandModes);
+    pu.intraDir[1] = chromaCandModes[pu.candId];
+  }
+#endif
   const uint32_t uiChFinalMode = PU::getFinalIntraMode(pu, chType);
 #endif
   PelBuf pReco              = cs.getRecoBuf(area);
@@ -660,7 +679,12 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
   {
     m_pcIntraPred->initIntraPatternChType(*tu.cu, area);
   }
-
+#if PRINT_DEBUG_INFO
+  if(!pu.cs->pcv->isEncoder && compID == COMPONENT_Cb)
+  {
+    print_debug_info(*tu.cu, compID);
+  }
+#endif
   //===== get prediction signal =====
 #if JVET_AD0188_CCP_MERGE
   if (compID != COMPONENT_Y && pu.idxNonLocalCCP)
@@ -891,6 +915,42 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
       m_pcIntraPred->predIntraMip( compID, piPred, pu );
 #endif
     }
+#if JVET_AG0058_EIP
+    else if (PU::isEIP(pu, chType))
+    {
+      const bool isEncoder = pu.cs->pcv->isEncoder;
+      m_pcIntraPred->initEipParams(pu, COMPONENT_Y);
+      if (!isEncoder)
+      {
+        if (pu.cu->eipMerge)
+        {
+          static_vector<EipModelCandidate, MAX_MERGE_EIP> eipMergeCandList;
+          m_pcIntraPred->getNeiEipCands(pu, eipMergeCandList);
+          m_pcIntraPred->reorderEipCands(pu, eipMergeCandList);
+          pu.cu->eipModel = eipMergeCandList[pu.intraDir[CHANNEL_TYPE_LUMA]];
+        }
+        else 
+        {
+          static_vector<EipModelCandidate, NUM_DERIVED_EIP> eipModelCandList;
+          m_pcIntraPred->getCurEipCands(pu, eipModelCandList);
+          pu.cu->eipModel = eipModelCandList[0];
+        }
+      }
+      m_pcIntraPred->eipPred(pu, piPred);
+      if (!isEncoder)
+      {
+        pu.cu->eipModel.eipDimdMode = IntraPrediction::deriveDimdMipMode(piPred, piPred.width, piPred.height, *pu.cu);
+
+        // const CodingUnit& cu = *pu.cu;
+        // printf("pos(%d, %d), size(%d, %d), merge(%d), ", cu.lx(), cu.ly(), cu.lwidth(), cu.lheight(), int(cu.eipMerge));
+        // for (int i = 0; i < 15; i++)
+        // {
+        // printf("%d ", int(cu.eipModel.params[i]));
+        // }
+        // printf("\n");
+      }
+    }
+#endif
     else
     {
       if (predRegDiffFromTB)

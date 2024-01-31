@@ -3630,6 +3630,12 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
         CS::saveTemporalCcpModel(cs);
       }
 #endif
+#if JVET_AG0058_EIP
+      if ((pcPic->temporalId == 0) || (pcPic->temporalId < pcSlice->getSPS()->getMaxTLayers() - 1))
+      {
+        CS::saveTemporalEipModel(cs);
+      }
+#endif
 
 #if JVET_W0066_CCSAO
       if ( cs.sps->getCCSAOEnabledFlag() )

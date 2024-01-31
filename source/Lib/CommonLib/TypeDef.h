@@ -197,6 +197,7 @@
 #endif
 #define JVET_AD0120_LBCCP                                 1 // JVET-AD0120: Local-Boosting Cross-Component Prediction, wherein the template part is controlled by CCCM SPS
 #define JVET_AE0043_CCP_MERGE_TEMPORAL                    1 // JVET-AE0043: Cross-component merge mode with temporal candidates
+#define JVET_AG0058_EIP                                   1 // JVET-AG0058: Extrapolation filter-based intra prediction mode
 
 //IBC
 #define JVET_Y0058_IBC_LIST_MODIFY                        1 // JVET-Y0058: Modifications of IBC merge/AMVP list construction, ARMC-TM-IBC part is included under JVET_W0090_ARMC_TM
@@ -1815,6 +1816,37 @@ enum RESHAPE_SIGNAL_TYPE
   RESHAPE_SIGNAL_HLG = 2,
   RESHAPE_SIGNAL_NULL = 100,
 };
+
+#if JVET_AG0058_EIP
+enum EIP_REFERENCE_TYPE
+{
+  EIP_A = 0,
+  EIP_AL = 1,
+  EIP_L = 2,
+  EIP_AL_A = 3,
+  EIP_AL_L = 4,
+  EIP_A_L = 5,
+  EIP_AL_A_L = 6,
+  NUM_EIP_TPL_TYPE = 7,
+};
+
+enum EIP_FILTER_TYPE
+{
+  EIP_FILTER_S  = 0,
+  EIP_FILTER_V  = 1,
+  EIP_FILTER_H  = 2,
+  NUM_EIP_SHAPE = 3,
+};
+
+struct EIPInfo
+{
+  int recoType;
+  int filterShape;
+
+  EIPInfo() : recoType(0), filterShape(0) {}
+  EIPInfo(int _recoType, int _filterShape) : recoType(_recoType), filterShape(_filterShape) {}
+};
+#endif
 
 #if JVET_AB0155_SGPM
 struct SgpmInfo

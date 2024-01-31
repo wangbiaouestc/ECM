@@ -1666,6 +1666,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if JVET_AD0082_TMRL_CONFIG
   WRITE_FLAG(pcSPS->getUseTmrl() ? 1 : 0, "sps_tmrl_enabled_flag");
 #endif
+#if JVET_AG0058_EIP
+  WRITE_FLAG(pcSPS->getUseEip() ? 1 : 0, "sps_eip_enabled_flag");
+#endif
 #if JVET_AD0085_MPM_SORTING
   WRITE_FLAG(pcSPS->getUseMpmSorting() ? 1 : 0, "sps_mpm_sorting_enabled_flag");
 #endif
@@ -3470,6 +3473,9 @@ void  HLSWriter::codeConstraintInfo  ( const ConstraintInfo* cinfo )
 #endif
 #if JVET_AD0082_TMRL_CONFIG
     WRITE_FLAG(cinfo->getNoTmrlConstraintFlag() ? 1 : 0, "gci_no_tmrl_constraint_flag");
+#endif
+#if JVET_AG0058_EIP
+    WRITE_FLAG(cinfo->getNoEipConstraintFlag() ? 1 : 0, "gci_no_eip_constraint_flag");
 #endif
     /* inter */
     WRITE_FLAG(cinfo->getNoRprConstraintFlag() ? 1 : 0, "gci_no_ref_pic_resampling_constraint_flag");

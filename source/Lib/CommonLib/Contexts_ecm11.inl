@@ -3213,6 +3213,23 @@ const CtxSet ContextSetCfg::InterCcpMergeFlag = ContextSetCfg::addCtxSet
      { DWO, },
      });
 #endif
+
+#if JVET_AG0058_EIP
+const CtxSet ContextSetCfg::EipFlag = ContextSetCfg::addCtxSet
+  ({
+     { CNU, CNU, },
+     { CNU, CNU, },
+     { CNU, CNU, },
+     { DWS, DWS, },
+     { DWS, DWS, },
+     { DWS, DWS, },
+     { DWE, DWE, },
+     { DWE, DWE, },
+     { DWE, DWE, },
+     { DWO, DWO, },
+     { DWO, DWO, },
+     });
+#endif
 #endif
 #endif
 

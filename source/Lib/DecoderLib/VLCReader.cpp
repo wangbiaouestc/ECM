@@ -2619,6 +2619,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_AD0082_TMRL_CONFIG
   READ_FLAG(uiCode, "sps_tmrl_enabled_flag");                       pcSPS->setUseTmrl(uiCode != 0);
 #endif
+#if JVET_AG0058_EIP
+  READ_FLAG(uiCode, "sps_eip_enabled_flag");                        pcSPS->setUseEip(uiCode != 0);
+#endif
 #if JVET_AD0085_MPM_SORTING
   READ_FLAG(uiCode, "sps_mpm_sorting_enabled_flag");                pcSPS->setUseMpmSorting(uiCode != 0);
 #endif
@@ -5672,6 +5675,9 @@ void HLSyntaxReader::parseConstraintInfo(ConstraintInfo *cinfo)
 #endif
 #if JVET_AD0082_TMRL_CONFIG
     READ_FLAG(symbol, "gci_no_tmrl_constraint_flag");                    cinfo->setNoTmrlConstraintFlag(symbol > 0 ? true : false);
+#endif
+#if JVET_AG0058_EIP
+    READ_FLAG(symbol, "gci_no_eip_constraint_flag");                     cinfo->setNoTmrlConstraintFlag(symbol > 0 ? true : false);
 #endif
     /* inter */
     READ_FLAG(symbol, "gci_no_ref_pic_resampling_constraint_flag");      cinfo->setNoRprConstraintFlag(symbol > 0 ? true : false);

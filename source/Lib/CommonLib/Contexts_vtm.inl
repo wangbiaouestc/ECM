@@ -1217,3 +1217,12 @@ const CtxSet ContextSetCfg::ChromaFusionCclm = ContextSetCfg::addCtxSet
      { DWS, },
      });
 #endif
+#if JVET_AG0058_EIP
+const CtxSet ContextSetCfg::EipFlag = ContextSetCfg::addCtxSet
+  ({
+     { CNU, CNU, },
+     { CNU, CNU, },
+     { CNU, CNU, },
+     { DWS, DWS, },
+     });
+#endif

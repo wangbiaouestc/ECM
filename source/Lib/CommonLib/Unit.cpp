@@ -365,6 +365,11 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   sgpmMode0    = other.sgpmMode0;
   sgpmMode1    = other.sgpmMode1;
 #endif
+#if JVET_AG0058_EIP
+  eipFlag = other.eipFlag;
+  eipMerge = other.eipMerge;
+  eipModel = other.eipModel;
+#endif
 #if ENABLE_OBMC
   obmcFlag          = other.obmcFlag;
   isobmcMC          = other.isobmcMC;
@@ -570,6 +575,10 @@ void CodingUnit::initData()
   sgpmSplitDir = -1;
   sgpmMode0    = -1;
   sgpmMode1    = -1;
+#endif
+#if JVET_AG0058_EIP
+  eipFlag = false;
+  eipMerge = false;
 #endif
 #if ENABLE_OBMC
   obmcFlag          = true;

@@ -445,6 +445,10 @@ void EncApp::xInitLibCfg()
     m_cEncLib.setNoTmrlConstraintFlag(m_noTmrlConstraintFlag);
     CHECK(m_noTmrlConstraintFlag && m_tmrl, "TMRL shall be deactivated when m_noTmrlConstraintFlag is equal to 1");
 #endif
+#if JVET_AG0058_EIP
+    m_cEncLib.setNoEipConstraintFlag(m_noEipConstraintFlag);
+    CHECK(m_noEipConstraintFlag && m_eip, "EIP shall be deactivated when m_noTmrlConstraintFlag is equal to 1");
+#endif
 #if ENABLE_OBMC
     m_cEncLib.setNoObmcConstraintFlag(m_noObmcConstraintFlag);
     CHECK(m_noObmcConstraintFlag && m_OBMC, "OBMC shall be deactivated when m_noObmcConstraintFlag is equal to 1");
@@ -587,6 +591,9 @@ void EncApp::xInitLibCfg()
 #endif
 #if JVET_AD0082_TMRL_CONFIG
     m_cEncLib.setNoTmrlConstraintFlag(false);
+#endif
+#if JVET_AG0058_EIP
+    m_cEncLib.setNoEipConstraintFlag(false);
 #endif
 #if ENABLE_OBMC
     m_cEncLib.setNoObmcConstraintFlag(false);
@@ -906,6 +913,9 @@ void EncApp::xInitLibCfg()
 #endif
 #if JVET_AD0082_TMRL_CONFIG
   m_cEncLib.setUseTmrl                                           ( m_tmrl );
+#endif
+#if JVET_AG0058_EIP
+  m_cEncLib.setUseEip                                            ( m_eip );
 #endif
 #if JVET_AD0085_MPM_SORTING
   m_cEncLib.setUseMpmSorting                                     ( m_mpmSorting );

@@ -707,6 +707,49 @@ void ibcCiipBlendingSIMD( Pel *pDst, int strideDst, const Pel *pSrc0, int stride
 }
 #endif
 
+#if JVET_AG0058_EIP && INTRA_TRANS_ENC_OPT
+template< X86_VEXT vext >
+int64_t calcAeipGroupSumSIMD(const Pel* src1, const Pel* src2, const int numSamples)
+{
+  int i = 0;
+#if USE_AVX2
+  __m256i vzero = _mm256_setzero_si256();
+  __m256i vsum32 = vzero;
+  const int samplesBySIMD = (numSamples >> 4) << 4;
+  for (; i < samplesBySIMD; i += 16)
+  {
+    __m256i vsrc1 = _mm256_lddqu_si256((__m256i*)(&src1[i]));
+    __m256i vsrc2 = _mm256_lddqu_si256((__m256i*)(&src2[i]));
+    __m256i vsumtemp = _mm256_madd_epi16(vsrc1, vsrc2);
+    vsum32 = _mm256_add_epi32(vsum32, vsumtemp);
+  }
+  vsum32 = _mm256_hadd_epi32(vsum32, vsum32);
+  vsum32 = _mm256_hadd_epi32(vsum32, vsum32);
+  int64_t sum = (_mm_cvtsi128_si32(_mm256_castsi256_si128(vsum32)) + _mm_cvtsi128_si32(_mm256_castsi256_si128(_mm256_permute2x128_si256(vsum32, vsum32, 0x11))));
+#else
+  __m128i vzero = _mm_setzero_si128();
+  __m128i vsum32 = vzero;
+  const int samplesBySIMD = (numSamples >> 4) << 4;
+  for (; i < samplesBySIMD; i += 8)
+  {
+    __m128i vsrc1 = _mm_loadu_si128((__m128i*)(&src1[i]));
+    __m128i vsrc2 = _mm_loadu_si128((__m128i*)(&src2[i]));
+    __m128i vsumtemp = _mm_madd_epi16(vsrc1, vsrc2);
+    vsum32 = _mm_add_epi32(vsum32, vsumtemp);
+  }
+  vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
+  vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+  int64_t sum = _mm_cvtsi128_si32(vsum32);
+#endif
+  for (; i < numSamples; i++)
+  {
+    sum += src1[i] * src2[i];
+  }
+
+  return sum;
+}
+#endif
+
 template <X86_VEXT vext>
 void IntraPrediction::_initIntraX86()
 {
@@ -721,6 +764,9 @@ void IntraPrediction::_initIntraX86()
 #endif
 #if JVET_AC0112_IBC_CIIP && INTRA_TRANS_ENC_OPT
   m_ibcCiipBlending = ibcCiipBlendingSIMD<vext>;
+#endif
+#if JVET_AG0058_EIP && INTRA_TRANS_ENC_OPT
+  m_calcAeipGroupSum = calcAeipGroupSumSIMD<vext>;
 #endif
 }
 

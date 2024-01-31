@@ -591,5 +591,50 @@ struct LutCCP
   // Postions for future extensions
 };
 #endif
+#if JVET_AG0058_EIP
+struct EipModelCandidate
+{
+  int64_t params[EIP_FILTER_TAP] = { 0 };
+  int     filterShape            = 0;
+  int     eipDimdMode            = PLANAR_IDX;
 
+  inline bool isTheSameParams(const EipModelCandidate& p) const
+  {
+    if (filterShape != p.filterShape) 
+    {
+      return false;
+    }
+    for (int i = 0; i < EIP_FILTER_TAP; ++i)
+    {
+      if (params[i] != p.params[i])
+      {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool operator==(const EipModelCandidate &cand) const 
+  { 
+    if (isTheSameParams(cand))
+    {
+      return true;
+    }
+    return false;
+  }
+};
+
+#if JVET_AG0058_EIP
+struct LutEIP
+{
+#if JVET_Z0118_GDR  
+  static_vector<EipModelCandidate, MAX_NUM_HEIP_CANDS> lutEip0;
+  static_vector<EipModelCandidate, MAX_NUM_HEIP_CANDS> lutEip1;
+#else
+  static_vector<CccmModel, MAX_NUM_HEIP_CANDS> lutEip;
+#endif
+  // Postions for future extensions
+};
+#endif
+#endif
 #endif

@@ -1508,6 +1508,13 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
 #if JVET_W0123_TIMD_FUSION
   cu_timd_flag(cu);
 #endif
+#if JVET_AG0058_EIP
+  cu_eip_flag(cu);
+  if (cu.eipFlag)
+  {
+    return;
+  }
+#endif
 #if JVET_AB0155_SGPM
   sgpm_flag(cu);
   if (cu.sgpm)
@@ -1722,6 +1729,13 @@ void CABACWriter::intra_luma_pred_mode( const PredictionUnit& pu )
 #if JVET_W0123_TIMD_FUSION
   cu_timd_flag(*pu.cu);
 #endif
+#if JVET_AG0058_EIP
+  cu_eip_flag(*pu.cu);
+  if (pu.cu->eipFlag)
+  {
+    return;
+  }
+#endif
 #if JVET_AB0155_SGPM
   sgpm_flag(*pu.cu);
   if (pu.cu->sgpm)
@@ -1873,6 +1887,41 @@ void CABACWriter::intra_luma_pred_mode( const PredictionUnit& pu )
   }
 #endif
 }
+
+#if JVET_AG0058_EIP
+void CABACWriter::cu_eip_flag(const CodingUnit& cu)
+{
+  if (cu.timd || cu.dimd || !cu.Y().valid() || !isLuma(cu.chType))
+  {
+    return;
+  }
+
+  const bool bCanUseEip = getAllowedEip(cu, COMPONENT_Y) || getAllowedEipMerge(cu, COMPONENT_Y);
+  if (bCanUseEip)
+  {
+    m_BinEncoder.encodeBin(cu.eipFlag, Ctx::EipFlag(0));
+    if (cu.eipFlag)
+    {
+      if (getAllowedEip(cu, COMPONENT_Y) && getAllowedEipMerge(cu, COMPONENT_Y))
+      {
+        m_BinEncoder.encodeBin(cu.eipMerge, Ctx::EipFlag(1));
+      }
+      if(cu.eipMerge)
+      {
+        CHECK(cu.firstPU->intraDir[0] >= NUM_EIP_MERGE_SIGNAL, "cu.firstPU->intraDir[0] >= NUM_EIP_MERGE_SIGNAL");
+        unary_max_eqprob(cu.firstPU->intraDir[0], NUM_EIP_MERGE_SIGNAL - 1);
+      }
+      else
+      {
+        CHECK(cu.firstPU->intraDir[0] >= NUM_DERIVED_EIP, "cu.firstPU->intraDir[0] >= NUM_DERIVED_EIP");
+        static_vector<EIPInfo, NUM_DERIVED_EIP> eipInfoList;
+        xWriteTruncBinCode(cu.firstPU->intraDir[0], getAllowedCurEip(cu, COMPONENT_Y, eipInfoList));
+      }
+    }
+  }
+  DTRACE(g_trace_ctx, D_SYNTAX, "eip_flag() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.eipFlag ? 1 : 0);
+}
+#endif
 
 #if JVET_W0123_TIMD_FUSION
 void CABACWriter::cu_timd_flag( const CodingUnit& cu )
