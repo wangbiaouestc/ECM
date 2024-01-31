@@ -331,6 +331,9 @@ class ConstraintInfo
 #if JVET_AD0082_TMRL_CONFIG
   bool              m_noTmrlConstraintFlag;
 #endif
+#if JVET_AG0058_EIP
+  bool              m_noEipConstraintFlag;
+#endif
 #if ENABLE_OBMC
   bool              m_noObmcConstraintFlag;
 #endif
@@ -648,6 +651,10 @@ public:
 #if JVET_AD0082_TMRL_CONFIG
   bool          getNoTmrlConstraintFlag() const { return m_noTmrlConstraintFlag; }
   void          setNoTmrlConstraintFlag(bool bVal) { m_noTmrlConstraintFlag = bVal; }
+#endif
+#if JVET_AG0058_EIP
+  bool          getNoEipConstraintFlag() const { return m_noEipConstraintFlag; }
+  void          setNoEipConstraintFlag(bool bVal) { m_noEipConstraintFlag = bVal; }
 #endif
 #if ENABLE_OBMC
   bool          getNoObmcConstraintFlag() const { return m_noObmcConstraintFlag; }
@@ -1782,6 +1789,9 @@ private:
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
   bool              m_tmNoninterToolsEnableFlag;
 #endif
+#if JVET_AG0058_EIP
+  bool              m_eip;
+#endif
 #if JVET_AD0085_MPM_SORTING
   bool              m_mpmSorting;
 #endif
@@ -2443,6 +2453,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
   void      setTMnoninterToolsEnableFlag         (bool b)                                          { m_tmNoninterToolsEnableFlag = b; }
   bool      getTMnoninterToolsEnableFlag          ()                                      const     { return m_tmNoninterToolsEnableFlag; }
+#endif
+#if JVET_AG0058_EIP
+  void      setUseEip          (bool b)                                          { m_eip = b; }
+  bool      getUseEip()                                                const     { return m_eip; }
 #endif
 #if JVET_AD0085_MPM_SORTING
   void      setUseMpmSorting   (bool b)                                          { m_mpmSorting = b; }

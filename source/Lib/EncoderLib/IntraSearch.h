@@ -539,7 +539,14 @@ private:
   Pel*            m_sgpmPredBuf[SGPM_NUM];
   uint8_t         m_intraModeReady[NUM_LUMA_MODE];
 #endif
-
+#if JVET_AG0058_EIP
+  Pel* m_eipPredBuf[NUM_DERIVED_EIP];
+  Pel* m_eipMergePredBuf[MAX_MERGE_EIP];
+  static_vector<ModeInfo, NUM_DERIVED_EIP + MAX_MERGE_EIP> m_uiSavedRdModeListEip;
+  static_vector<ModeInfo, NUM_DERIVED_EIP + MAX_MERGE_EIP> m_uiSavedHadModeListEip;
+  static_vector<double, NUM_DERIVED_EIP + MAX_MERGE_EIP>   m_dSavedModeCostEip;
+  static_vector<double, NUM_DERIVED_EIP + MAX_MERGE_EIP>   m_dSavedHadListEip;
+#endif
   PelStorage      m_tmpStorageLCU;
   PelStorage      m_colorTransResiBuf;
 #if JVET_AB0143_CCCM_TS
@@ -686,6 +693,10 @@ public:
   double getBestIntraSADCost()    { return m_bestIntraSADCost; }
 #endif
   void setLumaIntraPredIdx(PredictionUnit& pu);
+#if JVET_AG0058_EIP
+  EipModelCandidate m_eipModel[NUM_DERIVED_EIP];
+  EipModelCandidate m_eipMergeModel[MAX_MERGE_EIP];
+#endif
 protected:
 
   // -------------------------------------------------------------------------------------------------------------------

@@ -832,7 +832,12 @@ void DecLib::executeLoopFilters()
     CS::saveTemporalCcpModel(cs);
   }
 #endif
-
+#if JVET_AG0058_EIP
+  if ((cs.picture->temporalId == 0) || (cs.picture->temporalId < cs.slice->getSPS()->getMaxTLayers() - 1))
+  {
+    CS::saveTemporalEipModel(cs);
+  }
+#endif
 #if JVET_W0066_CCSAO
   if (cs.sps->getCCSAOEnabledFlag())
   {

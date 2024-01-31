@@ -55,6 +55,9 @@ namespace CS
 #if JVET_AE0043_CCP_MERGE_TEMPORAL
   void   saveTemporalCcpModel(CodingStructure &cs); 
 #endif
+#if JVET_AG0058_EIP
+  void   saveTemporalEipModel(CodingStructure &cs); 
+#endif
 }
 
 
@@ -87,6 +90,9 @@ namespace CU
   void saveMotionInHMVP               (const CodingUnit& cu, const bool isToBeDone );
 #if JVET_AD0188_CCP_MERGE
   void saveModelsInHCCP               (const CodingUnit &cu);
+#endif
+#if JVET_AG0058_EIP
+  void saveModelsInHEIP               (const CodingUnit &cu);
 #endif
 
   PartSplit getSplitAtDepth           (const CodingUnit& cu, const unsigned depth);
@@ -203,6 +209,9 @@ namespace PU
   bool          isMIP                 (const PredictionUnit &pu, const ChannelType &chType = CHANNEL_TYPE_LUMA);
 #if JVET_V0130_INTRA_TMP
   bool          isTmp(const PredictionUnit& pu, const ChannelType& chType = CHANNEL_TYPE_LUMA);
+#endif
+#if JVET_AG0058_EIP
+  bool isEIP(const PredictionUnit& pu, const ChannelType& chType = CHANNEL_TYPE_LUMA);
 #endif
   bool          isDMChromaMIP         (const PredictionUnit &pu);
 #if JVET_AB0155_SGPM
@@ -846,7 +855,6 @@ namespace PU
 #endif
   void ccpParamsToGlmModel(const ComponentID compId, const CCPModelCandidate& params, CccmModel& glmModel);
 #endif
-
   const PredictionUnit *getPUFromPos(const PredictionUnit &pu, const ChannelType &chType, const Position &refPos);
   bool  hasNonLocalCCP(const PredictionUnit &pu);
 #if JVET_AF0073_INTER_CCP_MERGE
@@ -1283,5 +1291,12 @@ int getSpatialIpm(const PredictionUnit& pu, uint8_t* spatialIpm, const int maxCa
 );
 void fillMPMList(const PredictionUnit& pu, uint8_t* mpm, const int numToFill, const int numCand, bool extPrecision = false);
 void fillNonMPMList(uint8_t* mpm, uint8_t* non_mpm);
+#endif
+
+#if JVET_AG0058_EIP
+Position getRecoLinesEIP(const CodingUnit& cu, const ComponentID compId);
+bool     getAllowedEipMerge(const CodingUnit &cu, const ComponentID compId);
+bool     getAllowedEip(const CodingUnit &cu, const ComponentID compId);
+int getAllowedCurEip(const CodingUnit& cu, const ComponentID compId, static_vector<EIPInfo, NUM_DERIVED_EIP>& eipInfoList);
 #endif
 #endif

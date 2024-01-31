@@ -109,9 +109,9 @@ public:
 typedef short TrainDataType;
 #endif
 
-#if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA || JVET_AC0119_LM_CHROMA_FUSION
-typedef int64_t TCccmCoeff;
+#if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA || JVET_AC0119_LM_CHROMA_FUSION || JVET_AG0058_EIP
 
+typedef int64_t TCccmCoeff;
 #define FIXED_MULT(x, y) TCccmCoeff((int64_t(x)*(y) + CCCM_DECIM_ROUND) >> CCCM_DECIM_BITS )
 #if !JVET_AB0174_CCCM_DIV_FREE
 #define FIXED_DIV(x, y)  TCccmCoeff((int64_t(x)    << CCCM_DECIM_BITS ) / (y) )
@@ -189,7 +189,13 @@ struct CccmCovariance
 #endif
   );
 #endif
-
+#if JVET_AG0058_EIP
+#if JVET_AB0174_CCCM_DIV_FREE
+  void solveEip                    ( const TCccmCoeff* A, const TCccmCoeff* Y, const int sampleNum, const int lumaOffset, CccmModel& model );
+#else
+  void solveEip                    ( const TCccmCoeff* A, const TCccmCoeff* Y, const int sampleNum, CccmModel& model );
+#endif
+#endif
 private:
   TCccmCoeff ATA[CCCM_NUM_PARAMS_MAX][CCCM_NUM_PARAMS_MAX];
   TCccmCoeff ATCb[CCCM_NUM_PARAMS_MAX];
@@ -255,14 +261,23 @@ protected:
 #if JVET_AB0157_INTRA_FUSION
   Pel      m_refBuffer2nd[MAX_NUM_COMPONENT][(MAX_CU_SIZE * 2 + 1 + MAX_REF_LINE_IDX) * 2];
 #endif
-
+#if JVET_AG0058_EIP
+  Pel        m_eipBuffer[(MAX_EIP_SIZE * 2 + MAX_EIP_REF_SIZE) * (MAX_EIP_SIZE * 2 + MAX_EIP_REF_SIZE)];
+  Pel        m_eipYBuffer[NUM_EIP_BASE_RECOTYPE][MAX_EIP_SIZE * MAX_EIP_SIZE * 2];
+  Pel        m_eipPredTpl[2][MAX_EIP_SIZE * EIP_TPL_SIZE];
+  TCccmCoeff ATABuf[NUM_EIP_COMB][((EIP_FILTER_TAP + 1) * EIP_FILTER_TAP) >> 1];
+  TCccmCoeff ATYBuf[NUM_EIP_COMB][EIP_FILTER_TAP];
+  bool       bSrcBufFilled[NUM_EIP_SHAPE * NUM_EIP_BASE_RECOTYPE];
+  bool       bDstBufFilled[NUM_EIP_BASE_RECOTYPE];
+  int        numSamplesBuf[NUM_EIP_BASE_RECOTYPE];
+#endif
 private:
 #if !MERGE_ENC_OPT
   Pel* m_yuvExt2[MAX_NUM_COMPONENT][4];
   int  m_yuvExtSize2;
 #endif
 
-#if JVET_AA0057_CCCM || JVET_AC0119_LM_CHROMA_FUSION
+#if JVET_AA0057_CCCM || JVET_AC0119_LM_CHROMA_FUSION || JVET_AG0058_EIP
   Area m_cccmBlkArea;
 #if JVET_AB0174_CCCM_DIV_FREE
   int  m_cccmLumaOffset;
@@ -732,6 +747,16 @@ public:
   void getTmrlSearchRange(const PredictionUnit& pu, int8_t* tmrlRefList, uint8_t* tmrlIntraList, uint8_t& sizeRef, uint8_t& sizeMode);
   TmrlMode m_tmrlList[MRL_LIST_SIZE];
   void getTmrlList(CodingUnit& cu);
+#endif
+#if JVET_AG0058_EIP
+  void initEipParams(const PredictionUnit& pu, const ComponentID compId);
+  void eipPred(const PredictionUnit& pu, PelBuf& piPred, const ComponentID compId = COMPONENT_Y);
+  void getCurEipCands(const PredictionUnit& pu, static_vector<EipModelCandidate, NUM_DERIVED_EIP>& candList, const ComponentID compId = COMPONENT_Y, const bool fastTest = true); 
+  int64_t (*m_calcAeipGroupSum)(const Pel* src1, const Pel* src2, const int numSamples);
+  static int64_t calcAeipGroupSum(const Pel* src1, const Pel* src2, const int numSamples);
+
+  void getNeiEipCands(const PredictionUnit &pu, static_vector<EipModelCandidate, MAX_MERGE_EIP> &candList, const ComponentID compId = COMPONENT_Y);
+  void reorderEipCands(const PredictionUnit &pu, static_vector<EipModelCandidate, MAX_MERGE_EIP> &candList, const ComponentID compId = COMPONENT_Y);
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING && JVET_Y0065_GPM_INTRA
 protected:

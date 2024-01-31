@@ -939,6 +939,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_AD0082_TMRL_CONFIG
   ("NoTmrlConstraintFlag",                             m_noTmrlConstraintFlag,                          false, "Indicate that TMRL is deactivated")
 #endif
+#if JVET_AG0058_EIP
+  ("NoEipConstraintFlag",                              m_noEipConstraintFlag,                           false, "Indicate that EIP is deactivated")
+#endif
 #if ENABLE_OBMC
   ("NoObmcConstraintFlag",                             m_noObmcConstraintFlag,                            false, "Indicate that OBMC is deactivated")
 #endif
@@ -1132,6 +1135,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #endif
 #if JVET_AD0082_TMRL_CONFIG
   ("TMRL",                                            m_tmrl,                                            true,  "Enable template based multiple reference line intra prediction\n")
+#endif
+#if JVET_AG0058_EIP
+  ("EIP",                                             m_eip,                                             true, "Enable extrapolation filter-based intra prediction\n")
 #endif
 #if JVET_AD0085_MPM_SORTING
   ( "MPMSorting",                                     m_mpmSorting,                                      true,  "Enable template-based intra MPM list construction\n" )
@@ -5714,6 +5720,9 @@ void EncAppCfg::xPrintParameter()
 #endif
 #if JVET_AD0082_TMRL_CONFIG
   msg(VERBOSE, "TMRL:%d ", m_tmrl);
+#endif
+#if JVET_AG0058_EIP
+  msg(VERBOSE, "EIP:%d ", m_eip);
 #endif
 #if JVET_AD0085_MPM_SORTING
   msg(VERBOSE, "MPMsorting:%d ", m_mpmSorting);

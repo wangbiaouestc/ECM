@@ -483,6 +483,9 @@ void IntraPrediction::init(ChromaFormat chromaFormatIDC, const unsigned bitDepth
 #if JVET_AC0112_IBC_CIIP && INTRA_TRANS_ENC_OPT
   m_ibcCiipBlending = ibcCiipBlending;
 #endif
+#if JVET_AG0058_EIP && INTRA_TRANS_ENC_OPT
+  m_calcAeipGroupSum = calcAeipGroupSum;
+#endif
 #if JVET_V0130_INTRA_TMP
   unsigned int blkSize;
   if( m_pppTarPatch == NULL )
@@ -18292,7 +18295,7 @@ int IntraPrediction::xCflmCalcRefAver(const PredictionUnit& pu, const CompArea& 
 }
 #endif
 
-#if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA || JVET_AC0119_LM_CHROMA_FUSION
+#if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA || JVET_AC0119_LM_CHROMA_FUSION || JVET_AG0058_EIP
     
 #if JVET_AC0053_GAUSSIAN_SOLVER
 void CccmCovariance::gaussBacksubstitution( TCccmCoeff* x, int numEq, int col )
@@ -19754,6 +19757,871 @@ void IntraPrediction::getTmrlList(CodingUnit& cu)
   for (auto i = 0; i < uiModeList.size(); i++)
   {
     m_tmrlList[i] = uiModeList[i];
+  }
+}
+#endif
+
+#if JVET_AG0058_EIP
+int64_t IntraPrediction::calcAeipGroupSum(const Pel* src1, const Pel* src2, const int numSamples)
+{
+  int64_t sum = 0;
+  for (int i = 0; i < numSamples; i++)
+  {
+    sum += src1[i] * src2[i];
+  }
+
+  return sum;
+}
+
+#if JVET_AB0174_CCCM_DIV_FREE
+void CccmCovariance::solveEip(const TCccmCoeff* A, const TCccmCoeff* Y, const int sampleNum, const int lumaOffset, CccmModel& model)
+#else
+void CccmCovariance::solveEip(const TCccmCoeff* A, const TCccmCoeff* Y, const int sampleNum, CccmModel& model)
+#endif
+{
+  const int numParams = model.getNumParams();
+  CHECK( CCCM_REF_SAMPLES_MAX < sampleNum, "Insufficient buffer size" );
+  CHECK( CCCM_NUM_PARAMS_MAX < numParams, "Insufficient buffer size" );
+
+  int i = 0;
+  for (int coli0 = 0; coli0 < numParams; coli0++)
+  {
+    for (int coli1 = coli0; coli1 < numParams; coli1++)
+    {
+      ATA[coli0][coli1] = A[i];
+      i++;
+    }
+  }
+
+  for (int coli = 0; coli < numParams; coli++)
+  {
+    ATCb[coli] = Y[coli];
+  }
+  
+#if JVET_AB0174_CCCM_DIV_FREE
+  // Remove chromaOffset from stats to update cross-correlation
+  for( int coli = 0; coli < numParams; coli++ )
+  {
+    ATCb[coli] = ATCb[coli] - ((ATA[coli][numParams - 1] * lumaOffset) >> (model.bd - 1));
+  }
+#endif
+  // Scale the matrix and vector to selected dynamic range
+  int matrixShift = 28 - 2 * model.bd - ceilLog2(sampleNum);
+
+  if (matrixShift > 0)
+  {
+    for (int coli0 = 0; coli0 < numParams; coli0++)
+    {
+      for (int coli1 = coli0; coli1 < numParams; coli1++)
+      {
+        ATA[coli0][coli1] <<= matrixShift;
+      }
+    }
+
+    for (int coli = 0; coli < numParams; coli++)
+    {
+      ATCb[coli] <<= matrixShift;
+    }
+  }
+  else if (matrixShift < 0)
+  {
+    matrixShift = -matrixShift;
+
+    for (int coli0 = 0; coli0 < numParams; coli0++)
+    {
+      for (int coli1 = coli0; coli1 < numParams; coli1++)
+      {
+        ATA[coli0][coli1] >>= matrixShift;
+      }
+    }
+
+    for (int coli = 0; coli < numParams; coli++)
+    {
+      ATCb[coli] >>= matrixShift;
+    }
+  }
+#if JVET_AC0053_GAUSSIAN_SOLVER
+  // Solve the filter coefficients
+  gaussElimination(ATA, ATCb, model.params.data(), nullptr, nullptr, numParams, 1, model.bd);
+#else
+  // Solve the filter coefficients using LDL decomposition
+  TE U;       // Upper triangular L' of ATA's LDL decomposition
+  Ty diag;    // Diagonal of D
+
+  bool decompOk = ldlDecompose(ATA, U, diag, numParams);
+  ldlSolve(U, diag, ATCb, model.params.data(), numParams, decompOk);
+#endif
+
+#if JVET_AB0174_CCCM_DIV_FREE
+  // Add the chroma offset to bias term (after shifting up by CCCM_DECIM_BITS and down by cccmModelCb.bd - 1)
+  model.params[numParams - 1] += lumaOffset << (CCCM_DECIM_BITS - (model.bd - 1));
+#endif
+}
+
+void IntraPrediction::initEipParams(const PredictionUnit& pu, const ComponentID compId)
+{
+  const ChannelType chType = toChannelType(compId);
+  const CodingUnit& cu = *pu.cu;
+  const CodingStructure& cs = *cu.cs;
+  const SPS& sps = *cs.sps;
+  const PreCalcValues& pcv = *cs.pcv;
+  const auto& area = pu.blocks[compId];
+  const int height = area.height;
+  const int width = area.width;
+  const bool noShift = pcv.noChroma2x2 && width == 4;   // don't shift on the lowest level (chroma not-split)
+  const int  compScaleX = getComponentScaleX(compId, sps.getChromaFormatIdc());
+  const int  compScaleY = getComponentScaleY(compId, sps.getChromaFormatIdc());
+  const int  unitWidth = pcv.minCUWidth >> (noShift ? 0 : compScaleX);
+  const int  unitHeight = pcv.minCUHeight >> (noShift ? 0 : compScaleY);
+
+  const int  totalAboveUnits = (2 * width + (unitWidth - 1)) / unitWidth;
+  const int  totalLeftUnits = (2 * height + (unitHeight - 1)) / unitHeight;
+  const int  numAboveUnits = std::max<int>(width / unitWidth, 1);
+  const int  numLeftUnits = std::max<int>(height / unitHeight, 1);
+  const int  numAboveRightUnits = totalAboveUnits - numAboveUnits;
+  const int  numLeftBelowUnits = totalLeftUnits - numLeftUnits;
+
+  static bool neighborFlags[4 * MAX_NUM_PART_IDXS_IN_CTU_WIDTH + 1] = { false }; // Just a dummy array here, content not used
+  int avaiAboveRightUnits = isAboveRightAvailable(cu, chType, area.topRight(), numAboveRightUnits, unitWidth, (neighborFlags + totalLeftUnits + 1 + numAboveUnits));
+  int avaiLeftBelowUnits = isBelowLeftAvailable(cu, chType, area.bottomLeft(), numLeftBelowUnits, unitHeight, (neighborFlags + totalLeftUnits - 1 - numLeftUnits));
+
+  const Position tplSize = getRecoLinesEIP(cu, compId);
+  m_cccmBlkArea.x = tplSize.x + EIP_FILTER_SIZE;
+  m_cccmBlkArea.y = tplSize.y + EIP_FILTER_SIZE;
+  m_cccmBlkArea.width = width + m_cccmBlkArea.x + avaiAboveRightUnits * unitWidth;
+  m_cccmBlkArea.height = height + m_cccmBlkArea.y + avaiLeftBelowUnits  * unitHeight;
+  m_cccmLumaOffset = pu.cs->picture->getRecoBuf(pu.blocks[compId]).at(-1, -1);
+
+  // fill reconstruction buffer
+  const int refSizeY = m_cccmBlkArea.y;
+  const int refSizeX = m_cccmBlkArea.x;
+  const int refHeight = m_cccmBlkArea.height;
+  const int refWidth = m_cccmBlkArea.width;
+  const int refPosPicX = pu.blocks[compId].x - refSizeX;
+  const int refPosPicY = pu.blocks[compId].y - refSizeY;
+  const Pel* piReco = cs.picture->getRecoBuf(compId).buf;
+  const int picStride = cs.picture->getRecoBuf(compId).stride;
+  CPelBuf recoTopAndTopLeft(piReco + refPosPicX + refPosPicY * picStride, picStride, refWidth, refSizeY);
+  PelBuf refTopAndTopLeft(m_eipBuffer, refWidth, refWidth, refSizeY);
+  refTopAndTopLeft.copyFrom(recoTopAndTopLeft);
+  CPelBuf recoLeft(piReco + refPosPicX + (refPosPicY + refSizeY) * picStride, picStride, refSizeX, refHeight - refSizeY);
+  PelBuf refLeft(m_eipBuffer + refWidth * refSizeY, refWidth, refSizeX, refHeight - refSizeY);
+  refLeft.copyFrom(recoLeft);
+}
+
+void setInputsVec(Pel *inputs, PelBuf &reco, int w, int h, int filterShape) 
+{
+  for(int idx = 0; idx < EIP_FILTER_TAP; idx++)
+  {
+    inputs[idx] = reco.at(w + g_eipFilter[filterShape][idx].x, h + g_eipFilter[filterShape][idx].y);
+  }
+}
+
+void IntraPrediction::getCurEipCands(const PredictionUnit& pu, static_vector<EipModelCandidate, NUM_DERIVED_EIP>& candList, const ComponentID compId, const bool fastTest)
+{
+  if(!getAllowedEip(*pu.cu, compId))
+  {
+    return;
+  }
+
+  const Position tplSize = getRecoLinesEIP(*pu.cu, compId);
+  const int refSizeY = m_cccmBlkArea.y;
+  const int refSizeX = m_cccmBlkArea.x;
+  const int refHeight = m_cccmBlkArea.height;
+  const int refWidth = m_cccmBlkArea.width;
+  PelBuf refBuf(m_eipBuffer, refWidth, refHeight);
+  const int bd = pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA);
+  const int log2BatchSize = 10;
+  const int batchSize = (1 << log2BatchSize);
+  const int sizeAtaBuf = ((EIP_FILTER_TAP + 1) * EIP_FILTER_TAP) >> 1;
+  const int numInputs = EIP_FILTER_TAP;
+  static_vector<EIPInfo, NUM_DERIVED_EIP> eipInfoList;
+  getAllowedCurEip(*pu.cu, compId, eipInfoList);
+  memset(ATABuf[0], 0, sizeof(TCccmCoeff) * NUM_EIP_COMB * sizeAtaBuf);
+  memset(ATYBuf[0], 0, sizeof(TCccmCoeff) * NUM_EIP_COMB * EIP_FILTER_TAP);
+  for (int i = 0; i < NUM_EIP_SHAPE * NUM_EIP_BASE_RECOTYPE; i++)
+  {
+    bSrcBufFilled[i] = false;
+  }
+  for (int i = 0; i < NUM_EIP_BASE_RECOTYPE; i++) 
+  {
+    bDstBufFilled[i] = false;
+    numSamplesBuf[i] = 0;
+  }
+  if (!pu.cs->pcv->isEncoder) // decoder derives one set of coefficients.
+  {
+    const auto eipInfoBackup = eipInfoList[pu.intraDir[0]];
+    eipInfoList.clear();
+    eipInfoList.push_back(eipInfoBackup);
+  }
+  static_vector<int, NUM_EIP_BASE_RECOTYPE> refIdxList;
+  for (auto mode : eipInfoList)
+  {
+    int recoType = mode.recoType, filterShape = mode.filterShape;
+    CccmModel model(EIP_FILTER_TAP, bd);
+    TCccmCoeff ATA[sizeAtaBuf]{ 0 };
+    TCccmCoeff ATY[EIP_FILTER_TAP]{ 0 };
+    int totalSamples = 0;
+    // push needed refIdx for current mode.
+    refIdxList.clear();
+    if (recoType == EIP_AL || recoType == EIP_AL_A || recoType == EIP_AL_L || recoType == EIP_AL_A_L) 
+    {
+      refIdxList.push_back(EIP_AL);
+    }
+    if (recoType == EIP_A || recoType == EIP_AL_A || recoType == EIP_AL_A_L)
+    {
+      refIdxList.push_back(EIP_A);
+    }
+    if (recoType == EIP_L || recoType == EIP_AL_L || recoType == EIP_AL_A_L)
+    {
+      refIdxList.push_back(EIP_L);
+    }
+    for (auto refIdx : refIdxList)
+    {
+      const int srcBufIdx = filterShape + refIdx * NUM_EIP_BASE_RECOTYPE;
+      // fill src buffer
+      if (!bSrcBufFilled[srcBufIdx])
+      {
+        bSrcBufFilled[srcBufIdx] = true;
+        int startX, startY, endX, endY;
+        if (refIdx == EIP_AL) 
+        {
+          startX = refSizeX - tplSize.x;
+          startY = refSizeY - tplSize.y;
+          endX = refSizeX;
+          endY = refSizeY;
+        }
+        else if (refIdx == EIP_A)
+        {
+          startX = refSizeX;
+          startY = refSizeY - tplSize.y;
+          endX = refWidth;
+          endY = refSizeY;
+        }
+        else // EIP_L
+        {
+          startX = refSizeX - tplSize.x;
+          startY = refSizeY;
+          endX = refSizeX;
+          endY = refHeight;
+        }
+
+        int numSamples = 0;
+        for (int y = startY; y < endY; y++)
+        {
+          for (int x = startX; x < endX; x++)
+          {
+            for (int inputIdx = 0; inputIdx < numInputs; inputIdx++)
+            {
+              m_a[inputIdx][numSamples] = refBuf.at(x + g_eipFilter[filterShape][inputIdx].x, y + g_eipFilter[filterShape][inputIdx].y);
+            }
+            numSamples++;
+          }
+        }
+        numSamplesBuf[refIdx] = numSamples;
+
+        if (!bDstBufFilled[refIdx])
+        {
+          bDstBufFilled[refIdx] = true;
+          numSamples = 0;
+          for (int y = startY; y < endY; y++)
+          {
+            for (int x = startX; x < endX; x++)
+            {
+              m_eipYBuffer[refIdx][numSamples++] = refBuf.at(x, y);
+            }
+          }
+        }
+
+        const int samplesInBatches = (numSamples >> log2BatchSize) << log2BatchSize;
+        int i = 0;
+        for (int coli0 = 0; coli0 < numInputs; coli0++)
+        {
+          for (int coli1 = coli0; coli1 < numInputs; coli1++)
+          {
+            for (int offset = 0; offset < samplesInBatches; offset += batchSize)
+            {
+              ATABuf[srcBufIdx][i] += m_calcAeipGroupSum(&m_a[coli0][offset], &m_a[coli1][offset], batchSize);
+            }
+            ATABuf[srcBufIdx][i] +=
+              m_calcAeipGroupSum(&m_a[coli0][samplesInBatches], &m_a[coli1][samplesInBatches], numSamples - samplesInBatches);
+            i++;
+          }
+        }
+
+        for (int coli = 0; coli < numInputs; coli++)
+        {
+          for (int offset = 0; offset < samplesInBatches; offset += batchSize)
+          {
+            ATYBuf[srcBufIdx][coli] += m_calcAeipGroupSum(&m_a[coli][offset], &m_eipYBuffer[refIdx][offset], batchSize);
+          }
+          ATYBuf[srcBufIdx][coli] += m_calcAeipGroupSum(&m_a[coli][samplesInBatches], &m_eipYBuffer[refIdx][samplesInBatches], numSamples - samplesInBatches);
+        }
+      }
+
+      CHECK(!bSrcBufFilled[srcBufIdx], "srcBuf is not filled.");
+      
+      for (int i = 0; i < sizeAtaBuf; i++)
+      {
+        ATA[i] += ATABuf[srcBufIdx][i];
+      }
+
+      for (int coli = 0; coli < numInputs; coli++)
+      {
+        ATY[coli] += ATYBuf[srcBufIdx][coli];
+      }
+      totalSamples += numSamplesBuf[refIdx];
+    }
+
+    m_cccmSolver.solveEip(ATA, ATY, totalSamples, m_cccmLumaOffset, model);
+    EipModelCandidate cand;
+    cand.filterShape = filterShape;
+    memcpy(cand.params, model.params.data(), sizeof(cand.params));
+    candList.push_back(cand);
+  }
+}
+
+void IntraPrediction::eipPred(const PredictionUnit& pu, PelBuf& piPred, const ComponentID compId)
+{
+  EipModelCandidate model = pu.cu->eipModel;
+  CccmModel cand(EIP_FILTER_TAP, pu.cu->slice->getSPS()->getBitDepth(toChannelType(compId)));
+  memcpy(cand.params.data(), model.params, sizeof(model.params));
+
+  const int refSizeY = m_cccmBlkArea.y;
+  const int refSizeX = m_cccmBlkArea.x;
+  const int stride = m_cccmBlkArea.width;
+  const int blockHeight = piPred.height;
+  const int blockWidth = piPred.width;
+
+  PelBuf predBuf(m_eipBuffer + refSizeY * stride + refSizeX, stride, blockWidth, blockHeight);
+  const ScanElement* scan = g_scanOrder[SCAN_UNGROUPED][SCAN_DIAG][gp_sizeIdxInfo->idxFrom(blockWidth)][gp_sizeIdxInfo->idxFrom(blockHeight)];
+  const int num = blockWidth * blockHeight;
+  Pel inputs[EIP_FILTER_TAP];
+  const ClpRng clipRng = pu.cu->slice->clpRngs().comp[compId];
+  for (int scanIdx = 0; scanIdx < num; scanIdx++)
+  {
+    setInputsVec(inputs, predBuf, scan[scanIdx].x, scan[scanIdx].y, model.filterShape);
+    predBuf.at(scan[scanIdx].x, scan[scanIdx].y) = ClipPel(cand.convolve(inputs), clipRng);
+  }
+
+  piPred.copyFrom(predBuf);
+}
+
+void IntraPrediction::getNeiEipCands(const PredictionUnit& pu, static_vector<EipModelCandidate, MAX_MERGE_EIP>& candList, const ComponentID compId)
+{
+  if(!getAllowedEipMerge(*pu.cu, compId))
+  {
+    return;
+  }
+
+  const CompArea& area = pu.blocks[compId];
+  const ChannelType channelType = toChannelType(compId);
+  int numCand = 0;
+  const int maxCands = MAX_MERGE_EIP;
+  const CodingStructure &cs = *pu.cs;
+  const Position topLeft = area.topLeft();
+  const Position posCand[5] = {
+    topLeft.offset(-1, area.height - 1),
+    topLeft.offset(area.width - 1, -1),
+    topLeft.offset(-1, -1),
+    topLeft.offset(area.width, -1),
+    topLeft.offset(-1, area.height),
+  };
+
+  auto getEipModel = [&](Position pos) -> void
+  {
+    const PredictionUnit* neighborPu = cs.getPURestricted(pos, pu, channelType); // PU::getPUFromPos(pu, channelType, pos);
+    if (neighborPu && neighborPu->cu->eipFlag)
+    {
+      EipModelCandidate cand = neighborPu->cu->eipModel;
+      bool bIncludedModel = false;
+      for (auto i = 0; i < candList.size(); i++) 
+      {
+        if(cand.isTheSameParams(candList[i]))
+        {
+          bIncludedModel = true;
+          break;
+        }
+      }
+      if(!bIncludedModel)
+      {
+        candList.push_back(cand);
+        numCand++;
+      }
+    }
+    if (numCand >= maxCands)
+    {
+      return;
+    }
+  };
+
+  for (int posIdx = 0; posIdx < 5; posIdx++)
+  {
+    getEipModel(posCand[posIdx]);
+  }
+
+  auto tryToAddOneModel = [&](const EipModelCandidate& cand)
+  {
+    bool bIncludedModel = false;
+    for (auto i = 0; i < candList.size(); i++) 
+    {
+      if(cand.isTheSameParams(candList[i]))
+      {
+        bIncludedModel = true;
+        break;
+      }
+    }
+    if(!bIncludedModel)
+    {
+      candList.push_back(cand);
+      numCand++;
+    }
+    if (numCand >= maxCands)
+    {
+      return;
+    }
+  };
+  const Slice &slice = *pu.cs->slice;
+  if (!slice.isIntra() && compId == COMPONENT_Y)
+  {
+    const Picture* const pColPic = slice.getRefPic(RefPicList(slice.isInterB() ? 1 - slice.getColFromL0Flag() : 0), slice.getColRefIdx()); 
+
+    if(pColPic)
+    {
+      const PreCalcValues& pcv = *cs.pcv;
+      bool c0Avail;
+      bool c1Avail;
+      bool boundaryCond;
+      const SubPic& curSubPic = pu.cs->slice->getPPS()->getSubPicFromPos(pu.lumaPos());
+      int lumaScaleX = getChannelTypeScaleX( channelType, pu.chromaFormat );
+      int lumaScaleY = getChannelTypeScaleY( channelType, pu.chromaFormat );
+      Position posRB = pu.blocks[compId].bottomRight().offset(-1, -1);
+      Position posCenter = pu.blocks[compId].center();
+      Position posC0;
+      Position posC1;
+
+      int offsetX0 = 0, offsetX1 = 0, offsetX2 = 0, offsetX3 = pu.blocks[compId].width >> 1;
+      int offsetY0 = 0, offsetY1 = 0, offsetY2 = 0, offsetY3 = pu.blocks[compId].height >> 1;
+
+      const int numNACandidate[5] = { 2, 2, 2, 2, 2 };
+      const int idxMap[5][2] = { { 0, 1 },{ 0, 2 },{ 0, 2 },{ 0, 2 },{ 0, 2 } };
+
+      for (int iDistanceIndex = 0; iDistanceIndex < 5 && numCand < maxCands; iDistanceIndex++)
+      {
+        const int iNADistanceHor = pu.blocks[compId].width  * iDistanceIndex;
+        const int iNADistanceVer = pu.blocks[compId].height * iDistanceIndex;
+
+        for (int naspIdx = 0; naspIdx < numNACandidate[iDistanceIndex] && numCand < maxCands; naspIdx++)
+        {
+          switch (idxMap[iDistanceIndex][naspIdx])
+          {
+          case 0: offsetX0 = offsetX2 = 2 + iNADistanceHor; offsetY0 = offsetY2 = 2 + iNADistanceVer; offsetX1 = iNADistanceHor; offsetY1 = iNADistanceVer; break;
+          case 1: offsetX0 = 2; offsetY0 = 0; offsetX1 = 0; offsetY1 = 2; break;
+          case 2: offsetX0 = offsetX2; offsetY0 = 2 - offsetY3; offsetX1 = 2 - offsetX3; offsetY1 = offsetY2; break;
+          default: printf("error!"); exit(0); break;
+          }
+        
+          c0Avail = false;
+          if (curSubPic.getTreatedAsPicFlag())
+          {
+            boundaryCond = ((posRB.x + offsetX0) <= (curSubPic.getSubPicRight() >> lumaScaleX)) && ((posRB.y + offsetY0) <= (curSubPic.getSubPicBottom() >> lumaScaleY));
+          }
+          else
+          {
+            boundaryCond = ((posRB.x + offsetX0) < (pcv.lumaWidth >> lumaScaleX)) && ((posRB.y + offsetY0) < (pcv.lumaHeight >> lumaScaleY));
+          }
+          if (boundaryCond)
+          {
+            posC0 = posRB.offset(offsetX0, offsetY0);
+            c0Avail = true;
+          }
+
+          if (idxMap[iDistanceIndex][naspIdx] == 0)
+          {
+            c1Avail = false;
+            if (curSubPic.getTreatedAsPicFlag())
+            {
+              boundaryCond = ((posCenter.x + offsetX1) <= (curSubPic.getSubPicRight() >> lumaScaleX) && (posCenter.y + offsetY1) <= (curSubPic.getSubPicBottom() >> lumaScaleY));
+            }
+            else
+            {
+              boundaryCond = ((posCenter.x + offsetX1) < (pcv.lumaWidth >> lumaScaleX)) && ((posCenter.y + offsetY1) < (pcv.lumaHeight >> lumaScaleY));
+            }
+            if (boundaryCond)
+            {
+              posC1 = posCenter.offset(offsetX1, offsetY1);
+              c1Avail = true;
+            }
+          }
+          else
+          {
+            c1Avail = false;
+            if (curSubPic.getTreatedAsPicFlag())
+            {
+              boundaryCond = ((posRB.x + offsetX1) <= (curSubPic.getSubPicRight() >> lumaScaleX) && (posRB.y + offsetY1) <= (curSubPic.getSubPicBottom() >> lumaScaleY));
+            }
+            else
+            {
+              boundaryCond = ((posRB.x + offsetX1) < (pcv.lumaWidth >> lumaScaleX)) && ((posRB.y + offsetY1) < (pcv.lumaHeight >> lumaScaleY));
+            }
+            if (boundaryCond)
+            {
+              posC1 = posRB.offset(offsetX1, offsetY1);
+              c1Avail = true;
+            }
+          }
+
+          if (c0Avail || c1Avail)
+          {
+            int modelIdx = c0Avail? pColPic->cs->getEipIdxInfo(posC0) 
+                            : pColPic->cs->getEipIdxInfo(posC1);
+            if (modelIdx > 0)
+            {
+              const EipModelCandidate currEipModel = pColPic->cs->m_eipModelLUT[modelIdx-1];
+              tryToAddOneModel(currEipModel);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Non-adjacent candidates round 1
+  int offsetX = 0;  int offsetY = 0;
+  int offsetX0 = 0; int offsetX1 = 0; int offsetX2 = pu.blocks[compId].width >> 1;
+  int offsetY0 = 0; int offsetY1 = 0; int offsetY2 = pu.blocks[compId].height >> 1;
+
+  const int horNAInterval = std::max((int)(pu.blocks[compId].width * 2) >> 1, 4);
+  const int verNAInterval = std::max((int)(pu.blocks[compId].height * 2) >> 1, 4);
+  const int numNACandidate[7] = { 5, 9, 9, 9, 9, 9, 9 };
+  const int idxMap[7][9] = {
+    { 0, 1, 2, 3, 4 },
+    { 0, 1, 2, 3, 4, 5, 6, 7, 8 },
+    { 0, 1, 2, 3, 4, 5, 6, 7, 8 },
+    { 0, 1, 2, 3, 4, 5, 6, 7, 8 },
+    { 0, 1, 2, 3, 4, 5, 6, 7, 8 },
+    { 0, 1, 2, 3, 4, 5, 6, 7, 8 },
+    { 0, 1, 2, 3, 4, 5, 6, 7, 8 }
+  };
+
+  for (int iDistanceIndex = 0; iDistanceIndex < 7 && numCand < maxCands; iDistanceIndex++)
+  {
+    const int iNADistanceHor = horNAInterval * (iDistanceIndex + 1);
+    const int iNADistanceVer = verNAInterval * (iDistanceIndex + 1);
+
+    for (int naspIdx = 0; naspIdx < numNACandidate[iDistanceIndex] && numCand < maxCands; naspIdx++)
+    {
+      switch (idxMap[iDistanceIndex][naspIdx])
+      {
+      case 0: offsetX = offsetX0 = -iNADistanceHor - 1;                  offsetY = offsetY0 = verNAInterval + iNADistanceVer - 1;  break;
+      case 1: offsetX = offsetX1 = horNAInterval + iNADistanceHor - 1;  offsetY = offsetY1 = -iNADistanceVer - 1;                  break;
+      case 2: offsetX = offsetX2;       offsetY = offsetY1;       break;
+      case 3: offsetX = offsetX0;       offsetY = offsetY2;       break;
+      case 4: offsetX = offsetX0;       offsetY = offsetY1;       break;
+      case 5: offsetX = -1;             offsetY = offsetY0;       break;
+      case 6: offsetX = offsetX1;       offsetY = -1;             break;
+      case 7: offsetX = offsetX0 >> 1;  offsetY = offsetY0;       break;
+      case 8: offsetX = offsetX1;       offsetY = offsetY1 >> 1;  break;
+      default: printf("error!"); exit(0); break;
+      }
+
+      getEipModel(topLeft.offset(offsetX, offsetY));
+    }
+  }
+
+  // Non-adjacent candidates round 2
+  const int numNACandidate2[7] = { 4, 4, 4, 4, 4, 4, 4 };
+  const int idxMap2[7][5]        = { { 0, 1, 2, 3 }, { 0, 1, 2, 3 }, { 0, 1, 2, 3 }, { 0, 1, 2, 3 },
+                                     { 0, 1, 2, 3 }, { 0, 1, 2, 3 }, { 0, 1, 2, 3 } };
+
+  for (int iDistanceIndex = 0; iDistanceIndex < 7 && numCand < maxCands; iDistanceIndex++)
+  {
+    const int horNADistance = horNAInterval * (iDistanceIndex + 1);
+    const int verNADistance = verNAInterval * (iDistanceIndex + 1);
+
+    for (int naspIdx = 0; naspIdx < numNACandidate2[iDistanceIndex] && numCand < maxCands; naspIdx++)
+    {
+      switch (idxMap2[iDistanceIndex][naspIdx])
+      {
+      case 0: offsetX = offsetX0 = -horNADistance - 1;          offsetY = offsetY2 + ((verNAInterval + verNADistance - 1 - offsetY2) >> 1); break;
+      case 1: offsetX = offsetX2 + ((horNAInterval + horNADistance - 1 - offsetX2) >> 1); offsetY = offsetY0 = -verNADistance - 1; break;
+      case 2: offsetX = offsetX0;                                offsetY = offsetY0 + ((offsetY2 - offsetY0) >> 1); break;
+      case 3: offsetX = offsetX0 + ((offsetX2 - offsetX0) >> 1); offsetY = offsetY0; break;
+      default: printf("error!"); exit(0); break;
+      }
+
+      getEipModel(topLeft.offset(offsetX, offsetY));
+    }
+  }
+
+  // Shifted temporal eip models
+  if (!slice.isIntra() && compId == COMPONENT_Y)
+  {
+    const Picture* const pColPic = slice.getRefPic(RefPicList(slice.isInterB() ? 1 - slice.getColFromL0Flag() : 0), slice.getColRefIdx()); 
+
+    if(pColPic)
+    {
+      const PreCalcValues& pcv = *cs.pcv;
+
+      bool c0Avail;
+      bool c1Avail;
+      bool boundaryCond;
+      const SubPic& curSubPic = pu.cs->slice->getPPS()->getSubPicFromPos(pu.lumaPos());
+      int lumaScaleX = getChannelTypeScaleX( channelType, pu.chromaFormat );
+      int lumaScaleY = getChannelTypeScaleY( channelType, pu.chromaFormat );
+      Position posRB = pu.blocks[compId].bottomRight().offset(-1, -1);
+      Position posCenter = pu.blocks[compId].center();
+      
+      Position posC0;
+      Position posC1;
+
+      int offsetX0 = 0, offsetX1 = 0, offsetX2 = 0, offsetX3 = pu.blocks[compId].width >> 1;
+      int offsetY0 = 0, offsetY1 = 0, offsetY2 = 0, offsetY3 = pu.blocks[compId].height >> 1;
+
+      const int numNACandidate[5] = { 2, 2, 2, 2, 2 };
+      const int idxMap[5][2] = { { 0, 1 },{ 0, 2 },{ 0, 2 },{ 0, 2 },{ 0, 2 } };
+
+      const unsigned plevel = pu.cs->sps->getLog2ParallelMergeLevelMinus2() + 2;
+
+      MotionInfo miNeigh;
+      bool foundNeighMV = false;
+      bool useL0;
+      const int colPOC     = pColPic->getPOC();
+
+      for (int posIdx = 0; posIdx < 5 && foundNeighMV == false; posIdx++)
+      {
+        const PredictionUnit *puRef = cs.getPURestricted(posCand[posIdx], pu, pu.chType);
+        bool isAvailableNeigh = puRef && 
+                                PU::isDiffMER(pu.lumaPos(), posCand[posIdx], plevel) && 
+                                pu.cu != puRef->cu && 
+                                CU::isInter(*puRef->cu);
+
+        if (isAvailableNeigh)
+        {
+          miNeigh = puRef->getMotionInfo(posCand[posIdx]);
+          for (int i = 0; i < 2 && foundNeighMV == false; i++)
+          {
+            int refIdx = miNeigh.refIdx[i];
+            if (refIdx != -1)
+            {
+              const int currRefPOC = slice.getRefPic(RefPicList(i), refIdx)->getPOC();
+              if (currRefPOC == colPOC)
+              {
+                foundNeighMV = true;
+                useL0 = i == 0 ? 1 : 0;
+              }
+            }
+          }
+        }
+      }
+      
+      Mv   shiftMv;
+      if (foundNeighMV)
+      {
+        shiftMv = useL0 ? miNeigh.mv[0] : miNeigh.mv[1];
+        shiftMv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
+        shiftMv.hor = shiftMv.hor >> lumaScaleX;
+        shiftMv.ver = shiftMv.ver >> lumaScaleY;
+      }
+      else
+      {
+        shiftMv.set(0,0);
+      }
+
+      for (int iDistanceIndex = 0; iDistanceIndex < 5 && numCand < maxCands; iDistanceIndex++)
+      {
+        const int iNADistanceHor = pu.blocks[compId].width  * iDistanceIndex;
+        const int iNADistanceVer = pu.blocks[compId].height * iDistanceIndex;
+
+        for (int naspIdx = 0; naspIdx < numNACandidate[iDistanceIndex] && numCand < maxCands; naspIdx++)
+        {
+          switch (idxMap[iDistanceIndex][naspIdx])
+          {
+          case 0: offsetX0 = offsetX2 = 2 + iNADistanceHor; offsetY0 = offsetY2 = 2 + iNADistanceVer; offsetX1 = iNADistanceHor; offsetY1 = iNADistanceVer; break;
+          case 1: offsetX0 = 2; offsetY0 = 0; offsetX1 = 0; offsetY1 = 2; break;
+          case 2: offsetX0 = offsetX2; offsetY0 = 2 - offsetY3; offsetX1 = 2 - offsetX3; offsetY1 = offsetY2; break;
+          default: printf("error!"); exit(0); break;
+          }
+        
+          c0Avail = false;
+          if (curSubPic.getTreatedAsPicFlag())
+          {
+            boundaryCond = ((posRB.x + shiftMv.hor + offsetX0) <= (curSubPic.getSubPicRight() >> lumaScaleX)) && ((posRB.y + shiftMv.ver + offsetY0) <= (curSubPic.getSubPicBottom() >> lumaScaleY));
+          }
+          else
+          {
+            boundaryCond = ((posRB.x + shiftMv.hor + offsetX0) < (pcv.lumaWidth >> lumaScaleX)) && ((posRB.y + shiftMv.ver + offsetY0) < (pcv.lumaHeight >> lumaScaleY));
+          }
+          if (boundaryCond)
+          {
+            posC0 = posRB.offset(shiftMv.hor + offsetX0, shiftMv.ver + offsetY0);
+            c0Avail = true;
+          }
+
+          if (idxMap[iDistanceIndex][naspIdx] == 0)
+          {
+            c1Avail = false;
+            if (curSubPic.getTreatedAsPicFlag())
+            {
+              boundaryCond = ((posCenter.x + shiftMv.hor + offsetX1) <= (curSubPic.getSubPicRight() >> lumaScaleX) && (posCenter.y + shiftMv.ver + offsetY1) <= (curSubPic.getSubPicBottom() >> lumaScaleY));
+            }
+            else
+            {
+              boundaryCond = ((posCenter.x + shiftMv.hor + offsetX1) < (pcv.lumaWidth >> lumaScaleX)) && ((posCenter.y + shiftMv.ver + offsetY1) < (pcv.lumaHeight >> lumaScaleY));
+            }
+            if (boundaryCond)
+            {
+              posC1 = posCenter.offset(shiftMv.hor + offsetX1, shiftMv.ver + offsetY1);
+              c1Avail = true;
+            }
+          }
+          else
+          {
+            c1Avail = false;
+            if (curSubPic.getTreatedAsPicFlag())
+            {
+              boundaryCond = ((posRB.x + shiftMv.hor + offsetX1) <= (curSubPic.getSubPicRight() >> lumaScaleX) && (posRB.y + shiftMv.ver + offsetY1) <= (curSubPic.getSubPicBottom() >> lumaScaleY));
+            }
+            else
+            {
+              boundaryCond = ((posRB.x + shiftMv.hor + offsetX1) < (pcv.lumaWidth >> lumaScaleX)) && ((posRB.y + shiftMv.ver + offsetY1) < (pcv.lumaHeight >> lumaScaleY));
+            }
+            if (boundaryCond)
+            {
+              posC1 = posRB.offset(shiftMv.hor + offsetX1, shiftMv.ver + offsetY1);          
+              c1Avail = true;
+            }
+          }
+          if (c0Avail || c1Avail)
+          {
+            int modelIdx = c0Avail? pColPic->cs->getEipIdxInfo(posC0) 
+                            : pColPic->cs->getEipIdxInfo(posC1);
+            if (modelIdx > 0)
+            {
+              const EipModelCandidate currEipModel = pColPic->cs->m_eipModelLUT[modelIdx-1];
+              tryToAddOneModel(currEipModel);
+            }
+          }
+        }
+      }
+    }
+  }
+
+#if JVET_Z0118_GDR  
+  auto tryHistEip = [&](const static_vector<EipModelCandidate, MAX_NUM_HEIP_CANDS>& lut)-> void
+#else
+  auto tryHistEip = [&](const LutEIP& eipLut)-> void
+#endif
+  {
+#if JVET_Z0118_GDR  
+    for (int idx = 0; idx < lut.size() && numCand < maxCands; idx++)
+    {
+      EipModelCandidate cand;
+      pu.cs->getOneModelFromEipLut(lut, cand, idx);
+#else
+    for (int idx = 0; idx < eipLut.lutEip.size() && numCand < maxCands; idx++)
+    {
+      EipModelCandidate cand;
+      pu.cs->getOneModelFromEipLut(eipLut.lutEip, cand, idx);
+#endif
+      bool duplication = false;
+      for (int j = 0; j < candList.size(); j++)
+      {
+        if (cand.isTheSameParams(candList[j]))
+        {
+          duplication = true;
+          // THROW("Should not duplicaten");
+          break;
+        }
+      }
+      if (!duplication)
+      {
+        candList.push_back(cand);
+        numCand++;
+      }
+      if(numCand >= maxCands)
+      {
+        return;
+      }
+    }
+  };
+
+#if JVET_Z0118_GDR
+  if (pu.cs->isGdrEnabled() && pu.cs->isClean(pu))
+  {
+    tryHistEip(pu.cs->eipLut.lutEip1);  
+  }
+  else
+  {
+    tryHistEip(pu.cs->eipLut.lutEip0); 
+  }
+#else
+  tryHistEip(pu.cs->eipLut.lutEip); 
+#endif
+}
+
+void IntraPrediction::reorderEipCands(const PredictionUnit& pu, static_vector<EipModelCandidate, MAX_MERGE_EIP>& candList, const ComponentID compId)
+{
+  if (candList.size() <= 1)
+  {
+    return;
+  }
+
+  CHECK(candList.size() > MAX_MERGE_EIP, "candlist size is error.");
+  const int refSizeY = m_cccmBlkArea.y;
+  const int refSizeX = m_cccmBlkArea.x;
+  const int stride = m_cccmBlkArea.width;
+  const int blockHeight = pu.blocks[compId].height;
+  const int blockWidth = pu.blocks[compId].width;
+  const int topOffset = stride * (refSizeY - EIP_TPL_SIZE) + refSizeX;
+  const int leftOffset = stride * refSizeY + refSizeX - EIP_TPL_SIZE;
+  PelBuf recoTop(m_eipBuffer + topOffset, stride, blockWidth, EIP_TPL_SIZE);
+  PelBuf recoLeft(m_eipBuffer + leftOffset, stride, EIP_TPL_SIZE, blockHeight);
+  PelBuf predTop(m_eipPredTpl[0], blockWidth, EIP_TPL_SIZE);
+  PelBuf predLeft(m_eipPredTpl[1], EIP_TPL_SIZE, blockHeight);
+
+  DistParam cDistParam;
+  cDistParam.applyWeight = false;
+  Distortion uiCost;
+  static_vector<Distortion, MAX_MERGE_EIP> candCostList;
+  static_vector<EipModelCandidate, MAX_MERGE_EIP> tmpCandList;
+  Pel inputs[EIP_FILTER_TAP];
+  const ChannelType chType = toChannelType(compId);
+  const ClpRng clipRng = pu.cu->slice->clpRngs().comp[compId];
+  for(auto model: candList)
+  {
+    CccmModel cand(EIP_FILTER_TAP, pu.cu->slice->getSPS()->getBitDepth(toChannelType(compId)));
+    memcpy(cand.params.data(), model.params, sizeof(model.params));
+
+    uiCost = 0;
+    for (int h = 0; h < EIP_TPL_SIZE; h++)
+    {
+      for (int w = 0; w < blockWidth; w++)
+      {
+        setInputsVec(inputs, recoTop, w, h, model.filterShape);
+        predTop.at(w, h) = ClipPel(cand.convolve(inputs), clipRng);
+      }
+    }
+    m_dbvSadCost->setDistParam(cDistParam, predTop, recoTop, pu.cs->sps->getBitDepth(chType), compId, false);
+    uiCost += cDistParam.distFunc(cDistParam);
+
+    for (int h = 0; h < blockHeight; h++)
+    {
+      for (int w = 0; w < EIP_TPL_SIZE; w++)
+      {
+        setInputsVec(inputs, recoLeft, w, h, model.filterShape);
+        predLeft.at(w, h) = ClipPel(cand.convolve(inputs), clipRng);
+      }
+    }
+    m_dbvSadCost->setDistParam(cDistParam, predLeft, recoLeft, pu.cs->sps->getBitDepth(chType), compId, false);
+    uiCost += cDistParam.distFunc(cDistParam);
+
+    updateCandList(model, uiCost, tmpCandList, candCostList, NUM_EIP_MERGE_SIGNAL);
+  }
+  candList.clear();
+  for(auto model: tmpCandList)
+  {
+    candList.push_back(model);
   }
 }
 #endif

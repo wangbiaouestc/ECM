@@ -1990,6 +1990,13 @@ void CABACReader::intra_luma_pred_modes( CodingUnit &cu )
 #if JVET_W0123_TIMD_FUSION
   cu_timd_flag(cu);
 #endif
+#if JVET_AG0058_EIP
+  cu_eip_flag(cu);
+  if (cu.eipFlag)
+  {
+    return;
+  }
+#endif
 #if JVET_AB0155_SGPM
   sgpm_flag(cu);
   if (cu.sgpm)
@@ -2221,6 +2228,54 @@ void CABACReader::cu_dimd_flag(CodingUnit& cu)
   unsigned ctxId = DeriveCtx::CtxDIMDFlag(cu);
   cu.dimd = m_BinDecoder.decodeBin(Ctx::DimdFlag(ctxId));
   DTRACE(g_trace_ctx, D_SYNTAX, "cu_dimd_flag() ctx=%d pos=(%d,%d) dimd=%d\n", ctxId, cu.lumaPos().x, cu.lumaPos().y, cu.dimd);
+}
+#endif
+
+#if JVET_AG0058_EIP
+void CABACReader::cu_eip_flag(CodingUnit& cu)
+{
+  if (cu.timd || cu.dimd || !cu.Y().valid() || !isLuma(cu.chType))
+  {
+    cu.eipFlag = false;
+    return;
+  }
+
+  const bool bCanUseEip = getAllowedEip(cu, COMPONENT_Y) || getAllowedEipMerge(cu, COMPONENT_Y);
+  if (bCanUseEip)
+  {
+    cu.eipFlag = m_BinDecoder.decodeBin(Ctx::EipFlag(0));
+    if (cu.eipFlag)
+    {
+      if (getAllowedEip(cu, COMPONENT_Y) && getAllowedEipMerge(cu, COMPONENT_Y))
+      {
+        cu.eipMerge = m_BinDecoder.decodeBin(Ctx::EipFlag(1));
+      }
+      else if (getAllowedEipMerge(cu, COMPONENT_Y))
+      {
+        cu.eipMerge = true;
+      }
+      else
+      {
+        cu.eipMerge = false;
+      }
+      if(cu.eipMerge)
+      {
+        cu.firstPU->intraDir[0] = unary_max_eqprob(NUM_EIP_MERGE_SIGNAL - 1);
+      }
+      else
+      {
+        unsigned int symbol = 0;
+        static_vector<EIPInfo, NUM_DERIVED_EIP> eipInfoList;
+        xReadTruncBinCode(symbol, getAllowedCurEip(cu, COMPONENT_Y, eipInfoList));
+        cu.firstPU->intraDir[0] = symbol;
+      }
+    }
+  }
+  else
+  {
+    cu.eipFlag = false;
+  }
+  DTRACE(g_trace_ctx, D_SYNTAX, "eip_flag() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.eipFlag ? 1 : 0);
 }
 #endif
 
@@ -10163,6 +10218,9 @@ const char* ctxNames[] =
 #endif
 #if JVET_AF0073_INTER_CCP_MERGE
   "InterCcpMergeFlag",
+#endif
+#if JVET_AG0058_EIP
+  "EipFlag",
 #endif
 };
 

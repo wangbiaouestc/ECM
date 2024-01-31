@@ -48,6 +48,7 @@
 // ---------------------------------------------------------------------------
 // tools
 // ---------------------------------------------------------------------------
+
 struct PLTBuf {
   uint8_t        curPLTSize[MAX_NUM_CHANNEL_TYPE];
   Pel            curPLT[MAX_NUM_COMPONENT][MAXPLTPREDSIZE];
@@ -383,6 +384,11 @@ struct CodingUnit : public UnitArea
   int            sgpmSplitDir;
   int            sgpmMode0;
   int            sgpmMode1;
+#endif
+#if JVET_AG0058_EIP
+  bool eipFlag;
+  bool              eipMerge;
+  EipModelCandidate eipModel;
 #endif
 #if ENABLE_OBMC
   bool           obmcFlag;

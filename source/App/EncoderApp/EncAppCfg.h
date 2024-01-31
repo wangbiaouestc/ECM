@@ -214,6 +214,9 @@ protected:
 #if JVET_AD0082_TMRL_CONFIG
   bool      m_noTmrlConstraintFlag;
 #endif
+#if JVET_AG0058_EIP
+  bool      m_noEipConstraintFlag;
+#endif
 #if ENABLE_OBMC
   bool      m_noObmcConstraintFlag;
 #endif
@@ -480,6 +483,9 @@ protected:
 #endif
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
   bool      m_tmNoninterToolsEnableFlag;
+#endif
+#if JVET_AG0058_EIP
+  bool      m_eip;
 #endif
 #if JVET_AD0085_MPM_SORTING
   bool      m_mpmSorting;

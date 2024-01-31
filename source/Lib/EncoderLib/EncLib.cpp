@@ -1689,6 +1689,9 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_AD0082_TMRL_CONFIG
   cinfo->setNoTmrlConstraintFlag(m_noTmrlConstraintFlag);
 #endif
+#if JVET_AG0058_EIP
+  cinfo->setNoEipConstraintFlag(m_noEipConstraintFlag);
+#endif
 #if ENABLE_OBMC
   cinfo->setNoObmcConstraintFlag(m_noObmcConstraintFlag);
 #endif
@@ -1913,6 +1916,9 @@ void EncLib::xInitSPS( SPS& sps )
 #endif
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
   sps.setTMnoninterToolsEnableFlag            ( m_tmNoninterToolsEnableFlag );
+#endif
+#if JVET_AG0058_EIP
+  sps.setUseEip             ( m_eip );
 #endif
 #if JVET_AD0085_MPM_SORTING
   sps.setUseMpmSorting      ( m_mpmSorting );

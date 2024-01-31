@@ -1693,6 +1693,17 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     }
   }
 #endif
+#if JVET_AG0058_EIP
+  {
+    const CodingUnit &cu          = *bestCS->cus.front();
+    CHECK(cu.chType != partitioner.chType, "different partition type." );
+    if(slice.getSPS()->getUseEip() && partitioner.chType == CHANNEL_TYPE_LUMA && CU::isIntra(cu)
+       && bestCS->cus.size() == 1 && bestCS->area.Y() == (*bestCS->cus.back()).Y())
+    {
+      CU::saveModelsInHEIP(cu);
+    }
+  }
+#endif
 
 #if JVET_AF0073_INTER_CCP_MERGE
   {
@@ -1996,6 +2007,9 @@ void EncCu::xCheckModeSplit(CodingStructure *&tempCS, CodingStructure *&bestCS, 
 #if JVET_AD0188_CCP_MERGE
   const auto oldCCPLut        = tempCS->ccpLut;
 #endif
+#if JVET_AG0058_EIP
+  const auto oldEipLut        = tempCS->eipLut;
+#endif
 #if ENABLE_QPA_SUB_CTU
   const PPS &pps              = *tempCS->pps;
   const uint32_t currDepth    = partitioner.currDepth;
@@ -2136,6 +2150,9 @@ void EncCu::xCheckModeSplit(CodingStructure *&tempCS, CodingStructure *&bestCS, 
         tempCS->motionLut = oldMotionLut;
 #if JVET_AD0188_CCP_MERGE
         tempCS->ccpLut  = oldCCPLut;
+#endif
+#if JVET_AG0058_EIP
+        tempCS->eipLut  = oldEipLut;
 #endif
         tempCS->prevPLT = oldPLT;
         tempCS->releaseIntermediateData();
@@ -2398,6 +2415,9 @@ void EncCu::xCheckModeSplit(CodingStructure *&tempCS, CodingStructure *&bestCS, 
   tempCS->prevPLT   = oldPLT;
 #if JVET_AD0188_CCP_MERGE
   tempCS->ccpLut    = oldCCPLut;
+#endif
+#if JVET_AG0058_EIP
+  tempCS->eipLut    = oldEipLut;
 #endif
 
   tempCS->releaseIntermediateData();
@@ -2887,7 +2907,6 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
             }
           }
 #endif
-
           tempCS->interHad    = interHad;
 
           m_bestModeUpdated = tempCS->useDbCost = bestCS->useDbCost = false;
@@ -2940,6 +2959,9 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
 #endif
               m_modeCtrl->setBestISPIntraModeRelCU(cu.ispMode ? PU::getFinalIntraMode(*cu.firstPU, CHANNEL_TYPE_LUMA) : UINT8_MAX);
               m_modeCtrl->setBestDCT2NonISPCostRelCU(m_modeCtrl->getMtsFirstPassNoIspCost());
+#if JVET_AG0058_EIP
+              m_modeCtrl->setAeipFlagISPPass(cu.eipFlag);
+#endif
             }
 
             if (sps.getUseColorTrans() && m_pcEncCfg->getRGBFormatFlag() && !CS::isDualITree(*tempCS) && !cu.colorTransform)
@@ -7305,6 +7327,9 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
   cu.tmpFlag = false;
 #endif
   cu.bdpcmMode = 0;
+#if JVET_AG0058_EIP
+  cu.eipFlag = false;
+#endif
 
   PredictionUnit &pu = tempCS->addPU(cu, pm.chType);
   pu.mergeFlag = true;
@@ -11502,6 +11527,9 @@ void EncCu::xCheckRDCostMergeGeo2Nx2N(CodingStructure *&tempCS, CodingStructure 
   cu.tmpFlag = false;
 #endif
   cu.bdpcmMode = 0;
+#if JVET_AG0058_EIP
+  cu.eipFlag = false;
+#endif
 
   PredictionUnit &pu = tempCS->addPU(cu, pm.chType);
   pu.mergeFlag = true;
@@ -11792,6 +11820,9 @@ void EncCu::xCheckRDCostMergeGeo2Nx2N(CodingStructure *&tempCS, CodingStructure 
 	    cu.tmpFlag = false;
 #endif
       cu.bdpcmMode = 0;
+#if JVET_AG0058_EIP
+      cu.eipFlag = false;
+#endif
       PredictionUnit &pu = tempCS->addPU(cu, pm.chType);
       pu.mergeFlag = true;
       pu.regularMergeFlag = false;

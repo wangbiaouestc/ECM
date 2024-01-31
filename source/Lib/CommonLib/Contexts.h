@@ -803,6 +803,9 @@ public:
 #if JVET_AF0073_INTER_CCP_MERGE
   static const CtxSet   InterCcpMergeFlag;
 #endif
+#if JVET_AG0058_EIP
+  static const CtxSet   EipFlag;
+#endif
   static const unsigned NumberOfContexts;
 
   // combined sets for less complex copying

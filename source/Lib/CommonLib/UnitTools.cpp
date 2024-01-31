@@ -154,6 +154,30 @@ void CS::saveTemporalCcpModel(CodingStructure &cs)
   }
 }
 #endif
+#if JVET_AG0058_EIP
+void CS::saveTemporalEipModel(CodingStructure &cs)
+{
+  if (cs.area.Y().area() > 0)
+  {
+    EipModelIdxBuf eipIdxBuf = cs.getEipIdxBuf(cs.area.Y());
+    eipIdxBuf.fill(0);
+  }
+  cs.m_eipModelLUT.resize(0);
+
+  int idx = 0;
+  for (CodingUnit *cu : cs.cus)
+  {
+    if (cu->Y().valid()&& cu->eipFlag)
+    {
+      EipModelCandidate eipModel = cu->eipModel;
+      cs.m_eipModelLUT.push_back(eipModel);
+      idx++;
+      EipModelIdxBuf eipIdxBuf = cu->cs->getEipIdxBuf(cu->Y());
+      eipIdxBuf.fill(idx);
+    }
+  }
+}
+#endif
 // CU tools
 
 #if JVET_AG0117_CABAC_SPATIAL_TUNING
@@ -4171,7 +4195,12 @@ uint32_t PU::getIntraDirLuma(const PredictionUnit &pu, const int partIdx)
   {
     return PLANAR_IDX;
   }
-
+#if JVET_AG0058_EIP
+  else if (isEIP(pu))
+  {
+    return PLANAR_IDX;
+  }
+#endif
   else
   {
     if (partIdx)
@@ -4193,6 +4222,12 @@ uint32_t PU::getIntraDirLuma( const PredictionUnit &pu )
   {
     return PLANAR_IDX;
   }
+#if JVET_AG0058_EIP
+  else if (isEIP(pu))
+  {
+    return PLANAR_IDX;
+  }
+#endif
   else
   {
     return pu.intraDir[CHANNEL_TYPE_LUMA];
@@ -4415,6 +4450,12 @@ const PredictionUnit &PU::getCoLocatedLumaPU(const PredictionUnit &pu)
 #if JVET_AB0155_SGPM
 uint32_t PU::getCoLocatedIntraLumaMode(const PredictionUnit &pu, const int partIdx)
 {
+#if JVET_AG0058_EIP
+  if(PU::getCoLocatedLumaPU(pu).cu->eipFlag)
+  {
+    return PU::getCoLocatedLumaPU(pu).cu->eipModel.eipDimdMode;
+  }
+#endif
 #if JVET_W0123_TIMD_FUSION
   if (PU::getCoLocatedLumaPU(pu).cu->timd)
   {
@@ -4432,6 +4473,12 @@ uint32_t PU::getCoLocatedIntraLumaMode(const PredictionUnit &pu, const int partI
 #else
 uint32_t PU::getCoLocatedIntraLumaMode(const PredictionUnit &pu)
 {
+#if JVET_AG0058_EIP
+  if(PU::getCoLocatedLumaPU(pu).cu->eipFlag)
+  {
+    return PU::getCoLocatedLumaPU(pu).cu->eipModel.eipDimdMode;
+  }
+#endif
 #if JVET_W0123_TIMD_FUSION
   if (PU::getCoLocatedLumaPU(pu).cu->timd)
   {
@@ -24790,6 +24837,7 @@ bool CU::isMTSAllowed(const CodingUnit &cu, const ComponentID compID)
   mtsAllowed &= !(cu.timd && cu.firstPU->multiRefIdx);
 #endif
   mtsAllowed &= !(cu.bdpcmMode && cuWidth <= tsMaxSize && cuHeight <= tsMaxSize);
+
   return mtsAllowed;
 }
 
@@ -25977,6 +26025,13 @@ uint32_t PU::getFinalIntraModeForTransform( const TransformUnit &tu, const Compo
     intraMode = MAP131TO67(intraMode);
   }
 #endif
+#if JVET_AG0058_EIP
+  if (PU::isEIP(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
+  {
+    intraMode = tu.cu->eipModel.eipDimdMode;
+  }
+#endif
+
   CHECK( intraMode >= NUM_INTRA_MODE - 1, "Invalid intra mode" );
 
   intraMode = PU::getNSPTIntraMode( PU::getWideAngle( tu, intraMode, compID ) );
@@ -26681,4 +26736,119 @@ void PU::getGeoAffMergeCandidates(PredictionUnit& pu, AffineMergeCtx& gpmAffMrgC
   }
 }
 
+#endif
+
+#if JVET_AG0058_EIP
+bool PU::isEIP(const PredictionUnit& pu, const ChannelType& chType)
+{
+  return pu.cu->eipFlag && chType == CH_L;
+}
+
+Position getRecoLinesEIP(const CodingUnit& cu, const ComponentID compId)
+{
+  const int numRecoLines = std::min(cu.blocks[compId].width, cu.blocks[compId].height);
+  const int above = std::min(cu.blocks[compId].y - EIP_FILTER_SIZE, numRecoLines);
+  const int left = std::min(cu.blocks[compId].x - EIP_FILTER_SIZE, numRecoLines);
+  CHECK(above < 1 || left < 1, "no reconstruction lines above or left.");
+
+  return Position(above, left);
+}
+
+bool getAllowedEip(const CodingUnit& cu, const ComponentID compId)
+{
+  if (!cu.cs->sps->getUseEip())
+  {
+    return false;
+  }
+
+  const uint32_t width = cu.blocks[compId].width;
+  const uint32_t height = cu.blocks[compId].height;
+
+  if (width > MAX_EIP_SIZE || height > MAX_EIP_SIZE)
+  {
+    return false;
+  }
+
+  if (cu.blocks[compId].area() < 64)
+  {
+    return false;
+  }
+
+  const int numAboveAvail = cu.blocks[compId].y;
+  const int numLeftAvail = cu.blocks[compId].x;
+  const int tplSize = std::min(cu.blocks[compId].height, cu.blocks[compId].width) + EIP_FILTER_SIZE;
+  if(numAboveAvail < tplSize || numLeftAvail < tplSize)
+  {
+    return false;
+  }
+
+  return true;
+}
+
+bool getAllowedEipMerge(const CodingUnit& cu, const ComponentID compId)
+{
+  if (!cu.cs->sps->getUseEip())
+  {
+    return false;
+  }
+
+  const uint32_t width = cu.blocks[compId].width;
+  const uint32_t height = cu.blocks[compId].height;
+
+  if (width > MAX_EIP_SIZE || height > MAX_EIP_SIZE)
+  {
+    return false;
+  }
+
+  const int numAboveAvail = cu.blocks[compId].y;
+  const int numLeftAvail = cu.blocks[compId].x;
+
+  if ((numAboveAvail >= (EIP_FILTER_SIZE + EIP_TPL_SIZE)) && (numLeftAvail >= (EIP_FILTER_SIZE + EIP_TPL_SIZE)))
+  {
+    return true;
+  }
+
+  return false;
+}
+
+int getAllowedCurEip(const CodingUnit &cu, const ComponentID compId, static_vector<EIPInfo, NUM_DERIVED_EIP>& eipInfoList){ 
+  const int numOfCombEIP[4][4] = 
+  {
+    { 3, 3, 3, 2 },
+    { 3, 5, 5, 5 },
+    { 3, 5, 9, 9 },
+    { 2, 5, 9, 9 },
+  };
+  const int log2Wm2 = floorLog2(cu.blocks[compId].width)  - 2;
+  const int log2Hm2 = floorLog2(cu.blocks[compId].height) - 2;
+  for (int i = 0; i < numOfCombEIP[log2Wm2][log2Hm2]; i++)
+  {
+    eipInfoList.push_back(g_eipInfoLut[log2Wm2][log2Hm2][i]);
+  }
+
+  return int(eipInfoList.size());
+}
+
+void CU::saveModelsInHEIP(const CodingUnit &cu)
+{
+  if (!cu.Y().valid())
+  {
+    return;
+  }
+
+  CodingStructure      &cs = *cu.cs;
+  if (cu.eipFlag)
+  {
+#if JVET_Z0118_GDR   
+    if (cu.cs->isGdrEnabled() && cu.cs->isClean(cu))
+    {      
+      cs.addEipToLut(cs.eipLut.lutEip1, cu.eipModel, -1);
+    }
+
+    cs.addEipToLut(cs.eipLut.lutEip0, cu.eipModel, -1);
+#else
+    cs.addEipToLut(cs.eipLut.lutEip, cu.eipModel, -1);
+#endif
+  }
+}
 #endif
