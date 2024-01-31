@@ -3144,7 +3144,11 @@ private:
   bool                        m_ccSaoEnabledFlag[MAX_NUM_COMPONENT];
 #endif
 #if ALF_IMPROVEMENT
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+  int                         m_alfFixedFilterSetIdx[MAX_NUM_COMPONENT];
+#else
   int                         m_alfFixedFilterSetIdx;
+#endif
 #endif
   bool                        m_alfEnabledFlag[MAX_NUM_COMPONENT];                      //!< alf enabled flags for each component
   int                         m_numAlfAps;                                              //!< number of alf aps active for the picture
@@ -3306,8 +3310,13 @@ public:
   bool                        getCcSaoEnabledFlag(ComponentID compId) const             { return m_ccSaoEnabledFlag[compId];                                                           }
 #endif
 #if ALF_IMPROVEMENT
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+  void                        setAlfFixedFilterSetIdx( ComponentID compId, int i )                            { m_alfFixedFilterSetIdx[compId] = i;                                                                  }
+  int                         getAlfFixedFilterSetIdx( ComponentID compId ) const                           { return m_alfFixedFilterSetIdx[compId];                                                               }
+#else
   void                        setAlfFixedFilterSetIdx(int i)                            { m_alfFixedFilterSetIdx = i;                                                                  }
   int                         getAlfFixedFilterSetIdx() const                           { return m_alfFixedFilterSetIdx;                                                               }
+#endif
 #endif
   void                        setAlfEnabledFlag(ComponentID compId, bool b)             { m_alfEnabledFlag[compId] = b;                                                                }
   bool                        getAlfEnabledFlag(ComponentID compId) const               { return m_alfEnabledFlag[compId];                                                             }
@@ -3591,8 +3600,12 @@ private:
   double                     m_dProcessingTime;
 
   int                        m_rpPicOrderCntVal;
-#if ALF_IMPROVEMENT                               
+#if ALF_IMPROVEMENT                   
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+  int                        m_tileGroupAlfFixedFilterSetIdx[MAX_NUM_COMPONENT];
+#else
   int                        m_tileGroupAlfFixedFilterSetIdx;
+#endif
 #endif
   APS*                       m_alfApss[ALF_CTB_MAX_NUM_APS];
   bool                       m_tileGroupAlfEnabledFlag[MAX_NUM_COMPONENT];
@@ -4036,8 +4049,13 @@ public:
 
 
 #if ALF_IMPROVEMENT  
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+  int                         getTileGroupAlfFixedFilterSetIdx( ComponentID compId ) const { return m_tileGroupAlfFixedFilterSetIdx[compId]; }
+  void                        setTileGroupAlfFixedFilterSetIdx( ComponentID compId, int i ) { m_tileGroupAlfFixedFilterSetIdx[compId] = i; }
+#else
   int                         getTileGroupAlfFixedFilterSetIdx() const { return m_tileGroupAlfFixedFilterSetIdx; }
   void                        setTileGroupAlfFixedFilterSetIdx(int i) { m_tileGroupAlfFixedFilterSetIdx = i; }
+#endif
 #endif
   void                        resetTileGroupAlfEnabledFlag() { memset(m_tileGroupAlfEnabledFlag, 0, sizeof(m_tileGroupAlfEnabledFlag)); }
   bool                        getTileGroupAlfEnabledFlag(ComponentID compId) const { return m_tileGroupAlfEnabledFlag[compId]; }

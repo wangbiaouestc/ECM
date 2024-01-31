@@ -583,7 +583,13 @@ void Slice::inheritFromPicHeader( PicHeader *picHeader, const PPS *pps, const SP
   setTileGroupAlfEnabledFlag(COMPONENT_Cb, picHeader->getAlfEnabledFlag(COMPONENT_Cb));
   setTileGroupAlfEnabledFlag(COMPONENT_Cr, picHeader->getAlfEnabledFlag(COMPONENT_Cr));
 #if ALF_IMPROVEMENT
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+  setTileGroupAlfFixedFilterSetIdx(COMPONENT_Y, picHeader->getAlfFixedFilterSetIdx(COMPONENT_Y));
+  setTileGroupAlfFixedFilterSetIdx(COMPONENT_Cb, picHeader->getAlfFixedFilterSetIdx(COMPONENT_Cb));
+  setTileGroupAlfFixedFilterSetIdx(COMPONENT_Cr, picHeader->getAlfFixedFilterSetIdx(COMPONENT_Cr));
+#else
   setTileGroupAlfFixedFilterSetIdx(picHeader->getAlfFixedFilterSetIdx());
+#endif
 #endif
   setTileGroupNumAps(picHeader->getNumAlfAps());
   setAlfAPSs(picHeader->getAlfAPSs());
@@ -1752,7 +1758,11 @@ void Slice::copySliceInfo(Slice *pSrc, bool cpyAlmostAll)
 
   memcpy(m_alfApss, pSrc->m_alfApss, sizeof(m_alfApss)); // this might be quite unsafe
 #if ALF_IMPROVEMENT
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+  memcpy( m_tileGroupAlfFixedFilterSetIdx, pSrc->m_tileGroupAlfFixedFilterSetIdx, sizeof(m_tileGroupAlfFixedFilterSetIdx));
+#else
   m_tileGroupAlfFixedFilterSetIdx          = pSrc->m_tileGroupAlfFixedFilterSetIdx;
+#endif
 #endif
   memcpy( m_tileGroupAlfEnabledFlag, pSrc->m_tileGroupAlfEnabledFlag, sizeof(m_tileGroupAlfEnabledFlag));
   m_tileGroupNumAps               = pSrc->m_tileGroupNumAps;

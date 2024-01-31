@@ -2289,7 +2289,11 @@ void HLSWriter::codePictureHeader( PicHeader* picHeader, bool writeRbspTrailingB
       if (picHeader->getAlfEnabledFlag(COMPONENT_Y))
       {
 #if ALF_IMPROVEMENT
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+        WRITE_FLAG(picHeader->getAlfFixedFilterSetIdx(COMPONENT_Y), "ph_alf_fixed_filter_set_idx_luma");
+#else
         WRITE_FLAG(picHeader->getAlfFixedFilterSetIdx(), "ph_alf_fixed_filter_set_idx");
+#endif
 #endif
         WRITE_CODE(picHeader->getNumAlfAps(), 3, "ph_num_alf_aps_ids_luma");
         const std::vector<int>&   apsId = picHeader->getAlfAPSs();
@@ -2297,12 +2301,21 @@ void HLSWriter::codePictureHeader( PicHeader* picHeader, bool writeRbspTrailingB
         {
           WRITE_CODE(apsId[i], 3, "ph_alf_aps_id_luma");
         }
-
         const int alfChromaIdc = picHeader->getAlfEnabledFlag(COMPONENT_Cb) + picHeader->getAlfEnabledFlag(COMPONENT_Cr) * 2 ;
         if (sps->getChromaFormatIdc() != CHROMA_400)
         {
           WRITE_CODE(picHeader->getAlfEnabledFlag(COMPONENT_Cb), 1, "ph_alf_cb_enabled_flag");
           WRITE_CODE(picHeader->getAlfEnabledFlag(COMPONENT_Cr), 1, "ph_alf_cr_enabled_flag");
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+          if (picHeader->getAlfEnabledFlag(COMPONENT_Cb))
+          {
+            WRITE_FLAG(picHeader->getAlfFixedFilterSetIdx(COMPONENT_Cb), "ph_alf_fixed_filter_set_idx_cb");
+          }
+          if (picHeader->getAlfEnabledFlag(COMPONENT_Cr))
+          {
+            WRITE_FLAG(picHeader->getAlfFixedFilterSetIdx(COMPONENT_Cr), "ph_alf_fixed_filter_set_idx_cr");
+          }
+#endif
         }
         if (alfChromaIdc)
         {
@@ -2963,7 +2976,11 @@ void HLSWriter::codeSliceHeader         ( Slice* pcSlice )
     if (alfEnabled)
     {
 #if ALF_IMPROVEMENT
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+      WRITE_FLAG(pcSlice->getTileGroupAlfFixedFilterSetIdx(COMPONENT_Y), "slice_alf_fixed_filter_set_idx_luma");
+#else
       WRITE_FLAG(pcSlice->getTileGroupAlfFixedFilterSetIdx(), "slice_alf_fixed_filter_set_idx");
+#endif
 #endif
       WRITE_CODE(pcSlice->getTileGroupNumAps(), 3, "slice_num_alf_aps_ids_luma");
       const std::vector<int>&   apsId = pcSlice->getTileGroupApsIdLuma();
@@ -2977,6 +2994,16 @@ void HLSWriter::codeSliceHeader         ( Slice* pcSlice )
       {
         WRITE_CODE(pcSlice->getTileGroupAlfEnabledFlag(COMPONENT_Cb), 1, "slice_alf_cb_enabled_flag");
         WRITE_CODE(pcSlice->getTileGroupAlfEnabledFlag(COMPONENT_Cr), 1, "slice_alf_cr_enabled_flag");
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+        if (pcSlice->getTileGroupAlfEnabledFlag(COMPONENT_Cb))
+        {
+          WRITE_FLAG(pcSlice->getTileGroupAlfFixedFilterSetIdx(COMPONENT_Cb), "slice_alf_fixed_filter_set_idx_cb");
+        }
+        if (pcSlice->getTileGroupAlfEnabledFlag(COMPONENT_Cr))
+        {
+          WRITE_FLAG(pcSlice->getTileGroupAlfFixedFilterSetIdx(COMPONENT_Cr), "slice_alf_fixed_filter_set_idx_cr");
+        }
+#endif
       }
       if (alfChromaIdc)
       {
@@ -4288,7 +4315,6 @@ void HLSWriter::alfFilter( const AlfParam& alfParam, const bool isChroma, const 
 #endif
     }
   }
-
   // Clipping values coding
 #if ALF_IMPROVEMENT
   if( alfParam.nonLinearFlag[isChroma][altIdx])
