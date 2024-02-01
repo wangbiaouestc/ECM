@@ -823,6 +823,31 @@ void CodingStructure::reconstructPicture(const CompArea &carea, std::vector<Pel>
 {  
   ComponentID compID = carea.compID;
   
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+  ClpRng clpRng = slice->clpRng(compID);
+  if (compID == COMPONENT_Y)
+  {
+    if (lmcsEnable)
+    {
+      clpRng.min = pLUT[slice->getLumaPelMin()];
+      clpRng.max = pLUT[slice->getLumaPelMax()];
+    }
+    else
+    {
+      if (slice->getSPS()->getUseLmcs() && slice->getLmcsEnabledFlag())
+      {
+        clpRng.min = pLUT[slice->getLumaPelMin()];
+        clpRng.max = pLUT[slice->getLumaPelMax()];
+      }
+      else
+      {
+        clpRng.min = slice->getLumaPelMin();
+        clpRng.max = slice->getLumaPelMax();
+      }
+    }
+  }
+#endif
+
   // 1. normal picture
   if (!isInGdrIntervalOrRecoveryPoc())  
   {
@@ -831,11 +856,19 @@ void CodingStructure::reconstructPicture(const CompArea &carea, std::vector<Pel>
     if (lmcsEnable)
     {
       picRecoBuff.rspSignal(getPredBuf(carea), pLUT);
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+      picRecoBuff.reconstruct(picRecoBuff, resiCS->getResiBuf(carea), clpRng);
+#else
       picRecoBuff.reconstruct(picRecoBuff, resiCS->getResiBuf(carea), slice->clpRng(compID));
+#endif
     }
     else
     {
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+      picRecoBuff.reconstruct(getPredBuf(carea), resiCS->getResiBuf(carea), clpRng);
+#else
       picRecoBuff.reconstruct(getPredBuf(carea), resiCS->getResiBuf(carea), slice->clpRng(compID));
+#endif
     }
 
     return;
@@ -847,11 +880,19 @@ void CodingStructure::reconstructPicture(const CompArea &carea, std::vector<Pel>
   if (lmcsEnable)
   {
     picRecoBuff0.rspSignal(getPredBuf(carea), pLUT);
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+    picRecoBuff0.reconstruct(picRecoBuff0, resiCS->getResiBuf(carea), clpRng);
+#else
     picRecoBuff0.reconstruct(picRecoBuff0, resiCS->getResiBuf(carea), slice->clpRng(compID));
+#endif
   }
   else
   {
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+    picRecoBuff0.reconstruct(getPredBuf(carea), resiCS->getResiBuf(carea), clpRng);
+#else
     picRecoBuff0.reconstruct(getPredBuf(carea), resiCS->getResiBuf(carea), slice->clpRng(compID));
+#endif
   }
 
   // 2.2. gdr interval clean picture
@@ -869,11 +910,19 @@ void CodingStructure::reconstructPicture(const CompArea &carea, std::vector<Pel>
     if (lmcsEnable)
     {
       picRecoBuff1.rspSignal(getPredBuf(overlappedArea), pLUT);
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+      picRecoBuff1.reconstruct(picRecoBuff1, resiCS->getResiBuf(overlappedArea), clpRng);
+#else
       picRecoBuff1.reconstruct(picRecoBuff1, resiCS->getResiBuf(overlappedArea), slice->clpRng(compID));
+#endif
     }
     else
     {
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+      picRecoBuff1.reconstruct(getPredBuf(overlappedArea), resiCS->getResiBuf(overlappedArea), clpRng);
+#else
       picRecoBuff1.reconstruct(getPredBuf(overlappedArea), resiCS->getResiBuf(overlappedArea), slice->clpRng(compID));
+#endif
     }
   }
 }

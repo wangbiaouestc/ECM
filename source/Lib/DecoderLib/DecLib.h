@@ -245,6 +245,9 @@ public:
   bool  decode(InputNALUnit& nalu, int& iSkipFrame, int& iPOCLastDisplay, int iTargetOlsIdx);
   void  deletePicBuffer();
   void  executeLoopFilters();
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+  void  adaptiveClipToRealRange();
+#endif
 #if JVET_R0270
   void finishPicture(int &poc, PicList *&rpcListPic, MsgLevel msgl = INFO, bool associatedWithNewClvs = false);
 #else

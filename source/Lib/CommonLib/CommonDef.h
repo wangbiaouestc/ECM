@@ -266,6 +266,10 @@ static const double LAMBDA_DEC_SIDE[MAX_QP+1] = {
 };
 #endif
 
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+static const int ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_1 =                5;
+static const int ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_0 =                1;
+#endif
 static const int MAX_TLAYER =                                       7; ///< Explicit temporal layer QP offset - max number of temporal layer
 
 static const int ADAPT_SR_SCALE =                                   1; ///< division factor for adaptive search range

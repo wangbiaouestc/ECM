@@ -924,6 +924,30 @@ void DecLib::finishPictureLight(int& poc, PicList*& rpcListPic )
   m_puCounter++;
 }
 
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+void DecLib::adaptiveClipToRealRange()
+{
+  ClpRng clpRng;
+  clpRng.min = m_pcPic->cs->slice->getLumaPelMin();
+  clpRng.max = m_pcPic->cs->slice->getLumaPelMax();
+  m_pcPic->lumaClpRng.max = clpRng.max;
+  m_pcPic->lumaClpRng.min = clpRng.min;
+  int compIdx = 0;
+  ComponentID compID = ComponentID(compIdx);
+  int width = m_pcPic->cs->pps->getPicWidthInLumaSamples();
+  int height = m_pcPic->cs->pps->getPicHeightInLumaSamples();
+  Pel* reconPel = m_pcPic->getRecoBuf().get(compID).buf;
+  int stride = m_pcPic->getRecoBuf().get(compID).stride;
+  for (uint32_t yPos = 0; yPos < height; yPos++)
+  {
+    for (uint32_t xPos = 0; xPos < width; xPos++)
+    {
+      reconPel[yPos * stride + xPos] = ClipPel(reconPel[yPos * stride + xPos], clpRng);
+    }
+  }
+}
+#endif
+
 #if JVET_R0270
 void DecLib::finishPicture(int &poc, PicList *&rpcListPic, MsgLevel msgl, bool associatedWithNewClvs)
 #else
@@ -2996,6 +3020,47 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
 #if JVET_Y0128_NON_CTC
     //---------------
     pcSlice->setRefPOCList();
+#endif
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+    int clipDeltaShift = 0;
+    if (pcSlice->getAdaptiveClipQuant())
+    {
+      clipDeltaShift = ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_1;
+    }
+    else
+    {
+      clipDeltaShift = ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_0;
+    }
+    if (pcSlice->getSliceType() != I_SLICE)
+    {
+      int deltaMax = pcSlice->getLumaPelMax();
+      if (deltaMax > 0)
+      {
+        deltaMax = (deltaMax << clipDeltaShift);
+      }
+      else if (deltaMax < 0)
+      {
+        deltaMax = -((-deltaMax) << clipDeltaShift);
+      }
+      int deltaMin = pcSlice->getLumaPelMin();
+      if (deltaMin > 0)
+      {
+        deltaMin = (deltaMin << clipDeltaShift);
+      }
+      else if (deltaMin < 0)
+      {
+        deltaMin = -((-deltaMin) << clipDeltaShift);
+      }
+      const Picture* const pColPic = pcSlice->getRefPic(RefPicList(1 - pcSlice->getColFromL0Flag()), pcSlice->getColRefIdx());
+      ClpRng colLumaClpRng = pColPic->getLumaClpRng();
+      int lumaPelMax = std::min(deltaMax + colLumaClpRng.max, (1 << pcSlice->getSPS()->getBitDepth(toChannelType(COMPONENT_Y))) - 1);
+      int lumaPelMin = std::max(0, deltaMin + colLumaClpRng.min);
+      CHECK(lumaPelMax > (1 << pcSlice->getSPS()->getBitDepth(toChannelType(COMPONENT_Y))) - 1, "this is not possible");
+      CHECK(lumaPelMin < 0, "this is not possible");
+      CHECK(lumaPelMin > lumaPelMax, "this is not possible");
+      pcSlice->setLumaPelMax(lumaPelMax);
+      pcSlice->setLumaPelMin(lumaPelMin);
+    }
 #endif
 
     if (pcSlice->getSPS()->getUseSMVD() && pcSlice->getCheckLDC() == false

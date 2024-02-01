@@ -3449,6 +3449,69 @@ void HLSWriter::codeSliceHeader         ( Slice* pcSlice )
     WRITE_UVLC(0,"slice_segment_header_extension_length");
   }
 
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+  WRITE_FLAG(pcSlice->getAdaptiveClipQuant() ? 1 : 0, "adaptive_clip_quant");
+  int clipDeltaShift = 0;
+  if (pcSlice->getAdaptiveClipQuant())
+  {
+    clipDeltaShift = ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_1;
+  }
+  else
+  {
+    clipDeltaShift = ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_0;
+  }
+  if (pcSlice->getSliceType() == I_SLICE)
+  {
+    int deltaMin = pcSlice->getPic()->lumaClpRngforQuant.min - 64;
+    if (deltaMin > 0)
+    {
+      deltaMin = (deltaMin >> clipDeltaShift);
+    }
+    else if (deltaMin < 0)
+    {
+      deltaMin = -((-deltaMin) >> clipDeltaShift);
+    }
+    int deltaMax = pcSlice->getPic()->lumaClpRngforQuant.max - 940;
+    if (deltaMax > 0)
+    {
+      deltaMax = (deltaMax >> clipDeltaShift);
+    }
+    else if (deltaMax < 0)
+    {
+      deltaMax = -((-deltaMax) >> clipDeltaShift);
+    }
+    WRITE_SVLC(deltaMax, "clip_luma_pel_max");
+    WRITE_SVLC(deltaMin, "clip_luma_pel_min");
+  }
+  else
+  {
+    const Picture* const pColPic = pcSlice->getRefPic(RefPicList(1 - pcSlice->getColFromL0Flag()), pcSlice->getColRefIdx());
+    ClpRng colLumaClpRng = pColPic->getLumaClpRng();
+    int colLumaMin = colLumaClpRng.min;
+    int colLumaMax = colLumaClpRng.max;
+    int deltaMin = pcSlice->getPic()->lumaClpRngforQuant.min - colLumaMin;
+    int deltaMax = pcSlice->getPic()->lumaClpRngforQuant.max - colLumaMax;
+    if (deltaMin > 0)
+    {
+      deltaMin = (deltaMin >> clipDeltaShift);
+    }
+    else if (deltaMin < 0)
+    {
+      deltaMin = -((-deltaMin) >> clipDeltaShift);
+    }
+
+    if (deltaMax > 0)
+    {
+      deltaMax = (deltaMax >> clipDeltaShift);
+    }
+    else if (deltaMax < 0)
+    {
+      deltaMax = -((-deltaMax) >> clipDeltaShift);
+    }
+    WRITE_SVLC(deltaMax, "clip_luma_pel_max");
+    WRITE_SVLC(deltaMin, "clip_luma_pel_min");
+  }
+#endif
 }
 
 void  HLSWriter::codeConstraintInfo  ( const ConstraintInfo* cinfo )

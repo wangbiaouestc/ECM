@@ -8269,11 +8269,46 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
     CompArea      tmpArea(COMPONENT_Y, area.chromaFormat, Position(0,0), area.size());
     PelBuf tmpPred = m_tmpStorageLCU.getBuf(tmpArea);
     tmpPred.copyFrom(piPred);
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+    ClpRng clpRng = cs.slice->clpRng(compID);
+    if (pu.cu->cs->sps->getUseLmcs() && pu.cu->cs->picHeader->getLmcsEnabledFlag())
+    {
+      std::vector<Pel>& fwdLUT = m_pcReshape->getFwdLUT();
+      clpRng.min = fwdLUT[cs.slice->getLumaPelMin()];
+      clpRng.max = fwdLUT[cs.slice->getLumaPelMax()];
+    }
+    else
+    {
+      clpRng.min = cs.slice->getLumaPelMin();
+      clpRng.max = cs.slice->getLumaPelMax();
+    }
+    piReco.reconstruct(tmpPred, piResi, clpRng);
+#else
     piReco.reconstruct(tmpPred, piResi, cs.slice->clpRng(compID));
+#endif
   }
   else
   {
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+    ClpRng clpRng = cs.slice->clpRng(compID);
+    if (compID == COMPONENT_Y)
+    {
+      if (pu.cu->cs->sps->getUseLmcs() && pu.cu->cs->picHeader->getLmcsEnabledFlag())
+      {
+        std::vector<Pel>& fwdLUT = m_pcReshape->getFwdLUT();
+        clpRng.min = fwdLUT[cs.slice->getLumaPelMin()];
+        clpRng.max = fwdLUT[cs.slice->getLumaPelMax()];
+      }
+      else
+      {
+        clpRng.min = cs.slice->getLumaPelMin();
+        clpRng.max = cs.slice->getLumaPelMax();
+      }
+    }
+    piReco.reconstruct(piPred, piResi, clpRng);
+#else
     piReco.reconstruct(piPred, piResi, cs.slice->clpRng( compID ));
+#endif
     if( jointCbCr )
     {
       crReco.reconstruct(crPred, crResi, cs.slice->clpRng( COMPONENT_Cr ));
