@@ -237,6 +237,10 @@ void Slice::initSlice()
   m_useLTforDRAP         = false;
   m_isDRAP               = false;
   m_latestDRAPPOC        = MAX_INT;
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+  m_lumaPelMax           = 0;
+  m_lumaPelMin           = 0;
+#endif
 #if JVET_W0066_CCSAO
   m_ccSaoComParam.reset();
   resetCcSaoEnabledFlag();

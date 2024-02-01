@@ -1128,7 +1128,26 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 #if KEEP_PRED_AND_RESI_SIGNALS
   pReco.reconstruct( piPred, piResi, tu.cu->cs->slice->clpRng( compID ) );
 #else
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+  ClpRng clpRng = tu.cu->cs->slice->clpRng(compID);
+  if (compID == COMPONENT_Y)
+  {
+    if (pu.cu->cs->sps->getUseLmcs() && pu.cu->cs->picHeader->getLmcsEnabledFlag())
+    {
+      std::vector<Pel>& fwdLUT = m_pcReshape->getFwdLUT();
+      clpRng.min = fwdLUT[cs.slice->getLumaPelMin()];
+      clpRng.max = fwdLUT[cs.slice->getLumaPelMax()];
+    }
+    else
+    {
+      clpRng.min = cs.slice->getLumaPelMin();
+      clpRng.max = cs.slice->getLumaPelMax();
+    }
+  }
+  piPred.reconstruct(piPred, piResi, clpRng);
+#else
   piPred.reconstruct( piPred, piResi, tu.cu->cs->slice->clpRng( compID ) );
+#endif
   pReco.copyFrom( piPred );
 #endif
 #if JVET_AC0071_DBV && JVET_AA0070_RRIBC
@@ -2120,11 +2139,41 @@ void DecCu::xDecodeInterTU( TransformUnit & currTU, const ComponentID compID )
 #else
       picRecoBuff.rspSignal( cs.getPredBuf( currTU.blocks[currCompID] ), m_pcReshape->getFwdLUT() );
 #endif
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+      ClpRng clpRng = currTU.cu->cs->slice->clpRng(currCompID);
+      if (currCompID == COMPONENT_Y)
+      {
+        std::vector<Pel>& fwdLUT = m_pcReshape->getFwdLUT();
+        clpRng.min = fwdLUT[currTU.cu->cs->slice->getLumaPelMin()];
+        clpRng.max = fwdLUT[currTU.cu->cs->slice->getLumaPelMax()];
+      }
+      currTU.cs->getRecoBuf( currTU.blocks[currCompID] ).reconstruct( picRecoBuff, compResiBuf, clpRng);
+#else
       currTU.cs->getRecoBuf( currTU.blocks[currCompID] ).reconstruct( picRecoBuff, compResiBuf, currTU.cu->cs->slice->clpRng( currCompID ) );
+#endif
     }
     else
     {
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+      ClpRng clpRng = currTU.cu->cs->slice->clpRng(currCompID);
+      if (currCompID == COMPONENT_Y)
+      {
+        if (cs.slice->getSPS()->getUseLmcs() && cs.picHeader->getLmcsEnabledFlag())
+        {
+          std::vector<Pel>& fwdLUT = m_pcReshape->getFwdLUT();
+          clpRng.min = fwdLUT[currTU.cu->cs->slice->getLumaPelMin()];
+          clpRng.max = fwdLUT[currTU.cu->cs->slice->getLumaPelMax()];
+        }
+        else
+        {
+          clpRng.min = currTU.cu->cs->slice->getLumaPelMin();
+          clpRng.max = currTU.cu->cs->slice->getLumaPelMax();
+        }
+      }
+      currTU.cs->getRecoBuf( currTU.blocks[currCompID] ).reconstruct( cs.getPredBuf( currTU.blocks[currCompID] ), compResiBuf, clpRng);
+#else
       currTU.cs->getRecoBuf( currTU.blocks[currCompID] ).reconstruct( cs.getPredBuf( currTU.blocks[currCompID] ), compResiBuf, currTU.cu->cs->slice->clpRng( currCompID ) );
+#endif
 #if JVET_AA0070_RRIBC
       if (CU::isIBC(*currTU.cu) && currTU.cu->rribcFlipType)
       {
@@ -2155,6 +2204,21 @@ void DecCu::xDecodeInterTexture(CodingUnit &cu)
       cs.getRecoBuf(cu).get(COMPONENT_Y).rspSignal(m_pcReshape->getFwdLUT());
     }
 
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+    ClpRng clpRng = cs.slice->clpRng(COMPONENT_Y);
+    if (cs.slice->getSPS()->getUseLmcs() && cs.slice->getLmcsEnabledFlag())
+    {
+      std::vector<Pel>& fwdLUT = m_pcReshape->getFwdLUT();
+      clpRng.min = fwdLUT[cs.slice->getLumaPelMin()];
+      clpRng.max = fwdLUT[cs.slice->getLumaPelMax()];
+    }
+    else
+    {
+      clpRng.min = cs.slice->getLumaPelMin();
+      clpRng.max = cs.slice->getLumaPelMax();
+    }
+    cs.getRecoBuf(cu).get(COMPONENT_Y).reconstruct(cs.getRecoBuf(cu).get(COMPONENT_Y), cs.getResiBuf(cu).get(COMPONENT_Y), clpRng);
+#endif
 #if JVET_AA0070_RRIBC
     if (CU::isIBC(cu) && cu.rribcFlipType)
     {

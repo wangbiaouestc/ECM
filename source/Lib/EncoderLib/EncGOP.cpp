@@ -2221,6 +2221,9 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
     DTRACE_UPDATE( g_trace_ctx, ( std::make_pair( "poc", pocCurr ) ) );
     DTRACE_UPDATE( g_trace_ctx, ( std::make_pair( "final", 0 ) ) );
 
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+    getRealRange(pcPic);
+#endif
 #if !SHARP_LUMA_DELTA_QP
     //Set Frame/Field coding
     pcPic->fieldPic = isField;
@@ -3273,6 +3276,17 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
 
     xPicInitLMCS(pcPic, picHeader, pcSlice);
 
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+    if (m_pcCfg->getIntraPeriod() == -1)
+    {
+      if (pcPic->cs->slice->getSliceType() == I_SLICE)
+      {
+        pcSlice->setLumaPelMax((1 << pcPic->cs->sps->getBitDepth(toChannelType(COMPONENT_Y))) - 1);
+        pcSlice->setLumaPelMin(0);
+      }
+    }
+#endif
+
     if( pcSlice->getSPS()->getScalingListFlag() && m_pcCfg->getUseScalingListId() == SCALING_LIST_FILE_READ )
     {
       picHeader->setExplicitScalingListEnabledFlag( true );
@@ -3817,6 +3831,9 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
       {
         updateCompositeReference(pcSlice, rcListPic, pocCurr);
       }
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+      adaptiveClipToRealRange(pcPic);
+#endif
     }
     else // skip enc picture
     {
@@ -6211,6 +6228,57 @@ void EncGOP::xAttachSliceDataToNalUnit (OutputNALUnit& rNalu, OutputBitstream* c
   codedSliceData->clear();
 }
 
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+void EncGOP::getRealRange(Picture* pcPic)
+{
+  int compIdx = 0;
+  ComponentID compID = ComponentID(compIdx);
+  int width = pcPic->cs->pps->getPicWidthInLumaSamples();
+  int height = pcPic->cs->pps->getPicHeightInLumaSamples();
+  int oriStride = pcPic->getOrigBuf().get(compID).stride;
+  Pel* oriPel = pcPic->getOrigBuf().get(compID).buf;
+  int pelMax = 0;
+  int pelMin = (1 << pcPic->cs->sps->getBitDepth(toChannelType(compID))) - 1;
+  for (uint32_t yPos = 0; yPos < height; yPos++)
+  {
+    for (uint32_t xPos = 0; xPos < width; xPos++)
+    {
+      int tmpPel = oriPel[yPos * oriStride + xPos];
+      if (tmpPel > pelMax)
+      {
+        pelMax = tmpPel;
+      }
+      if (tmpPel < pelMin)
+      {
+        pelMin = tmpPel;
+      }
+    }
+  }
+  pcPic->lumaClpRng.min = pelMin;
+  pcPic->lumaClpRng.max = pelMax;
+}
+void EncGOP::adaptiveClipToRealRange(Picture* pcPic)
+{
+  ClpRng clpRng;
+  clpRng.min = pcPic->cs->slice->getLumaPelMin();
+  clpRng.max = pcPic->cs->slice->getLumaPelMax();
+
+  int compIdx = 0;
+  ComponentID compID = ComponentID(compIdx);
+  int width = pcPic->cs->pps->getPicWidthInLumaSamples();
+  int height = pcPic->cs->pps->getPicHeightInLumaSamples();
+
+  Pel* reconPel = pcPic->getRecoBuf().get(compID).buf;
+  int stride = pcPic->getRecoBuf().get(compID).stride;
+  for (uint32_t yPos = 0; yPos < height; yPos++)
+  {
+    for (uint32_t xPos = 0; xPos < width; xPos++)
+    {
+      reconPel[yPos * stride + xPos] = ClipPel(reconPel[yPos * stride + xPos], clpRng);
+    }
+  }
+}
+#endif
 
 void EncGOP::arrangeCompositeReference(Slice* pcSlice, PicList& rcListPic, int pocCurr)
 {

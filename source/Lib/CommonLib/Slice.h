@@ -3624,6 +3624,11 @@ private:
   bool                       m_disableSATDForRd;
   bool                       m_isLossless;
 
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+  int                        m_lumaPelMax;
+  int                        m_lumaPelMin;
+  bool                       m_adaptiveClipQuant;
+#endif
 #if MULTI_HYP_PRED
   int                        m_numMultiHypRefPics = 0;
 
@@ -4124,6 +4129,14 @@ public:
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   bool                        getUseIBC()                                   const { return m_useIBC; }
   void                        setUseIBC(bool b) { m_useIBC = b; }
+#endif
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+  void                        setLumaPelMax(int u)                                { m_lumaPelMax = u; }
+  int                         getLumaPelMax()                               const { return  m_lumaPelMax; }
+  void                        setLumaPelMin(int u)                                { m_lumaPelMin = u; }
+  int                         getLumaPelMin()                               const { return  m_lumaPelMin; }
+  void                        setAdaptiveClipQuant(bool b)                        { m_adaptiveClipQuant = b; };
+  bool                        getAdaptiveClipQuant()                        const { return m_adaptiveClipQuant; };
 #endif
 
 protected:

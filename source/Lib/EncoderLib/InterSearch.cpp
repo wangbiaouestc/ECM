@@ -13183,7 +13183,23 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
         {
           lumaPredBuf.rspSignal(m_pcReshape->getFwdLUT());
         }
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+        ClpRng clpRng = tu.cs->slice->clpRng(COMPONENT_Y);
+        if (cs.picHeader->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag())
+        {
+          std::vector<Pel>& fwdLUT = m_pcReshape->getFwdLUT();
+          clpRng.min = fwdLUT[tu.cu->cs->slice->getLumaPelMin()];
+          clpRng.max = fwdLUT[tu.cu->cs->slice->getLumaPelMax()];
+        }
+        else
+        {
+          clpRng.min = tu.cu->cs->slice->getLumaPelMin();
+          clpRng.max = tu.cu->cs->slice->getLumaPelMax();
+        }
+        lumaRecoBuf.reconstruct(lumaPredBuf, csFull->getResiBuf(tu.blocks[COMPONENT_Y]), clpRng);
+#else
         lumaRecoBuf.reconstruct(lumaPredBuf, csFull->getResiBuf(tu.blocks[COMPONENT_Y]), cs.slice->clpRng(COMPONENT_Y));
+#endif
         if (CU::isIBC(cu) && cu.rribcFlipType)
         {
           lumaRecoBuf.flipSignal(cu.rribcFlipType == 1);
@@ -14551,6 +14567,21 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
       }
 #endif
     }
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+    ClpRngs clpRngs = cu.slice->clpRngs();
+    if (cs.picHeader->getLmcsEnabledFlag()) // LMCS enabled
+    {
+      std::vector<Pel>& fwdLUT = m_pcReshape->getFwdLUT();
+      clpRngs.comp[COMPONENT_Y].min = fwdLUT[cu.cs->slice->getLumaPelMin()];
+      clpRngs.comp[COMPONENT_Y].max = fwdLUT[cu.cs->slice->getLumaPelMax()];
+    }
+    else
+    {
+      clpRngs.comp[COMPONENT_Y].min = cu.cs->slice->getLumaPelMin();
+      clpRngs.comp[COMPONENT_Y].max = cu.cs->slice->getLumaPelMax();
+    }
+    cs.getRecoBuf().copyClip(cs.getRecoBuf(), clpRngs);
+#endif
 
     // add empty TU(s)
     cs.addEmptyTUs( partitioner );
@@ -14954,12 +14985,37 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
         PelBuf tmpPred = m_tmpStorageLCU.getBuf( tmpArea );
         tmpPred.rspSignal( cs.getPredBuf( COMPONENT_Y ), m_pcReshape->getFwdLUT() );
 
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+        ClpRng clpRng = cs.slice->clpRng(COMPONENT_Y);
+        std::vector<Pel>& fwdLUT = m_pcReshape->getFwdLUT();
+        clpRng.min = fwdLUT[cs.slice->getLumaPelMin()];
+        clpRng.max = fwdLUT[cs.slice->getLumaPelMax()];
+        cs.getRecoBuf(COMPONENT_Y).reconstruct(tmpPred, cs.getResiBuf(COMPONENT_Y), clpRng);
+#else
         cs.getRecoBuf( COMPONENT_Y ).reconstruct( tmpPred, cs.getResiBuf( COMPONENT_Y ), cs.slice->clpRng( COMPONENT_Y ) );
+#endif
       }
       else
       {
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+        ClpRng clpRng = cs.slice->clpRng(COMPONENT_Y);
+        if (cs.slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag())
+        {
+          std::vector<Pel>& fwdLUT = m_pcReshape->getFwdLUT();
+          clpRng.min = fwdLUT[cs.slice->getLumaPelMin()];
+          clpRng.max = fwdLUT[cs.slice->getLumaPelMax()];
+        }
+        else
+        {
+          clpRng.min = cs.slice->getLumaPelMin();
+          clpRng.max = cs.slice->getLumaPelMax();
+        }
+        cs.getRecoBuf(COMPONENT_Y)
+          .reconstruct(cs.getPredBuf(COMPONENT_Y), cs.getResiBuf(COMPONENT_Y), clpRng);
+#else
         cs.getRecoBuf(COMPONENT_Y)
           .reconstruct(cs.getPredBuf(COMPONENT_Y), cs.getResiBuf(COMPONENT_Y), cs.slice->clpRng(COMPONENT_Y));
+#endif
 #if JVET_AA0070_RRIBC
         if (CU::isIBC(cu) && cu.rribcFlipType)
         {
@@ -14970,7 +15026,31 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
     }
     else
     {
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+      ClpRng clpRng = cs.slice->clpRng(COMPONENT_Y);
+      if (cs.slice->getSPS()->getUseLmcs() && cs.slice->getLmcsEnabledFlag())
+      {
+        if (m_pcReshape->getCTUFlag() && !cu.firstPU->ciipFlag && !cu.firstPU->gpmIntraFlag && !CU::isIBC(cu))
+        {
+          clpRng.min = cs.slice->getLumaPelMin();
+          clpRng.max = cs.slice->getLumaPelMax();
+        }
+        else
+        {
+          std::vector<Pel>& fwdLUT = m_pcReshape->getFwdLUT();
+          clpRng.min = fwdLUT[cs.slice->getLumaPelMin()];
+          clpRng.max = fwdLUT[cs.slice ->getLumaPelMax()];
+        }
+      }
+      else
+      {
+        clpRng.min = cs.slice->getLumaPelMin();
+        clpRng.max = cs.slice->getLumaPelMax();
+      }
+      cs.getRecoBuf().bufs[0].reconstruct(cs.getPredBuf().bufs[0], cs.getResiBuf().bufs[0], clpRng);
+#else
       cs.getRecoBuf().bufs[0].reconstruct(cs.getPredBuf().bufs[0], cs.getResiBuf().bufs[0], cs.slice->clpRngs().comp[0]);
+#endif
 #if JVET_Y0065_GPM_INTRA
       if (cs.slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !cu.firstPU->ciipFlag && !cu.firstPU->gpmIntraFlag && !CU::isIBC(cu))
 #else
@@ -14979,6 +15059,21 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
       {
         cs.getRecoBuf().bufs[0].rspSignal(m_pcReshape->getFwdLUT());
       }
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+      ClpRng clpRngTmp = cs.slice->clpRng(COMPONENT_Y);
+      if (cs.slice->getSPS()->getUseLmcs() && cs.slice->getLmcsEnabledFlag())
+      {
+        std::vector<Pel>& fwdLUT = m_pcReshape->getFwdLUT();
+        clpRngTmp.min = fwdLUT[cs.slice->getLumaPelMin()];
+        clpRngTmp.max = fwdLUT[cs.slice->getLumaPelMax()];
+      }
+      else
+      {
+        clpRngTmp.min = cs.slice->getLumaPelMin();
+        clpRngTmp.max = cs.slice->getLumaPelMax();
+      }
+      cs.getRecoBuf().bufs[0].copyClip(cs.getRecoBuf().bufs[0], clpRngTmp);
+#endif
 #if JVET_AA0070_RRIBC
       if (CU::isIBC(cu) && cu.rribcFlipType)
       {

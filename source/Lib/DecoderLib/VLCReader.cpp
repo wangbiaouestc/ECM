@@ -5471,6 +5471,53 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
     }
   }
 
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+  READ_FLAG(uiCode, "adaptive_clip_quant"); pcSlice->setAdaptiveClipQuant(uiCode ? true : false);
+  int clipDeltaShift = 0;
+  if (pcSlice->getAdaptiveClipQuant())
+  {
+    clipDeltaShift = ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_1;
+  }
+  else
+  {
+    clipDeltaShift = ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_0;
+  }
+  if (pcSlice->getSliceType() == I_SLICE)
+  {
+    READ_SVLC(iCode, "clip_luma_pel_max");
+    int deltaMax = iCode;
+    if (deltaMax > 0)
+    {
+      deltaMax = (deltaMax << clipDeltaShift);
+    }
+    else if (deltaMax < 0)
+    {
+      deltaMax = -((-deltaMax) << clipDeltaShift);
+    }
+    READ_SVLC(iCode, "clip_luma_pel_min");
+    int deltaMin = iCode;
+    if (deltaMin > 0)
+    {
+      deltaMin = (deltaMin << clipDeltaShift);
+    }
+    else if (deltaMin < 0)
+    {
+      deltaMin = -((-deltaMin) << clipDeltaShift);
+    }
+    pcSlice->setLumaPelMax(std::min(deltaMax + 940, (1 << sps->getBitDepth(toChannelType(COMPONENT_Y))) - 1));
+    pcSlice->setLumaPelMin(std::max(0, deltaMin + 64));
+  }
+  else
+  {
+    READ_SVLC(iCode, "clip_luma_pel_max");
+    int deltaMax = iCode;
+    READ_SVLC(iCode, "clip_luma_pel_min");
+    int deltaMin = iCode;
+    pcSlice->setLumaPelMax(deltaMax);
+    pcSlice->setLumaPelMin(deltaMin);
+  }
+#endif
+
   std::vector<uint32_t> entryPointOffset;
 
   pcSlice->resetNumberOfSubstream();
