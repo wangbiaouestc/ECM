@@ -125,6 +125,87 @@ const CtxSet ContextSetCfg::RegularMergeFlag = ContextSetCfg::addCtxSet
      { 131, 117, },
      });
 
+#if JVET_AG0164_AFFINE_GPM
+const CtxSet ContextSetCfg::AffineGPMFlag = ContextSetCfg::addCtxSet
+  ({
+     {  19,   6,   7, },
+     {  19,   5,   6, },
+     { CNU, CNU, CNU, },
+     {   5,   1,   0, },
+     {   5,   1,   1, },
+     { DWS, DWS, DWS, },
+     {  11,  11,   4, },
+     {  11,  11,  18, },
+     { DWE, DWE, DWE, },
+     { 116, 119, 148, },
+     { 117, 117, 116, },
+	 });
+
+const CtxSet ContextSetCfg::GpmMergeIdx = ContextSetCfg::addCtxSet
+   ({
+     {  26,  29,  44,  44,  29, CNU, CNU, CNU, CNU, CNU, },
+     {   5,  29,  44,  37,  44, CNU, CNU, CNU, CNU, CNU, },
+     {  33,  42,  43,  27,  18, CNU, CNU, CNU, CNU, CNU, },
+     {   5,   5,   5,   5,   9, DWS, DWS, DWS, DWS, DWS, },
+     {   6,   5,   5,   5,   9, DWS, DWS, DWS, DWS, DWS, },
+     {   6,   7,   6,  13,  12, DWS, DWS, DWS, DWS, DWS, },
+     {  18,  18,  18,  18,  11, DWE, DWE, DWE, DWE, DWE, },
+     {  18,  18,  18,  18,  11, DWE, DWE, DWE, DWE, DWE, },
+     {  18,  18,   4,   4,   4, DWE, DWE, DWE, DWE, DWE, },
+     { 119, 134, 126, 126, 198, 119, 119, 119, 119, 119, },
+     { 117, 105, 117, 116, 238, 119, 119, 119, 119, 119, },
+	 });
+
+const CtxSet ContextSetCfg::GpmAffMergeIdx = ContextSetCfg::addCtxSet
+   ({
+     {  26,  29,  44,  44,  29, CNU, CNU, CNU, CNU, CNU, },
+     {   5,  29,  44,  37,  44, CNU, CNU, CNU, CNU, CNU, },
+     {  33,  42,  43,  27,  18, CNU, CNU, CNU, CNU, CNU, },
+     {   5,   5,   5,   5,   9, DWS, DWS, DWS, DWS, DWS, },
+     {   6,   5,   5,   5,   9, DWS, DWS, DWS, DWS, DWS, },
+     {   6,   7,   6,  13,  12, DWS, DWS, DWS, DWS, DWS, },
+     {  18,  18,  18,  18,  11, DWE, DWE, DWE, DWE, DWE, },
+     {  18,  18,  18,  18,  11, DWE, DWE, DWE, DWE, DWE, },
+     {  18,  18,   4,   4,   4, DWE, DWE, DWE, DWE, DWE, },
+     { 119, 134, 126, 126, 198, 119, 119, 119, 119, 119, },
+     { 117, 105, 117, 116, 238, 119, 119, 119, 119, 119, },
+	 });
+#endif
+
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+const CtxSet ContextSetCfg::GeoBlendFlag = ContextSetCfg::addCtxSet
+   ({
+     {  CNU, },
+     {  CNU, },
+     {  CNU, },
+     {  DWS, },
+     {  DWS, },
+     {  DWS, },
+     {  DWE, },
+     {  DWE, },
+     {  DWE, },
+     {  DWO, },
+     {  DWO, },
+	 });
+#endif
+
+#if JVET_AG0135_AFFINE_CIIP 
+const CtxSet ContextSetCfg::CiipAffineFlag = ContextSetCfg::addCtxSet
+  ({
+     {  12,   6,  15, },
+     {  19,   5,   6, },
+     { CNU, CNU, CNU, },
+     {   5,   1,   0, },
+     {   5,   1,   8, },
+     { DWS, DWS, DWS, },
+     {  11,  11,   4, },
+     {   4,   4,  11, },
+     {  18,  18,  18, },
+     { 108, 122, 133, },
+     { 116, 117, 116, },
+	 });
+#endif
+
 const CtxSet ContextSetCfg::MergeIdx = ContextSetCfg::addCtxSet
   ({
 #if NON_ADJACENT_MRG_CAND
@@ -3130,6 +3211,23 @@ const CtxSet ContextSetCfg::InterCcpMergeFlag = ContextSetCfg::addCtxSet
      { DWE, },
      { DWO, },
      { DWO, },
+     });
+#endif
+
+#if JVET_AG0058_EIP
+const CtxSet ContextSetCfg::EipFlag = ContextSetCfg::addCtxSet
+  ({
+     { CNU, CNU, },
+     { CNU, CNU, },
+     { CNU, CNU, },
+     { DWS, DWS, },
+     { DWS, DWS, },
+     { DWS, DWS, },
+     { DWE, DWE, },
+     { DWE, DWE, },
+     { DWE, DWE, },
+     { DWO, DWO, },
+     { DWO, DWO, },
      });
 #endif
 #endif

@@ -120,7 +120,10 @@ CodingStructure::CodingStructure(CUCache& cuCache, PUCache& puCache, TUCache& tu
   m_ccpmIdxBuf = nullptr;
   m_ccpModelLUT.clear();
 #endif
-
+#if JVET_AG0058_EIP
+  m_eipIdxBuf = nullptr;
+  m_eipModelLUT.clear();
+#endif
 #if JVET_W0123_TIMD_FUSION
 #if JVET_Z0118_GDR
   m_ipmBuf0 = nullptr;
@@ -200,6 +203,14 @@ void CodingStructure::destroy()
   }
   m_ccpmIdxBuf = nullptr;
   m_ccpModelLUT.clear();
+#endif
+#if JVET_AG0058_EIP
+  if (m_eipIdxBuf)
+  {
+    delete [] m_eipIdxBuf;
+  }
+  m_eipIdxBuf = nullptr;
+  m_eipModelLUT.clear();
 #endif
 
 #if JVET_W0123_TIMD_FUSION
@@ -1846,7 +1857,10 @@ void CodingStructure::createInternals(const UnitArea& _unit, const bool isTopLay
   m_ccpmIdxBuf = new int[_lumaAreaScaled];
   m_ccpModelLUT.resize(0);
 #endif
-
+#if JVET_AG0058_EIP
+  m_eipIdxBuf = new int[_lumaAreaScaled];
+  m_eipModelLUT.resize(0);
+#endif
 #if JVET_W0123_TIMD_FUSION
 #if JVET_Z0118_GDR
   m_ipmBuf0 = new uint8_t[_lumaAreaScaled];
@@ -2335,6 +2349,9 @@ void CodingStructure::initSubStructure( CodingStructure& subStruct, const Channe
 #if JVET_AD0188_CCP_MERGE
   subStruct.ccpLut    = ccpLut;
 #endif
+#if JVET_AG0058_EIP
+  subStruct.eipLut = eipLut;
+#endif
   subStruct.prevPLT = prevPLT;
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   subStruct.treeType  = treeType;
@@ -2474,7 +2491,12 @@ void CodingStructure::useSubStructure( const CodingStructure& subStruct, const C
 #if JVET_AD0188_CCP_MERGE
   ccpLut = subStruct.ccpLut;
 #endif
-
+#if JVET_AG0058_EIP
+  if ((slice->isIntra() || (!slice->isIntra() && !subStruct.m_isTuEnc)) && chType != CHANNEL_TYPE_CHROMA)
+  {
+    eipLut = subStruct.eipLut;
+  }
+#endif
 #if JVET_W0123_TIMD_FUSION
   if (!subStruct.m_isTuEnc && chType != CHANNEL_TYPE_CHROMA)
   {
@@ -2632,6 +2654,15 @@ void CodingStructure::copyStructure( const CodingStructure& other, const Channel
   CCCPModelIdxBuf subIdxB = other.getCcpmIdxBuf();
   ownIdxB.copyFrom( subIdxB );
   m_ccpModelLUT = other.m_ccpModelLUT;
+#endif
+#if JVET_AG0058_EIP
+  eipLut = other.eipLut;
+#endif
+#if JVET_AG0058_EIP
+  EipModelIdxBuf ownEipIdxB = getEipIdxBuf();
+  CEipModelIdxBuf subEipIdxB = other.getEipIdxBuf();
+  ownEipIdxB.copyFrom(subEipIdxB);
+  m_eipModelLUT = other.m_eipModelLUT;
 #endif
 
 #if JVET_W0123_TIMD_FUSION
@@ -3015,6 +3046,48 @@ const int& CodingStructure::getCcpmIdxInfo( const Position& pos ) const
   const Position miPos = scaling.scale(pos - area.chromaPos());
 
   return *( m_ccpmIdxBuf + miPos.y * stride + miPos.x );
+}
+#endif
+
+#if JVET_AG0058_EIP
+EipModelIdxBuf CodingStructure::getEipIdxBuf( const Area& bufArea)
+{
+  const CompArea& lumaArea = area.Y();
+  CHECK( !lumaArea.contains( bufArea ), "Trying to access Eip model information outside of this coding structure");
+  const Area miArea   = g_miScaling.scale( bufArea );
+  const Area selfArea = g_miScaling.scale( lumaArea );
+  
+  return EipModelIdxBuf( m_eipIdxBuf + rsAddr( miArea.pos(), selfArea.pos(), selfArea.width ), selfArea.width, miArea.size() );
+}
+
+const CEipModelIdxBuf CodingStructure::getEipIdxBuf( const Area& bufArea ) const
+{
+  const CompArea& lumaArea = area.Y();
+  CHECK( !lumaArea.contains( bufArea ), "Trying to access Eip model information outside of this coding structure");
+  const Area miArea   = g_miScaling.scale( bufArea );
+  const Area selfArea = g_miScaling.scale( lumaArea );
+  
+  return EipModelIdxBuf( m_eipIdxBuf + rsAddr( miArea.pos(), selfArea.pos(), selfArea.width ), selfArea.width, miArea.size() );
+}
+
+int& CodingStructure::getEipIdxInfo( const Position& pos )
+{
+  CHECK( !area.Y().contains( pos ), "Trying to access Eip model information outside of this coding structure");
+
+  const unsigned stride = g_miScaling.scaleHor( area.lumaSize().width );
+  const Position miPos  = g_miScaling.scale( pos - area.lumaPos() );
+
+  return *( m_eipIdxBuf + miPos.y * stride + miPos.x );
+}
+
+const int& CodingStructure::getEipIdxInfo( const Position& pos ) const
+{
+  CHECK( !area.Y().contains( pos ), "Trying to access Eip model information outside of this coding structure");
+
+  const unsigned stride = g_miScaling.scaleHor( area.lumaSize().width );
+  const Position miPos  = g_miScaling.scale( pos - area.lumaPos() );
+
+  return *( m_eipIdxBuf + miPos.y * stride + miPos.x );
 }
 #endif
 

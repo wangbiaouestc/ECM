@@ -434,20 +434,73 @@ unsigned DeriveCtx::CtxbvOneZeroComp(const CodingUnit &cu)
   return ctxId;
 }
 #endif
+#if JVET_AG0135_AFFINE_CIIP
+unsigned DeriveCtx::CtxCiipAffineFlag(const CodingUnit& cu)
+{
+  const CodingStructure *cs = cu.cs;
+  unsigned ctxId = 0;
 
+  const CodingUnit *cuLeft = cs->getCURestricted(cu.lumaPos().offset(-1, 0), cu, CH_L);
+  ctxId = (cuLeft && (cuLeft->affine || cuLeft->firstPU->ciipAffine)) ? 1 : 0;
+
+  const CodingUnit *cuAbove = cs->getCURestricted(cu.lumaPos().offset(0, -1), cu, CH_L);
+  ctxId += (cuAbove && (cuAbove->affine || cuAbove->firstPU->ciipAffine)) ? 1 : 0;
+
+  return ctxId;
+}
+#endif
 unsigned DeriveCtx::CtxAffineFlag( const CodingUnit& cu )
 {
   const CodingStructure *cs = cu.cs;
   unsigned ctxId = 0;
 
-  const CodingUnit *cuLeft = cs->getCURestricted( cu.lumaPos().offset( -1, 0 ), cu, CH_L );
-  ctxId = ( cuLeft && cuLeft->affine ) ? 1 : 0;
+#if JVET_AG0164_AFFINE_GPM
+  const CodingUnit* cuLeft = cs->getCURestricted(cu.lumaPos().offset(-1, 0), cu, CH_L);
+#if JVET_AG0135_AFFINE_CIIP
+  ctxId = (cuLeft && ((cuLeft->affine && !cuLeft->firstPU->ciipAffine) || (cuLeft->geoFlag && (cuLeft->firstPU->affineGPM[0] || cuLeft->firstPU->affineGPM[1])))) ? 1 : 0;
+#else
+  ctxId = (cuLeft && (cuLeft->affine || (cuLeft->geoFlag && (cuLeft->firstPU->affineGPM[0] || cuLeft->firstPU->affineGPM[1])))) ? 1 : 0;
+#endif
 
+  const CodingUnit* cuAbove = cs->getCURestricted(cu.lumaPos().offset(0, -1), cu, CH_L);
+#if JVET_AG0135_AFFINE_CIIP
+  ctxId += (cuAbove && ((cuAbove->affine && !cuAbove->firstPU->ciipAffine) || (cuAbove->geoFlag && (cuAbove->firstPU->affineGPM[0] || cuAbove->firstPU->affineGPM[1])))) ? 1 : 0;
+#else
+  ctxId += (cuAbove && (cuAbove->affine || (cuAbove->geoFlag && (cuAbove->firstPU->affineGPM[0] || cuAbove->firstPU->affineGPM[1])))) ? 1 : 0;
+#endif
+#else
+  const CodingUnit *cuLeft = cs->getCURestricted( cu.lumaPos().offset( -1, 0 ), cu, CH_L );
+#if JVET_AG0135_AFFINE_CIIP
+  ctxId = (cuLeft && (cuLeft->affine && !cuLeft->firstPU->ciipAffine)) ? 1 : 0;
+#else
+  ctxId = ( cuLeft && cuLeft->affine ) ? 1 : 0;
+#endif
   const CodingUnit *cuAbove = cs->getCURestricted( cu.lumaPos().offset( 0, -1 ), cu, CH_L );
+#if JVET_AG0135_AFFINE_CIIP
+  ctxId += (cuAbove && (cuAbove->affine && !cuAbove->firstPU->ciipAffine)) ? 1 : 0;
+#else
   ctxId += ( cuAbove && cuAbove->affine ) ? 1 : 0;
+#endif
+#endif
+  return ctxId;
+}
+
+#if JVET_AG0164_AFFINE_GPM
+unsigned DeriveCtx::CtxGPMAffineFlag(const CodingUnit& cu)
+{
+  const CodingStructure* cs = cu.cs;
+  unsigned ctxId = 0;
+
+  const CodingUnit* cuLeft = cs->getCURestricted(cu.lumaPos().offset(-1, 0), cu, CH_L);
+  ctxId = (cuLeft && (cuLeft->affine || (cuLeft->geoFlag && ( cuLeft->firstPU->affineGPM[0] || cuLeft->firstPU->affineGPM[1])))) ? 1 : 0;
+
+  const CodingUnit* cuAbove = cs->getCURestricted(cu.lumaPos().offset(0, -1), cu, CH_L);
+  ctxId += (cuAbove && (cuAbove->affine || (cuAbove->geoFlag && (cuAbove->firstPU->affineGPM[0] || cuAbove->firstPU->affineGPM[1])))) ? 1 : 0;
 
   return ctxId;
 }
+#endif
+
 unsigned DeriveCtx::CtxSkipFlag( const CodingUnit& cu )
 {
   const CodingStructure *cs = cu.cs;
@@ -758,6 +811,50 @@ void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
 #endif
 #endif
 }
+
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+int8_t  MergeCtx::getDir( Slice* slice, int candIdx, MvField *mvField )
+{
+  if (candIdx < 0)
+  {
+    return (-1);
+  }
+
+  mvField[REF_PIC_LIST_0].refIdx = mvFieldNeighbours[(candIdx << 1) + 0].refIdx;
+  mvField[REF_PIC_LIST_1].refIdx = mvFieldNeighbours[(candIdx << 1) + 1].refIdx;
+  mvField[REF_PIC_LIST_0].mv = mvFieldNeighbours[(candIdx << 1) + 0].mv;
+  mvField[REF_PIC_LIST_1].mv = mvFieldNeighbours[(candIdx << 1) + 1].mv;
+
+  int8_t  refIdx[2] = { -1, -1 };
+  Mv      mv[2];
+  refIdx[REF_PIC_LIST_0]  = mvField[REF_PIC_LIST_0].refIdx;
+  refIdx[REF_PIC_LIST_1]  = mvField[REF_PIC_LIST_1].refIdx;
+  mv[REF_PIC_LIST_0]      = mvField[REF_PIC_LIST_0].mv;
+  mv[REF_PIC_LIST_1]      = mvField[REF_PIC_LIST_1].mv;
+  if ( refIdx[0] == (-1) && refIdx[1] == (-1) )
+  {
+    return (-1);
+  }
+
+  if ( refIdx[0] == (-1) || refIdx[1] == (-1) ) 
+  {
+    return (refIdx[0] == (-1)) ? 1 : 0 ;
+  }
+  int poc0 = -1, poc1 = -1;
+  if ( refIdx[0] != (-1) && refIdx[1] != (-1) ) 
+  {
+    poc0 = slice->getRefPic(REF_PIC_LIST_0, refIdx[0])->getPOC();
+    poc1 = slice->getRefPic(REF_PIC_LIST_1, refIdx[1])->getPOC();
+    if ( poc0 == poc1 && mv[0] == mv[1] ) 
+    {
+      mvField[REF_PIC_LIST_1].refIdx = -1;
+      mvField[REF_PIC_LIST_1].mv.setZero();
+      return 0;
+    }
+  }
+  return 2; // bi-dir
+}
+#endif
 
 #if JVET_AE0169_BIPREDICTIVE_IBC
 void MergeCtx::setIbcL1Info( PredictionUnit& pu, int candIdx )
@@ -1581,6 +1678,37 @@ void MergeCtx::setMmvdMergeCandiInfo(PredictionUnit& pu, int candIdx)
 
   PU::restrictBiPredMergeCandsOne(pu);
 }
+
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+void MergeCtx::setGeoMrgDuplicate( const PredictionUnit& pu )
+{
+  CHECK(GEO_MAX_NUM_UNI_CANDS > NUM_MERGE_CANDS, "setGeoMrgDuplicate() failed");
+  uint8_t maxNumMergeCandidates = pu.cs->sps->getMaxNumGeoCand();
+  Slice* slice = pu.cs->slice;
+
+  Mv   mrgMv[GEO_MAX_NUM_UNI_CANDS];
+  maxNumMergeCandidates = std::min((int)maxNumMergeCandidates, numValidMergeCand);
+  for (uint8_t mergeCand = 0; mergeCand < maxNumMergeCandidates; mergeCand++)
+  {
+    int mrgList        = mvFieldNeighbours[(mergeCand << 1) + 0].refIdx == -1 ? 1 : 0;
+    int mrgRefIdx      = mvFieldNeighbours[(mergeCand << 1) + mrgList].refIdx;
+    pocMrg[mergeCand]  = slice->getRefPic((RefPicList)mrgList, mrgRefIdx)->getPOC();
+    mrgMv[mergeCand]   = mvFieldNeighbours[(mergeCand << 1) + mrgList].mv;
+    mrgDuplicated[mergeCand] = false;
+    if (mergeCand)
+    {
+      for (int i = 0; i < mergeCand; i++)
+      {
+        if (pocMrg[mergeCand] == pocMrg[i] && mrgMv[mergeCand] == mrgMv[i])
+        {
+          mrgDuplicated[mergeCand] = true;
+          break;
+        }
+      }
+    }
+  }
+}
+#endif
 #if JVET_AB0112_AFFINE_DMVR
 bool AffineMergeCtx::xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh) const
 {
@@ -2017,5 +2145,114 @@ unsigned DeriveCtx::ctxIbcFilterFlag(const CodingUnit& cu)
   const CodingUnit *cuAbove = cs->getCURestricted(pos.offset(0, -1), cu, cu.chType);
   ctxId += (cuAbove && !cuAbove->firstPU->mergeFlag && (cuAbove->ibcLicFlag || cuAbove->ibcFilterFlag)) ? 1 : 0;
   return ctxId;
+}
+#endif
+
+#if JVET_AG0164_AFFINE_GPM
+void AffineMergeCtx::setAffMergeInfo(PredictionUnit &pu, int candIdx, int8_t mmvdIdx) const
+{
+  if (candIdx >= m_indexOffset)
+  {
+    candIdx -= m_indexOffset;
+  }
+  bool extMMVD = pu.cs->picHeader->getGPMMMVDTableFlag();
+  CHECK(mmvdIdx >= (extMMVD ? GPM_EXT_MMVD_MAX_REFINE_NUM : GPM_MMVD_MAX_REFINE_NUM), "GPM MMVD index is invalid");
+  CHECK(!pu.cu->geoFlag || CU::isIBC(*pu.cu), "incorrect GPM setting")
+
+  Mv  mvOffset(0, 0);
+
+  if (mmvdIdx >= 0)
+  {
+    const int mvShift = MV_FRACTIONAL_BITS_DIFF;
+    const int refMvdCands[8] = { 1 << mvShift , 2 << mvShift , 4 << mvShift , 8 << mvShift , 16 << mvShift , 32 << mvShift,  64 << mvShift , 128 << mvShift };
+    const int refExtMvdCands[9] = { 1 << mvShift , 2 << mvShift , 4 << mvShift , 8 << mvShift , 12 << mvShift , 16 << mvShift, 24 << mvShift, 32 << mvShift, 64 << mvShift };
+    int fPosStep = (extMMVD ? (mmvdIdx >> 3) : (mmvdIdx >> 2));
+    int fPosPosition = (extMMVD ? (mmvdIdx - (fPosStep << 3)) : (mmvdIdx - (fPosStep << 2)));
+    int offset = (extMMVD ? refExtMvdCands[fPosStep] : refMvdCands[fPosStep]);
+
+    if (fPosPosition == 0)
+    {
+      mvOffset = Mv(offset, 0);
+    }
+    else if (fPosPosition == 1)
+    {
+      mvOffset = Mv(-offset, 0);
+    }
+    else if (fPosPosition == 2)
+    {
+      mvOffset = Mv(0, offset);
+    }
+    else if (fPosPosition == 3)
+    {
+      mvOffset = Mv(0, -offset);
+    }
+    else if (fPosPosition == 4)
+    {
+      mvOffset = Mv(offset, offset);
+    }
+    else if (fPosPosition == 5)
+    {
+      mvOffset = Mv(offset, -offset);
+    }
+    else if (fPosPosition == 6)
+    {
+      mvOffset = Mv(-offset, offset);
+    }
+    else if (fPosPosition == 7)
+    {
+      mvOffset = Mv(-offset, -offset);
+    }
+  }
+  pu.cu->affine = true;
+  pu.mergeFlag  = true;
+  pu.interDir       = interDirNeighbours[candIdx];
+  pu.cu->affineType = affineType[candIdx];
+  pu.cu->bcwIdx     = bcwIdx[candIdx];
+#if INTER_LIC
+  pu.cu->licFlag = licFlags[candIdx];
+#endif
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  pu.colIdx = colIdx[candIdx];
+#endif
+  pu.mergeType    = mergeType[candIdx];
+
+  pu.cu->obmcFlag = true;
+  //pu.cu->obmcFlag = obmcFlags[candIdx];
+
+  if (pu.mergeType == MRG_TYPE_SUBPU_ATMVP)
+  {
+    THROW("Invalid merge type");
+  }
+  else
+  {
+    for (int i = 0; i < 2; ++i)
+    {
+      if (pu.cs->slice->getNumRefIdx(RefPicList(i)) > 0)
+      {
+        const MvField *mvField = mvFieldNeighbours[(candIdx << 1) + i];
+        pu.mvpIdx[i]     = 0;
+        pu.mvpNum[i]     = 0;
+        pu.mvd[i]        = Mv();
+        pu.refIdx[i]     = mvField[0].refIdx;
+        pu.mvAffi[i][0]  = mvField[0].mv + mvOffset;
+        pu.mvAffi[i][1]  = mvField[1].mv + mvOffset;
+        pu.mvAffi[i][2]  = mvField[2].mv + mvOffset;
+
+        pu.mv[i] = pu.mvAffi[i][0];// For split reordering
+      }
+      else
+      {
+        pu.mvpIdx[i]     = 0;
+        pu.mvpNum[i]     = 0;
+        pu.mvd[i]        = Mv();
+        pu.refIdx[i]     = -1;
+        pu.mvAffi[i][0]  = Mv();
+        pu.mvAffi[i][1]  = Mv();
+        pu.mvAffi[i][2]  = Mv();
+
+        pu.mv[i] = Mv();// For split reordering
+      }
+    }
+  }
 }
 #endif

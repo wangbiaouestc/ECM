@@ -446,5 +446,9 @@ extern const int8_t g_amvpSbTmvp_mvd_dir[2][8];
 extern const int8_t g_amvpSbTmvp_mvd_offset[6];
 extern uint32_t g_picAmvpSbTmvpEnabledArea;
 #endif
+#if JVET_AG0058_EIP
+extern const Position g_eipFilter[NUM_EIP_SHAPE][EIP_FILTER_TAP];
+extern const EIPInfo  g_eipInfoLut[4][4][9];
+#endif
 #endif  //__TCOMROM__
 

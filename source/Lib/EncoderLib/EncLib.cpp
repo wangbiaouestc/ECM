@@ -1689,6 +1689,9 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_AD0082_TMRL_CONFIG
   cinfo->setNoTmrlConstraintFlag(m_noTmrlConstraintFlag);
 #endif
+#if JVET_AG0058_EIP
+  cinfo->setNoEipConstraintFlag(m_noEipConstraintFlag);
+#endif
 #if ENABLE_OBMC
   cinfo->setNoObmcConstraintFlag(m_noObmcConstraintFlag);
 #endif
@@ -1823,6 +1826,9 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setMaxNumAffineMergeCand(getMaxNumAffineMergeCand());
   sps.setMaxNumIBCMergeCand(getMaxNumIBCMergeCand());
   sps.setMaxNumGeoCand(getMaxNumGeoCand());
+#if JVET_AG0164_AFFINE_GPM
+  sps.setMaxNumGpmAffCand      (((m_sourceWidth * m_sourceHeight) > (m_intraPeriod == -1 ? 1280 * 720 : 0)) ? getMaxNumGpmAffCand() : 0);
+#endif
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
   sps.setMaxNumMHPCand(getMaxNumMHPCand());
 #endif
@@ -1830,6 +1836,9 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setUseAffineType         ( m_AffineType );
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
   sps.setUseAffineTM           ( m_useAffineTM );
+#endif
+#if JVET_AG0135_AFFINE_CIIP
+  sps.setUseCiipAffine         (((m_sourceWidth * m_sourceHeight) > (m_intraPeriod == -1 ? 832 * 480 : 0)) ? m_useCiipAffine : false);
 #endif
 #if AFFINE_MMVD
   sps.setUseAffineMmvdMode     ( m_AffineMmvdMode );
@@ -1908,6 +1917,9 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
   sps.setTMnoninterToolsEnableFlag            ( m_tmNoninterToolsEnableFlag );
 #endif
+#if JVET_AG0058_EIP
+  sps.setUseEip             ( m_eip );
+#endif
 #if JVET_AD0085_MPM_SORTING
   sps.setUseMpmSorting      ( m_mpmSorting );
 #endif
@@ -1946,6 +1958,9 @@ void EncLib::xInitSPS( SPS& sps )
   }
 #endif
   sps.setUseGeo                ( m_Geo );
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  sps.setUseGeoBlend           ( true );
+#endif
   sps.setUseMMVD               ( m_MMVD );
   sps.setFpelMmvdEnabledFlag   (( m_MMVD ) ? m_allowDisFracMMVD : false);
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION

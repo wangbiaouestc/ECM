@@ -324,6 +324,16 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
 #endif
   }
 #endif
+#if JVET_AG0058_EIP
+  {
+#if JVET_Z0118_GDR
+    cs.eipLut.lutEip0.resize(0);
+    cs.eipLut.lutEip1.resize(0);
+#else
+    cs.eipLut.lutEip.resize(0);
+#endif
+  }
+#endif
   unsigned subStrmId = 0;
   for( unsigned ctuIdx = 0; ctuIdx < slice->getNumCtuInSlice(); ctuIdx++ )
   {
@@ -461,6 +471,17 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
       cs.ccpLut.lutCCP1.resize(0);
 #else
       cs.ccpLut.lutCCP.resize(0);
+#endif
+    }
+#endif
+#if JVET_AG0058_EIP
+    if (ctuXPosInCtus == tileXPosInCtus)
+    {
+#if JVET_Z0118_GDR
+      cs.eipLut.lutEip0.resize(0);
+      cs.eipLut.lutEip1.resize(0);
+#else
+      cs.eipLut.lutEip.resize(0);
 #endif
     }
 #endif

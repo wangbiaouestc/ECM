@@ -560,6 +560,12 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
       }
     }
 #endif
+#if JVET_AG0058_EIP
+    if (PU::isEIP(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
+    {
+      intraMode = tu.cu->eipModel.eipDimdMode;
+    }
+#endif
 
 #if EXTENDED_LFNST || JVET_W0119_LFNST_EXTENSION
     if (lfnstIdx < 4)
@@ -831,6 +837,12 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
       {
         intraMode = VER_IDX;
       }
+    }
+#endif
+#if JVET_AG0058_EIP
+    if (PU::isEIP(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
+    {
+      intraMode = tu.cu->eipModel.eipDimdMode;
     }
 #endif
 
@@ -1243,10 +1255,17 @@ void TrQuant::getTrTypes(const TransformUnit tu, const ComponentID compID, int &
         predMode = g_geoAngle2IntraAng[g_geoParams[tu.cu->sgpmSplitDir][0]];
       }
 #endif
+
 #if JVET_AD0085_TMRL_EXTENSION
       if (tu.cu->tmrlFlag && compID == COMPONENT_Y)
       {
         predMode = MAP131TO67(predMode);
+      }
+#endif
+#if JVET_AG0058_EIP
+      if (tu.cu->eipFlag && compID == COMPONENT_Y)
+      {
+        predMode = tu.cu->eipModel.eipDimdMode;
       }
 #endif
       int ucMode;
@@ -2677,6 +2696,12 @@ int TrQuant::getLfnstIdx(const TransformUnit &tu, ComponentID compID)
     {
       intraMode = VER_IDX;
     }
+  }
+#endif
+#if JVET_AG0058_EIP
+  if (PU::isEIP(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
+  {
+    intraMode = tu.cu->eipModel.eipDimdMode;
   }
 #endif
 

@@ -175,6 +175,9 @@ public:
   void        cu_palette_info           ( const CodingUnit&             cu,       ComponentID       compBegin,     uint32_t numComp,          CUCtx&       cuCtx);
   void        cuPaletteSubblockInfo     ( const CodingUnit&             cu,       ComponentID       compBegin,     uint32_t numComp,          int subSetId,               uint32_t& prevRunPos,        unsigned& prevRunType );
   Pel         writePLTIndex             ( const CodingUnit&             cu,       uint32_t          idx,           PelBuf&  paletteIdx,       PLTtypeBuf&  paletteRunType, int         maxSymbol,   ComponentID compBegin );
+#if JVET_AG0058_EIP
+  void        cu_eip_flag              ( const CodingUnit&             cu );
+#endif
   // prediction unit (clause 7.3.8.6)
   void        prediction_unit           ( const PredictionUnit&         pu );
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
@@ -216,12 +219,19 @@ public:
   void        geo_merge_idx(const PredictionUnit&         pu);
   void        geo_merge_idx1(const PredictionUnit&         pu);
 
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  uint64_t    geo_blend_est(const TempCtx& ctxStart, const int flag);
+#endif
   uint64_t    geo_mode_est(const TempCtx& ctxStart, const int geoMode
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
                          , const uint8_t altCodeIdx = 0
 #endif
   );
-  uint64_t    geo_mergeIdx_est(const TempCtx& ctxStart, const int candIdx, const int maxNumGeoCand);
+  uint64_t    geo_mergeIdx_est(const TempCtx& ctxStart, const int candIdx, const int maxNumGeoCand
+#if JVET_AG0164_AFFINE_GPM
+    , int isAffine = 0
+#endif
+  );
 #if JVET_Y0065_GPM_INTRA
   uint64_t    geo_intraFlag_est         ( const TempCtx& ctxStart, const int flag);
   uint64_t    geo_intraIdx_est          ( const int intraIdx);
@@ -231,6 +241,9 @@ public:
 #if TM_MRG
   uint64_t    geo_tmFlag_est(const TempCtx& ctxStart, const int flag);
 #endif
+#endif
+#if JVET_AG0164_AFFINE_GPM
+  uint64_t    geo_affFlag_est(const TempCtx& ctxStart, const int flag, int ctxOffset);
 #endif
 #if JVET_AA0058_GPM_ADAPTIVE_BLENDING
   uint64_t    geoBldFlagEst             (const TempCtx& ctxStart, const int flag);
@@ -255,6 +268,9 @@ public:
   void        mvp_flag                  ( const PredictionUnit&         pu,       RefPicList eRefList );
 
   void        Ciip_flag                 ( const PredictionUnit&         pu );
+#if JVET_AG0135_AFFINE_CIIP
+  void        ciipAffineFlag            ( const PredictionUnit&         pu);
+#endif
   void        smvd_mode                 ( const PredictionUnit&         pu );
 #if JVET_AG0098_AMVP_WITH_SBTMVP
   void        amvpSbTmvpFlag            ( const PredictionUnit&         pu );

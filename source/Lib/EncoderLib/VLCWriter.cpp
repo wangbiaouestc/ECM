@@ -1564,11 +1564,20 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
     WRITE_FLAG(pcSPS->getUseCiipTmMrg() ? 1 : 0, "sps_ciip_tm_merge_enabled_flag");
   }
 #endif
+#if JVET_AG0135_AFFINE_CIIP
+  if (pcSPS->getUseCiip() && pcSPS->getUseAffine())
+  {
+    WRITE_FLAG(pcSPS->getUseCiipAffine() ? 1 : 0, "sps_ciip_affine_flag");
+  }
+#endif
   if (pcSPS->getMaxNumMergeCand() >= 2)
   {
     WRITE_FLAG(pcSPS->getUseGeo() ? 1 : 0, "sps_gpm_enabled_flag");
     if (pcSPS->getUseGeo())
     {
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+      WRITE_FLAG(pcSPS->getUseGeoBlend() ? 1 : 0, "sps_gpm_blend_flag");
+#endif
       CHECK(pcSPS->getMaxNumMergeCand() < pcSPS->getMaxNumGeoCand(),
             "The number of GPM candidates must not be greater than the number of merge candidates");
       CHECK(2 > pcSPS->getMaxNumGeoCand(),
@@ -1578,6 +1587,13 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
         WRITE_UVLC(pcSPS->getMaxNumMergeCand() - pcSPS->getMaxNumGeoCand(),
                    "max_num_merge_cand_minus_max_num_gpm_cand");
       }
+#if JVET_AG0164_AFFINE_GPM
+      if (pcSPS->getUseAffine() && pcSPS->getMaxNumGeoCand() != 0 && pcSPS->getMaxNumAffineMergeCand() >= 3)
+      {
+        WRITE_UVLC(pcSPS->getMaxNumAffineMergeCand() - pcSPS->getMaxNumGpmAffCand(), "max_num_aff_merge_cand_minus_max_num_gpm_aff_cand");
+      }
+#endif
+
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_W0097_GPM_MMVD_TM && TM_MRG
       if (pcSPS->getTMToolsEnableFlag())
       {
@@ -1649,6 +1665,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #endif
 #if JVET_AD0082_TMRL_CONFIG
   WRITE_FLAG(pcSPS->getUseTmrl() ? 1 : 0, "sps_tmrl_enabled_flag");
+#endif
+#if JVET_AG0058_EIP
+  WRITE_FLAG(pcSPS->getUseEip() ? 1 : 0, "sps_eip_enabled_flag");
 #endif
 #if JVET_AD0085_MPM_SORTING
   WRITE_FLAG(pcSPS->getUseMpmSorting() ? 1 : 0, "sps_mpm_sorting_enabled_flag");
@@ -2270,7 +2289,11 @@ void HLSWriter::codePictureHeader( PicHeader* picHeader, bool writeRbspTrailingB
       if (picHeader->getAlfEnabledFlag(COMPONENT_Y))
       {
 #if ALF_IMPROVEMENT
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+        WRITE_FLAG(picHeader->getAlfFixedFilterSetIdx(COMPONENT_Y), "ph_alf_fixed_filter_set_idx_luma");
+#else
         WRITE_FLAG(picHeader->getAlfFixedFilterSetIdx(), "ph_alf_fixed_filter_set_idx");
+#endif
 #endif
         WRITE_CODE(picHeader->getNumAlfAps(), 3, "ph_num_alf_aps_ids_luma");
         const std::vector<int>&   apsId = picHeader->getAlfAPSs();
@@ -2278,12 +2301,21 @@ void HLSWriter::codePictureHeader( PicHeader* picHeader, bool writeRbspTrailingB
         {
           WRITE_CODE(apsId[i], 3, "ph_alf_aps_id_luma");
         }
-
         const int alfChromaIdc = picHeader->getAlfEnabledFlag(COMPONENT_Cb) + picHeader->getAlfEnabledFlag(COMPONENT_Cr) * 2 ;
         if (sps->getChromaFormatIdc() != CHROMA_400)
         {
           WRITE_CODE(picHeader->getAlfEnabledFlag(COMPONENT_Cb), 1, "ph_alf_cb_enabled_flag");
           WRITE_CODE(picHeader->getAlfEnabledFlag(COMPONENT_Cr), 1, "ph_alf_cr_enabled_flag");
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+          if (picHeader->getAlfEnabledFlag(COMPONENT_Cb))
+          {
+            WRITE_FLAG(picHeader->getAlfFixedFilterSetIdx(COMPONENT_Cb), "ph_alf_fixed_filter_set_idx_cb");
+          }
+          if (picHeader->getAlfEnabledFlag(COMPONENT_Cr))
+          {
+            WRITE_FLAG(picHeader->getAlfFixedFilterSetIdx(COMPONENT_Cr), "ph_alf_fixed_filter_set_idx_cr");
+          }
+#endif
         }
         if (alfChromaIdc)
         {
@@ -2944,7 +2976,11 @@ void HLSWriter::codeSliceHeader         ( Slice* pcSlice )
     if (alfEnabled)
     {
 #if ALF_IMPROVEMENT
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+      WRITE_FLAG(pcSlice->getTileGroupAlfFixedFilterSetIdx(COMPONENT_Y), "slice_alf_fixed_filter_set_idx_luma");
+#else
       WRITE_FLAG(pcSlice->getTileGroupAlfFixedFilterSetIdx(), "slice_alf_fixed_filter_set_idx");
+#endif
 #endif
       WRITE_CODE(pcSlice->getTileGroupNumAps(), 3, "slice_num_alf_aps_ids_luma");
       const std::vector<int>&   apsId = pcSlice->getTileGroupApsIdLuma();
@@ -2958,6 +2994,16 @@ void HLSWriter::codeSliceHeader         ( Slice* pcSlice )
       {
         WRITE_CODE(pcSlice->getTileGroupAlfEnabledFlag(COMPONENT_Cb), 1, "slice_alf_cb_enabled_flag");
         WRITE_CODE(pcSlice->getTileGroupAlfEnabledFlag(COMPONENT_Cr), 1, "slice_alf_cr_enabled_flag");
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+        if (pcSlice->getTileGroupAlfEnabledFlag(COMPONENT_Cb))
+        {
+          WRITE_FLAG(pcSlice->getTileGroupAlfFixedFilterSetIdx(COMPONENT_Cb), "slice_alf_fixed_filter_set_idx_cb");
+        }
+        if (pcSlice->getTileGroupAlfEnabledFlag(COMPONENT_Cr))
+        {
+          WRITE_FLAG(pcSlice->getTileGroupAlfFixedFilterSetIdx(COMPONENT_Cr), "slice_alf_fixed_filter_set_idx_cr");
+        }
+#endif
       }
       if (alfChromaIdc)
       {
@@ -3454,6 +3500,9 @@ void  HLSWriter::codeConstraintInfo  ( const ConstraintInfo* cinfo )
 #endif
 #if JVET_AD0082_TMRL_CONFIG
     WRITE_FLAG(cinfo->getNoTmrlConstraintFlag() ? 1 : 0, "gci_no_tmrl_constraint_flag");
+#endif
+#if JVET_AG0058_EIP
+    WRITE_FLAG(cinfo->getNoEipConstraintFlag() ? 1 : 0, "gci_no_eip_constraint_flag");
 #endif
     /* inter */
     WRITE_FLAG(cinfo->getNoRprConstraintFlag() ? 1 : 0, "gci_no_ref_pic_resampling_constraint_flag");
@@ -4266,7 +4315,6 @@ void HLSWriter::alfFilter( const AlfParam& alfParam, const bool isChroma, const 
 #endif
     }
   }
-
   // Clipping values coding
 #if ALF_IMPROVEMENT
   if( alfParam.nonLinearFlag[isChroma][altIdx])

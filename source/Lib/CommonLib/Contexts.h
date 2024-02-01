@@ -502,6 +502,10 @@ public:
   static const CtxSet   MergeFlag;
   static const CtxSet   RegularMergeFlag;
   static const CtxSet   MergeIdx;
+#if JVET_AG0164_AFFINE_GPM
+  static const CtxSet   GpmMergeIdx;
+  static const CtxSet   GpmAffMergeIdx;
+#endif
 #if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
   static const CtxSet   TmMergeIdx;
 #endif
@@ -574,6 +578,9 @@ public:
   static const CtxSet   MmvdStepMvpIdx;
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   static const CtxSet   MmvdStepMvpIdxECM3;
+#endif
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  static const CtxSet   GeoBlendFlag;
 #endif
 #if JVET_W0097_GPM_MMVD_TM
   static const CtxSet   GeoMmvdFlag;
@@ -707,6 +714,9 @@ public:
 #if JVET_V0094_BILATERAL_FILTER
   static const CtxSet   BifCtrlFlags[];
 #endif
+#if JVET_AG0164_AFFINE_GPM
+  static const CtxSet   AffineGPMFlag;
+#endif
 #if JVET_W0066_CCSAO
   static const CtxSet   CcSaoControlIdc;
 #endif
@@ -746,6 +756,9 @@ public:
   static const CtxSet   AlfUseTemporalFilt;
   static const CtxSet   CcAlfFilterControlFlag;
   static const CtxSet   CiipFlag;
+#if JVET_AG0135_AFFINE_CIIP
+  static const CtxSet   CiipAffineFlag;
+#endif
   static const CtxSet   SmvdFlag;
 #if JVET_AG0098_AMVP_WITH_SBTMVP
   static const CtxSet   amvpSbTmvpFlag;
@@ -789,6 +802,9 @@ public:
 #endif
 #if JVET_AF0073_INTER_CCP_MERGE
   static const CtxSet   InterCcpMergeFlag;
+#endif
+#if JVET_AG0058_EIP
+  static const CtxSet   EipFlag;
 #endif
   static const unsigned NumberOfContexts;
 

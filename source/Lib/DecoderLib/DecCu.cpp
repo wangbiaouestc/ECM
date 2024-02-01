@@ -283,7 +283,11 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
         if (cs.slice->getSPS()->getUseTimd() && currCU.geoFlag && currCU.firstPU->gpmIntraFlag)
 #endif
         {
+#if JVET_AG0164_AFFINE_GPM
+          if ((int)(currCU.firstPU->geoMergeIdx0)- GEO_MAX_ALL_INTER_UNI_CANDS > 0 || (int)(currCU.firstPU->geoMergeIdx1)- GEO_MAX_ALL_INTER_UNI_CANDS > 0) // dimd/timd
+#else
           if ((int)(currCU.firstPU->geoMergeIdx0)-GEO_MAX_NUM_UNI_CANDS > 0 || (int)(currCU.firstPU->geoMergeIdx1)-GEO_MAX_NUM_UNI_CANDS > 0) // dimd/timd
+#endif
           {
             const CompArea &area = currCU.Y();
 #if ENABLE_DIMD
@@ -527,6 +531,9 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
 #if JVET_AD0188_CCP_MERGE
         CU::saveModelsInHCCP(currCU);
 #endif
+#if JVET_AG0058_EIP
+        CU::saveModelsInHEIP(currCU);
+#endif
         break;
       default:
         THROW( "Invalid prediction mode" );
@@ -583,6 +590,14 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
   const PredictionUnit &pu  = *tu.cs->getPU( area.pos(), chType );
 #endif
 #if ENABLE_DIMD
+#if JVET_AG0058_EIP
+  if (pu.parseChromaMode && compID == COMPONENT_Cb && !CS::isDualITree(cs))
+  {
+    unsigned chromaCandModes[NUM_CHROMA_MODE];
+    PU::getIntraChromaCandModes(pu, chromaCandModes);
+    pu.intraDir[1] = chromaCandModes[pu.candId];
+  }
+#endif
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
   if (pu.intraDir[1] == DIMD_CHROMA_IDX && compID == COMPONENT_Cb)
   {
@@ -621,6 +636,14 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 #endif
   uint32_t uiChFinalMode = PU::getFinalIntraMode(pu, chType);
 #else
+#if JVET_AG0058_EIP
+  if (pu.parseChromaMode && compID == COMPONENT_Cb && !CS::isDualITree(cs))
+  {
+    unsigned chromaCandModes[NUM_CHROMA_MODE];
+    PU::getIntraChromaCandModes(pu, chromaCandModes);
+    pu.intraDir[1] = chromaCandModes[pu.candId];
+  }
+#endif
   const uint32_t uiChFinalMode = PU::getFinalIntraMode(pu, chType);
 #endif
   PelBuf pReco              = cs.getRecoBuf(area);
@@ -656,7 +679,12 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
   {
     m_pcIntraPred->initIntraPatternChType(*tu.cu, area);
   }
-
+#if PRINT_DEBUG_INFO
+  if(!pu.cs->pcv->isEncoder && compID == COMPONENT_Cb)
+  {
+    print_debug_info(*tu.cu, compID);
+  }
+#endif
   //===== get prediction signal =====
 #if JVET_AD0188_CCP_MERGE
   if (compID != COMPONENT_Y && pu.idxNonLocalCCP)
@@ -887,6 +915,42 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
       m_pcIntraPred->predIntraMip( compID, piPred, pu );
 #endif
     }
+#if JVET_AG0058_EIP
+    else if (PU::isEIP(pu, chType))
+    {
+      const bool isEncoder = pu.cs->pcv->isEncoder;
+      m_pcIntraPred->initEipParams(pu, COMPONENT_Y);
+      if (!isEncoder)
+      {
+        if (pu.cu->eipMerge)
+        {
+          static_vector<EipModelCandidate, MAX_MERGE_EIP> eipMergeCandList;
+          m_pcIntraPred->getNeiEipCands(pu, eipMergeCandList);
+          m_pcIntraPred->reorderEipCands(pu, eipMergeCandList);
+          pu.cu->eipModel = eipMergeCandList[pu.intraDir[CHANNEL_TYPE_LUMA]];
+        }
+        else 
+        {
+          static_vector<EipModelCandidate, NUM_DERIVED_EIP> eipModelCandList;
+          m_pcIntraPred->getCurEipCands(pu, eipModelCandList);
+          pu.cu->eipModel = eipModelCandList[0];
+        }
+      }
+      m_pcIntraPred->eipPred(pu, piPred);
+      if (!isEncoder)
+      {
+        pu.cu->eipModel.eipDimdMode = IntraPrediction::deriveDimdMipMode(piPred, piPred.width, piPred.height, *pu.cu);
+
+        // const CodingUnit& cu = *pu.cu;
+        // printf("pos(%d, %d), size(%d, %d), merge(%d), ", cu.lx(), cu.ly(), cu.lwidth(), cu.lheight(), int(cu.eipMerge));
+        // for (int i = 0; i < 15; i++)
+        // {
+        // printf("%d ", int(cu.eipModel.params[i]));
+        // }
+        // printf("\n");
+      }
+    }
+#endif
     else
     {
       if (predRegDiffFromTB)
@@ -1490,12 +1554,27 @@ void DecCu::xFillPCMBuffer(CodingUnit &cu)
 
 void DecCu::xReconInter(CodingUnit &cu)
 {
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  if ( cu.geoBlendFlag )
+  {
+    m_pcInterPred->motionCompensationGeoBlend( cu, m_geoMrgCtx
+  #if JVET_AE0046_BI_GPM
+      , m_mvBufBDMVR
+      , m_mvBufBDOF4GPM
+  #endif
+    );
+  }
+  else
+#endif
   if( cu.geoFlag )
   {
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
     m_pcInterPred->motionCompensationGeo( cu, m_geoMrgCtx 
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG
                                         , m_geoTmMrgCtx
+#endif
+#if JVET_AG0164_AFFINE_GPM
+                                        , m_geoAffMrgCtx
 #endif
 #if JVET_AE0046_BI_GPM
                                         , m_mvBufBDMVR
@@ -1515,6 +1594,9 @@ void DecCu::xReconInter(CodingUnit &cu)
 	  PU::spanGeoMotionInfo
 #endif
                              ( *cu.firstPU, m_geoMrgCtx
+#if JVET_AG0164_AFFINE_GPM
+                               , m_geoAffMrgCtx
+#endif
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG
 							                , m_geoTmMrgCtx0, m_geoTmMrgCtx1
 #endif
@@ -1771,30 +1853,62 @@ void DecCu::xReconInter(CodingUnit &cu)
     m_pcInterPred->subBlockOBMC(*cu.firstPU);
     cu.isobmcMC = false;
 #endif
-    if( cu.cs->slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() )
+#if JVET_AG0135_AFFINE_CIIP
+    if (cu.firstPU->ciipAffine)
     {
-      m_pcIntraPred->geneWeightedPred<true>( COMPONENT_Y, cu.cs->getPredBuf( *cu.firstPU ).Y(), *cu.firstPU, cu.cs->getPredBuf( *cu.firstPU ).Y(), m_ciipBuffer.getBuf( localUnitArea.Y() ), m_pcReshape->getFwdLUT().data() );
+      if (cu.cs->slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag())
+      {
+        m_pcIntraPred->geneWeightedCIIPAffinePred<true>(COMPONENT_Y, cu.cs->getPredBuf(*cu.firstPU).Y(), *cu.firstPU, cu.cs->getPredBuf(*cu.firstPU).Y(), m_ciipBuffer.getBuf(localUnitArea.Y()), m_pcReshape->getFwdLUT().data());
+      }
+      else
+      {
+        m_pcIntraPred->geneWeightedCIIPAffinePred<false>(COMPONENT_Y, cu.cs->getPredBuf(*cu.firstPU).Y(), *cu.firstPU, cu.cs->getPredBuf(*cu.firstPU).Y(), m_ciipBuffer.getBuf(localUnitArea.Y()));
+      }
+
+#if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+      if (isChromaEnabled(cu.chromaFormat))
+#else
+      if (isChromaEnabled(cu.chromaFormat) && cu.chromaSize().width > 2)
+#endif
+      {
+        m_pcIntraPred->geneWeightedCIIPAffinePred<false>(COMPONENT_Cb, cu.cs->getPredBuf(*cu.firstPU).Cb(), *cu.firstPU, cu.cs->getPredBuf(*cu.firstPU).Cb(), m_ciipBuffer.getBuf(localUnitArea.Cb()));
+        m_pcIntraPred->geneWeightedCIIPAffinePred<false>(COMPONENT_Cr, cu.cs->getPredBuf(*cu.firstPU).Cr(), *cu.firstPU, cu.cs->getPredBuf(*cu.firstPU).Cr(), m_ciipBuffer.getBuf(localUnitArea.Cr()));
+      }
     }
     else
     {
-      m_pcIntraPred->geneWeightedPred<false>( COMPONENT_Y, cu.cs->getPredBuf( *cu.firstPU ).Y(), *cu.firstPU, cu.cs->getPredBuf( *cu.firstPU ).Y(), m_ciipBuffer.getBuf( localUnitArea.Y() ) );
-    }
+#endif
+      if (cu.cs->slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag())
+      {
+        m_pcIntraPred->geneWeightedPred<true>(COMPONENT_Y, cu.cs->getPredBuf(*cu.firstPU).Y(), *cu.firstPU, cu.cs->getPredBuf(*cu.firstPU).Y(), m_ciipBuffer.getBuf(localUnitArea.Y()), m_pcReshape->getFwdLUT().data());
+      }
+      else
+      {
+        m_pcIntraPred->geneWeightedPred<false>(COMPONENT_Y, cu.cs->getPredBuf(*cu.firstPU).Y(), *cu.firstPU, cu.cs->getPredBuf(*cu.firstPU).Y(), m_ciipBuffer.getBuf(localUnitArea.Y()));
+      }
 
 #if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
-    if( isChromaEnabled( cu.chromaFormat ) )
+      if (isChromaEnabled(cu.chromaFormat))
 #else
-    if( isChromaEnabled( cu.chromaFormat ) && cu.chromaSize().width > 2 )
+      if (isChromaEnabled(cu.chromaFormat) && cu.chromaSize().width > 2)
 #endif
-    {
-      m_pcIntraPred->geneWeightedPred<false>( COMPONENT_Cb, cu.cs->getPredBuf( *cu.firstPU ).Cb(), *cu.firstPU, cu.cs->getPredBuf( *cu.firstPU ).Cb(), m_ciipBuffer.getBuf( localUnitArea.Cb() ) );
-      m_pcIntraPred->geneWeightedPred<false>( COMPONENT_Cr, cu.cs->getPredBuf( *cu.firstPU ).Cr(), *cu.firstPU, cu.cs->getPredBuf( *cu.firstPU ).Cr(), m_ciipBuffer.getBuf( localUnitArea.Cr() ) );
+      {
+        m_pcIntraPred->geneWeightedPred<false>(COMPONENT_Cb, cu.cs->getPredBuf(*cu.firstPU).Cb(), *cu.firstPU, cu.cs->getPredBuf(*cu.firstPU).Cb(), m_ciipBuffer.getBuf(localUnitArea.Cb()));
+        m_pcIntraPred->geneWeightedPred<false>(COMPONENT_Cr, cu.cs->getPredBuf(*cu.firstPU).Cr(), *cu.firstPU, cu.cs->getPredBuf(*cu.firstPU).Cr(), m_ciipBuffer.getBuf(localUnitArea.Cr()));
+      }
+#if JVET_AG0135_AFFINE_CIIP
     }
+#endif
   }
 #if ENABLE_OBMC
   cu.isobmcMC = true;
 #if JVET_X0090_CIIP_FIX
 #if JVET_Y0065_GPM_INTRA
-  if (!cu.firstPU->ciipFlag && !cu.firstPU->gpmIntraFlag)
+  if (!cu.firstPU->ciipFlag && !cu.firstPU->gpmIntraFlag
+#if JVET_AG0164_AFFINE_GPM
+    && (!cu.firstPU->affineGPM[0] && !cu.firstPU->affineGPM[1])
+#endif
+    )
 #else
   if (!cu.firstPU->ciipFlag)
 #endif
@@ -2174,9 +2288,9 @@ void DecCu::xDecodeInterTexture(CodingUnit &cu)
 #endif
 }
 
-void DecCu::xDeriveCUMV( CodingUnit &cu )
+void DecCu::xDeriveCUMV(CodingUnit &cu)
 {
-  for( auto &pu : CU::traversePUs( cu ) )
+  for (auto &pu : CU::traversePUs(cu))
   {
 #if JVET_AC0144_AFFINE_DMVR_REGRESSION
     if (cu.cs->pcv->isEncoder && !cu.geoFlag && !(!pu.cu->affine && PU::checkBDMVRCondition(pu)) && pu.mergeType != MRG_TYPE_SUBPU_ATMVP
@@ -2291,11 +2405,44 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
       {
       {
         if( pu.cu->geoFlag )
-        {
+        {     
+#if JVET_AG0164_AFFINE_GPM
+          if (pu.affineGPM[0] || pu.affineGPM[1])
+          {
+            PU::getGeoAffMergeCandidates(pu, m_geoAffMrgCtx, m_pcInterPred);
+            if (pu.cs->sps->getUseAML() && (m_geoAffMrgCtx.numValidMergeCand > 1)
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+              && pu.cs->sps->getTMToolsEnableFlag()
+#endif
+              )
+            {
+              m_geoAffMrgCtx.maxNumMergeCand = m_geoAffMrgCtx.numValidMergeCand;
+              PredictionUnit puSaved = pu;
+              CodingUnit     cuSaved = *pu.cu;
+              puSaved.cu = &cuSaved;
+              m_pcInterPred->adjustAffineMergeCandidates(puSaved, m_geoAffMrgCtx);
+
+             m_geoAffMrgCtx.numValidMergeCand = std::min(m_geoAffMrgCtx.numValidMergeCand, (int)pu.cs->sps->getMaxNumGpmAffCand());
+             m_geoAffMrgCtx.maxNumMergeCand = m_geoAffMrgCtx.numValidMergeCand;
+            }
+          }
+          if (!pu.affineGPM[0] || !pu.affineGPM[1])
+          {
+#endif
 #if JVET_AE0046_BI_GPM
-          PU::getGeoMergeCandidates(pu, m_geoMrgCtx, nullptr, true);
+            PU::getGeoMergeCandidates(pu, m_geoMrgCtx, nullptr, true);
 #else
-          PU::getGeoMergeCandidates( pu, m_geoMrgCtx );
+            PU::getGeoMergeCandidates(pu, m_geoMrgCtx);
+#endif
+
+#if JVET_AG0164_AFFINE_GPM
+          }
+#endif
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+          if (pu.cu->geoBlendFlag)
+          {
+            return;
+          }
 #endif
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG
           if (pu.geoTmFlag0)
@@ -2507,7 +2654,11 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
               , pu.afMmvdFlag
 #if JVET_Z0139_NA_AFF
 #if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+#if JVET_AG0135_AFFINE_CIIP
+              , (cu.slice->getTLayer() < 4 && PU::checkAffineTMCondition(pu)) ? false : (pu.mergeIdx == 0 && !pu.affBMMergeFlag)
+#else
               , (pu.mergeIdx == 0 && !pu.affBMMergeFlag)
+#endif
 #else
               , pu.mergeIdx == 0
 #endif
@@ -2730,7 +2881,11 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
             }
           }
 #if JVET_AB0112_AFFINE_DMVR
+#if JVET_AG0135_AFFINE_CIIP
+          if (!pu.afMmvdFlag&&pu.mergeType != MRG_TYPE_SUBPU_ATMVP && (pu.ciipAffine ? PU::checkBDMVRConditionCIIPAffine(pu) : PU::checkBDMVRCondition(pu)))
+#else
           if (!pu.afMmvdFlag&&pu.mergeType != MRG_TYPE_SUBPU_ATMVP && PU::checkBDMVRCondition(pu))
+#endif
           {
 #if !JVET_AC0144_AFFINE_DMVR_REGRESSION
             m_pcInterPred->setBdmvrSubPuMvBuf(m_mvBufBDMVR[0], m_mvBufBDMVR[1]);
@@ -2841,7 +2996,11 @@ void DecCu::xDeriveCUMV( CodingUnit &cu )
         else if (pu.ciipFlag && pu.tmMergeFlag)
         {
           int storeMrgIdx = pu.mergeIdx;
+#if JVET_AG0135_AFFINE_CIIP
+          pu.tmMergeFlag = true;
+#else
           pu.tmMergeFlag = false;
+#endif
           PU::getInterMergeCandidates(pu, mrgCtx, 0, CIIP_TM_MRG_MAX_NUM_CANDS - 1);
           mrgCtx.numValidMergeCand = int(pu.cs->sps->getMaxNumCiipTMMergeCand());
           pu.tmMergeFlag = true;

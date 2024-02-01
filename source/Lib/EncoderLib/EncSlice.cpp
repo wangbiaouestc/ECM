@@ -1972,6 +1972,18 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
     hashBlkHitPerc = (hashBlkHitPerc == -1) ? m_pcCuEncoder->getIbcHashMap().calHashBlkMatchPerc(cs.area.Y()) : hashBlkHitPerc;
     bool isSCC = hashBlkHitPerc >= 20;
     spsTmp->setUseIbcFilter(isSCC);   
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+    if (cs.slice->getPOC() == 0 || cs.slice->getSliceType() == I_SLICE) // ensure sequential and parallel simulation generate same output
+    {
+      spsTmp->setUseGeoBlend(!isSCC);
+    }
+#endif
+#if JVET_AG0164_AFFINE_GPM
+    if (m_pcCuEncoder->getEncCfg()->getMaxNumGpmAffCand() > 0 && isSCC)
+    {
+      spsTmp->setMaxNumGpmAffCand(m_pcCuEncoder->getEncCfg()->getMaxNumGpmAffCand());
+    }
+#endif
   }
 #endif
 #if JVET_AD0188_CCP_MERGE
@@ -1982,6 +1994,17 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
     cs.ccpLut.lutCCP1.resize(0);
 #else
     cs.ccpLut.lutCCP.resize(0);
+#endif
+  }
+#endif
+#if JVET_AG0058_EIP
+  if ((pCfg->getSwitchPOC() != pcPic->poc || -1 == pCfg->getDebugCTU()))
+  {
+#if JVET_Z0118_GDR
+    cs.eipLut.lutEip0.resize(0);
+    cs.eipLut.lutEip1.resize(0);
+#else
+    cs.eipLut.lutEip.resize(0);
 #endif
   }
 #endif
@@ -2066,7 +2089,17 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
 #endif
     }
 #endif
-
+#if JVET_AG0058_EIP
+    if ((pCfg->getSwitchPOC() != pcPic->poc || -1 == pCfg->getDebugCTU()) && cs.pps->ctuIsTileColBd(ctuXPosInCtus))
+    {
+#if JVET_Z0118_GDR
+      cs.eipLut.lutEip0.resize(0);
+      cs.eipLut.lutEip1.resize(0);
+#else
+      cs.eipLut.lutEip.resize(0);
+#endif
+    }
+#endif
     const SubPic &curSubPic = pcSlice->getPPS()->getSubPicFromPos(pos);
     // padding/restore at slice level
     if (pcSlice->getPPS()->getNumSubPics() >= 2 && curSubPic.getTreatedAsPicFlag() && ctuIdx == 0)

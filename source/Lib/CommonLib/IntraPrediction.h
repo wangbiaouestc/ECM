@@ -109,73 +109,26 @@ public:
 typedef short TrainDataType;
 #endif
 
-#if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA || JVET_AC0119_LM_CHROMA_FUSION
-typedef int64_t TCccmCoeff;
+#if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA || JVET_AC0119_LM_CHROMA_FUSION || JVET_AG0058_EIP
 
+typedef int64_t TCccmCoeff;
 #define FIXED_MULT(x, y) TCccmCoeff((int64_t(x)*(y) + CCCM_DECIM_ROUND) >> CCCM_DECIM_BITS )
 #if !JVET_AB0174_CCCM_DIV_FREE
 #define FIXED_DIV(x, y)  TCccmCoeff((int64_t(x)    << CCCM_DECIM_BITS ) / (y) )
 #endif
 
-enum CccmType
-{
-  CCCM_TYPE_BASE,
-#if JVET_AC0054_GLCCCM
-  CCCM_TYPE_GRADLOC,
-#endif
-#if JVET_AC0147_CCCM_NO_SUBSAMPLING
-  CCCM_TYPE_NOSUBS,
-#endif
-#if JVET_AD0202_CCCM_MDF
-  CCCM_TYPE_MULTIF_1,
-  CCCM_TYPE_MULTIF_2,
-  CCCM_TYPE_MULTIF_3,
-#endif
-  CCCM_TYPE_UNDEFINED
-};
-
 struct CccmModel
 {
   CccmModel( int num, int bitdepth )
   {
-    initModel( num, bitdepth, CCCM_TYPE_UNDEFINED );
-  }
-
-  CccmModel( CccmType type, int bitdepth )
-  {
-    switch (type)
-    {
-      case CCCM_TYPE_BASE: initModel( CCCM_NUM_PARAMS, bitdepth, type ); break;
-#if JVET_AC0054_GLCCCM
-      case CCCM_TYPE_GRADLOC: initModel( CCCM_NUM_PARAMS, bitdepth, type ); break;
-#endif
-#if JVET_AC0147_CCCM_NO_SUBSAMPLING
-      case CCCM_TYPE_NOSUBS: initModel( CCCM_NO_SUB_NUM_PARAMS, bitdepth, type ); break;
-#endif
-#if JVET_AD0202_CCCM_MDF
-      case CCCM_TYPE_MULTIF_1: initModel( CCCM_MULTI_PRED_FILTER_NUM_PARAMS,  bitdepth, type ); break;
-      case CCCM_TYPE_MULTIF_2: initModel( CCCM_MULTI_PRED_FILTER_NUM_PARAMS2, bitdepth, type ); break;
-      case CCCM_TYPE_MULTIF_3: initModel( CCCM_MULTI_PRED_FILTER_NUM_PARAMS2, bitdepth, type ); break;
-#endif
-      default:
-        fprintf(stdout, "No initializer for CCCM model type: %d\n", int(type));
-        exit(0);
-    }
-  }
-
-  void initModel( int num, int bitdepth, CccmType type )
-  {
-    cccmType = type;
-    bd       = bitdepth;
-    midVal   = ( 1 << ( bitdepth - 1 ) );
-
+    bd = bitdepth;
+    midVal = ( 1 << ( bitdepth - 1 ) );
     params.resize( num );
   }
-  
+
   ~CccmModel() {}
 
   std::vector<TCccmCoeff> params;
-  CccmType   cccmType;
   int        bd;
   int        midVal;
   
@@ -236,7 +189,13 @@ struct CccmCovariance
 #endif
   );
 #endif
-
+#if JVET_AG0058_EIP
+#if JVET_AB0174_CCCM_DIV_FREE
+  void solveEip                    ( const TCccmCoeff* A, const TCccmCoeff* Y, const int sampleNum, const int lumaOffset, CccmModel& model );
+#else
+  void solveEip                    ( const TCccmCoeff* A, const TCccmCoeff* Y, const int sampleNum, CccmModel& model );
+#endif
+#endif
 private:
   TCccmCoeff ATA[CCCM_NUM_PARAMS_MAX][CCCM_NUM_PARAMS_MAX];
   TCccmCoeff ATCb[CCCM_NUM_PARAMS_MAX];
@@ -302,14 +261,23 @@ protected:
 #if JVET_AB0157_INTRA_FUSION
   Pel      m_refBuffer2nd[MAX_NUM_COMPONENT][(MAX_CU_SIZE * 2 + 1 + MAX_REF_LINE_IDX) * 2];
 #endif
-
+#if JVET_AG0058_EIP
+  Pel        m_eipBuffer[(MAX_EIP_SIZE * 2 + MAX_EIP_REF_SIZE) * (MAX_EIP_SIZE * 2 + MAX_EIP_REF_SIZE)];
+  Pel        m_eipYBuffer[NUM_EIP_BASE_RECOTYPE][MAX_EIP_SIZE * MAX_EIP_SIZE * 2];
+  Pel        m_eipPredTpl[2][MAX_EIP_SIZE * EIP_TPL_SIZE];
+  TCccmCoeff ATABuf[NUM_EIP_COMB][((EIP_FILTER_TAP + 1) * EIP_FILTER_TAP) >> 1];
+  TCccmCoeff ATYBuf[NUM_EIP_COMB][EIP_FILTER_TAP];
+  bool       bSrcBufFilled[NUM_EIP_SHAPE * NUM_EIP_BASE_RECOTYPE];
+  bool       bDstBufFilled[NUM_EIP_BASE_RECOTYPE];
+  int        numSamplesBuf[NUM_EIP_BASE_RECOTYPE];
+#endif
 private:
 #if !MERGE_ENC_OPT
   Pel* m_yuvExt2[MAX_NUM_COMPONENT][4];
   int  m_yuvExtSize2;
 #endif
 
-#if JVET_AA0057_CCCM || JVET_AC0119_LM_CHROMA_FUSION
+#if JVET_AA0057_CCCM || JVET_AC0119_LM_CHROMA_FUSION || JVET_AG0058_EIP
   Area m_cccmBlkArea;
 #if JVET_AB0174_CCCM_DIV_FREE
   int  m_cccmLumaOffset;
@@ -780,6 +748,16 @@ public:
   TmrlMode m_tmrlList[MRL_LIST_SIZE];
   void getTmrlList(CodingUnit& cu);
 #endif
+#if JVET_AG0058_EIP
+  void initEipParams(const PredictionUnit& pu, const ComponentID compId);
+  void eipPred(const PredictionUnit& pu, PelBuf& piPred, const ComponentID compId = COMPONENT_Y);
+  void getCurEipCands(const PredictionUnit& pu, static_vector<EipModelCandidate, NUM_DERIVED_EIP>& candList, const ComponentID compId = COMPONENT_Y, const bool fastTest = true); 
+  int64_t (*m_calcAeipGroupSum)(const Pel* src1, const Pel* src2, const int numSamples);
+  static int64_t calcAeipGroupSum(const Pel* src1, const Pel* src2, const int numSamples);
+
+  void getNeiEipCands(const PredictionUnit &pu, static_vector<EipModelCandidate, MAX_MERGE_EIP> &candList, const ComponentID compId = COMPONENT_Y);
+  void reorderEipCands(const PredictionUnit &pu, static_vector<EipModelCandidate, MAX_MERGE_EIP> &candList, const ComponentID compId = COMPONENT_Y);
+#endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING && JVET_Y0065_GPM_INTRA
 protected:
   bool    m_abFilledIntraGPMRefTpl[NUM_INTRA_MODE];
@@ -882,6 +860,10 @@ public:
   void     applyChromaLM          (const ComponentID compID, PelBuf &piPred, const PredictionUnit &pu, const CompArea &chromaArea, int intraDir, const CclmModel &cclmModel);
 #endif
   void     filterPredInside       (const ComponentID compID, PelBuf &piPred, const PredictionUnit &pu);
+#endif
+#if JVET_AG0135_AFFINE_CIIP
+  template<bool lmcs>
+  void geneWeightedCIIPAffinePred(const ComponentID compId, PelBuf& pred, const PredictionUnit &pu, const PelBuf& interPred, const PelBuf& intraPred, const Pel* pLUT = nullptr);
 #endif
   template<bool lmcs>
   void geneWeightedPred           ( const ComponentID compId, PelBuf& pred, const PredictionUnit &pu, const PelBuf& interPred, const PelBuf& intraPred, const Pel* pLUT = nullptr );
@@ -1026,13 +1008,16 @@ public:
 };
 //! \}
 
-
+#if JVET_W0123_TIMD_FUSION && JVET_AG0092_ENHANCED_TIMD_FUSION
+void xLocationdepBlending(Pel *pDst, int strideDst, Pel *pVer, int strideVer, Pel *pHor, int strideHor,Pel *pNonLocDep, int strideNonLocDep, int width, int height, int mode, int wVer, int wHor, int wNonLocDep, int range = 10);
+#else
 #if ENABLE_DIMD
 #if JVET_AC0098_LOC_DEP_DIMD
 #if JVET_AB0157_INTRA_FUSION
 void xDimdLocationdepBlending(Pel *pDst, int strideDst, Pel *pVer, int strideVer, Pel *pHor, int strideHor,Pel *pNonLocDep, int strideNonLocDep, int width, int height, int mode, int wVer, int wHor, int wNonLocDep);
 #else
 void xDimdLocationdepBlending(Pel *pDst, int strideDst, Pel *pMainAng, int strideMainAng, Pel *pSecondAng, int strideSecondAng,Pel *pPlanar, int stridePlanar, int width, int height, int sideMain, int sideSecond, int wMain, int wSecond, int wPlanar);
+#endif
 #endif
 #endif
 #endif

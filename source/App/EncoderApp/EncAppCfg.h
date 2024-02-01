@@ -214,6 +214,9 @@ protected:
 #if JVET_AD0082_TMRL_CONFIG
   bool      m_noTmrlConstraintFlag;
 #endif
+#if JVET_AG0058_EIP
+  bool      m_noEipConstraintFlag;
+#endif
 #if ENABLE_OBMC
   bool      m_noObmcConstraintFlag;
 #endif
@@ -397,6 +400,9 @@ protected:
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
   bool      m_useAffineTM;
 #endif
+#if JVET_AG0135_AFFINE_CIIP
+  bool      m_useCiipAffine;
+#endif
 #if AFFINE_MMVD
   bool      m_AffineMmvdMode;
 #endif
@@ -477,6 +483,9 @@ protected:
 #endif
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
   bool      m_tmNoninterToolsEnableFlag;
+#endif
+#if JVET_AG0058_EIP
+  bool      m_eip;
 #endif
 #if JVET_AD0085_MPM_SORTING
   bool      m_mpmSorting;
@@ -899,6 +908,9 @@ protected:
 #endif
   uint32_t      m_maxNumAffineMergeCand;                          ///< Max number of affine merge candidates
   uint32_t      m_maxNumGeoCand;
+#if JVET_AG0164_AFFINE_GPM
+  uint32_t      m_maxNumGpmAffCand;
+#endif
   uint32_t      m_maxNumIBCMergeCand;                             ///< Max number of IBC merge candidates
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
   uint32_t      m_maxNumMHPCand;

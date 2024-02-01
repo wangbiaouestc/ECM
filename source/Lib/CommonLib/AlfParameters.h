@@ -194,8 +194,14 @@ struct AlfFilterShape
 
       filterType = ALF_FILTER_9;
 #if ALF_IMPROVEMENT
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+      numCoeff = MAX_NUM_ALF_CHROMA_COEFF;
+      numOrder = 2;
+      indexSecOrder = numCoeff - 2;
+#else
       numOrder = 1;
       indexSecOrder = numCoeff - 1;
+#endif
       offset0 = 0;
 #endif
     }

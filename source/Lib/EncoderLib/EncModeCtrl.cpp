@@ -2443,6 +2443,9 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
 #if JVET_V0130_INTRA_TMP
             int bit7 = cuECtx.tmpFlag;
 #endif
+#if JVET_AG0058_EIP
+            int bit8 = cuECtx.eipFlag;
+#endif
             int val =
               (bit0) |
               (bit1 << 1) |
@@ -2453,6 +2456,9 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
               (bit6 << 6) |
 #if JVET_V0130_INTRA_TMP
               (bit7 << 7) |
+#endif
+#if JVET_AG0058_EIP
+              (bit8 << 8) |
 #endif
               ( cuECtx.bestPredModeDCT2 << 9 );
             relatedCU.ispPredModeVal     = val;

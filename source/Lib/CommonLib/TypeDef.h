@@ -42,7 +42,6 @@
 #error Include CommonDef.h not TypeDef.h
 #endif
 
-
 #include <vector>
 #include <utility>
 #include <sstream>
@@ -144,6 +143,8 @@
 #define JVET_W0123_TIMD_FUSION                            1 // JVET-W0123: Template based intra mode derivation and fusion
 #if JVET_W0123_TIMD_FUSION
 #define JVET_X0148_TIMD_PDPC                              1 // JVET-X0148: PDPC handling for TIMD
+#define JVET_AG0092_ENHANCED_TIMD_FUSION                  1 // JVET-AG0092: TIMD fusion with non-angular predictor
+#define JVET_AG0128_REF_LINE_OPT_TIMD_FUSION              1 // JVET-AG0128: TIMD fusion reference line determination
 
 #if ENABLE_DIMD
 #define JVET_AC0098_LOC_DEP_DIMD                          1 // JVET-AC0098: Location-dependent Decoder-side Intra Mode Derivation
@@ -196,6 +197,7 @@
 #endif
 #define JVET_AD0120_LBCCP                                 1 // JVET-AD0120: Local-Boosting Cross-Component Prediction, wherein the template part is controlled by CCCM SPS
 #define JVET_AE0043_CCP_MERGE_TEMPORAL                    1 // JVET-AE0043: Cross-component merge mode with temporal candidates
+#define JVET_AG0058_EIP                                   1 // JVET-AG0058: Extrapolation filter-based intra prediction mode
 
 //IBC
 #define JVET_Y0058_IBC_LIST_MODIFY                        1 // JVET-Y0058: Modifications of IBC merge/AMVP list construction, ARMC-TM-IBC part is included under JVET_W0090_ARMC_TM
@@ -231,6 +233,7 @@
 
 #define JVET_AE0174_NONINTER_TM_TOOLS_CONTROL             1 // JVET-AE0174: Add non-inter TM sps flag to control whether template matching is used for non-inter (Intra and IBC) tools
 #define JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES    1 // JVET-AE0094: IBC with non-adjacent spatial candidates
+#define JVET_AG0091_ARBVP                                 1 // JVET-AG0091: Auto-relocated block vector prediction
 
 #if JVET_AC0071_DBV && JVET_V0130_INTRA_TMP
 #define JVET_AF0066_ENABLE_DBV_4_SINGLE_TREE              1 // JVET-AF0066: Enable DBV mode in single tree configuration
@@ -310,6 +313,9 @@
 #define JVET_AF0073_INTER_CCP_MERGE                       1 // JVET-AF0073: Cross-component prediction merge mode for inter prediction
 #define JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT          1 // JVET-AF0159: Affine subblock BDOF refinement
 #define JVET_AF0057                                       1 // JVET-AF0057: Encoder only. DMVR with robust MV derivation.
+#define JVET_AG0112_REGRESSION_BASED_GPM_BLENDING         1 // JVET-AG0112: Regression-based GPM blending
+#define JVET_AG0135_AFFINE_CIIP                           1 // JVET-AG0135: CIIP with affine prediction 
+#define JVET_AG0164_AFFINE_GPM                            1 // JVET-AG0164: GPM with affine prediction
 #define JVET_AG0098_AMVP_WITH_SBTMVP                      1 // JVET-AG0098: AMVP with SbTMVP mode
 #define JVET_AG0067_DMVR_EXTENSIONS                       1 // JVET-AG0067: On DMVR Extensions
 
@@ -409,6 +415,7 @@
 #define JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO      1 // JVET-AE0151: CCSAO with history offsets and extended edge classifiers
 #define JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF            1 // JVET-AF0197: Luma Residual Tap in CCALF
 #define JVET_AF0112_BIF_DYNAMIC_SCALING                   1 // JVET-AF0112: Dynamic TU scale factor for BIF with LUTs interpolation
+#define JVET_AG0157_ALF_CHROMA_FIXED_FILTER               1 // JVET-AG0157: Fixed filter for chroma ALF
 
 // SIMD optimizations
 #if IF_12TAP
@@ -1811,6 +1818,37 @@ enum RESHAPE_SIGNAL_TYPE
   RESHAPE_SIGNAL_NULL = 100,
 };
 
+#if JVET_AG0058_EIP
+enum EIP_REFERENCE_TYPE
+{
+  EIP_A = 0,
+  EIP_AL = 1,
+  EIP_L = 2,
+  EIP_AL_A = 3,
+  EIP_AL_L = 4,
+  EIP_A_L = 5,
+  EIP_AL_A_L = 6,
+  NUM_EIP_TPL_TYPE = 7,
+};
+
+enum EIP_FILTER_TYPE
+{
+  EIP_FILTER_S  = 0,
+  EIP_FILTER_V  = 1,
+  EIP_FILTER_H  = 2,
+  NUM_EIP_SHAPE = 3,
+};
+
+struct EIPInfo
+{
+  int recoType;
+  int filterShape;
+
+  EIPInfo() : recoType(0), filterShape(0) {}
+  EIPInfo(int _recoType, int _filterShape) : recoType(_recoType), filterShape(_filterShape) {}
+};
+#endif
+
 #if JVET_AB0155_SGPM
 struct SgpmInfo
 {
@@ -1829,6 +1867,82 @@ struct SgpmInfo
   }
 };
 #endif
+
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+struct AffineBlendingModel
+{
+  bool  valid;
+  int params[3];
+  int shift;
+  int offset;
+  int min, max;
+
+  void init()
+  {
+    valid = false;
+    shift = 1;
+    params[0] = 1 << (shift - 1);
+    params[1] = 1 << (shift - 1);
+    params[2] = 0;
+  }
+
+  AffineBlendingModel()
+  {
+    init();
+  }
+
+  AffineBlendingModel( const int s, const int _min, const int _max )
+  {
+    shift = s;
+    params[0] = 1 << (shift - 1);
+    params[1] = 1 << (shift - 1);
+    params[2] = 0;
+    min = _min;
+    max = _max;
+  }
+  void copy( const AffineBlendingModel& other )
+  {
+    if ( other.valid )
+    {
+      *this = other;
+    }
+    else
+    {
+      init();
+    }
+  }
+
+  int compute( const int x, const int y, bool bClip=true )
+  {
+    int weight = (params[0] * x + params[1] * y + params[2] + offset) >> shift ;
+    if ( bClip )
+    {
+      return (weight > max ? max : (weight < min ? min : weight));
+    }
+    else
+    {
+      return weight;
+    }
+  }
+
+  bool isSame( const AffineBlendingModel& other )
+  {
+    bool  bSame = true;
+
+    bSame &= other.valid == valid;
+    bSame &= other.params[0] == params[0];
+    bSame &= other.params[1] == params[1];
+    bSame &= other.params[2] == params[2];
+    bSame &= other.shift == shift;
+    bSame &= other.offset == offset;
+    bSame &= other.min == min;
+    bSame &= other.max == max;
+
+    return bSame;
+  }
+};
+#endif
+
 // ---------------------------------------------------------------------------
 // exception class
 // ---------------------------------------------------------------------------

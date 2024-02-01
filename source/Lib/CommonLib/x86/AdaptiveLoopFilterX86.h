@@ -1116,7 +1116,6 @@ static const uint16_t shuffleTab9[4][3][2][8] =
   }, //3
 };
 
-
 template<X86_VEXT vext>
 static void simdFilter9x9Blk(AlfClassifier **classifier, const PelUnitBuf &recDst,
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
@@ -1174,15 +1173,27 @@ static void simdFilter9x9Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
   const __m128i mmMin = _mm_set1_epi16(clpRng.min);
   const __m128i mmMax = _mm_set1_epi16(clpRng.max);
 
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+  const int padSize = ALF_PADDING_SIZE_FIXED_RESULTS;
+#endif
+
   for (size_t i = 0; i < height; i += stepY)
   {
     const AlfClassifier *pClass = isChroma(compId) ? nullptr : classifier[blkDst.y + i] + blkDst.x;
     for (size_t j = 0; j < width; j += stepX)
     {
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+      __m128i params[2][2][13];
+#else
       __m128i params[2][2][10];
+#endif
       for (int k = 0; k < 2; k++)
       {
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+        __m128i rawCoeff[2][4], rawClip[2][4], s0, s1, s2, s3, rawTmp0, rawTmp1;
+#else
         __m128i rawCoeff[2][3], rawClip[2][3], s0, s1, s2, s3, rawTmp0, rawTmp1;
+#endif
 
         for (int l = 0; l < 2; l++)
         {
@@ -1191,10 +1202,20 @@ static void simdFilter9x9Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
 
           rawCoeff[l][0] = _mm_loadu_si128((const __m128i *) (filterSet + classIdx * MAX_NUM_ALF_LUMA_COEFF));
           rawCoeff[l][1] = _mm_loadu_si128((const __m128i *) (filterSet + classIdx * MAX_NUM_ALF_LUMA_COEFF + 8));
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+          rawCoeff[l][2] = _mm_loadu_si128((const __m128i *) (filterSet + classIdx * MAX_NUM_ALF_LUMA_COEFF + 16));
+          rawCoeff[l][3] = _mm_loadl_epi64((const __m128i *) (filterSet + classIdx * MAX_NUM_ALF_LUMA_COEFF + 24));
+#else
           rawCoeff[l][2] = _mm_loadl_epi64((const __m128i *) (filterSet + classIdx * MAX_NUM_ALF_LUMA_COEFF + 16));
+#endif
           rawClip[l][0] = _mm_loadu_si128((const __m128i *) (fClipSet + classIdx * MAX_NUM_ALF_LUMA_COEFF));
           rawClip[l][1] = _mm_loadu_si128((const __m128i *) (fClipSet + classIdx * MAX_NUM_ALF_LUMA_COEFF + 8));
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+          rawClip[l][2] = _mm_loadu_si128((const __m128i *) (fClipSet + classIdx * MAX_NUM_ALF_LUMA_COEFF + 16));
+          rawClip[l][3] = _mm_loadl_epi64((const __m128i *) (fClipSet + classIdx * MAX_NUM_ALF_LUMA_COEFF + 24));
+#else
           rawClip[l][2] = _mm_loadl_epi64((const __m128i *) (fClipSet + classIdx * MAX_NUM_ALF_LUMA_COEFF + 16));
+#endif
 
           for (int m = 0; m < shuffleTime9[transposeIdx]; m++)
           {
@@ -1228,6 +1249,11 @@ static void simdFilter9x9Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
         params[k][0][7] = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoeff[0][1], 0xff), _mm_shuffle_epi32(rawCoeff[1][1], 0xff));
         params[k][0][8] = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoeff[0][2], 0x00), _mm_shuffle_epi32(rawCoeff[1][2], 0x00));
         params[k][0][9] = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoeff[0][2], 0x55), _mm_shuffle_epi32(rawCoeff[1][2], 0x55));
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+        params[k][0][10] = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoeff[0][2], 0xaa), _mm_shuffle_epi32(rawCoeff[1][2], 0xaa));
+        params[k][0][11] = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoeff[0][2], 0xff), _mm_shuffle_epi32(rawCoeff[1][2], 0xff));
+        params[k][0][12] = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawCoeff[0][3], 0x00), _mm_shuffle_epi32(rawCoeff[1][3], 0x00));
+#endif
 
         params[k][1][0] = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[0][0], 0x00), _mm_shuffle_epi32(rawClip[1][0], 0x00));
         params[k][1][1] = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[0][0], 0x55), _mm_shuffle_epi32(rawClip[1][0], 0x55));
@@ -1239,6 +1265,11 @@ static void simdFilter9x9Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
         params[k][1][7] = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[0][1], 0xff), _mm_shuffle_epi32(rawClip[1][1], 0xff));
         params[k][1][8] = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[0][2], 0x00), _mm_shuffle_epi32(rawClip[1][2], 0x00));
         params[k][1][9] = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[0][2], 0x55), _mm_shuffle_epi32(rawClip[1][2], 0x55));
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+        params[k][1][10] = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[0][2], 0xaa), _mm_shuffle_epi32(rawClip[1][2], 0xaa));
+        params[k][1][11] = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[0][2], 0xff), _mm_shuffle_epi32(rawClip[1][2], 0xff));
+        params[k][1][12] = _mm_unpacklo_epi64(_mm_shuffle_epi32(rawClip[0][3], 0x00), _mm_shuffle_epi32(rawClip[1][3], 0x00));
+#endif
       }
 
       for (size_t ii = 0; ii < stepY; ii++)
@@ -1255,6 +1286,13 @@ static void simdFilter9x9Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
         pImg7 = pImg5 + srcStride;
         pImg8 = pImg6 - srcStride;
 
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+        const Pel *pImg0FixedBased = fixedFilterResults[fixedFilterSetIdx][blkDst.y + i + ii + padSize + 0] + blkDst.x + j + padSize;
+        const Pel *pImg1FixedBased = fixedFilterResults[fixedFilterSetIdx][blkDst.y + i + ii + padSize + 1] + blkDst.x + j + padSize;
+        const Pel *pImg2FixedBased = fixedFilterResults[fixedFilterSetIdx][blkDst.y + i + ii + padSize - 1] + blkDst.x + j + padSize;
+        const Pel *pImg3FixedBased = fixedFilterResults[fixedFilterSetIdx][blkDst.y + i + ii + padSize + 2] + blkDst.x + j + padSize;
+        const Pel *pImg4FixedBased = fixedFilterResults[fixedFilterSetIdx][blkDst.y + i + ii + padSize - 2] + blkDst.x + j + padSize;
+#endif
         __m128i cur = _mm_loadu_si128((const __m128i *) pImg0);
         __m128i accumA = mmOffset;
         __m128i accumB = mmOffset;
@@ -1306,6 +1344,30 @@ static void simdFilter9x9Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
         process2coeffs(7, pImg1 - 2, pImg2 + 2, pImg1 - 3, pImg2 + 3);
         process2coeffs(8, pImg0 + 4, pImg0 - 4, pImg0 + 3, pImg0 - 3);
         process2coeffs(9, pImg0 + 2, pImg0 - 2, pImg0 + 1, pImg0 - 1);
+
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+        process2coeffs(10, pImg3FixedBased, pImg4FixedBased, pImg1FixedBased, pImg2FixedBased );
+        process2coeffs(11, pImg0FixedBased - 2, pImg0FixedBased + 2, pImg0FixedBased - 1, pImg0FixedBased + 1);
+
+        __m128i val00 = _mm_sub_epi16(_mm_loadu_si128((const __m128i *)(fixedFilterResults[fixedFilterSetIdx][blkDst.y + i + ii + padSize] + blkDst.x + j + padSize)), cur);
+        __m128i val10 = _mm_setzero_si128();
+        __m128i val01A = _mm_unpacklo_epi16(val00, val10);
+        __m128i val01B = _mm_unpackhi_epi16(val00, val10);
+        __m128i limit01A = params[0][1][12];
+        __m128i limit01B = params[1][1][12];
+
+        val01A = _mm_min_epi16(val01A, limit01A);
+        val01B = _mm_min_epi16(val01B, limit01B);
+        limit01A = _mm_sub_epi16(_mm_setzero_si128(), limit01A);
+        limit01B = _mm_sub_epi16(_mm_setzero_si128(), limit01B);
+        val01A = _mm_max_epi16(val01A, limit01A);
+        val01B = _mm_max_epi16(val01B, limit01B);
+
+        __m128i coeff01A = params[0][0][12];
+        __m128i coeff01B = params[1][0][12];
+        accumA = _mm_add_epi32(accumA, _mm_madd_epi16(val01A, coeff01A));
+        accumB = _mm_add_epi32(accumB, _mm_madd_epi16(val01B, coeff01B));
+#endif
 
         accumA = _mm_srai_epi32(accumA, shift);
         accumB = _mm_srai_epi32(accumB, shift);
@@ -6697,13 +6759,21 @@ static void simdFilterResi13x13Blk(AlfClassifier **classifier, const CPelBuf &sr
 }
 #endif
 #endif
-
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+static void simdDeriveClassificationLaplacian(const CPelBuf &srcLuma, const Area &blkDst, const Area &blk, uint32_t **laplacian[NUM_DIRECTIONS], const int side)
+#else
 static void simdDeriveClassificationLaplacian(const CPelBuf &srcLuma, const Area &blkDst, const Area &blk, uint32_t **laplacian[NUM_DIRECTIONS])
+#endif
 {
   const size_t imgStride = srcLuma.stride;
   const Pel *  srcExt = srcLuma.buf;
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+  const int flP1 = side + 1;
+  const int fl2 = side << 1;
+#else
   const size_t flP1 = ALF_CLASSIFIER_FL + 1;
   const size_t fl2 = ALF_CLASSIFIER_FL << 1;
+#endif
   const int imgHExtended = blk.height + fl2;
   const int imgWExtended = blk.width + fl2;
 
@@ -6921,7 +6991,11 @@ static void simdCalcClass0(AlfClassifier **classifier, const Area &blkDst, const
 #endif
   const __m128i shift = _mm_cvtsi32_si128(9 + bitDepth - 4);
   const int multTab[] = { 5628, 1407, 624, 351, 225, 156 };
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+  const __m128i mult = _mm_set1_epi32(multTab[dirWindSize % 10]);
+#else  
   const __m128i mult = _mm_set1_epi32(multTab[dirWindSize]);
+#endif
   const __m128i dirOff = _mm_set1_epi32(noDir * (noDir + 1));
   const __m128i ones = _mm_set1_epi32(1);
   const __m128i zeros = _mm_setzero_si128();

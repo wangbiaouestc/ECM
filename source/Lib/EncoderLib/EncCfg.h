@@ -258,6 +258,9 @@ protected:
 #if JVET_AD0082_TMRL_CONFIG
   bool      m_noTmrlConstraintFlag;
 #endif
+#if JVET_AG0058_EIP
+  bool      m_noEipConstraintFlag;
+#endif
 #if ENABLE_OBMC
   bool      m_noObmcConstraintFlag;
 #endif
@@ -412,6 +415,9 @@ protected:
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
   bool      m_useAffineTM; 
 #endif
+#if JVET_AG0135_AFFINE_CIIP
+  bool      m_useCiipAffine;
+#endif
 #if AFFINE_MMVD
   bool      m_AffineMmvdMode;
 #endif
@@ -484,6 +490,9 @@ protected:
 #endif
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
   bool      m_tmNoninterToolsEnableFlag;
+#endif
+#if JVET_AG0058_EIP
+  bool      m_eip;
 #endif
 #if JVET_AD0085_MPM_SORTING
   bool      m_mpmSorting;
@@ -891,6 +900,9 @@ protected:
 #endif
   uint32_t      m_maxNumAffineMergeCand;              ///< Maximum number of affine merge candidates
   uint32_t      m_maxNumGeoCand;
+#if JVET_AG0164_AFFINE_GPM
+  uint32_t      m_maxNumGpmAffCand;
+#endif
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
   uint32_t      m_maxNumMHPCand;
 #endif
@@ -1239,6 +1251,10 @@ public:
   bool      getNoTmrlConstraintFlag() const { return m_noTmrlConstraintFlag; }
   void      setNoTmrlConstraintFlag(bool val) { m_noTmrlConstraintFlag = val; }
 #endif
+#if JVET_AG0058_EIP
+  bool      getNoEipConstraintFlag() const { return m_noEipConstraintFlag; }
+  void      setNoEipConstraintFlag(bool val) { m_noEipConstraintFlag = val; }
+#endif
 #if ENABLE_OBMC
   bool      getNoObmcConstraintFlag() const { return m_noObmcConstraintFlag; }
   void      setNoObmcConstraintFlag(bool bVal) { m_noObmcConstraintFlag = bVal; }
@@ -1496,6 +1512,10 @@ public:
   void      setUseAffineTM( bool b )                         { m_useAffineTM = b; }
   bool      getUseAffineTM()                           const { return  m_useAffineTM; }
 #endif
+#if JVET_AG0135_AFFINE_CIIP
+  void      setUseCIIPAffine(bool b)                         { m_useCiipAffine = b; }
+  bool      getUseCIIPAffine()                         const { return  m_useCiipAffine; }
+#endif
 #if AFFINE_MMVD
   void      setAffineMmvdMode               ( bool b )       { m_AffineMmvdMode = b; }
   bool      getAffineMmvdMode               ()         const { return m_AffineMmvdMode; }
@@ -1663,6 +1683,10 @@ public:
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
   void      setTMnoninterToolsEnableFlag                   (bool b)         { m_tmNoninterToolsEnableFlag = b; }
   bool      getTMnoninterToolsEnableFlag                   ()         const { return m_tmNoninterToolsEnableFlag; }
+#endif
+#if JVET_AG0058_EIP
+  void      setUseEip                    (bool b)         { m_eip = b; }
+  bool      getUseEip                    ()         const { return m_eip; }
 #endif
 #if JVET_AD0085_MPM_SORTING
   void      setUseMpmSorting             (bool b)         { m_mpmSorting = b; }
@@ -2463,6 +2487,10 @@ public:
   uint32_t     getMaxNumAffineMergeCand          ()                  { return m_maxNumAffineMergeCand; }
   void         setMaxNumGeoCand                  ( uint32_t u )      { m_maxNumGeoCand = u;    }
   uint32_t     getMaxNumGeoCand                  ()                  { return m_maxNumGeoCand; }
+#if JVET_AG0164_AFFINE_GPM
+  void         setMaxNumGpmAffCand(uint32_t u)                       { m_maxNumGpmAffCand = u; }
+  uint32_t     getMaxNumGpmAffCand()                                 { return m_maxNumGpmAffCand; }
+#endif
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
   void         setMaxNumMHPCand                  ( uint32_t u )      { m_maxNumMHPCand = u;    }
   uint32_t     getMaxNumMHPCand                  ()                  { return m_maxNumMHPCand; }

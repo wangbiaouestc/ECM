@@ -583,7 +583,13 @@ void Slice::inheritFromPicHeader( PicHeader *picHeader, const PPS *pps, const SP
   setTileGroupAlfEnabledFlag(COMPONENT_Cb, picHeader->getAlfEnabledFlag(COMPONENT_Cb));
   setTileGroupAlfEnabledFlag(COMPONENT_Cr, picHeader->getAlfEnabledFlag(COMPONENT_Cr));
 #if ALF_IMPROVEMENT
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+  setTileGroupAlfFixedFilterSetIdx(COMPONENT_Y, picHeader->getAlfFixedFilterSetIdx(COMPONENT_Y));
+  setTileGroupAlfFixedFilterSetIdx(COMPONENT_Cb, picHeader->getAlfFixedFilterSetIdx(COMPONENT_Cb));
+  setTileGroupAlfFixedFilterSetIdx(COMPONENT_Cr, picHeader->getAlfFixedFilterSetIdx(COMPONENT_Cr));
+#else
   setTileGroupAlfFixedFilterSetIdx(picHeader->getAlfFixedFilterSetIdx());
+#endif
 #endif
   setTileGroupNumAps(picHeader->getNumAlfAps());
   setAlfAPSs(picHeader->getAlfAPSs());
@@ -1752,7 +1758,11 @@ void Slice::copySliceInfo(Slice *pSrc, bool cpyAlmostAll)
 
   memcpy(m_alfApss, pSrc->m_alfApss, sizeof(m_alfApss)); // this might be quite unsafe
 #if ALF_IMPROVEMENT
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+  memcpy( m_tileGroupAlfFixedFilterSetIdx, pSrc->m_tileGroupAlfFixedFilterSetIdx, sizeof(m_tileGroupAlfFixedFilterSetIdx));
+#else
   m_tileGroupAlfFixedFilterSetIdx          = pSrc->m_tileGroupAlfFixedFilterSetIdx;
+#endif
 #endif
   memcpy( m_tileGroupAlfEnabledFlag, pSrc->m_tileGroupAlfEnabledFlag, sizeof(m_tileGroupAlfEnabledFlag));
   m_tileGroupNumAps               = pSrc->m_tileGroupNumAps;
@@ -3737,6 +3747,9 @@ SPS::SPS()
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   , m_useARL(false)
 #endif
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  , m_useGeoBlend(true)
+#endif
 #endif
 , m_SBT                       ( false )
 , m_ISP                       ( false )
@@ -3874,6 +3887,9 @@ SPS::SPS()
 #if JVET_X0141_CIIP_TIMD_TM && TM_MRG
 , m_ciipTmMrg                 ( false )
 #endif
+#if JVET_AG0135_AFFINE_CIIP
+, m_ciipAffine                ( false )
+#endif
 , m_Geo                       ( false )
 #if INTER_LIC
 , m_licEnabledFlag            ( false )
@@ -3916,6 +3932,9 @@ SPS::SPS()
 , m_maxNumAffineMergeCand(AFFINE_MRG_MAX_NUM_CANDS)
 , m_maxNumIBCMergeCand(IBC_MRG_MAX_NUM_CANDS)
 , m_maxNumGeoCand(0)
+#if JVET_AG0164_AFFINE_GPM
+, m_maxNumGpmAffCand(0)
+#endif
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
 , m_maxNumMHPCand(0)
 #endif

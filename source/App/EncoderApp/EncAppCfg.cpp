@@ -939,6 +939,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_AD0082_TMRL_CONFIG
   ("NoTmrlConstraintFlag",                             m_noTmrlConstraintFlag,                          false, "Indicate that TMRL is deactivated")
 #endif
+#if JVET_AG0058_EIP
+  ("NoEipConstraintFlag",                              m_noEipConstraintFlag,                           false, "Indicate that EIP is deactivated")
+#endif
 #if ENABLE_OBMC
   ("NoObmcConstraintFlag",                             m_noObmcConstraintFlag,                            false, "Indicate that OBMC is deactivated")
 #endif
@@ -1057,6 +1060,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_X0141_CIIP_TIMD_TM && TM_MRG
   ("CIIPTM",                                          m_tmCIIPMode,                                         2, "CIIP-TM mode (0:off, 1:on, 2:on conditionally for non-negative intra period)  [default: 2]")
 #endif
+#if JVET_AG0135_AFFINE_CIIP
+  ("CIIPAFFINE",                                      m_useCiipAffine,                                   true, "CIIP-AFFINE mode (0:off, 1:on)  [default: on]")
+#endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
   ("TmvpNmvpAML",                                     m_useTmvpNmvpReorder,                              true, "Enable ARMC for TMVP and non-adjacent MVP (0:off, 1:on)  [default: on]")
 #endif
@@ -1129,6 +1135,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #endif
 #if JVET_AD0082_TMRL_CONFIG
   ("TMRL",                                            m_tmrl,                                            true,  "Enable template based multiple reference line intra prediction\n")
+#endif
+#if JVET_AG0058_EIP
+  ("EIP",                                             m_eip,                                             true, "Enable extrapolation filter-based intra prediction\n")
 #endif
 #if JVET_AD0085_MPM_SORTING
   ( "MPMSorting",                                     m_mpmSorting,                                      true,  "Enable template-based intra MPM list construction\n" )
@@ -1549,6 +1558,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("MaxNumGeoCand",                                   m_maxNumGeoCand,                                     10u, "Maximum number of geometric partitioning mode candidates")
 #else
   ("MaxNumGeoCand",                                   m_maxNumGeoCand,                                     5u, "Maximum number of geometric partitioning mode candidates")
+#endif
+#if JVET_AG0164_AFFINE_GPM
+  ("MaxNumGPMAffCand",                                m_maxNumGpmAffCand,                                  9u, "Maximum number of geometric partitioning mode candidates")
 #endif
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
 #if NON_ADJACENT_MRG_CAND
@@ -3965,6 +3977,10 @@ bool EncAppCfg::xCheckParameter()
   xConfirmPara( m_maxNumGeoCand > GEO_MAX_NUM_UNI_CANDS, "MaxNumGeoCand must be no more than GEO_MAX_NUM_UNI_CANDS." );
   xConfirmPara( m_maxNumGeoCand > m_maxNumMergeCand, "MaxNumGeoCand must be no more than MaxNumMergeCand." );
   xConfirmPara( 0 < m_maxNumGeoCand && m_maxNumGeoCand < 2, "MaxNumGeoCand must be no less than 2 unless MaxNumGeoCand is 0." );
+#if JVET_AG0164_AFFINE_GPM
+  xConfirmPara( m_maxNumGpmAffCand > GEO_MAX_NUM_UNI_AFF_CANDS, "MaxNumGeoCand must be no more than GEO_MAX_NUM_UNI_CANDS." );
+  xConfirmPara( 0 < m_maxNumGpmAffCand && m_maxNumGpmAffCand < 2, "MaxNumGeoCand must be no less than 2 unless MaxNumGeoCand is 0." );
+#endif
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
   xConfirmPara( m_maxNumMHPCand > GEO_MAX_NUM_UNI_CANDS, "m_maxNumMHPCand must be no more than GEO_MAX_NUM_UNI_CANDS." );
   xConfirmPara( m_maxNumMHPCand > m_maxNumMergeCand, "m_maxNumMHPCand must be no more than MaxNumMergeCand." );
@@ -5374,6 +5390,10 @@ void EncAppCfg::xPrintParameter()
 #endif
   msg( DETAILS, "Max Num Affine Merge Candidates        : %d\n", m_maxNumAffineMergeCand );
   msg( DETAILS, "Max Num Geo Merge Candidates           : %d\n", m_maxNumGeoCand );
+#if JVET_AG0164_AFFINE_GPM
+  msg( DETAILS, "Max Num Gpm Affine Merge Candidates    : %d\n", m_maxNumGpmAffCand );
+#endif
+
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
   msg( DETAILS, "Max Num MHP Merge Candidates           : %d\n", m_maxNumMHPCand );
 #endif
@@ -5467,6 +5487,9 @@ void EncAppCfg::xPrintParameter()
     msg(VERBOSE, "CIIP:%d ", m_ciip);
 #if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
     msg(VERBOSE, "CIIPTIMD:%d ", m_ciipTimd);
+#endif
+#if JVET_AG0135_AFFINE_CIIP
+    msg(VERBOSE, "CIIPAffine:%d ", m_useCiipAffine);
 #endif
     msg( VERBOSE, "Geo:%d ", m_Geo );
     m_allowDisFracMMVD = m_MMVD ? m_allowDisFracMMVD : false;
@@ -5697,6 +5720,9 @@ void EncAppCfg::xPrintParameter()
 #endif
 #if JVET_AD0082_TMRL_CONFIG
   msg(VERBOSE, "TMRL:%d ", m_tmrl);
+#endif
+#if JVET_AG0058_EIP
+  msg(VERBOSE, "EIP:%d ", m_eip);
 #endif
 #if JVET_AD0085_MPM_SORTING
   msg(VERBOSE, "MPMsorting:%d ", m_mpmSorting);

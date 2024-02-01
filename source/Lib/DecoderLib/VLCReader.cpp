@@ -2495,12 +2495,26 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
     pcSPS->setUseCiipTmMrg(false);
   }
 #endif
+#if JVET_AG0135_AFFINE_CIIP
+  if (pcSPS->getUseCiip() && pcSPS->getUseAffine())
+  {
+    READ_FLAG(uiCode, "sps_ciip_affine_flag");  pcSPS->setUseCiipAffine(uiCode != 0);
+  }
+  else
+  {
+    pcSPS->setUseCiipAffine(false);
+  }
+#endif
   if (pcSPS->getMaxNumMergeCand() >= 2)
   {
     READ_FLAG(uiCode, "sps_gpm_enabled_flag");
     pcSPS->setUseGeo(uiCode != 0);
     if (pcSPS->getUseGeo())
     {
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+      READ_FLAG(uiCode, "sps_gpm_blend_flag");
+      pcSPS->setUseGeoBlend(uiCode != 0);
+#endif
       if (pcSPS->getMaxNumMergeCand() >= 3)
       {
         READ_UVLC(uiCode, "max_num_merge_cand_minus_max_num_gpm_cand");
@@ -2512,6 +2526,15 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
       {
         pcSPS->setMaxNumGeoCand(2);
       }
+
+#if JVET_AG0164_AFFINE_GPM
+      if (pcSPS->getUseAffine() && pcSPS->getMaxNumGeoCand() != 0 && pcSPS->getMaxNumAffineMergeCand() >= 3)
+      {
+        READ_UVLC(uiCode, "max_num_aff_merge_cand_minus_max_num_gpm_aff_cand");
+        pcSPS->setMaxNumGpmAffCand((uint32_t)(pcSPS->getMaxNumAffineMergeCand() - uiCode));
+      }
+#endif
+
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_W0097_GPM_MMVD_TM && TM_MRG
       pcSPS->setUseGPMTMMode( false );
       if (pcSPS->getTMToolsEnableFlag())
@@ -2595,6 +2618,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #endif
 #if JVET_AD0082_TMRL_CONFIG
   READ_FLAG(uiCode, "sps_tmrl_enabled_flag");                       pcSPS->setUseTmrl(uiCode != 0);
+#endif
+#if JVET_AG0058_EIP
+  READ_FLAG(uiCode, "sps_eip_enabled_flag");                        pcSPS->setUseEip(uiCode != 0);
 #endif
 #if JVET_AD0085_MPM_SORTING
   READ_FLAG(uiCode, "sps_mpm_sorting_enabled_flag");                pcSPS->setUseMpmSorting(uiCode != 0);
@@ -3463,8 +3489,13 @@ void HLSyntaxReader::parsePictureHeader( PicHeader* picHeader, ParameterSetManag
       if (uiCode)
       {
 #if ALF_IMPROVEMENT
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+        READ_FLAG(uiCode, "ph_alf_fixed_filter_set_idx_luma");
+        picHeader->setAlfFixedFilterSetIdx(COMPONENT_Y, uiCode);
+#else
         READ_FLAG(uiCode, "ph_alf_fixed_filter_set_idx");
         picHeader->setAlfFixedFilterSetIdx(uiCode);
+#endif
 #endif
         READ_CODE(3, uiCode, "ph_num_alf_aps_ids_luma");
         int numAps = uiCode;
@@ -3482,6 +3513,18 @@ void HLSyntaxReader::parsePictureHeader( PicHeader* picHeader, ParameterSetManag
         {
           READ_CODE(1, uiCode, "ph_alf_cb_enabled_flag");   alfCbEnabledFlag = uiCode;
           READ_CODE(1, uiCode, "ph_alf_cr_enabled_flag");   alfCrEnabledFlag = uiCode;
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+          if( alfCbEnabledFlag )
+          {
+            READ_FLAG(uiCode, "ph_alf_fixed_filter_set_idx_cb");
+            picHeader->setAlfFixedFilterSetIdx(COMPONENT_Cb, uiCode);
+          }
+          if( alfCrEnabledFlag )
+          {
+            READ_FLAG(uiCode, "ph_alf_fixed_filter_set_idx_cr");
+            picHeader->setAlfFixedFilterSetIdx(COMPONENT_Cr, uiCode);
+          }
+#endif
         }
         else
         {
@@ -4623,9 +4666,14 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
 
     if (uiCode)
     {
-#if ALF_IMPROVEMENT 
+#if ALF_IMPROVEMENT
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+      READ_FLAG(uiCode, "slice_alf_fixed_filter_set_idx_luma");
+      pcSlice->setTileGroupAlfFixedFilterSetIdx(COMPONENT_Y, uiCode);
+#else
       READ_FLAG(uiCode, "slice_alf_fixed_filter_set_idx");
       pcSlice->setTileGroupAlfFixedFilterSetIdx(uiCode);
+#endif
 #endif
       READ_CODE(3, uiCode, "slice_num_alf_aps_ids_luma");
       int numAps = uiCode;
@@ -4646,6 +4694,18 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
       {
         READ_CODE(1, uiCode, "slice_alf_cb_enabled_flag");   alfCbEnabledFlag = uiCode;
         READ_CODE(1, uiCode, "slice_alf_cr_enabled_flag");   alfCrEnabledFlag = uiCode;
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+        if (alfCbEnabledFlag)
+        {
+          READ_FLAG(uiCode, "slice_alf_fixed_filter_set_idx_cb");
+          pcSlice->setTileGroupAlfFixedFilterSetIdx(COMPONENT_Cb, uiCode);
+        }
+        if (alfCrEnabledFlag)
+        {
+          READ_FLAG(uiCode, "slice_alf_fixed_filter_set_idx_cr");
+          pcSlice->setTileGroupAlfFixedFilterSetIdx(COMPONENT_Cr, uiCode);
+        }
+#endif
       }
       else
       {
@@ -5649,6 +5709,9 @@ void HLSyntaxReader::parseConstraintInfo(ConstraintInfo *cinfo)
 #endif
 #if JVET_AD0082_TMRL_CONFIG
     READ_FLAG(symbol, "gci_no_tmrl_constraint_flag");                    cinfo->setNoTmrlConstraintFlag(symbol > 0 ? true : false);
+#endif
+#if JVET_AG0058_EIP
+    READ_FLAG(symbol, "gci_no_eip_constraint_flag");                     cinfo->setNoTmrlConstraintFlag(symbol > 0 ? true : false);
 #endif
     /* inter */
     READ_FLAG(symbol, "gci_no_ref_pic_resampling_constraint_flag");      cinfo->setNoRprConstraintFlag(symbol > 0 ? true : false);

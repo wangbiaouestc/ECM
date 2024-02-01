@@ -276,7 +276,13 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
                     pcEncPic->slices[i]->setAlfAPSs(pic->slices[i]->getAlfAPSs());
                     pcEncPic->slices[i]->setTileGroupApsIdChroma(pic->slices[i]->getTileGroupApsIdChroma());
 #if ALF_IMPROVEMENT 
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+                    pcEncPic->slices[i]->setTileGroupAlfFixedFilterSetIdx(COMPONENT_Y, pic->slices[i]->getTileGroupAlfFixedFilterSetIdx(COMPONENT_Y));
+                    pcEncPic->slices[i]->setTileGroupAlfFixedFilterSetIdx(COMPONENT_Cb, pic->slices[i]->getTileGroupAlfFixedFilterSetIdx(COMPONENT_Cb));
+                    pcEncPic->slices[i]->setTileGroupAlfFixedFilterSetIdx(COMPONENT_Cr, pic->slices[i]->getTileGroupAlfFixedFilterSetIdx(COMPONENT_Cr));
+#else
                     pcEncPic->slices[i]->setTileGroupAlfFixedFilterSetIdx(pic->slices[i]->getTileGroupAlfFixedFilterSetIdx());
+#endif
 #endif
                     pcEncPic->slices[i]->setTileGroupAlfEnabledFlag(COMPONENT_Y,  pic->slices[i]->getTileGroupAlfEnabledFlag(COMPONENT_Y));
                     pcEncPic->slices[i]->setTileGroupAlfEnabledFlag(COMPONENT_Cb, pic->slices[i]->getTileGroupAlfEnabledFlag(COMPONENT_Cb));
@@ -832,7 +838,12 @@ void DecLib::executeLoopFilters()
     CS::saveTemporalCcpModel(cs);
   }
 #endif
-
+#if JVET_AG0058_EIP
+  if ((cs.picture->temporalId == 0) || (cs.picture->temporalId < cs.slice->getSPS()->getMaxTLayers() - 1))
+  {
+    CS::saveTemporalEipModel(cs);
+  }
+#endif
 #if JVET_W0066_CCSAO
   if (cs.sps->getCCSAOEnabledFlag())
   {
