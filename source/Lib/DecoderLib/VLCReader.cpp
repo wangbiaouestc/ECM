@@ -1130,6 +1130,10 @@ void HLSyntaxReader::parseAlfAps( APS* aps )
           param.lumaClassifierIdx[altIdx] = 2;
         }
       }
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+      READ_CODE(2, code, "alf_luma_bits");
+      param.coeffBits[altIdx] = code + 6;
+#endif
 #else
       READ_FLAG(code, "alf_luma_classifier");
       param.lumaClassifierIdx[altIdx] = code;
@@ -2129,6 +2133,16 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   READ_FLAG( uiCode, "sps_ccsao_enabled_flag" );                    pcSPS->setCCSAOEnabledFlag ( uiCode ? true : false );
 #endif
   READ_FLAG( uiCode, "sps_alf_enabled_flag" );                      pcSPS->setALFEnabledFlag ( uiCode ? true : false );
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  if( pcSPS->getALFEnabledFlag() )
+  {
+    READ_FLAG( uiCode, "sps_alf_precision_flag" );                  pcSPS->setAlfPrecisionFlag( uiCode ? true : false );
+  }
+  else
+  {
+    pcSPS->setAlfPrecisionFlag( false );
+  }
+#endif
   if (pcSPS->getALFEnabledFlag() && pcSPS->getChromaFormatIdc() != CHROMA_400)
   {
     READ_FLAG( uiCode, "sps_ccalf_enabled_flag" );                      pcSPS->setCCALFEnabledFlag ( uiCode ? true : false );

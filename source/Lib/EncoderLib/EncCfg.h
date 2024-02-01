@@ -653,6 +653,9 @@ protected:
 #if JVET_W0066_CCSAO
   bool      m_CCSAO;
 #endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  bool      m_alfPrecision;
+#endif
   bool      m_bTestSAODisableAtPictureLevel;
   double    m_saoEncodingRate;       // When non-0 SAO early picture termination is enabled for luma and chroma
   double    m_saoEncodingRateChroma; // The SAO early picture termination rate to use for chroma (when m_SaoEncodingRate is >0). If <=0, use results for luma.
@@ -2209,6 +2212,10 @@ public:
 #if JVET_W0066_CCSAO
   void      setUseCCSAO( bool b )                                    { m_CCSAO = b; }
   bool      getUseCCSAO()                                      const { return m_CCSAO; }
+#endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  void      setUseAlfPrecision( bool b )                             { m_alfPrecision = b; }
+  bool      getUseAlfPrecision()                               const { return m_alfPrecision; }
 #endif
   void  setTestSAODisableAtPictureLevel (bool bVal)                  { m_bTestSAODisableAtPictureLevel = bVal; }
   bool  getTestSAODisableAtPictureLevel ( ) const                    { return m_bTestSAODisableAtPictureLevel; }

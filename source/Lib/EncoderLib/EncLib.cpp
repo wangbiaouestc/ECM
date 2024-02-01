@@ -2073,6 +2073,9 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_W0066_CCSAO
   sps.setCCSAOEnabledFlag( m_CCSAO );
 #endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  sps.setAlfPrecisionFlag( m_alfPrecision );
+#endif
   sps.setJointCbCrEnabledFlag( m_JointCbCrMode );
   sps.setMaxTLayers( m_maxTempLayer );
   sps.setTemporalIdNestingFlag( ( m_maxTempLayer == 1 ) ? true : false );

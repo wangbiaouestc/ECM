@@ -394,6 +394,9 @@ static void simdFilter5x5Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
 #else
   , const int vbCTUHeight, int vbPos
 #endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  , char coeffBits
+#endif
 )
 {
 #if !ALF_IMPROVEMENT
@@ -406,9 +409,14 @@ static void simdFilter5x5Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
 
   const size_t srcStride = srcBuffer.stride;
   const size_t dstStride = dstBuffer.stride;
-
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  int shift = coeffBits;
+  shift -= 1;
+  int round = 1 << (shift - 1);
+#else
   constexpr int shift = AdaptiveLoopFilter::m_NUM_BITS - 1;
   constexpr int round = 1 << (shift - 1);
+#endif
 #if !ALF_IMPROVEMENT
   const __m128i mmOffset1 = _mm_set1_epi32((1 << ((shift + 3) - 1)) - round );
 #endif
@@ -671,6 +679,9 @@ static void simdFilter7x7Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
 #if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
   , Pel ***gaussPic, Pel ***gaussCtu
 #endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  , char coeffBits
+#endif
 #else
   , const int vbCTUHeight, int vbPos
 #endif
@@ -686,10 +697,14 @@ static void simdFilter7x7Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
 
   const size_t srcStride = srcBuffer.stride;
   const size_t dstStride = dstBuffer.stride;
-
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  int shift = coeffBits;
+  shift -= 1;
+  int round = 1 << (shift - 1);
+#else
   constexpr int shift = AdaptiveLoopFilter::m_NUM_BITS - 1;
   constexpr int round = 1 << (shift - 1);
-
+#endif
   const size_t width  = blk.width;
   const size_t height = blk.height;
 
@@ -1141,6 +1156,9 @@ static void simdFilter9x9Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
 #if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
   , Pel ***gaussPic, Pel ***gaussCtu
 #endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  , char coeffBits
+#endif
   )
 {
   const CPelBuf srcBuffer = recSrc.get(compId);
@@ -1149,8 +1167,14 @@ static void simdFilter9x9Blk(AlfClassifier **classifier, const PelUnitBuf &recDs
   const size_t srcStride = srcBuffer.stride;
   const size_t dstStride = dstBuffer.stride;
 
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  int shift = coeffBits;
+  shift -= 1;
+  int round = 1 << (shift - 1);
+#else
   constexpr int shift = AdaptiveLoopFilter::m_NUM_BITS - 1;
   constexpr int round = 1 << (shift - 1);
+#endif
 
   const size_t width = blk.width;
   const size_t height = blk.height;
@@ -1418,6 +1442,9 @@ static void simdFilter9x9BlkExt(AlfClassifier **classifier, const PelUnitBuf &re
 #if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
   , Pel ***gaussPic, Pel ***gaussCtu
 #endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  , char coeffBits
+#endif
   )
 {
   const CPelBuf srcBuffer = recSrc.get(compId);
@@ -1425,10 +1452,14 @@ static void simdFilter9x9BlkExt(AlfClassifier **classifier, const PelUnitBuf &re
 
   const size_t srcStride = srcBuffer.stride;
   const size_t dstStride = dstBuffer.stride;
-
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  int shift = coeffBits;
+  shift -= 1;
+  int round = 1 << (shift - 1);
+#else
   constexpr int shift = AdaptiveLoopFilter::m_NUM_BITS - 1;
   constexpr int round = 1 << (shift - 1);
-
+#endif
   const size_t width = blk.width;
   const size_t height = blk.height;
 
@@ -1993,6 +2024,9 @@ static void simdFilter9x9BlkExtDb(AlfClassifier **classifier, const PelUnitBuf &
 #if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
   , Pel ***gaussPic, Pel ***gaussCtu
 #endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  , char coeffBits
+#endif
   )
 {
   const CPelBuf srcBuffer = recSrc.get(compId);
@@ -2002,10 +2036,14 @@ static void simdFilter9x9BlkExtDb(AlfClassifier **classifier, const PelUnitBuf &
   const size_t srcStride = srcBuffer.stride;
   const size_t dstStride = dstBuffer.stride;
   const size_t srcBeforeDbStride = scrBufferBeforeDb.stride;
-
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  int shift = coeffBits;
+  shift -= 1;
+  int round = 1 << (shift - 1);
+#else
   constexpr int shift = AdaptiveLoopFilter::m_NUM_BITS - 1;
   constexpr int round = 1 << (shift - 1);
-
+#endif
   const size_t width = blk.width;
   const size_t height = blk.height;
 
@@ -2338,6 +2376,9 @@ static void simdFilter13x13BlkExt(AlfClassifier **classifier, const PelUnitBuf &
 #if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
   , Pel ***gaussPic, Pel ***gaussCtu
 #endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  , char coeffBits
+#endif
   )
 {
   const CPelBuf srcBuffer = recSrc.get(compId);
@@ -2345,10 +2386,14 @@ static void simdFilter13x13BlkExt(AlfClassifier **classifier, const PelUnitBuf &
 
   const size_t srcStride = srcBuffer.stride;
   const size_t dstStride = dstBuffer.stride;
-
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  int shift = coeffBits;
+  shift -= 1;
+  int round = 1 << (shift - 1);
+#else
   constexpr int shift = AdaptiveLoopFilter::m_NUM_BITS - 1;
   constexpr int round = 1 << (shift - 1);
-
+#endif
   const size_t width = blk.width;
   const size_t height = blk.height;
 
@@ -2853,6 +2898,9 @@ static void simdFilter13x13BlkExtDb(AlfClassifier **classifier, const PelUnitBuf
 #if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
   , Pel ***gaussPic, Pel ***gaussCtu
 #endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  , char coeffBits
+#endif
   )
 {
   const CPelBuf srcBuffer = recSrc.get(compId);
@@ -2862,10 +2910,14 @@ static void simdFilter13x13BlkExtDb(AlfClassifier **classifier, const PelUnitBuf
   const size_t srcStride = srcBuffer.stride;
   const size_t dstStride = dstBuffer.stride;
   const size_t srcBeforeDbStride = scrBufferBeforeDb.stride;
-
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  int shift = coeffBits;
+  shift -= 1;
+  int round = 1 << (shift - 1);
+#else
   constexpr int shift = AdaptiveLoopFilter::m_NUM_BITS - 1;
   constexpr int round = 1 << (shift - 1);
-
+#endif
   const size_t width = blk.width;
   const size_t height = blk.height;
 
@@ -3395,6 +3447,9 @@ static void simdFilter13x13BlkExtDbResiDirect(
 #if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
   , Pel ***gaussPic, Pel ***gaussCtu
 #endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  , char coeffBits
+#endif
 )
 {
   const CPelBuf srcBuffer         = recSrc.get(compId);
@@ -3406,9 +3461,14 @@ static void simdFilter13x13BlkExtDbResiDirect(
   const size_t dstStride         = dstBuffer.stride;
   const size_t srcBeforeDbStride = scrBufferBeforeDb.stride;
   const size_t srcResiStride     = scrBufferResi.stride;
-
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  int shift = coeffBits;
+  shift -= 1;
+  int round = 1 << (shift - 1);
+#else
   constexpr int shift = AdaptiveLoopFilter::m_NUM_BITS - 1;
   constexpr int round = 1 << (shift - 1);
+#endif
 
   const size_t width  = blk.width;
   const size_t height = blk.height;
@@ -3960,6 +4020,9 @@ static void simdFilter13x13BlkExtDbResi(
 #if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
   , Pel ***gaussPic, Pel ***gaussCtu
 #endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  , char coeffBits
+#endif
 )
 {
   const CPelBuf srcBuffer         = recSrc.get(compId);
@@ -3971,9 +4034,14 @@ static void simdFilter13x13BlkExtDbResi(
   const size_t dstStride         = dstBuffer.stride;
   const size_t srcBeforeDbStride = scrBufferBeforeDb.stride;
   const size_t srcResiStride     = scrBufferResi.stride;
-
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  int shift = coeffBits;
+  shift -= 1;
+  int round = 1 << (shift - 1);
+#else
   constexpr int shift = AdaptiveLoopFilter::m_NUM_BITS - 1;
   constexpr int round = 1 << (shift - 1);
+#endif
 
   const size_t width  = blk.width;
   const size_t height = blk.height;

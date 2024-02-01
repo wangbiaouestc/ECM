@@ -655,6 +655,9 @@ void HLSWriter::codeAlfAps( APS* pcAPS )
       {
         WRITE_FLAG( param.lumaClassifierIdx[altIdx] == 2 ? 1 : 0, "alf_luma_classifier_resi" );
       }
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+      WRITE_CODE(param.coeffBits[altIdx] - 6, 2, "alf_luma_bits");
+#endif
 #else
       WRITE_FLAG( param.lumaClassifierIdx[altIdx], "alf_luma_classifier" );
 #endif
@@ -1299,6 +1302,12 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
   WRITE_FLAG( pcSPS->getCCSAOEnabledFlag(),                                          "sps_ccsao_enabled_flag" );
 #endif
   WRITE_FLAG( pcSPS->getALFEnabledFlag(),                                            "sps_alf_enabled_flag" );
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  if( pcSPS->getALFEnabledFlag() )
+  {
+    WRITE_FLAG( pcSPS->getAlfPrecisionFlag(),                                        "sps_alf_precision_flag" );
+  }
+#endif
   if (pcSPS->getALFEnabledFlag() && pcSPS->getChromaFormatIdc() != CHROMA_400)
   {
     WRITE_FLAG( pcSPS->getCCALFEnabledFlag(),                                            "sps_ccalf_enabled_flag" );

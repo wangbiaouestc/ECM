@@ -1713,7 +1713,9 @@ private:
 #if JVET_W0066_CCSAO
   bool              m_ccSaoEnabledFlag;
 #endif
-
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  bool              m_alfPrecisionFlag;
+#endif
   bool              m_bTemporalIdNestingFlag; // temporal_id_nesting_flag
 
   bool              m_scalingListEnabledFlag;
@@ -2136,7 +2138,10 @@ public:
   bool                    getCCSAOEnabledFlag() const                                                     { return m_ccSaoEnabledFlag; }
   void                    setCCSAOEnabledFlag( bool b )                                                   { m_ccSaoEnabledFlag = b;    }
 #endif
-
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  bool                    getAlfPrecisionFlag() const                                                 { return m_alfPrecisionFlag; }
+  void                    setAlfPrecisionFlag( bool b )                                               { m_alfPrecisionFlag = b;    }
+#endif
   bool                    getALFEnabledFlag() const                                                       { return m_alfEnabledFlag; }
   void                    setALFEnabledFlag( bool b )                                                     { m_alfEnabledFlag = b; }
 bool                    getCCALFEnabledFlag() const                                                       { return m_ccalfEnabledFlag; }
