@@ -117,7 +117,11 @@ public:
   static constexpr int AlfNumClippingValues[MAX_NUM_CHANNEL_TYPE] = { 4, 4 };
   static constexpr int MaxAlfNumClippingValues = 4;
 
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  static constexpr int   m_NUM_BITS_CHROMA = 8;
+#else
   static constexpr int   m_NUM_BITS = 8;
+#endif
 #if ALF_IMPROVEMENT
   static constexpr int   m_NUM_BITS_FIXED_FILTER = 12;
   static constexpr int   m_CLASSIFICATION_BLK_SIZE = 256;  //non-normative, local buffer size
@@ -329,6 +333,9 @@ public:
 #if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
     , Pel*** gaussPic, Pel*** gaussCtu
 #endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+    , char coeffBits
+#endif
    );
 #else
   void(*m_filterCcAlf)(const PelBuf &dstBuf, const CPelUnitBuf &recSrc, const Area &blkDst, const Area &blkSrc, const ComponentID compId, const int16_t *filterCoeff, const ClpRngs &clpRngs, CodingStructure &cs, int vbCTUHeight, int vbPos);
@@ -351,6 +358,9 @@ public:
 #if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
                          , Pel*** gaussPic, Pel*** gaussCtu
 #endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+    , char coeffBits
+#endif
   );
   void (*m_filter7x7Blk)(AlfClassifier **classifier, const PelUnitBuf &recDst, const PelUnitBuf &recBeforeDb, const PelUnitBuf &resi, const CPelUnitBuf &recSrc, const Area &blkDst, const Area &blk, const ComponentID compId, const short *filterSet, const Pel *fClipSet, const ClpRng &clpRng, CodingStructure &cs, Pel ***fixedFilterResults, Pel ***fixedFilterResiResults, int fixedFilterSetIdx
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
@@ -358,6 +368,9 @@ public:
 #endif
 #if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
                          , Pel*** gaussPic, Pel*** gaussCtu
+#endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+    , char coeffBits
 #endif
   );
   void alfFiltering(AlfClassifier **classifier, const PelUnitBuf &recDst, const PelUnitBuf &recBeforeDb, const PelUnitBuf &resi, const CPelUnitBuf &recSrc, const Area &blkDst, const Area &blk, const ComponentID compId, const short *filterSet, const Pel *fClipSet, const ClpRng &clpRng, CodingStructure &cs, AlfFilterType filterType, Pel ***fixedFilterResults, Pel ***fixedFilterResiResults, int fixedFilterSetIdx
@@ -367,6 +380,9 @@ public:
 #if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
                    , Pel*** gaussPic, Pel*** gaussCtu
 #endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+    , char coeffBits
+#endif
   );
   void (*m_filter9x9Blk)(AlfClassifier **classifier, const PelUnitBuf &recDst, const PelUnitBuf &recBeforeDb, const PelUnitBuf &resi, const CPelUnitBuf &recSrc, const Area &blkDst, const Area &blk, const ComponentID compId, const short *filterSet, const Pel *fClipSet, const ClpRng &clpRng, CodingStructure &cs, Pel ***fixedFilterResults, Pel ***fixedFilterResiResults, int fixedFilterSetIdx
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
@@ -374,6 +390,9 @@ public:
 #endif
 #if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
                          , Pel*** gaussPic, Pel*** gaussCtu
+#endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+    , char coeffBits
 #endif
   );
   void (*m_filter9x9BlkExt)(AlfClassifier **classifier, const PelUnitBuf &recDst, const PelUnitBuf &recBeforeDb, const PelUnitBuf &resi, const CPelUnitBuf &recSrc, const Area &blkDst, const Area &blk, const ComponentID compId, const short *filterSet, const Pel *fClipSet, const ClpRng &clpRng, CodingStructure &cs, Pel ***fixedFilterResults, Pel ***fixedFilterResiResults, int fixedFilterSetIdx
@@ -383,6 +402,9 @@ public:
 #if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
                          , Pel*** gaussPic, Pel*** gaussCtu
 #endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+    , char coeffBits
+#endif
   );
   void (*m_filterBlkExt)(AlfClassifier **classifier, const PelUnitBuf &recDst, const PelUnitBuf &recBeforeDb, const PelUnitBuf &resi, const CPelUnitBuf &recSrc, const Area &blkDst, const Area &blk, const ComponentID compId, const short *filterSet, const Pel *fClipSet, const ClpRng &clpRng, CodingStructure &cs, Pel ***fixedFilterResults, Pel ***fixedFilterResiResults, int fixedFilterSetIdx
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
@@ -391,6 +413,9 @@ public:
 #if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
                          , Pel*** gaussPic, Pel*** gaussCtu
 #endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+    , char coeffBits
+#endif
   );
   void (*m_filter9x9BlkExtDb)(AlfClassifier **classifier, const PelUnitBuf &recDst, const PelUnitBuf &recBeforeDb, const PelUnitBuf &resi, const CPelUnitBuf &recSrc, const Area &blkDst, const Area &blk, const ComponentID compId, const short *filterSet, const Pel *fClipSet, const ClpRng &clpRng, CodingStructure &cs, Pel ***fixedFilterResults, Pel ***fixedFilterResiResults, int fixedFilterSetIdx
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
@@ -398,6 +423,9 @@ public:
 #endif
 #if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
                         , Pel*** gaussPic, Pel*** gaussCtu
+#endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+    , char coeffBits
 #endif
   );
 #if JVET_AA0095_ALF_LONGER_FILTER
@@ -408,6 +436,9 @@ public:
 #if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
                        , Pel*** gaussPic, Pel*** gaussCtu
 #endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+    , char coeffBits
+#endif
   );
   void (*m_filter13x13BlkExt)(AlfClassifier **classifier, const PelUnitBuf &recDst, const PelUnitBuf &recBeforeDb, const PelUnitBuf &resi, const CPelUnitBuf &recSrc, const Area &blkDst, const Area &blk, const ComponentID compId, const short *filterSet, const Pel *fClipSet, const ClpRng &clpRng, CodingStructure &cs, Pel ***fixedFilterResults, Pel ***fixedFilterResiResults, int fixedFilterSetIdx
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
@@ -415,6 +446,9 @@ public:
 #endif
 #if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
                        , Pel*** gaussPic, Pel*** gaussCtu
+#endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+    , char coeffBits
 #endif
   );
 #endif
@@ -425,6 +459,9 @@ public:
 #if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
                        , Pel*** gaussPic, Pel*** gaussCtu
 #endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+    , char coeffBits
+#endif
   );
   void (*m_filter13x13BlkExtDbResi)(AlfClassifier **classifier, const PelUnitBuf &recDst, const PelUnitBuf &recBeforeDb, const PelUnitBuf &resi, const CPelUnitBuf &recSrc, const Area &blkDst, const Area &blk, const ComponentID compId, const short *filterSet, const Pel *fClipSet, const ClpRng &clpRng, CodingStructure &cs, Pel ***fixedFilterResults, Pel ***fixedFilterResiResults, int fixedFilterSetIdx
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
@@ -432,6 +469,9 @@ public:
 #endif
 #if JVET_AD0222_ADDITONAL_ALF_FIXFILTER
                        , Pel*** gaussPic, Pel*** gaussCtu
+#endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+    , char coeffBits
 #endif
   );
 #else
@@ -669,6 +709,10 @@ protected:
 #endif
   char                         m_classifierIdxApsLuma[ALF_CTB_MAX_NUM_APS][MAX_NUM_ALF_ALTERNATIVES_LUMA];
   char                         m_classifierFinal[MAX_NUM_ALF_ALTERNATIVES_LUMA];
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  char                         m_coeffBitsApsLuma[ALF_CTB_MAX_NUM_APS][MAX_NUM_ALF_ALTERNATIVES_LUMA];
+  char                         m_coeffBitsFinal[MAX_NUM_ALF_ALTERNATIVES_LUMA];
+#endif
 #else
   AlfClassifier**              m_classifier;
 #endif
