@@ -2438,6 +2438,14 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
   double maxCostAllowedForChroma = MAX_DOUBLE;
   const  CodingUnit *bestCU      = bestCS->getCU( partitioner.chType );
   Distortion interHad = m_modeCtrl->getInterHad();
+#if JVET_AG0146_DIMD_ITMP_IBC
+  bool isBvDimd = 0;
+  Mv   bvDimd   = Mv(0, 0);
+  bool bvDimdDerived = 0;
+#endif
+#if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
+  bool bvListDerived = 0;
+#endif
 #if JVET_W0123_TIMD_FUSION
   int timdMode = 0;
   int timdModeSecondary = 0;
@@ -2459,6 +2467,10 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
   int timdVerMode = 0;
 #endif
 #if JVET_AD0086_ENHANCED_INTRA_TMP
+#if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
+  int tmpXdisp = 0;
+  int tmpYdisp = 0;
+#endif
   m_pcIntraSearch->initTmpDisp();
   m_pcIntraSearch->initTmpFlmParams();
   m_pcIntraSearch->initTmpFusionInfo();
@@ -2793,6 +2805,28 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
           cu.areAboveRightUnavail = areAboveRightUnavail;
           cu.areBelowLeftUnavail  = areBelowLeftUnavail;
 #endif
+#if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
+          if (bvListDerived == 0)
+          {
+            PU::getItmpMergeCandidate(*cu.firstPU, m_pcIntraSearch->m_bvBasedMergeCandidates);
+            bvListDerived = 1;
+          }
+#endif
+#if JVET_AG0146_DIMD_ITMP_IBC
+          if (bvDimdDerived == 0)
+          {
+            const CompArea& area = cu.Y();
+            m_pcIntraSearch->getBestNonAnglularMode(bestCS->picture->getRecoBuf(area), area, cu, m_pcIntraSearch->m_bvBasedMergeCandidates);
+            isBvDimd = cu.isBvDimd;
+            bvDimd = cu.bvDimd;
+            bvDimdDerived = 1;
+          }
+          else
+          {
+            cu.isBvDimd = isBvDimd;
+            cu.bvDimd = bvDimd;
+          }
+#endif
 #if JVET_W0123_TIMD_FUSION
           cu.timd = false;
           if (isLuma(partitioner.chType) && cu.slice->getSPS()->getUseTimd())
@@ -2886,7 +2920,32 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
               if (templateType != NO_TEMPLATE)
               {
                 m_pcIntraSearch->getTargetTemplate(&cu, cu.lwidth(), cu.lheight(), templateType);
-                m_pcIntraSearch->candidateSearchIntra(&cu, cu.lwidth(), cu.lheight(), templateType);
+                m_pcIntraSearch->candidateSearchIntra(&cu, cu.lwidth(), cu.lheight(), templateType
+#if JVET_AG0136_INTRA_TMP_LIC || (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
+                                                      , true
+#endif
+                                                      );
+#if JVET_AG0136_INTRA_TMP_LIC
+                PelBuf bufDumb;
+                cu.ibcLicFlag = true;
+                cu.tmpLicFlag = true;
+                for (int licIdc = 0; licIdc < (cu.slice->getSPS()->getItmpLicExtension() ? 4 : 1); licIdc++)
+                {
+                  cu.ibcLicIdx = licIdc;
+                  for (int idx = 0; idx < m_pcIntraSearch->getTmpNumCandUseMR(); idx++)
+                  {
+                    m_pcIntraSearch->setBvMvFromMemory(cu, idx, true);
+                    m_pcInterSearch->LicItmp(*(cu.firstPU), bufDumb, false);
+                    m_pcIntraSearch->getMemLicParams(licIdc, idx) = m_pcInterSearch->getArrayLicParams();
+                  }
+                  for (int idx = m_pcIntraSearch->getTmpNumCandUseMR(); idx < MTMP_NUM; idx++)
+                  {
+                    m_pcIntraSearch->getMemLicParams(licIdc, idx) = m_pcIntraSearch->getMemLicParams(licIdc, idx - m_pcIntraSearch->getTmpNumCandUseMR());
+                  }
+                }
+                cu.ibcLicFlag = false;
+                cu.tmpLicFlag = false;
+#endif
 #if JVET_AD0086_ENHANCED_INTRA_TMP
                 for (int idx = 0; idx < m_pcIntraSearch->getTmpNumCand() && idx < MTMP_NUM; idx++)
                 {
@@ -2894,9 +2953,18 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
                   m_pcIntraSearch->xCalTmpFlmParam(&cu, cu.lwidth(), cu.lheight(), templateType);
                 }
                 cu.tmpIdx = 0;
-                m_pcIntraSearch->xTMPBuildFusionCandidate(cu, templateType);
+                m_pcIntraSearch->xTMPBuildFusionCandidate(cu, templateType
+#if JVET_AG0136_INTRA_TMP_LIC
+                                                          , false
+#endif
+                                                          );
+#if !JVET_AG0136_INTRA_TMP_LIC
                 cu.tmpIdx = 0;
                 cu.tmpFusionFlag = 0;
+#endif
+#endif
+#if JVET_AG0136_INTRA_TMP_LIC
+                m_pcIntraSearch->xTMPBuildFusionCandidate(cu, templateType, true);
 #endif
               }
 #else
@@ -2904,7 +2972,18 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
               m_pcIntraSearch->candidateSearchIntra(&cu, cu.lwidth(), cu.lheight());
 #endif
               tmpDerived = 1;
+#if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
+              tmpXdisp = cu.tmpXdisp;
+              tmpYdisp = cu.tmpYdisp;
+#endif
             }
+#if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
+            else
+            {
+              cu.tmpXdisp = tmpXdisp;
+              cu.tmpYdisp = tmpYdisp;
+            }
+#endif
           }
 #endif
           tempCS->interHad    = interHad;
@@ -2925,7 +3004,11 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
             {
               bestCostSoFar = encTestMode.maxCostAllowed;
             }
-            validCandRet = m_pcIntraSearch->estIntraPredLumaQT(cu, partitioner, bestCostSoFar, mtsFlag, startMTSIdx[trGrpIdx], endMTSIdx[trGrpIdx], (trGrpIdx > 0), !cu.colorTransform ? bestCS : nullptr);
+            validCandRet = m_pcIntraSearch->estIntraPredLumaQT(cu, partitioner, bestCostSoFar, mtsFlag, startMTSIdx[trGrpIdx], endMTSIdx[trGrpIdx], (trGrpIdx > 0), !cu.colorTransform ? bestCS : nullptr
+#if JVET_AG0136_INTRA_TMP_LIC
+                                                               , m_pcInterSearch
+#endif
+            );
             if ((!validCandRet || (cu.ispMode && cu.firstTU->cbf[COMPONENT_Y] == 0)))
             {
               continue;
@@ -15054,7 +15137,11 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 #else
                                         , pu.bv
 #endif
-                                        , predBuf);
+                                        , predBuf
+#if JVET_AG0136_INTRA_TMP_LIC
+                                        , true
+#endif
+                                        );
           distParam.cur = predBuf;
         }
         else
@@ -15466,7 +15553,11 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 #else
                                       , pu.bv
 #endif
-                                      , predBuf);
+                                      , predBuf
+#if JVET_AG0136_INTRA_TMP_LIC
+                                      , true
+#endif
+                                      );
         distParam.cur = predBuf;
       }
       else
@@ -15938,7 +16029,11 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
 #else
                                           , pu.bv
 #endif
-                                          , predBuf);
+                                          , predBuf
+#if JVET_AG0136_INTRA_TMP_LIC
+                                          , true
+#endif
+                                          );
             distParam.cur = predBuf;
           }
           else

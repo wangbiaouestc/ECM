@@ -138,6 +138,10 @@
 #define JVET_AD0086_ENHANCED_INTRA_TMP                    1 // JVET-AD0086: Enhanced intra TMP
 #define JVET_AE0077_EXT_INTRATMP                          1 // JVET-AE0077: Extended search areas for intraTMP
 #define JVET_AF0079_STORING_INTRATMP                      1 // JVET-AF0079: Storing fractional-pel intraTMP BV
+#define JVET_AG0136_INTRA_TMP_LIC                         1 // JVET-AG0136: Intra TMP extension to LIC
+#define JVET_AG0151_INTRA_TMP_MERGE_MODE                  1 // JVET-AG0151: Intra TMP with merge candidates
+#define JVET_AG0152_SGPM_ITMP_IBC                         1 // JVET-AG0152: SGPM with Intra TMP and IBC
+#define JVET_AG0146_DIMD_ITMP_IBC                         1 // JVET-AG0146: DIMD with Intra TMP and IBC
 #endif
 
 #define JVET_W0123_TIMD_FUSION                            1 // JVET-W0123: Template based intra mode derivation and fusion
@@ -1850,7 +1854,7 @@ struct EIPInfo
 };
 #endif
 
-#if JVET_AB0155_SGPM
+#if JVET_AB0155_SGPM && !JVET_AG0152_SGPM_ITMP_IBC
 struct SgpmInfo
 {
   int sgpmSplitDir;

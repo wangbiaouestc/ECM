@@ -9504,6 +9504,11 @@ void CABACReader::tmp_flag(CodingUnit& cu)
       }
       cu.tmpIdx += tmpFusionIdx;
       DTRACE(g_trace_ctx, D_SYNTAX, "tmp_fusion_idx() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.tmpIdx);
+#if JVET_AG0136_INTRA_TMP_LIC
+      cu.tmpLicFlag = m_BinDecoder.decodeBin(Ctx::TmpLic(0));
+      cu.ibcLicFlag = cu.tmpLicFlag;
+      cu.ibcLicIdx = 0;
+#endif
     }
     else
     {
@@ -9536,7 +9541,35 @@ void CABACReader::tmp_flag(CodingUnit& cu)
       cu.tmpFlmFlag = m_BinDecoder.decodeBin(Ctx::TmpFusion(3));
       DTRACE(g_trace_ctx, D_SYNTAX, "tmp_flm_flag() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y,
              cu.tmpFlmFlag);
+#if JVET_AG0136_INTRA_TMP_LIC
       if (!cu.tmpFlmFlag)
+      {
+        cu.tmpLicFlag = m_BinDecoder.decodeBin(Ctx::TmpLic(0));
+        cu.ibcLicFlag = cu.tmpLicFlag;
+        DTRACE(g_trace_ctx, D_SYNTAX, "tmpLicFlag() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.tmpLicFlag);
+        if (cu.slice->getSPS()->getItmpLicExtension() && cu.ibcLicFlag)
+        {
+          const int bin1 = m_BinDecoder.decodeBin(Ctx::ItmpLicIndex(0));
+          const int bin2 = m_BinDecoder.decodeBin(Ctx::ItmpLicIndex(1));
+          if (bin1)
+          {
+            cu.ibcLicIdx = bin2 ? IBC_LIC_IDX_L : IBC_LIC_IDX_T;
+          }
+          else
+          {
+            cu.ibcLicIdx = bin2 ? IBC_LIC_IDX_M : IBC_LIC_IDX;
+          }
+          DTRACE(g_trace_ctx, D_SYNTAX, "tmp_lic_idx=%d\n", cu.ibcLicIdx);
+        }
+        else
+        {
+          cu.ibcLicIdx = 0;
+        }
+      }
+      if (!cu.tmpFlmFlag && !cu.tmpLicFlag)
+#else
+      if (!cu.tmpFlmFlag)
+#endif
       {
         cu.tmpIsSubPel = m_BinDecoder.decodeBin(Ctx::TmpFlag(4));
         if (cu.tmpIsSubPel)

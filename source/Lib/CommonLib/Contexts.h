@@ -562,6 +562,10 @@ public:
 #if JVET_AD0086_ENHANCED_INTRA_TMP
   static const CtxSet   TmpIdx;
   static const CtxSet   TmpFusion;
+#if JVET_AG0136_INTRA_TMP_LIC
+  static const CtxSet   TmpLic;
+  static const CtxSet   ItmpLicIndex;
+#endif
 #endif  
 #endif
 #if MMLM

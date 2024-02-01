@@ -2016,6 +2016,10 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
   sps.setUseIbcNonAdjCand                   ( m_ibcNonAdjCand );
 #endif
+#if JVET_AG0136_INTRA_TMP_LIC
+  sps.setItmpLicExtension                   ( m_itmpLicExtension );
+  sps.setItmpLicMode                        ( m_itmpLicMode );
+#endif
   sps.setWrapAroundEnabledFlag                      ( m_wrapAround );
 #if MULTI_HYP_PRED
   sps.setMaxNumAddHyps(m_maxNumAddHyps);

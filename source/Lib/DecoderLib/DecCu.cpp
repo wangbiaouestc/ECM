@@ -317,6 +317,13 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
         break;
       case MODE_PLT:
       case MODE_INTRA:
+#if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
+        if (currCU.dimd || currCU.sgpm || (chType == CHANNEL_TYPE_LUMA && currCU.tmpFlag))
+        {
+          m_pcIntraPred->m_bvBasedMergeCandidates.clear();
+          PU::getItmpMergeCandidate(*currCU.firstPU, m_pcIntraPred->m_bvBasedMergeCandidates);
+        }
+#endif
 #if ENABLE_DIMD
         if (currCU.dimd)
         {
@@ -324,6 +331,9 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
           const CompArea &area = currCU.Y();
           IntraPrediction::deriveDimdMode(currCU.cs->picture->getRecoBuf(area), area, currCU);
           pu->intraDir[0] = currCU.dimdMode;
+#if JVET_AG0146_DIMD_ITMP_IBC
+          m_pcIntraPred->getBestNonAnglularMode(currCU.cs->picture->getRecoBuf(area), area, currCU, m_pcIntraPred->m_bvBasedMergeCandidates);
+#endif
         }
 #if JVET_W0123_TIMD_FUSION
         else if (currCU.timd)
@@ -360,9 +370,16 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
           currCU.sgpmSplitDir = sgpmInfoList[sgpmIdx].sgpmSplitDir;
           currCU.sgpmMode0    = sgpmInfoList[sgpmIdx].sgpmMode0;
           currCU.sgpmMode1    = sgpmInfoList[sgpmIdx].sgpmMode1;
-          
+
+#if JVET_AG0152_SGPM_ITMP_IBC
+          currCU.sgpmBv0 = sgpmInfoList[sgpmIdx].sgpmBv0;
+          currCU.sgpmBv1 = sgpmInfoList[sgpmIdx].sgpmBv1;
+          pu->intraDir[0] = currCU.sgpmMode0 >= SGPM_BV_START_IDX ? 0 : currCU.sgpmMode0;
+          pu->intraDir1[0] = currCU.sgpmMode1 >= SGPM_BV_START_IDX ? 0 : currCU.sgpmMode1;
+#else
           pu->intraDir[0]  = currCU.sgpmMode0;
           pu->intraDir1[0] = currCU.sgpmMode1;
+#endif
         }
 #endif
 
@@ -849,7 +866,41 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 		  {
         m_pcIntraPred->getTargetTemplate(tu.cu, pu.lwidth(), pu.lheight(), tempType);
 
-        m_pcIntraPred->candidateSearchIntra(tu.cu, pu.lwidth(), pu.lheight(), tempType);
+        m_pcIntraPred->candidateSearchIntra(tu.cu, pu.lwidth(), pu.lheight(), tempType
+#if JVET_AG0136_INTRA_TMP_LIC || (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
+                                            , false
+#endif
+                                            );
+#if JVET_AG0136_INTRA_TMP_LIC
+        if (tu.cu->tmpLicFlag)
+        {
+          PelBuf bufDumb;
+          if ((tu.cu)->tmpFusionFlag)
+          {
+            IntraTMPFusionInfo infoIntermediate[TMP_GROUP_IDX << 1] = {
+              { true, false, 0, TMP_FUSION_NUM },
+              { true, false, TMP_FUSION_NUM, TMP_FUSION_NUM },
+              { true, false, TMP_FUSION_NUM << 1, TMP_FUSION_NUM },
+              { true, true, 0, TMP_FUSION_NUM },
+              { true, true, TMP_FUSION_NUM, TMP_FUSION_NUM },
+              { true, true, TMP_FUSION_NUM << 1, TMP_FUSION_NUM }
+            };
+            infoIntermediate[(tu.cu)->tmpIdx].tmpFusionNumber = m_pcIntraPred->xCalTMPFusionNumber(infoIntermediate[(tu.cu)->tmpIdx].tmpMaxNum, 0, true);
+            for (int i = 0; i < infoIntermediate[(tu.cu)->tmpIdx].tmpFusionNumber; i++)
+            {
+              m_pcIntraPred->setBvMvFromMemory(*(tu.cu), i + infoIntermediate[(tu.cu)->tmpIdx].tmpFusionIdx, true);
+              m_pcInterPred->LicItmp(pu, bufDumb, false);
+              m_pcIntraPred->getMemLicParams((tu.cu)->ibcLicIdx, i + infoIntermediate[(tu.cu)->tmpIdx].tmpFusionIdx) = m_pcInterPred->getArrayLicParams();
+            }
+          }
+          else
+          {
+            m_pcIntraPred->setBvMvFromMemory(*(tu.cu), (tu.cu)->tmpIdx, true);
+            m_pcInterPred->LicItmp(pu, bufDumb, false);
+            m_pcIntraPred->getMemLicParams((tu.cu)->ibcLicIdx, (tu.cu)->tmpIdx) = m_pcInterPred->getArrayLicParams();
+          }
+        }
+#endif
 #if JVET_AD0086_ENHANCED_INTRA_TMP
         if (tu.cu->tmpFlmFlag)
         {
@@ -857,7 +908,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
         }
         if (tu.cu->tmpFusionFlag)
         {
-          m_pcIntraPred->xTMPBuildFusionCandidate(*tu.cu, tempType);
+          m_pcIntraPred->xTMPBuildFusionCandidate(*tu.cu, tempType
+#if JVET_AG0136_INTRA_TMP_LIC
+                                                  , (tu.cu)->tmpLicFlag
+#endif
+                                                  );
         }
         if (pu.cu->tmpIsSubPel)
         {
@@ -865,15 +920,41 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
         }
 #endif
 #if JVET_AB0061_ITMP_BV_FOR_IBC
-        m_pcIntraPred->generateTMPrediction(piPred.buf, piPred.stride, foundCandiNum, pu);
+        m_pcIntraPred->generateTMPrediction(piPred.buf, piPred.stride, foundCandiNum, pu
+#if JVET_AG0136_INTRA_TMP_LIC
+                                            , (tu.cu)->tmpLicFlag
+                                            , !(tu.cu)->tmpFlmFlag
+#endif
+                                            );
 #elif TMP_FAST_ENC
         m_pcIntraPred->generateTMPrediction( piPred.buf, piPred.stride, pu.Y(), foundCandiNum, pu.cu );
 #else
         m_pcIntraPred->generateTMPrediction(piPred.buf, piPred.stride, pu.lwidth(), pu.lheight(), foundCandiNum);
 #endif
 #if JVET_AD0086_ENHANCED_INTRA_TMP
+#if JVET_AG0136_INTRA_TMP_LIC
+        if ((tu.cu)->tmpLicFlag)
+        {
+          if (!(tu.cu)->tmpFusionFlag)
+          {
+            const auto& arrayLicParams = m_pcIntraPred->getMemLicParams((tu.cu)->ibcLicIdx, (tu.cu)->tmpIdx);
+            if ((tu.cu)->ibcLicIdx == IBC_LIC_IDX_M)
+            {
+              piPred.linearTransforms(arrayLicParams[1], arrayLicParams[0], arrayLicParams[2], arrayLicParams[4], arrayLicParams[3], arrayLicParams[5], arrayLicParams[6], true, (tu.cu)->cs->slice->clpRng(COMPONENT_Y));
+            }
+            else
+            {
+              piPred.linearTransform(arrayLicParams[1], arrayLicParams[0], arrayLicParams[2], true, (tu.cu)->cs->slice->clpRng(COMPONENT_Y));
+            }
+          }
+        }
+#endif
         m_pcIntraPred->xGenerateTmpFlmPred(piPred, pu.lwidth(), pu.lheight(), tempType, tu.cu);
-        m_pcIntraPred->xTMPFusionApplyModel(piPred, pu.lwidth(), pu.lheight(), tempType, tu.cu);
+        m_pcIntraPred->xTMPFusionApplyModel(piPred, pu.lwidth(), pu.lheight(), tempType, tu.cu
+#if JVET_AG0136_INTRA_TMP_LIC
+                                            , (tu.cu)->tmpLicFlag
+#endif
+                                            );
 #endif
 		  }
 		  else

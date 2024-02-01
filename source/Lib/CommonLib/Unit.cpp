@@ -284,6 +284,10 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   plIdx = other.plIdx;
 #endif
 #if ENABLE_DIMD
+#if JVET_AG0146_DIMD_ITMP_IBC
+  isBvDimd = other.isBvDimd;
+  bvDimd = other.bvDimd;
+#endif
   dimd = other.dimd;
   dimdBlending = other.dimdBlending;
 #if JVET_AC0098_LOC_DEP_DIMD
@@ -328,9 +332,16 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #endif
 #if TMP_FAST_ENC
 #if JVET_AD0086_ENHANCED_INTRA_TMP
+#if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
+  tmpXdisp = other.tmpXdisp;
+  tmpYdisp = other.tmpYdisp;
+#endif
   tmpIdx        = other.tmpIdx;
   tmpFusionFlag = other.tmpFusionFlag;
   tmpFlmFlag    = other.tmpFlmFlag;
+#if JVET_AG0136_INTRA_TMP_LIC
+  tmpLicFlag    = other.tmpLicFlag;
+#endif
   tmpIsSubPel  = other.tmpIsSubPel;
   tmpSubPelIdx = other.tmpSubPelIdx;
 #endif
@@ -359,6 +370,10 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #if JVET_AB0155_SGPM
   timdHor      = other.timdHor;
   timdVer      = other.timdVer;
+#if JVET_AG0152_SGPM_ITMP_IBC
+  sgpmBv0       = other.sgpmBv0;
+  sgpmBv1       = other.sgpmBv1;
+#endif
   sgpm         = other.sgpm;
   sgpmIdx      = other.sgpmIdx;
   sgpmSplitDir = other.sgpmSplitDir;
@@ -492,6 +507,10 @@ void CodingUnit::initData()
   plIdx = 0;
 #endif
 #if ENABLE_DIMD
+#if JVET_AG0146_DIMD_ITMP_IBC
+  isBvDimd  = 0;
+  bvDimd    = Mv(0, 0);
+#endif
   dimd = false;
   dimdBlending = false;
 #if JVET_AC0098_LOC_DEP_DIMD
@@ -536,11 +555,18 @@ void CodingUnit::initData()
 #endif
 #if TMP_FAST_ENC
 #if JVET_AD0086_ENHANCED_INTRA_TMP
+#if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
+  tmpXdisp = 0;
+  tmpYdisp = 0;
+#endif
   tmpIdx        = 0;
   tmpFusionFlag = false;
   tmpFlmFlag    = false;
   tmpIsSubPel  = 0;
   tmpSubPelIdx = -1;
+#if JVET_AG0136_INTRA_TMP_LIC
+  tmpLicFlag   = false;
+#endif
 #endif
 #endif
 #if JVET_W0123_TIMD_FUSION
@@ -575,6 +601,10 @@ void CodingUnit::initData()
   sgpmSplitDir = -1;
   sgpmMode0    = -1;
   sgpmMode1    = -1;
+#if JVET_AG0152_SGPM_ITMP_IBC
+  sgpmBv0      = Mv(0,0);
+  sgpmBv1      = Mv(0,0);
+#endif
 #endif
 #if JVET_AG0058_EIP
   eipFlag = false;
