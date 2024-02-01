@@ -9210,6 +9210,9 @@ void CABACWriter::tmp_flag(const CodingUnit& cu)
       {
         m_BinEncoder.encodeBinEP(tmpFusionIdx > 1 ? 1 : 0);
       }
+#if JVET_AG0136_INTRA_TMP_LIC
+      m_BinEncoder.encodeBin(cu.tmpLicFlag, Ctx::TmpLic(0));
+#endif
       DTRACE(g_trace_ctx, D_SYNTAX, "tmp_fusion_idx() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.tmpIdx);
     }
     else
@@ -9244,7 +9247,24 @@ void CABACWriter::tmp_flag(const CodingUnit& cu)
       m_BinEncoder.encodeBin(cu.tmpFlmFlag, Ctx::TmpFusion(3));
       DTRACE(g_trace_ctx, D_SYNTAX, "tmp_flm_flag() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y,
              cu.tmpFlmFlag);
+#if JVET_AG0136_INTRA_TMP_LIC
       if (!cu.tmpFlmFlag)
+      {
+        m_BinEncoder.encodeBin(cu.tmpLicFlag, Ctx::TmpLic(0));
+        DTRACE(g_trace_ctx, D_SYNTAX, "tmpLicFlag() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.tmpLicFlag);
+        if (cu.slice->getSPS()->getItmpLicExtension() && cu.tmpLicFlag)
+        {
+          const int bin1 = (cu.ibcLicIdx == IBC_LIC_IDX) || (cu.ibcLicIdx == IBC_LIC_IDX_M) ? 0 : 1;
+          const int bin2 = (cu.ibcLicIdx == IBC_LIC_IDX) || (cu.ibcLicIdx == IBC_LIC_IDX_T) ? 0 : 1;
+          m_BinEncoder.encodeBin(bin1, Ctx::ItmpLicIndex(0));
+          m_BinEncoder.encodeBin(bin2, Ctx::ItmpLicIndex(1));
+          DTRACE(g_trace_ctx, D_SYNTAX, "tmp_lic_idx=%d\n", cu.ibcLicIdx);
+        }
+      }
+      if (!cu.tmpFlmFlag && !cu.tmpLicFlag)
+#else
+      if (!cu.tmpFlmFlag)
+#endif
       {
         m_BinEncoder.encodeBin(cu.tmpIsSubPel != 0 ? 1 : 0, Ctx::TmpFlag(4));
         if (cu.tmpIsSubPel)

@@ -1570,6 +1570,10 @@ private:
 #if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
   bool              m_ibcNonAdjCand;
 #endif
+#if JVET_AG0136_INTRA_TMP_LIC
+  bool              m_itmpLicExtension;
+  bool              m_itmpLicMode;
+#endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   bool              m_DMVDMode;
 #endif
@@ -2208,6 +2212,12 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
   void                    setUseIbcNonAdjCand(bool b)                                                     { m_ibcNonAdjCand = b; }
   bool                    getUseIbcNonAdjCand() const                                                     { return m_ibcNonAdjCand; }
+#endif
+#if JVET_AG0136_INTRA_TMP_LIC
+  void                    setItmpLicExtension(bool b)                                                     { m_itmpLicExtension = b; }
+  bool                    getItmpLicExtension() const                                                     { return m_itmpLicExtension; }
+  void                    setItmpLicMode(bool b)                                                     { m_itmpLicMode = b; }
+  bool                    getItmpLicMode() const                                                     { return m_itmpLicMode; }
 #endif
 
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR

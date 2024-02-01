@@ -3707,6 +3707,9 @@ SPS::SPS()
 #if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
   , m_ibcNonAdjCand           ( false )
 #endif
+#if JVET_AG0136_INTRA_TMP_LIC
+  , m_itmpLicExtension        ( false )
+#endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
  , m_DMVDMode                 ( false )
 #endif

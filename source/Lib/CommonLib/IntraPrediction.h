@@ -378,6 +378,9 @@ private:
   Pel* m_cflmBuf[3];
 #endif
   MatrixIntraPrediction m_matrixIntraPred;
+#if JVET_AG0136_INTRA_TMP_LIC
+  std::array<std::array<std::array<int, 7>, MTMP_NUM>, 4> m_memLicParams;
+#endif
 
 
 
@@ -402,6 +405,10 @@ protected:
 #if JVET_AD0086_ENHANCED_INTRA_TMP
   static_vector<TempLibFast, MTMP_NUM> m_mtmpCandList;
   static_vector<uint64_t, MTMP_NUM>    m_mtmpCostList;
+#if JVET_AG0136_INTRA_TMP_LIC
+  static_vector<TempLibFast, MTMP_NUM> m_mtmpCandListUseMR;
+  static_vector<uint64_t, MTMP_NUM>    m_mtmpCostListUseMR;
+#endif
 #else
   TempLibFast  m_tempLibFast;
 #endif
@@ -416,12 +423,25 @@ protected:
 #if JVET_AD0086_ENHANCED_INTRA_TMP
   int                m_tmpXdisp[MTMP_NUM];
   int                m_tmpYdisp[MTMP_NUM];
+#if JVET_AG0136_INTRA_TMP_LIC
+  int                m_tmpXdispUseMR[MTMP_NUM];
+  int                m_tmpYdispUseMR[MTMP_NUM];
+#endif
   IntraTMPFusionInfo m_tmpFusionInfo[TMP_GROUP_IDX << 1];
+#if JVET_AG0136_INTRA_TMP_LIC
+  IntraTMPFusionInfo m_tmpFusionInfoUseMR[TMP_GROUP_IDX << 1];
+#endif
 #else
   int            m_tmpXdisp;
   int            m_tmpYdisp;
 #endif
   int            m_tmpNumCand;
+#if JVET_AG0136_INTRA_TMP_LIC
+  int            m_tmpNumCandUseMR;
+#endif
+#endif
+#if JVET_AG0136_INTRA_TMP_LIC
+  Pel m_memOffsetsFusionUseMR[3][TMP_FUSION_NUM];
 #endif
 
   // prediction
@@ -492,6 +512,9 @@ protected:
 #if JVET_AE0078_IBC_LIC_EXTENSION
 public:
 #endif
+#if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
+  std::vector<Mv> m_bvBasedMergeCandidates;
+#endif
 #if LMS_LINEAR_MODEL && MMLM
   struct MMLMParameters
   {
@@ -501,6 +524,9 @@ public:
   };
   int xCalcLMParametersGeneralized(int x, int y, int xx, int xy, int count, int bitDepth, int &a, int &b, int &iShift);
   int xLMSampleClassifiedTraining (int count, int mean, int meanC, int lumaSamples[], int chrmSamples[], int bitDepth, MMLMParameters parameters[]);
+#if JVET_AG0136_INTRA_TMP_LIC
+  std::array<int, 7>& getMemLicParams(const int licIdc, const int idx) { return m_memLicParams[licIdc][idx]; }
+#endif
 #endif
 #if JVET_AE0078_IBC_LIC_EXTENSION
 protected:
@@ -669,6 +695,10 @@ public:
     , const ChannelType channelType
 #endif
   );
+#if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
+  void predTimdIbcItmp(const ComponentID compId, const PredictionUnit& pu, Mv Bv, Pel* pPred, uint32_t uiStride, uint32_t iWidth, uint32_t iHeight, TemplateType eTempType, int32_t iTemplateWidth, int32_t iTemplateHeight, Pel* piOrg, int orgStride);
+  void predUsingBv(Pel* piPred, unsigned int uiStride, Mv Bv, CodingUnit cu);
+#endif
   void xIntraPredTimdAngLuma(Pel* pDstBuf, const ptrdiff_t dstStride, Pel* refMain, int width, int height, int deltaPos, int intraPredAngle, const ClpRng& clpRng, int xOffset, int yOffset);
 #if JVET_AC0119_LM_CHROMA_FUSION
   void xIntraPredTimdAngChroma(Pel* pDstBuf, const ptrdiff_t dstStride, Pel* refMain, int width, int height, int deltaPos, int intraPredAngle, const ClpRng& clpRng, int xOffset, int yOffset);
@@ -687,6 +717,9 @@ public:
   void initPredTimdIntraParams    (const PredictionUnit & pu, const CompArea area, int dirMode);
 #endif
   void predTimdIntraAng           ( const ComponentID compId, const PredictionUnit &pu, uint32_t uiDirMode, Pel* pPred, uint32_t uiStride, uint32_t iWidth, uint32_t iHeight, TemplateType eTempType, int32_t iTemplateWidth, int32_t iTemplateHeight);
+#if JVET_AG0146_DIMD_ITMP_IBC
+  int getBestNonAnglularMode(const CPelBuf& recoBuf, const CompArea& area, CodingUnit& cu, std::vector<Mv> BVs);
+#endif
 #if JVET_AB0155_SGPM
   int deriveTimdMode              ( const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu, bool bFull = true, bool bHorVer = false );
 #else
@@ -715,6 +748,9 @@ public:
 #endif
 #if JVET_AD0085_MPM_SORTING
   void deriveMPMSorted(const PredictionUnit& pu, uint8_t* mpm, int& sortedSize, int iStartIdx);
+#endif
+#if JVET_AG0136_INTRA_TMP_LIC
+  void setBvMvFromMemory(const CodingUnit& cu, const int idx, const bool useMR);
 #endif
 #if TMP_FAST_ENC && JVET_AD0086_ENHANCED_INTRA_TMP
   int64_t            m_tmpFlmParams[TMP_FLM_PARAMS][MTMP_NUM];
@@ -897,10 +933,24 @@ public:
 #if JVET_V0130_INTRA_TMP
 #if JVET_W0069_TMP_BOUNDARY
 #if JVET_AD0086_ENHANCED_INTRA_TMP
-  void(*m_calcTemplateDiff)      (Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int *diff, int *iMax, RefTemplateType TempType, int requiredTemplate);
+#if JVET_AG0136_INTRA_TMP_LIC
+  void (*m_calcTemplateDiffJointSadMrsad) (const Pel* const ref, const unsigned int uiStride, Pel** tarPatch, const unsigned int uiPatchWidth, const unsigned int uiPatchHeight, int* diffSad, int* diffMrsad, int* iMaxSad, int* iMaxMrsad, const RefTemplateType tempType, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, const int topTargetMean, const int leftTargetMean);
+  void(*m_calcTargetMean)           (Pel** tarPatch, const unsigned int uiPatchWidth, const unsigned int uiPatchHeight, const RefTemplateType tempType, const int requiredTemplate, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, int& topTargetMean, int& leftTargetMean);
+  static void calcTemplateDiffJointSadMrsad(const Pel* const ref, const unsigned int uiStride, Pel** tarPatch, const unsigned int uiPatchWidth, const unsigned int uiPatchHeight, int* diffSad, int* diffMrsad, int* iMaxSad, int* iMaxMrsad, const RefTemplateType tempType, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, const int topTargetMean, const int leftTargetMean);
+  static void calcTargetMean(Pel** tarPatch, const unsigned int uiPatchWidth, const unsigned int uiPatchHeight, const RefTemplateType tempType, const int requiredTemplate, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, int& topTargetMean, int& leftTargetMean);
+#endif
+  void(*m_calcTemplateDiff)      (Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int *diff, int *iMax, RefTemplateType TempType, int requiredTemplate
+#if JVET_AG0136_INTRA_TMP_LIC
+                                  , const bool isMrSad, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, const int topTargetMean, const int leftTargetMean
+#endif
+                                  );
   static void calcTemplateDiff(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsigned int uiPatchWidth,
                                unsigned int uiPatchHeight, int *diff, int *iMax, RefTemplateType TempType,
-                               int requiredTemplate);
+                               int requiredTemplate
+#if JVET_AG0136_INTRA_TMP_LIC
+                               , const bool isMrSad, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, const int topTargetMean, const int leftTargetMean
+#endif
+                               );
 #else
   int( *m_calcTemplateDiff )      ( Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int iMax, RefTemplateType TempType );
   static int calcTemplateDiff     ( Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int iMax, RefTemplateType TempType );
@@ -917,33 +967,69 @@ public:
 
 #if JVET_W0069_TMP_BOUNDARY
   RefTemplateType getRefTemplateType ( CodingUnit& cu, CompArea& area );
-  void searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, RefTemplateType tempType );
-  void candidateSearchIntra          ( CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType );
+  void searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, RefTemplateType tempType
+#if JVET_AG0136_INTRA_TMP_LIC
+                                      , const bool useMR
+#endif
+#if JVET_AG0136_INTRA_TMP_LIC || (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
+                                      , const bool bJointCalc
+#endif
+                                      );
+  void candidateSearchIntra          ( CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType
+#if JVET_AG0136_INTRA_TMP_LIC || (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
+                                      , const bool bJointCalc
+#endif
+                                      );
 #else
   void searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, );
   void candidateSearchIntra          ( CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight );
 #endif
 #if JVET_AD0086_ENHANCED_INTRA_TMP
   void convertDiff2Weight            (int *pDiff, int *weights, const int start, const int foundCandiNum);
-  int  xCalTMPFusionNumber           (const int maxNum, const int numIdx);
-  void xTMPBuildFusionCandidate      (CodingUnit &cu, RefTemplateType tempType);
+  int  xCalTMPFusionNumber           (const int maxNum, const int numIdx
+#if JVET_AG0136_INTRA_TMP_LIC
+                                      , const bool useMR
+#endif
+                                      );
+  void xTMPBuildFusionCandidate      (CodingUnit &cu, RefTemplateType tempType
+#if JVET_AG0136_INTRA_TMP_LIC
+                                      , const bool useMR
+#endif
+                                      );
 
   void xCalcTmpFlmRefArea            (CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType, bool& leftPadding, bool& rightPadding, bool& abovePadding, bool& belowPadding);
   void xGetTmpFlmRefBuf              (CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType);
   void xCalTmpFlmParam               (CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType);
   void xGenerateTmpFlmPred           (PelBuf& piPred, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType, CodingUnit* pcCU, bool bDeriveDimdMode = true);
 
-  void xTMPFusionCalcParams          (CodingUnit* cu, CompArea area, CccmModel& tmpFusionModel, int foundCandiNum, RefTemplateType tempType, Pel* curPointTemplate, Pel* refPointTemplate[]);
-  void xTMPFusionCalcModels          (CodingUnit* cu, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType);
-  void xTMPFusionApplyModel          (PelBuf& piPred, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType, CodingUnit* pcCU, bool bDeriveDimdMode = true);
+  void xTMPFusionCalcParams          (CodingUnit* cu, CompArea area, CccmModel& tmpFusionModel, int foundCandiNum, RefTemplateType tempType, Pel* curPointTemplate, Pel* refPointTemplate[]
+#if JVET_AG0136_INTRA_TMP_LIC
+                                      , const bool useMR, const int* const ptrLicParamsFusion[TMP_BEST_CANDIDATES]
+#endif
+                                      );
+  void xTMPFusionCalcModels          (CodingUnit* cu, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType
+#if JVET_AG0136_INTRA_TMP_LIC
+                                      , const bool useMR
+#endif
+                                      );
+  void xTMPFusionApplyModel          (PelBuf& piPred, unsigned int uiBlkWidth, unsigned int uiBlkHeight, RefTemplateType tempType, CodingUnit* pcCU
+#if JVET_AG0136_INTRA_TMP_LIC
+                                      , const bool useMR
+#endif
+                                      , bool bDeriveDimdMode = true);
 
   void xPadForInterpolation          (CodingUnit* pcCU);
 #endif
 
 #if JVET_AD0086_ENHANCED_INTRA_TMP
 #if JVET_AB0061_ITMP_BV_FOR_IBC
-  bool generateTMPrediction          (Pel* piPred, unsigned int uiStride, int& foundCandiNum, PredictionUnit& pu, bool bDeriveDimdMode = true);
+  bool generateTMPrediction          (Pel* piPred, unsigned int uiStride, int& foundCandiNum, PredictionUnit& pu
+#if JVET_AG0136_INTRA_TMP_LIC
+                                      , const bool useMR
 #endif
+                                      , bool bDeriveDimdMode = true);
+#endif
+
 #elif TMP_FAST_ENC
   bool generateTMPrediction          (Pel* piPred, unsigned int uiStride, CompArea area, int& foundCandiNum, CodingUnit* cu);
 #if JVET_AB0061_ITMP_BV_FOR_IBC
@@ -973,7 +1059,14 @@ public:
     {
       m_tmpXdisp[i] = 0;
       m_tmpYdisp[i] = 0;
+#if JVET_AG0136_INTRA_TMP_LIC
+      m_tmpXdispUseMR[i] = 0;
+      m_tmpYdispUseMR[i] = 0;
+#endif
     }
+#if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
+    m_bvBasedMergeCandidates.clear();
+#endif
   }
   void initTmpFlmParams()
   {
@@ -990,6 +1083,9 @@ public:
     for (int i = 0; i < TMP_GROUP_IDX << 1; i++)
     {
       m_tmpFusionInfo[i] = IntraTMPFusionInfo{ false, false, 0, 1 };
+#if JVET_AG0136_INTRA_TMP_LIC
+      m_tmpFusionInfoUseMR[i] = IntraTMPFusionInfo{ false, false, 0, 1 };
+#endif
     }
   }
 #elif TMP_FAST_ENC
@@ -997,7 +1093,12 @@ public:
     m_tmpYdisp = 0;
 #endif
 #if TMP_FAST_ENC
+#if JVET_AG0136_INTRA_TMP_LIC
+    int getTmpNumCand() const { return m_tmpNumCand; }
+    int getTmpNumCandUseMR() const { return m_tmpNumCandUseMR; }
+#else
     int getTmpNumCand() { return m_tmpNumCand; }
+#endif
 #endif
 
 #ifdef TARGET_SIMD_X86

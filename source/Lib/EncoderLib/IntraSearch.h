@@ -232,6 +232,10 @@ private:
     int      tmpIdx;
     bool     tmpFusionFlag;
     bool     tmpFlmFlag;
+#if JVET_AG0136_INTRA_TMP_LIC
+    bool tmpLicFlag;
+    uint8_t tmpLicIdc;
+#endif
     int      tmpIsSubPel;
     int      tmpSubPelIdx;
 #endif
@@ -242,20 +246,40 @@ private:
     int      sgpmMode0;
     int      sgpmMode1;
     int      sgpmIdx;
+#if JVET_AG0152_SGPM_ITMP_IBC
+    Mv       sgpmBv0;
+    Mv       sgpmBv1;
+#endif
 #endif
 #if JVET_AB0155_SGPM
 #if JVET_V0130_INTRA_TMP
     ModeInfo() : mipFlg( false ), mipTrFlg( false ), mRefId( 0 ), ispMod( NOT_INTRA_SUBPARTITIONS ), modeId( 0 ), tmpFlag( 0 )
 #if JVET_AD0086_ENHANCED_INTRA_TMP
+#if JVET_AG0136_INTRA_TMP_LIC
+      , tmpIdx(0) , tmpFusionFlag(false) , tmpFlmFlag(false) , tmpLicFlag(false) , tmpLicIdc(0), tmpIsSubPel(0), tmpSubPelIdx(0)
+#else
       , tmpIdx(0) , tmpFusionFlag(false) , tmpFlmFlag(false) , tmpIsSubPel(0), tmpSubPelIdx(0)
 #endif
-	, sgpmFlag( 0 ), sgpmSplitDir( 0 ), sgpmMode0( 0 ), sgpmMode1( 0 ), sgpmIdx( 0 ) {}
+#endif
+	, sgpmFlag( 0 ), sgpmSplitDir( 0 ), sgpmMode0( 0 ), sgpmMode1( 0 ), sgpmIdx( 0 ) 
+#if JVET_AG0152_SGPM_ITMP_IBC
+  , sgpmBv0(0, 0), sgpmBv1(0, 0)
+#endif
+{}
     ModeInfo(const bool mipf, const bool miptf, const int mrid, const uint8_t ispm, const uint32_t mode,
              const bool tmpf = 0
 #if JVET_AD0086_ENHANCED_INTRA_TMP
+#if JVET_AG0136_INTRA_TMP_LIC
+      , const int tmpi = 0 , const bool tmpff = 0  , const int tmpflmf = 0 , const int tmpLic = 0 , const int tmpLicIdc = 0 , const int tmpsp = 0, const int tmpspi = 0
+#else
       , const int tmpi = 0 , const bool tmpff = 0  , const int tmpflmf = 0 , const int tmpsp = 0, const int tmpspi = 0
 #endif
-	  , const bool sf = 0, const int sd = 0, const int sm0 = 0, const int sm1 = 0, const int si = 0 )
+#endif
+	  , const bool sf = 0, const int sd = 0, const int sm0 = 0, const int sm1 = 0, const int si = 0 
+#if JVET_AG0152_SGPM_ITMP_IBC
+    , const Mv sbv0 = Mv(0, 0), const Mv sbv1 = Mv(0, 0)
+#endif
+)
 #else
     ModeInfo() : mipFlg(false), mipTrFlg(false), mRefId(0), ispMod(NOT_INTRA_SUBPARTITIONS), modeId(0), sgpmFlag(0), sgpmSplitDir(0), sgpmMode0(0), sgpmMode1(0), sgpmIdx(0){}
     ModeInfo(const bool mipf, const bool miptf, const int mrid, const uint8_t ispm, const uint32_t mode,
@@ -270,13 +294,21 @@ private:
       , tmpFlag(tmpf)
 #endif
 #if JVET_AD0086_ENHANCED_INTRA_TMP
+#if JVET_AG0136_INTRA_TMP_LIC
+      , tmpIdx(tmpi) , tmpFusionFlag(tmpff) , tmpFlmFlag(tmpflmf) , tmpLicFlag(tmpLic) , tmpLicIdc(tmpLicIdc) ,tmpIsSubPel(tmpsp) , tmpSubPelIdx(tmpspi)
+#else
       , tmpIdx(tmpi) , tmpFusionFlag(tmpff) , tmpFlmFlag(tmpflmf) , tmpIsSubPel(tmpsp) , tmpSubPelIdx(tmpspi)
+#endif
 #endif
       , sgpmFlag(sf)
       , sgpmSplitDir(sd)
       , sgpmMode0(sm0)
       , sgpmMode1(sm1)
       , sgpmIdx(si)
+#if JVET_AG0152_SGPM_ITMP_IBC
+      , sgpmBv0(sbv0)
+      , sgpmBv1(sbv1)
+#endif
     {
     }
     ModeInfo &operator=(const ModeInfo &other)
@@ -293,6 +325,10 @@ private:
       tmpIdx        = other.tmpIdx;
       tmpFusionFlag = other.tmpFusionFlag;
       tmpFlmFlag    = other.tmpFlmFlag;
+#if JVET_AG0136_INTRA_TMP_LIC
+      tmpLicFlag    = other.tmpLicFlag;
+      tmpLicIdc     = other.tmpLicIdc;
+#endif
       tmpIsSubPel   = other.tmpIsSubPel;    // CU::tmpIsSubPel
       tmpSubPelIdx  = other.tmpSubPelIdx;   // CU::tmpSubPelIdx
 #endif
@@ -301,6 +337,10 @@ private:
       sgpmMode0    = other.sgpmMode0;
       sgpmMode1    = other.sgpmMode1;
       sgpmIdx      = other.sgpmIdx;
+#if JVET_AG0152_SGPM_ITMP_IBC
+      sgpmBv0 = other.sgpmBv0;
+      sgpmBv1 = other.sgpmBv1;
+#endif
       return *this;
     }
     bool operator==(const ModeInfo cmp) const
@@ -314,6 +354,10 @@ private:
                 && tmpIdx == cmp.tmpIdx
                 && tmpFusionFlag == cmp.tmpFusionFlag
                 && tmpFlmFlag == cmp.tmpFlmFlag
+#if JVET_AG0136_INTRA_TMP_LIC
+                && tmpLicFlag == cmp.tmpLicFlag
+                && tmpLicIdc == cmp.tmpLicIdc
+#endif
                 && tmpIsSubPel == cmp.tmpIsSubPel
                 && tmpSubPelIdx == cmp.tmpSubPelIdx
 #endif
@@ -337,12 +381,20 @@ private:
 #if JVET_AB0155_SGPM && JVET_V0130_INTRA_TMP
     ModeInfoWithCost(const bool mipf, const bool miptf, const int mrid, const uint8_t ispm, const uint32_t mode, const bool tpmf, 
 #if JVET_AD0086_ENHANCED_INTRA_TMP
+#if JVET_AG0136_INTRA_TMP_LIC
+      const int tmpi, const bool tmpff, const int tmpflmf,  const int tmpLicItmp, const int tmpLicIdc, const int tmpsp, const int tmpspi,
+#else
                      const int tmpi, const bool tmpff, const int tmpflmf,  const int tmpsp, const int tmpspi,
+#endif
 #endif
 					 double cost, const bool sf = 0, const int sd = 0, const int sm0 = 0, const int sm1 = 0)
       : ModeInfo(mipf, miptf, mrid, ispm, mode, tpmf
 #if JVET_AD0086_ENHANCED_INTRA_TMP
+#if JVET_AG0136_INTRA_TMP_LIC
+        ,tmpi ,tmpff ,tmpflmf , tmpLicItmp, tmpLicIdc, tmpsp, tmpspi
+#else
         ,tmpi ,tmpff ,tmpflmf , tmpsp, tmpspi
+#endif
 #endif
 	  , sf, sd, sm0, sm1), rdCost(cost)
     {
@@ -355,6 +407,10 @@ private:
       && tmpIdx == cmp.tmpIdx
       && tmpFusionFlag == cmp.tmpFusionFlag
       && tmpFlmFlag == cmp.tmpFlmFlag
+#if JVET_AG0136_INTRA_TMP_LIC
+      && tmpLicFlag == cmp.tmpLicFlag
+      && tmpLicIdc == cmp.tmpLicIdc
+#endif
       && tmpIsSubPel == cmp.tmpIsSubPel
       && tmpSubPelIdx == cmp.tmpSubPelIdx
 #endif
@@ -535,10 +591,17 @@ private:
   static_vector<double, SGPM_NUM>   m_dSavedModeCostSGPM;
   static_vector<double, SGPM_NUM>   m_dSavedHadListSGPM;
 
+#if JVET_AG0152_SGPM_ITMP_IBC
+  Pel* m_intraPredBuf[NUM_LUMA_MODE + SGPM_NUM_BVS];
+  Pel* m_sgpmPredBuf[SGPM_NUM];
+  uint8_t         m_intraModeReady[NUM_LUMA_MODE + SGPM_NUM_BVS];
+#else
   Pel*            m_intraPredBuf[NUM_LUMA_MODE];
   Pel*            m_sgpmPredBuf[SGPM_NUM];
   uint8_t         m_intraModeReady[NUM_LUMA_MODE];
 #endif
+#endif
+
 #if JVET_AG0058_EIP
   Pel* m_eipPredBuf[NUM_DERIVED_EIP];
   Pel* m_eipMergePredBuf[MAX_MERGE_EIP];
@@ -666,7 +729,11 @@ public:
   double findInterCUCost          ( CodingUnit &cu );
 #endif
 public:
-  bool estIntraPredLumaQT(CodingUnit &cu, Partitioner& pm, const double bestCostSoFar = MAX_DOUBLE, bool mtsCheckRangeFlag = false, int mtsFirstCheckId = 0, int mtsLastCheckId = 0, bool moreProbMTSIdxFirst = false, CodingStructure* bestCS = NULL);
+  bool estIntraPredLumaQT(CodingUnit &cu, Partitioner& pm, const double bestCostSoFar = MAX_DOUBLE, bool mtsCheckRangeFlag = false, int mtsFirstCheckId = 0, int mtsLastCheckId = 0, bool moreProbMTSIdxFirst = false, CodingStructure* bestCS = NULL
+#if JVET_AG0136_INTRA_TMP_LIC
+    , InterPrediction* pcInterPred = nullptr
+#endif
+  );
   void estIntraPredChromaQT       ( CodingUnit &cu, Partitioner& pm, const double maxCostAllowed = MAX_DOUBLE 
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
                                   , InterPrediction* pcInterPred = nullptr
@@ -716,10 +783,18 @@ protected:
   uint64_t xGetIntraFracBitsQTChroma(TransformUnit& tu, const ComponentID &compID);
   void xEncCoeffQT                                 ( CodingStructure &cs, Partitioner& pm, const ComponentID compID, const int subTuIdx = -1, const PartSplit ispType = TU_NO_ISP, CUCtx * cuCtx = nullptr );
 
-  void xIntraCodingTUBlock        (TransformUnit &tu, const ComponentID &compID, Distortion& ruiDist, const int &default0Save1Load2 = 0, uint32_t* numSig = nullptr, std::vector<TrMode>* trModes=nullptr, const bool loadTr=false );
+  void xIntraCodingTUBlock        (TransformUnit &tu, const ComponentID &compID, Distortion& ruiDist, const int &default0Save1Load2 = 0, uint32_t* numSig = nullptr, std::vector<TrMode>* trModes=nullptr, const bool loadTr=false 
+#if JVET_AG0136_INTRA_TMP_LIC
+    , InterPrediction* pcInterPred=nullptr
+#endif
+  );
   void xIntraCodingACTTUBlock(TransformUnit &tu, const ComponentID &compID, Distortion& ruiDist, std::vector<TrMode>* trModes = nullptr, const bool loadTr = false);
 #if JVET_W0103_INTRA_MTS
-  void xSelectAMTForFullRD(TransformUnit &tu);
+  void xSelectAMTForFullRD(TransformUnit &tu
+#if JVET_AG0136_INTRA_TMP_LIC
+    , InterPrediction* pcInterPred=nullptr
+#endif
+  );
   bool testISPforCurrCU(const CodingUnit &cu);
 #endif
   ChromaCbfs xRecurIntraChromaCodingQT( CodingStructure &cs, Partitioner& pm, const double bestCostSoFar = MAX_DOUBLE,                          const PartSplit ispType = TU_NO_ISP 
@@ -730,7 +805,11 @@ protected:
     , InterPrediction* pcInterPred = nullptr
 #endif
   );
-  bool       xRecurIntraCodingLumaQT  ( CodingStructure &cs, Partitioner& pm, const double bestCostSoFar = MAX_DOUBLE, const int subTuIdx = -1, const PartSplit ispType = TU_NO_ISP, const bool ispIsCurrentWinner = false, bool mtsCheckRangeFlag = false, int mtsFirstCheckId = 0, int mtsLastCheckId = 0, bool moreProbMTSIdxFirst = false );
+  bool       xRecurIntraCodingLumaQT  ( CodingStructure &cs, Partitioner& pm, const double bestCostSoFar = MAX_DOUBLE, const int subTuIdx = -1, const PartSplit ispType = TU_NO_ISP, const bool ispIsCurrentWinner = false, bool mtsCheckRangeFlag = false, int mtsFirstCheckId = 0, int mtsLastCheckId = 0, bool moreProbMTSIdxFirst = false 
+#if JVET_AG0136_INTRA_TMP_LIC
+    , InterPrediction* pcInterPred=NULL
+#endif
+  );
   bool       xRecurIntraCodingACTQT(CodingStructure &cs, Partitioner& pm, bool mtsCheckRangeFlag = false, int mtsFirstCheckId = 0, int mtsLastCheckId = 0, bool moreProbMTSIdxFirst = false);
   bool       xIntraCodingLumaISP      ( CodingStructure& cs, Partitioner& pm, const double bestCostSoFar = MAX_DOUBLE );
 

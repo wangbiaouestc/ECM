@@ -876,6 +876,37 @@ const CtxSet ContextSetCfg::TmpFusion = ContextSetCfg::addCtxSet({
   { 118, 115, 118, 125, 133, 119 },
 });
 
+#if JVET_AG0136_INTRA_TMP_LIC
+const CtxSet ContextSetCfg::TmpLic = ContextSetCfg::addCtxSet
+({
+  { CNU },
+  { CNU },
+  { CNU },
+  { DWS },
+  { DWS },
+  { DWS },
+  { DWE },
+  { DWE },
+  { DWE },
+  { DWO },
+  { DWO },
+  });
+
+const CtxSet ContextSetCfg::ItmpLicIndex = ContextSetCfg::addCtxSet
+({
+  { CNU, CNU, },
+  { CNU, CNU, },
+  { CNU, CNU, },
+  { DWS, DWS, },
+  { DWS, DWS, },
+  { DWS, DWS, },
+  { DWE, DWE, },
+  { DWE, DWE, },
+  { DWE, DWE, },
+  { DWO, DWO, },
+  { DWO, DWO, },
+  });
+#endif
 const CtxSet ContextSetCfg::MMLMFlag = ContextSetCfg::addCtxSet({
   { 45 },
   { 45 },

@@ -1067,6 +1067,143 @@ bool CU::isIdxModeValid(const bool &areAboveRightUnavail, const bool &areBelowLe
 }
 #endif
 // PU tools
+#if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
+bool CheckBvAvailable(std::vector<Mv>& pBv, Mv curBv)
+{
+  for (int i = 0; i < pBv.size(); i++)
+  {
+    if (pBv[i] == curBv)
+    {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+void getNeighBv(const PredictionUnit& puOrg, const PredictionUnit* pu, std::vector<Mv>& pBv)
+{
+  if (!pu || ((pu->cu->predMode != MODE_IBC) && (!pu->cu->tmpFlag)))
+  {
+    return;
+  }
+  if (pu && pu->cu->predMode == MODE_IBC)
+  {
+    if (PU::validItmpBv(puOrg, pu->bv.hor, pu->bv.ver))
+    {
+      if (!CheckBvAvailable(pBv, pu->bv))
+      {
+        pBv.push_back(pu->bv);
+      }
+    }
+
+    if (pu->interDir == 3)
+    {
+      Mv bv(pu->mv[REF_PIC_LIST_1]);
+      bv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
+      if (PU::validItmpBv(puOrg, bv.hor, bv.ver))
+      {
+        if (!CheckBvAvailable(pBv, bv))
+        {
+          pBv.push_back(bv);
+        }
+      }
+    }
+
+    return;
+  }
+
+  if (pu && pu->cu->tmpFlag)
+  {
+    if (PU::validItmpBv(puOrg, pu->bv.hor, pu->bv.ver))
+    {
+      if (!CheckBvAvailable(pBv, pu->bv))
+      {
+        pBv.push_back(pu->bv);
+      }
+    }
+    if (pu->cu->tmpIdx > 0
+#if JVET_AG0136_INTRA_TMP_LIC
+      && !pu->cu->tmpLicFlag
+#endif
+      )
+    {
+      Mv bv(pu->cu->tmpXdisp, pu->cu->tmpYdisp);
+
+      if (PU::validItmpBv(puOrg, bv.hor, bv.ver))
+      {
+        if (!CheckBvAvailable(pBv, bv))
+        {
+          pBv.push_back(bv);
+        }
+      }
+    }
+    return;
+  }
+}
+
+int PU::getItmpMergeCandidate(const PredictionUnit& pu, std::vector<Mv>& pBvs)
+{
+  const CompArea area = pu.Y();
+  const Position topLeft = area.topLeft();
+  const ChannelType ch = pu.chType;
+
+  getNeighBv(pu, (pu.cs->getPURestricted(topLeft.offset(-1, pu.Y().height - 1), pu, ch)), pBvs);
+  getNeighBv(pu, (pu.cs->getPURestricted(topLeft.offset(pu.Y().width - 1, -1), pu, ch)), pBvs);
+  getNeighBv(pu, (pu.cs->getPURestricted(topLeft.offset(-1, -1), pu, ch)), pBvs);
+  getNeighBv(pu, (pu.cs->getPURestricted(topLeft.offset(pu.Y().width, -1), pu, ch)), pBvs);
+  getNeighBv(pu, (pu.cs->getPURestricted(topLeft.offset(-1, pu.Y().height), pu, ch)), pBvs);
+
+  int offsetX = 0;
+  int offsetY = 0;
+  const int numNACandidate[4] = { 3, 5, 5, 5 };
+  const int idxMap[4][5] = { { 0, 1, 4 },{ 0, 1, 2, 3, 4 },{ 0, 1, 2, 3, 4 },{ 0, 1, 2, 3, 4 } };
+  for (int iDistanceIndex = 0; iDistanceIndex < NADISTANCE_LEVEL; iDistanceIndex++)
+  {
+    const int iNADistanceHor = pu.Y().width * (iDistanceIndex + 1);
+    const int iNADistanceVer = pu.Y().height * (iDistanceIndex + 1);
+
+    for (int iNASPIdx = 0; iNASPIdx < numNACandidate[iDistanceIndex]; iNASPIdx++)
+    {
+      switch (idxMap[iDistanceIndex][iNASPIdx])
+      {
+      case 0:offsetX = -iNADistanceHor - 1; offsetY = pu.Y().height + iNADistanceVer - 1; break;
+      case 1:offsetX = pu.Y().width + iNADistanceHor - 1; offsetY = -iNADistanceVer - 1; break;
+      case 2:offsetX = pu.Y().width >> 1;   offsetY = -iNADistanceVer - 1;    break;
+      case 3:offsetX = -iNADistanceHor - 1; offsetY = pu.Y().height >> 1; break;
+      case 4:offsetX = -iNADistanceHor - 1; offsetY = -iNADistanceVer - 1;    break;
+      default: printf("error!"); exit(0); break;
+      }
+      getNeighBv(pu, pu.cs->getPURestricted(topLeft.offset(offsetX, offsetY), pu, ch), pBvs);
+    }
+  }
+
+  return (int)pBvs.size();
+}
+
+bool PU::checkValidIntraTmpMergeCand(const PredictionUnit& pu, Mv Bv)
+{
+  return validItmpBv(pu, Bv.hor, Bv.ver);
+}
+
+bool PU::validItmpBv(const PredictionUnit& pu, int tmpXdisp, int tmpYdisp)
+{
+  const int x = pu.lx();
+  const int y = pu.ly();
+  const int w = pu.lwidth();
+  const int h = pu.lheight();
+  const Position p1(x + tmpXdisp + w - 1, y + tmpYdisp + h - 1);
+  if (!pu.cs->isDecomp(p1, CHANNEL_TYPE_LUMA))
+  {
+    return 0;
+  }
+  const Position p2(x + tmpXdisp - TMP_TEMPLATE_SIZE, y + tmpYdisp - TMP_TEMPLATE_SIZE);
+  if (!pu.cs->isDecomp(p2, CHANNEL_TYPE_LUMA))
+  {
+    return 0;
+  }
+  return 1;
+}
+#endif
 
 #if SECONDARY_MPM
 int PU::getIntraMPMs( const PredictionUnit &pu, uint8_t* mpm, uint8_t* non_mpm
@@ -4205,8 +4342,20 @@ uint32_t PU::getIntraDirLuma(const PredictionUnit &pu, const int partIdx)
   {
     if (partIdx)
     {
+#if JVET_AG0152_SGPM_ITMP_IBC
+      if (pu.cu->sgpm && pu.cu->sgpmMode1 >= SGPM_BV_START_IDX)
+      {
+        return 0;
+      }
+#endif
       return pu.intraDir1[CHANNEL_TYPE_LUMA];
     }
+#if JVET_AG0152_SGPM_ITMP_IBC
+    if (pu.cu->sgpm && pu.cu->sgpmMode0 >= SGPM_BV_START_IDX)
+    {
+      return 0;
+    }
+#endif
     return pu.intraDir[CHANNEL_TYPE_LUMA];
   }
 }
@@ -21375,7 +21524,11 @@ void PU::spanMotionInfo( PredictionUnit &pu, const MergeCtx &mrgCtx )
     mi.usesLIC = pu.cu->licFlag;
 #endif
 #if JVET_AC0112_IBC_LIC
+#if JVET_AG0136_INTRA_TMP_LIC
+    mi.useIbcLic = mi.isIBCmot ? (pu.cu->ibcLicFlag || pu.cu->tmpLicFlag): 0;
+#else
     mi.useIbcLic = mi.isIBCmot ? pu.cu->ibcLicFlag : 0;
+#endif
 #endif
 #if JVET_AE0159_FIBC
     mi.useIbcFilter = mi.isIBCmot ? pu.cu->ibcFilterFlag : false;
@@ -21706,6 +21859,16 @@ void PU::spanIpmInfoSgpm(PredictionUnit &pu)
 {
   int sgpmMode0 = pu.cu->sgpmMode0;
   int sgpmMode1 = pu.cu->sgpmMode1;
+#if JVET_AG0152_SGPM_ITMP_IBC
+  if (sgpmMode0 >= SGPM_BV_START_IDX)
+  {
+    sgpmMode0 = 0;
+  }
+  if (sgpmMode1 >= SGPM_BV_START_IDX)
+  {
+    sgpmMode1 = 0;
+  }
+#endif
   int splitDir  = pu.cu->sgpmSplitDir;
 
   int16_t angle = g_geoParams[splitDir][0];

@@ -180,6 +180,11 @@ namespace CU
 // PU tools
 namespace PU
 {
+#if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
+  int  getItmpMergeCandidate      (const PredictionUnit& pu, std::vector<Mv>& pBvs);
+  bool validItmpBv                (const PredictionUnit& pu, int tmpXdisp, int tmpYdisp);
+  bool checkValidIntraTmpMergeCand(const PredictionUnit& pu, Mv Bv);
+#endif
 #if JVET_AD0184_REMOVAL_OF_DIVISION_OPERATIONS
   int getMeanValue(int sum, int div);
 #endif
