@@ -1501,6 +1501,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_W0066_CCSAO
   ("CCSAO",                                           m_CCSAO,                                           true, "Cross-component Sample Adaptive Offset" )
 #endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  ("AlfPrecision",                                    m_alfPrecision,                                    true, "Luma Alf with variable precision coefficients" )
+#endif
   ("TestSAODisableAtPictureLevel",                    m_bTestSAODisableAtPictureLevel,                  false, "Enables the testing of disabling SAO at the picture level after having analysed all blocks")
   ("SaoEncodingRate",                                 m_saoEncodingRate,                                 0.75, "When >0 SAO early picture termination is enabled for luma and chroma")
   ("SaoEncodingRateChroma",                           m_saoEncodingRateChroma,                            0.5, "The SAO early picture termination rate to use for chroma (when m_SaoEncodingRate is >0). If <=0, use results for luma")
