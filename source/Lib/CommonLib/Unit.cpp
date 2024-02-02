@@ -873,23 +873,6 @@ uint8_t CodingUnit::getSbtTuSplit() const
   return sbtTuSplitType;
 }
 
-#if JVET_AG0143_INTER_INTRA
-bool CodingUnit::getSwitchCondition(ChannelType channelType) const
-{
-  bool            condition     = 
-    predMode == MODE_INTRA && slice->getSliceType() != I_SLICE && 
-      ((!tmpFlag && channelType == CHANNEL_TYPE_LUMA)||(channelType == CHANNEL_TYPE_CHROMA && firstPU->intraDir[1] != DBV_CHROMA_IDX));
- assert(slice->getSliceType() != I_SLICE || channelType == chType);
-  int tmpMaxSize = cs->sps->getIntraTMPMaxSize();
-  condition = condition || (predMode == MODE_IBC && channelType == CHANNEL_TYPE_LUMA && slice->getSliceType() == I_SLICE)
-    || (predMode == MODE_INTRA && ((channelType == CHANNEL_TYPE_LUMA && tmpFlag && !bdpcmMode && !dimd
-      && lwidth() <= tmpMaxSize && lheight() <= tmpMaxSize) || 
-      (channelType == CHANNEL_TYPE_CHROMA && firstPU->intraDir[1] == DBV_CHROMA_IDX)) && slice->getSliceType() == I_SLICE);
-  return condition;
-}
-#endif
-
-
 // ---------------------------------------------------------------------------
 // prediction unit method definitions
 // ---------------------------------------------------------------------------

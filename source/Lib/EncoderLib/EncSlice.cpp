@@ -2499,7 +2499,6 @@ void EncSlice::encodeSlice   ( Picture* pcPic, OutputBitstream* pcSubstreams, ui
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   static Ctx storedCtx;
 #endif
-
   // for every CTU in the slice...
   for( uint32_t ctuIdx = 0; ctuIdx < pcSlice->getNumCtuInSlice(); ctuIdx++ )
   {
@@ -2615,7 +2614,6 @@ void EncSlice::encodeSlice   ( Picture* pcPic, OutputBitstream* pcSubstreams, ui
       uiSubStrm++;
     }
   } // CTU-loop
-
   if(pcSlice->getPPS()->getCabacInitPresentFlag())
   {
     m_encCABACTableIdx = m_CABACWriter->getCtxInitId( *pcSlice );

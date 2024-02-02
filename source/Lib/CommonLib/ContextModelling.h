@@ -51,7 +51,6 @@
 
 #include <bitset>
 
-
 struct CoeffCodingContext
 {
 public:
@@ -69,6 +68,20 @@ public:
   bool  isLastSubSet    ()                      { return lastSubSet() == m_subSetId; }
   bool  only1stSigGroup ()                      { return m_sigCoeffGroupFlag.count()-m_sigCoeffGroupFlag[lastSubSet()]==0; }
   void  setScanPosLast  ( int       posLast )   { m_scanPosLast = posLast; }
+#if JVET_AG0143_INTER_INTRA
+  static inline bool getSwitchCondition(const CodingUnit &cu,ChannelType channelType) {
+    bool            condition     =
+      cu.predMode == MODE_INTRA && cu.slice->getSliceType() != I_SLICE &&
+      ((!cu.tmpFlag && channelType == CHANNEL_TYPE_LUMA)||(channelType == CHANNEL_TYPE_CHROMA && cu.firstPU->intraDir[1] != DBV_CHROMA_IDX));
+    assert(cu.slice->getSliceType() != I_SLICE || channelType == cu.chType);
+    int tmpMaxSize = cu.cs->sps->getIntraTMPMaxSize();
+    condition = condition || (cu.predMode == MODE_IBC && channelType == CHANNEL_TYPE_LUMA && cu.slice->getSliceType() == I_SLICE)
+                || (cu.predMode == MODE_INTRA && ((channelType == CHANNEL_TYPE_LUMA && cu.tmpFlag && !cu.bdpcmMode && !cu.dimd
+                                                && cu.lwidth() <= tmpMaxSize && cu.lheight() <= tmpMaxSize) ||
+                                               (channelType == CHANNEL_TYPE_CHROMA && cu.firstPU->intraDir[1] == DBV_CHROMA_IDX)) && cu.slice->getSliceType() == I_SLICE);
+    return condition;
+  }
+#endif
 public:
   ComponentID     compID          ()                        const { return m_compID; }
   int             subSetId        ()                        const { return m_subSetId; }
@@ -99,44 +112,15 @@ public:
   unsigned        posY(int scanPos) const { return m_scan[scanPos].y; }
   unsigned        maxLastPosX     ()                        const { return m_maxLastPosX; }
   unsigned        maxLastPosY     ()                        const { return m_maxLastPosY; }
-#if JVET_AG0143_INTER_INTRA
-  unsigned lastXCtxId(unsigned posLastX, const CodingUnit &cu) const
-  {
-    bool condition = cu.getSwitchCondition(m_chType);
-    if (condition)
-    {
-        return m_ctxSetLastXCtxSetSwitch(m_lastOffsetX + (posLastX >> m_lastShiftX));
-    }
-    else
-    {
-      return m_ctxSetLastX(m_lastOffsetX + (posLastX >> m_lastShiftX));
-    }
-  }
-  unsigned lastYCtxId(unsigned posLastY, const CodingUnit &cu) const
-  {
-    bool condition = cu.getSwitchCondition(m_chType);
-    if (condition)
-    {
-        return m_ctxSetLastYCtxSetSwitch(m_lastOffsetY + (posLastY >> m_lastShiftY));
-    }
-    else
-    {
-      return m_ctxSetLastY(m_lastOffsetY + (posLastY >> m_lastShiftY));
-    }
-  }
-#else
   unsigned        lastXCtxId      ( unsigned  posLastX  )   const { return m_ctxSetLastX( m_lastOffsetX + ( posLastX >> m_lastShiftX ) ); }
   unsigned        lastYCtxId      ( unsigned  posLastY  )   const { return m_ctxSetLastY( m_lastOffsetY + ( posLastY >> m_lastShiftY ) ); }
-#endif
   int             numCtxBins      ()                        const { return   m_remainingContextBins;      }
   void            setNumCtxBins   ( int n )                       {          m_remainingContextBins  = n; }
 #if JVET_AG0143_INTER_INTRA
-  unsigned sigGroupCtxId(bool ts, const CodingUnit &cu) const
+  unsigned sigGroupCtxId(bool ts=false) const
   {
-    bool condition = cu.getSwitchCondition(m_chType);
-    if (condition)
+    if (m_switchCondition)
     {
-      
         return ts ?
           m_sigGroupCtxIdTSSwitch
                   : 
@@ -161,18 +145,9 @@ public:
 #endif
 
 #if JVET_AE0102_LFNST_CTX 
-#if JVET_AG0143_INTER_INTRA
-  unsigned sigCtxIdAbs(int scanPos, const TCoeff *coeff, const int state, const CodingUnit &cu, int lfnstIdx = -1)
-#else  
   unsigned sigCtxIdAbs(int scanPos, const TCoeff* coeff, const int state, int lfnstIdx = -1)
-
-#endif
-#else
-#if JVET_AG0143_INTER_INTRA
-  unsigned sigCtxIdAbs(int scanPos, const TCoeff *coeff, const int state, const CodingUnit &cu)
 #else
   unsigned sigCtxIdAbs( int scanPos, const TCoeff* coeff, const int state )
-#endif
 #endif
   {
     const uint32_t posY      = m_scan[scanPos].y;
@@ -250,36 +225,10 @@ public:
     m_tmplCpDiag = diag;
     m_tmplCpSum1 = sumAbs - numPos;
 
-#if JVET_AG0143_INTER_INTRA
-    bool condition = cu.getSwitchCondition(m_chType);
-#if TCQ_8STATES
-    if (condition) 
-    {
-      return m_sigFlagCtxSetSwitch[state & 3](ctxOfs);
-    }
-    else
-    {
-      return m_sigFlagCtxSet[state & 3](ctxOfs);
-    }
-#else
-    if (condition)
-    {
-      return m_sigFlagCtxSetSwitch[std::max(0, state - 1)](ctxOfs);
-    }
-    else
-    {
-      return m_sigFlagCtxSet[std::max(0, state - 1)](ctxOfs);
-    }
-#endif
-
-
-#else
 #if TCQ_8STATES
     return m_sigFlagCtxSet[state & 3](ctxOfs);
 #else
     return m_sigFlagCtxSet[std::max(0, state - 1)](ctxOfs);
-#endif
-
 #endif
   }
 
@@ -307,107 +256,10 @@ public:
   }
 
 
-#if JVET_AG0143_INTER_INTRA
-  unsigned parityCtxIdAbs(uint8_t offset, const CodingUnit &cu) const
-  {
-    bool condition = cu.getSwitchCondition(m_chType);
-    if (condition)
-    {
-      return m_parFlagCtxSetSwitch(offset);
-    }
-    else
-    {
-      return m_parFlagCtxSet(offset);
-    }
-  }
-#else
   unsigned parityCtxIdAbs   ( uint8_t offset )  const { return m_parFlagCtxSet   ( offset ); }
-#endif
 
-#if JVET_AG0143_INTER_INTRA
 
 #if !JVET_AG0100_TRANSFORM_COEFFICIENT_CODING
-  unsigned greater1CtxIdAbs(uint8_t offset, const CodingUnit &cu) const
-  {
-    bool condition = cu.getSwitchCondition(m_chType);
-    if (condition)
-    {
-      return m_gtxFlagCtxSetSwitch[1](offset);
-    }
-    else
-    {
-      return m_gtxFlagCtxSet[1](offset);
-    }
-  }
-
-  unsigned greater2CtxIdAbs(uint8_t offset, const CodingUnit &cu) const
-  {
-    bool condition = cu.getSwitchCondition(m_chType);
-    if (condition)
-    {
-      return m_gtxFlagCtxSetSwitch[0](offset);
-    }
-    else
-    {
-      return m_gtxFlagCtxSet[0](offset);
-    }
-  }
-#else
-  unsigned greater1CtxIdAbs(uint8_t offset, const CodingUnit &cu) const
-  {
-    bool condition = cu.getSwitchCondition(m_chType);
-    if (condition)
-    {
-      return m_gtxFlagCtxSetSwitch[1](offset);
-    }
-    else
-    {
-      return m_gtxFlagCtxSet[1](offset);
-    }
-  }
-
-  unsigned greater2CtxIdAbs(uint8_t offset, const CodingUnit &cu) const
-  {
-    bool condition = cu.getSwitchCondition(m_chType);
-    if (condition)
-    {
-      return m_gtxFlagCtxSetSwitch[2](offset);
-    }
-    else
-    {
-      return m_gtxFlagCtxSet[2](offset);
-    }
-  }
-  unsigned greater3CtxIdAbs(uint8_t offset, const CodingUnit &cu) const
-  {
-    bool condition = cu.getSwitchCondition(m_chType);
-    if (condition)
-    {
-      return m_gtxFlagCtxSetSwitch[0](offset);
-    }
-    else
-    {
-      return m_gtxFlagCtxSet[0](offset);
-    }
-  }
-
-  unsigned greater4CtxIdAbs(uint8_t offset, const CodingUnit &cu) const
-  {
-    bool condition = cu.getSwitchCondition(m_chType);
-    if (condition)
-    {
-      return m_gtxFlagCtxSetSwitch[3](offset);
-    }
-    else
-    {
-      return m_gtxFlagCtxSet[3](offset);
-    }
-  }
-#endif
-
-#else
-
-#if !TEST_EE2_3_2
   unsigned greater1CtxIdAbs ( uint8_t offset )  const { return m_gtxFlagCtxSet[1]( offset ); }
   unsigned greater2CtxIdAbs ( uint8_t offset )  const { return m_gtxFlagCtxSet[0]( offset ); }
 #else
@@ -416,39 +268,52 @@ public:
   unsigned greater3CtxIdAbs(uint8_t offset)  const { return m_gtxFlagCtxSet[0](offset); }
   unsigned greater4CtxIdAbs(uint8_t offset)  const { return m_gtxFlagCtxSet[3](offset); }
 #endif
-#endif
+
 
 #if JVET_AE0102_LFNST_CTX
   void updateCtxSets()
   {
+#if JVET_AG0143_INTER_INTRA
+    if(m_switchCondition)
+    {
+      m_sigFlagCtxSet[0] = Ctx::SigFlagCtxSetSwitch[m_chType];
+      m_sigFlagCtxSet[1] = Ctx::SigFlagCtxSetSwitch[m_chType + 2];
+      m_sigFlagCtxSet[2] = Ctx::SigFlagCtxSetSwitch[m_chType];
+      m_sigFlagCtxSet[3] = Ctx::SigFlagCtxSetSwitch[m_chType + 4];
+      m_parFlagCtxSet = Ctx::ParFlagCtxSetSwitch[m_chType];
+      m_gtxFlagCtxSet[0] = Ctx::GtxFlagCtxSetSwitch[m_chType];
+      m_gtxFlagCtxSet[1] = Ctx::GtxFlagCtxSetSwitch[m_chType + 2];
+#if JVET_AG0100_TRANSFORM_COEFFICIENT_CODING
+      m_gtxFlagCtxSet[2] = Ctx::GtxFlagCtxSetSwitch[m_chType + 4];
+      m_gtxFlagCtxSet[3] = Ctx::GtxFlagCtxSetSwitch[m_chType + 6];
+#endif
+    }
+    else
+    {
+      m_sigFlagCtxSet[0] = Ctx::SigFlag[m_chType];
+      m_sigFlagCtxSet[1] = Ctx::SigFlag[m_chType + 2];
+      m_sigFlagCtxSet[2] = Ctx::SigFlag[m_chType];
+      m_sigFlagCtxSet[3] = Ctx::SigFlag[m_chType + 4];
+      m_parFlagCtxSet = Ctx::ParFlag[m_chType];
+      m_gtxFlagCtxSet[0] = Ctx::GtxFlag[m_chType];
+      m_gtxFlagCtxSet[1] = Ctx::GtxFlag[m_chType + 2];
+#if JVET_AG0100_TRANSFORM_COEFFICIENT_CODING
+      m_gtxFlagCtxSet[2] = Ctx::GtxFlag[m_chType + 4];
+      m_gtxFlagCtxSet[3] = Ctx::GtxFlag[m_chType + 6];
+#endif
+    }
+#else
     m_sigFlagCtxSet[0] = Ctx::SigFlag[m_chType];
     m_sigFlagCtxSet[1] = Ctx::SigFlag[m_chType + 2];
     m_sigFlagCtxSet[2] = Ctx::SigFlag[m_chType];
     m_sigFlagCtxSet[3] = Ctx::SigFlag[m_chType + 4];
-
     m_parFlagCtxSet    = Ctx::ParFlag[m_chType];
     m_gtxFlagCtxSet[0] = Ctx::GtxFlag[m_chType];
     m_gtxFlagCtxSet[1] = Ctx::GtxFlag[m_chType + 2];
-
-#if JVET_AG0143_INTER_INTRA
-    m_sigFlagCtxSetSwitch[0] = Ctx::SigFlagCtxSetSwitch[m_chType];
-    m_sigFlagCtxSetSwitch[1] = Ctx::SigFlagCtxSetSwitch[m_chType + 2];
-    m_sigFlagCtxSetSwitch[2] = Ctx::SigFlagCtxSetSwitch[m_chType];
-    m_sigFlagCtxSetSwitch[3] = Ctx::SigFlagCtxSetSwitch[m_chType + 4];
-    m_parFlagCtxSetSwitch    = Ctx::ParFlagCtxSetSwitch[m_chType];
-    m_gtxFlagCtxSetSwitch[0] = Ctx::GtxFlagCtxSetSwitch[m_chType];
-    m_gtxFlagCtxSetSwitch[1] = Ctx::GtxFlagCtxSetSwitch[m_chType + 2];
-#endif
 #if JVET_AG0100_TRANSFORM_COEFFICIENT_CODING
     m_gtxFlagCtxSet[2] = Ctx::GtxFlag[m_chType + 4];
     m_gtxFlagCtxSet[3] = Ctx::GtxFlag[m_chType + 6];
-
-#if JVET_AG0143_INTER_INTRA
-    m_gtxFlagCtxSetSwitch[2] = Ctx::GtxFlagCtxSetSwitch[m_chType + 4];
-    m_gtxFlagCtxSetSwitch[3] = Ctx::GtxFlagCtxSetSwitch[m_chType + 6];
 #endif
-
-
 #endif
 
   }
@@ -559,12 +424,8 @@ public:
     return unsigned(std::max<TCoeff>(std::min<TCoeff>(sum , GTN_MAXSUM-1), 0));
   }
 #endif
-
-#if JVET_AG0143_INTER_INTRA
-  unsigned sigCtxIdAbsTS(int scanPos, const TCoeff *coeff, const CodingUnit &cu)
-#else
-         unsigned sigCtxIdAbsTS(int scanPos, const TCoeff *coeff)
-#endif
+  
+  unsigned sigCtxIdAbsTS(int scanPos, const TCoeff *coeff)
   {
     const uint32_t posY   = m_scan[scanPos].y;
     const uint32_t posX   = m_scan[scanPos].x;
@@ -585,62 +446,15 @@ public:
     }
 #undef UPDATE
 
-#if JVET_AG0143_INTER_INTRA
-    bool condition = cu.getSwitchCondition(m_chType);
-    if (condition)
-    {
-      return m_tsSigFlagCtxSetSwitch(numPos);
-    }
-    else
-    {
-      return m_tsSigFlagCtxSet(numPos);
-    }
-
-#else
     return m_tsSigFlagCtxSet(numPos);
-#endif
   }
 
-#if JVET_AG0143_INTER_INTRA
-  unsigned parityCtxIdAbsTS(const CodingUnit &cu) const
-  {
-    bool condition = cu.getSwitchCondition(m_chType);
-    if (condition)
-    {
-      return m_tsParFlagCtxSetSwitch(0);
-    }
-    else
-    {
-      return m_tsParFlagCtxSet(0);
-    }
-  }
-#else
   unsigned parityCtxIdAbsTS() const { return m_tsParFlagCtxSet(0); }
-#endif
 
-#if JVET_AG0143_INTER_INTRA
-  unsigned greaterXCtxIdAbsTS(uint8_t offset, const CodingUnit &cu) const
-  {
-    bool condition = cu.getSwitchCondition(m_chType);
-    if (condition)
-    {
-      return m_tsGtxFlagCtxSetSwitch(offset);
-    }
-    else
-    {
-      return m_tsGtxFlagCtxSet(offset);
-    }
-  }
-#else
   unsigned greaterXCtxIdAbsTS(uint8_t offset) const { return m_tsGtxFlagCtxSet(offset); }
-#endif
 
 
-#if JVET_AG0143_INTER_INTRA
-  unsigned lrg1CtxIdAbsTS(int scanPos, const TCoeff *coeff, int bdpcm, const CodingUnit &cu)
-#else
   unsigned        lrg1CtxIdAbsTS(int scanPos, const TCoeff *coeff, int bdpcm)
-#endif
   {
     const uint32_t posY = m_scan[scanPos].y;
     const uint32_t posX = m_scan[scanPos].x;
@@ -668,19 +482,7 @@ public:
       }
     }
 #undef UPDATE
-#if JVET_AG0143_INTER_INTRA
-    bool condition = cu.getSwitchCondition(m_chType);
-    if (condition)
-    {
-      return m_tsLrg1FlagCtxSetSwitch(numPos);
-    }
-    else
-    {
-      return m_tsLrg1FlagCtxSet(numPos);
-    }
-#else
     return m_tsLrg1FlagCtxSet(numPos);
-#endif
   }
 
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
@@ -691,11 +493,7 @@ public:
 #endif
 
 
-#if JVET_AG0143_INTER_INTRA
-  unsigned signCtxIdAbsTS(int scanPos, const TCoeff *coeff, int bdpcm, const CodingUnit &cu)
-#else
   unsigned signCtxIdAbsTS(int scanPos, const TCoeff *coeff, int bdpcm)
-#endif
   {
     const uint32_t posY  = m_scan[scanPos].y;
     const uint32_t posX  = m_scan[scanPos].x;
@@ -737,21 +535,7 @@ public:
     {
       signCtx += 3;
     }
-
-#if JVET_AG0143_INTER_INTRA
-    bool condition = cu.getSwitchCondition(m_chType);
-    if (condition)
-    {
-      return m_tsSignFlagCtxSetSwitch(signCtx);
-    }
-    else
-    {
-      return m_tsSignFlagCtxSet(signCtx);
-    }
-
-#else
     return m_tsSignFlagCtxSet(signCtx);
-#endif
   }
 
   void neighTS(int &rightPixel, int &belowPixel, int scanPos, const TCoeff* coeff)
@@ -879,6 +663,9 @@ private:
   CoeffScanType             m_scanType;
   const ScanElement *       m_scan;
   const ScanElement *       m_scanCG;
+#if JVET_AG0143_INTER_INTRA
+  const bool                m_switchCondition;
+#endif
   const CtxSet              m_ctxSetLastX;
   const CtxSet              m_ctxSetLastY;
   const unsigned            m_maxLastPosX;
@@ -907,6 +694,10 @@ private:
   int                       m_tmplCpSum1;
 #endif
   int                       m_tmplCpDiag;
+#if JVET_AG0143_INTER_INTRA
+  unsigned                  m_sigGroupCtxIdSwitch;
+  unsigned                  m_sigGroupCtxIdTSSwitch;
+#endif
 #if TCQ_8STATES
   CtxSet                    m_sigFlagCtxSet[4];
 #else
@@ -924,28 +715,6 @@ private:
   CtxSet                    m_tsGtxFlagCtxSet;
   CtxSet                    m_tsLrg1FlagCtxSet;
   CtxSet                    m_tsSignFlagCtxSet;
-#if JVET_AG0143_INTER_INTRA
-  #if TCQ_8STATES
-  CtxSet                    m_sigFlagCtxSetSwitch[4];
-#else
-  CtxSet m_sigFlagCtxSetSwitch[3];
-#endif
-  unsigned                  m_sigGroupCtxIdSwitch;
-  CtxSet                    m_parFlagCtxSetSwitch;
-#if JVET_AG0100_TRANSFORM_COEFFICIENT_CODING
-  CtxSet                    m_gtxFlagCtxSetSwitch[4];
-#else
-  CtxSet                    m_gtxFlagCtxSetSwitch[2];
-#endif
-  const CtxSet              m_ctxSetLastXCtxSetSwitch;
-  const CtxSet              m_ctxSetLastYCtxSetSwitch;
-  unsigned                  m_sigGroupCtxIdTSSwitch;
-  CtxSet                    m_tsSigFlagCtxSetSwitch;
-  CtxSet                    m_tsParFlagCtxSetSwitch;
-  CtxSet                    m_tsGtxFlagCtxSetSwitch;
-  CtxSet                    m_tsLrg1FlagCtxSetSwitch;
-  CtxSet                    m_tsSignFlagCtxSetSwitch;
-#endif
   int                       m_remainingContextBins;
   std::bitset<MLS_GRP_NUM>  m_sigCoeffGroupFlag;
   const bool                m_bdpcm;
