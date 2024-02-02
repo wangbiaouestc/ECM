@@ -466,7 +466,6 @@ unsigned TBinDecoder<BinProbModel>::decodeBin( unsigned ctxId )
       m_bitsNeeded -= 8;
     }
   }
-
 #if JVET_AG0196_CABAC_RETRAIN
   CabacRetrain::dumpBin(bin,ctxId);
 #endif

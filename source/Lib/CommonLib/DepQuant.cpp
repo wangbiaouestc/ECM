@@ -682,7 +682,7 @@ namespace DQIntern
   {
 #if JVET_AG0143_INTER_INTRA
     assert(tuPars.m_chType == toChannelType(compID));
-    m_condition = tu.cu->getSwitchCondition(tuPars.m_chType);
+    m_condition = CoeffCodingContext::getSwitchCondition(*tu.cu,tuPars.m_chType);
     m_sliceType = tu.cu->slice->getSliceType();
 #endif
     m_scanId2Pos = tuPars.m_scanId2BlkPos;
@@ -911,27 +911,12 @@ namespace DQIntern
 
 
 #else
-#if TEST_EE2_3_2
-  const CtxSet &ctxSetGt1 =
-    m_condition ? Ctx::GtxFlagCtxSetSwitch[2 + chType]
-    : Ctx::GtxFlag[2 + chType];
-  const CtxSet &ctxSetGt2 = m_condition
-    ? Ctx::GtxFlagCtxSetSwitch[4 + chType]
-    : Ctx::GtxFlag[4 + chType];
-  const CtxSet &ctxSetGt3 =
-    m_condition ? Ctx::GtxFlagCtxSetSwitch[chType]
-    : Ctx::GtxFlag[chType];
-  const CtxSet &ctxSetGt4 = m_condition
-    ? Ctx::GtxFlagCtxSetSwitch[6 + chType]
-    : Ctx::GtxFlag[6 + chType];
-#else
     const CtxSet &ctxSetGt1 =
       m_condition ? Ctx::GtxFlagCtxSetSwitch[2 + chType]
                   : Ctx::GtxFlag[2 + chType];
     const CtxSet &ctxSetGt2 = m_condition
                                 ? Ctx::GtxFlagCtxSetSwitch[chType]
                                 : Ctx::GtxFlag[chType];
-#endif
     const CtxSet &ctxSetPar = m_condition
         ?  Ctx::ParFlagCtxSetSwitch[chType]
         : Ctx::ParFlag[chType];
@@ -943,7 +928,7 @@ namespace DQIntern
 #if JVET_AE0102_LFNST_CTX
 const CtxSet &ctxSetPar = isLfnst ? Ctx::ParFlagL[chType] : Ctx::ParFlag[chType];
 
-#if TEST_EE2_3_2
+#if JVET_AG0100_TRANSFORM_COEFFICIENT_CODING
 const CtxSet &ctxSetGt1 = isLfnst ? Ctx::GtxFlagL[2 + chType] : Ctx::GtxFlag[2 + chType];
 const CtxSet &ctxSetGt2 = isLfnst ? Ctx::GtxFlagL[4 + chType] : Ctx::GtxFlag[4 + chType];
 const CtxSet &ctxSetGt3 = isLfnst ? Ctx::GtxFlagL[chType] : Ctx::GtxFlag[chType];
@@ -954,7 +939,7 @@ const CtxSet &ctxSetGt4 = isLfnst ? Ctx::GtxFlagL[6 + chType] : Ctx::GtxFlag[6 +
 #endif
 #else
     const CtxSet &ctxSetPar = Ctx::ParFlag[chType];
-#if TEST_EE2_3_2
+#if JVET_AG0100_TRANSFORM_COEFFICIENT_CODING
     const CtxSet &ctxSetGt1 = Ctx::GtxFlag[2 + chType];
     const CtxSet &ctxSetGt2 = Ctx::GtxFlag[4 + chType];
     const CtxSet &ctxSetGt3 = Ctx::GtxFlag[chType];

@@ -412,18 +412,6 @@ public:
   void        residual_lfnst_mode       ( const CodingUnit&             cu,       CUCtx&            cuCtx );
   void        isp_mode                  ( const CodingUnit&             cu );
   void        last_sig_coeff            ( CoeffCodingContext&           cctx,     const TransformUnit& tu, ComponentID       compID );
-#if JVET_AG0143_INTER_INTRA
-#if TCQ_8STATES
-#if JVET_AE0102_LFNST_CTX 
-  void        residual_coding_subblock(CoeffCodingContext& cctx, const TCoeff* coeff, const uint64_t stateTransTable, int& state, const CodingUnit &cu, int lfnstIdx = -1);
-#else
-  void        residual_coding_subblock(CoeffCodingContext& cctx, const TCoeff* coeff, const uint64_t stateTransTable, int& state, const CodingUnit &cu);
-#endif
-
-#else
-  void        residual_coding_subblock(CoeffCodingContext &cctx, const TCoeff *coeff, const int stateTransTable, int &state, const CodingUnit &cu);
-#endif
-  #else
 #if TCQ_8STATES
 #if JVET_AE0102_LFNST_CTX 
   void        residual_coding_subblock(CoeffCodingContext& cctx, const TCoeff* coeff, const uint64_t stateTransTable, int& state, int lfnstIdx = -1);
@@ -433,17 +421,11 @@ public:
 #else
   void        residual_coding_subblock(CoeffCodingContext &cctx, const TCoeff *coeff, const int stateTransTable, int &state);
 #endif
-
-  #endif
 #if SIGN_PREDICTION
   void        codePredictedSigns ( TransformUnit &tu, ComponentID compID);
 #endif
   void        residual_codingTS         ( const TransformUnit&          tu,       ComponentID       compID );
-#if JVET_AG0143_INTER_INTRA
-  void        residual_coding_subblockTS(CoeffCodingContext &cctx, const TCoeff *coeff, const CodingUnit &cu);
-#else
   void        residual_coding_subblockTS(CoeffCodingContext &cctx, const TCoeff *coeff);
-#endif
   void        joint_cb_cr               ( const TransformUnit&          tu,       const int cbfMask );
 
 

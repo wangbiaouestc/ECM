@@ -44,7 +44,6 @@
 #include "MotionInfo.h"
 #include "ChromaFormat.h"
 
-
 // ---------------------------------------------------------------------------
 // tools
 // ---------------------------------------------------------------------------
@@ -507,9 +506,6 @@ struct CodingUnit : public UnitArea
 
   const bool        isConsInter() const { return modeType == MODE_TYPE_INTER; }
   const bool        isConsIntra() const { return modeType == MODE_TYPE_INTRA; }
-#endif
-#if JVET_AG0143_INTER_INTRA
-  bool getSwitchCondition(ChannelType channelType) const;
 #endif
 };
 
