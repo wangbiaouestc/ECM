@@ -13409,7 +13409,11 @@ bool PU::checkBDMVRConditionCIIPAffine(const PredictionUnit& pu)
     return pu.mergeFlag && pu.mergeType == MRG_TYPE_DEFAULT_N && !pu.cu->affine && !pu.mmvdMergeFlag
 #endif
       && !pu.cu->mmvdSkip
+#if JVET_AG0067_DMVR_EXTENSIONS
+      && (PU::isBiPredFromDifferentDirEqDistPoc(pu) || (PU::isBiPredFromDifferentDirGenDistPoc(pu) && !pu.cu->geoFlag))
+#else
       && PU::isBiPredFromDifferentDirEqDistPoc(pu)
+#endif
 #if JVET_AD0213_LIC_IMP
       && !pu.cu->licFlag
 #endif
