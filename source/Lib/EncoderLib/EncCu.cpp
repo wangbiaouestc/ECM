@@ -2357,7 +2357,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 
   Mv   refinedMvdL0[MAX_NUM_PARTS_IN_CTU][MRG_MAX_NUM_CANDS];
   setMergeBestSATDCost( MAX_DOUBLE );
-
+#if JVET_AD0045
+  bool enableVisualCheck = false;
+#endif
   {
     // first get merge candidates
     CodingUnit cu( tempCS->area );
@@ -2374,6 +2376,17 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
     );
     PU::getInterMMVDMergeCandidates(pu, mergeCtx);
     pu.regularMergeFlag = true;
+#if JVET_AD0045
+    // only set this to true when cfg, size, tid, framerate all fulfilled
+
+    enableVisualCheck = (m_pcEncCfg->getFrameRate() <= (int)DMVR_ENC_SELECT_FRAME_RATE_THR
+      || !m_pcEncCfg->getDMVREncMvSelectDisableHighestTemporalLayer()
+      || pu.cu->slice->getTLayer() != pu.cu->slice->getSPS()->getMaxTLayers() - 1)
+      && m_pcEncCfg->getDMVREncMvSelection()
+      && pu.lumaSize().width >= DMVR_ENC_SELECT_SIZE_THR
+      && pu.lumaSize().height >= DMVR_ENC_SELECT_SIZE_THR;
+    m_pcInterSearch->xDmvrSetEncoderCheckFlag(enableVisualCheck);
+#endif
   }
   bool candHasNoResidual[MRG_MAX_NUM_CANDS + MMVD_ADD_NUM];
   for (uint32_t ui = 0; ui < MRG_MAX_NUM_CANDS + MMVD_ADD_NUM; ui++)
@@ -2505,6 +2518,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 
         PU::spanMotionInfo( pu, mergeCtx );
         pu.mvRefine = true;
+#if JVET_AD0045
+        pu.dmvrImpreciseMv = false;
+#endif
         distParam.cur = singleMergeTempBuffer->Y();
         acMergeTmpBuffer[uiMergeCand] = m_acMergeTmpBuffer[uiMergeCand].getBuf(localUnitArea);
         m_pcInterSearch->motionCompensation(pu, *singleMergeTempBuffer, REF_PIC_LIST_X, true, true, &(acMergeTmpBuffer[uiMergeCand]));
@@ -2537,6 +2553,13 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
         m_CABACEstimator->getCtx() = ctxStart;
         uint64_t fracBits = m_pcInterSearch->xCalcPuMeBits(pu);
         double cost = (double)uiSad + (double)fracBits * sqrtLambdaForFirstPassIntra;
+#if JVET_AD0045
+        if (enableVisualCheck && pu.dmvrImpreciseMv)
+        {
+          cost = MAX_DOUBLE;
+        }
+#endif
+
         insertPos = -1;
         updateCandList(ModeInfo(uiMergeCand, true, false, false), cost, RdModeList, candCostList, uiNumMrgSATDCand, &insertPos);
         if (insertPos != -1)
@@ -2774,7 +2797,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
         mergeCtx.setMergeInfo(pu, uiMergeCand);
       }
       PU::spanMotionInfo( pu, mergeCtx );
-
+#if JVET_AD0045
+      pu.dmvrImpreciseMv = false;
+#endif
       if( m_pcEncCfg->getMCTSEncConstraint() )
       {
         bool isDMVR = PU::checkDMVRCondition( pu );
@@ -2856,6 +2881,13 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
         m_pcInterSearch->motionCompensation( pu );
         pu.mvRefine = false;
       }
+#if JVET_AD0045
+      if (enableVisualCheck && pu.dmvrImpreciseMv)
+      {
+        tempCS->initStructData(encTestMode.qp);
+        continue;
+      }
+#endif
       if (!cu.mmvdSkip && !pu.ciipFlag && uiNoResidualPass != 0)
       {
         CHECK(uiMergeCand >= mergeCtx.numValidMergeCand, "out of normal merge");
@@ -2906,6 +2938,10 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
   {
     xCalDebCost( *bestCS, partitioner );
   }
+#if JVET_AD0045
+  m_pcInterSearch->xDmvrSetEncoderCheckFlag(false);
+#endif
+
 }
 
 void EncCu::xCheckRDCostMergeGeo2Nx2N(CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &pm, const EncTestMode& encTestMode)

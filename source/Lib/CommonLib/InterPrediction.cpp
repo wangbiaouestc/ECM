@@ -67,6 +67,9 @@ InterPrediction::InterPrediction()
 , m_subPuMC(false)
 , m_IBCBufferWidth(0)
 {
+#if JVET_AD0045
+  dmvrEnableEncoderCheck = false;
+#endif
   for( uint32_t ch = 0; ch < MAX_NUM_COMPONENT; ch++ )
   {
     for( uint32_t refList = 0; refList < NUM_REF_PIC_LIST_01; refList++ )
@@ -1994,6 +1997,14 @@ void InterPrediction::xinitMC(PredictionUnit& pu, const ClpRngs &clpRngs)
   }
 }
 
+#if JVET_AD0045
+static constexpr int ACTIVITY_TH[MAX_QP + 1] = {
+  0,  0,  0,  0,  0,  1,  1,  1,  1,  1,  2,  2,  2,  3,  3,  3,  4,  4,  5,  5,  6,  6,
+  7,  7,  8,  9,  9,  10, 10, 11, 12, 13, 13, 14, 15, 16, 17, 18, 18, 19, 20, 21, 22, 23,
+  24, 25, 26, 27, 29, 30, 31, 32, 33, 34, 36, 36, 36, 36, 37, 37, 37, 37, 37, 37,
+};
+#endif
+
 void InterPrediction::xProcessDMVR(PredictionUnit& pu, PelUnitBuf &pcYuvDst, const ClpRngs &clpRngs, const bool bioApplied)
 {
   int iterationCount = 1;
@@ -2089,7 +2100,13 @@ void InterPrediction::xProcessDMVR(PredictionUnit& pu, PelUnitBuf &pcYuvDst, con
 
     srcPred0 = srcPred0.subBuf(UnitAreaRelative(pu, subPu));
     srcPred1 = srcPred1.subBuf(UnitAreaRelative(pu, subPu));
-
+#if JVET_AD0045
+    bool      riskArtifact = false;
+    const int widthInSubPu = pu.lumaSize().width / DMVR_SUBCU_WIDTH;
+    const int spatActivityThreshold = ACTIVITY_TH[std::max<int>(0, pu.cu->qp)];
+    // subblock boundary activity threshold
+    const int boundaryDiffThreshold = 10;
+#endif
     int yStart = 0;
     for (int y = puPos.y; y < (puPos.y + pu.lumaSize().height); y = y + dy, yStart = yStart + dy)
     {
@@ -2101,6 +2118,48 @@ void InterPrediction::xProcessDMVR(PredictionUnit& pu, PelUnitBuf &pcYuvDst, con
         xPrefetch(subPu, m_cYuvRefBuffDMVRL1, REF_PIC_LIST_1, 1);
 
         xinitMC(subPu, clpRngs);
+
+#if JVET_AD0045
+        bool checkDmvr = xDmvrGetEncoderCheckFlag() && xStart != 0 && yStart != 0;
+        if (checkDmvr)
+        {
+          checkDmvr = false;
+
+          CHECK(dx != DMVR_SUBCU_WIDTH, "bad subblock width");
+          CHECK(dy != DMVR_SUBCU_HEIGHT, "bad subblock height");
+
+          for (int listIdx = 0; listIdx < NUM_REF_PIC_LIST_01; listIdx++)
+          {
+            int blkSumAct = 0;
+
+            const ptrdiff_t blkStride = m_biLinearBufStride;
+            const Pel* org;
+            if (listIdx == 0)
+            {
+              org = biLinearPredL0;
+            }
+            else
+            {
+              org = biLinearPredL1;
+            }
+
+            for (int row = 1; row < DMVR_SUBCU_HEIGHT; row++)
+            {
+              for (int col = 1; col < DMVR_SUBCU_WIDTH; col++)
+              {
+                blkSumAct += std::abs(org[row * blkStride + col] - org[row * blkStride + col - 1]);
+                blkSumAct += std::abs(org[row * blkStride + col] - org[row * blkStride + col - blkStride]);
+              }
+            }
+
+            if (blkSumAct / ((DMVR_SUBCU_WIDTH - 1) * (DMVR_SUBCU_HEIGHT - 1)) < spatActivityThreshold)
+            {
+              checkDmvr = true;
+              break;
+            }
+          }
+        }
+#endif
 
         uint64_t minCost = MAX_UINT64;
         bool notZeroCost = true;
@@ -2188,9 +2247,60 @@ void InterPrediction::xProcessDMVR(PredictionUnit& pu, PelUnitBuf &pcYuvDst, con
         subPredBuf.bufs[COMPONENT_Cr].buf = pcYuvDst.bufs[COMPONENT_Cr].buf + (xStart >> scaleX) + ((yStart >> scaleY) * dstStride[COMPONENT_Cr]);
         }
         xWeightedAverage(subPu, srcPred0, srcPred1, subPredBuf, subPu.cu->slice->getSPS()->getBitDepths(), subPu.cu->slice->clpRngs(), bioAppliedType[num]);
+#if JVET_AD0045
+        if (checkDmvr)
+        {
+          checkDmvr = false;
+
+          const ptrdiff_t blkStride = pcYuvDst.bufs[COMPONENT_Y].stride;
+          const Pel* org = subPredBuf.bufs[COMPONENT_Y].buf;
+
+          // check boundary diff above
+          int blkSumAct = 0;
+
+          for (int col = 0; col < DMVR_SUBCU_WIDTH; col++)
+          {
+            blkSumAct += std::abs(org[col] - org[col - blkStride]);
+          }
+          checkDmvr = blkSumAct / DMVR_SUBCU_WIDTH > boundaryDiffThreshold;
+
+          if (!checkDmvr)
+          {
+            // check boundary diff left
+            blkSumAct = 0;
+
+            for (int row = 0; row < DMVR_SUBCU_HEIGHT; row++)
+            {
+              blkSumAct += std::abs(org[row * blkStride] - org[row * blkStride - 1]);
+            }
+            checkDmvr = blkSumAct / DMVR_SUBCU_HEIGHT > boundaryDiffThreshold;
+          }
+
+          if (checkDmvr)
+          {
+            constexpr int MV_THRESHOLD = 28;   // subblock motion difference threshold
+
+            if (abs(pu.mvdL0SubPu[num].hor - pu.mvdL0SubPu[num - 1].hor) >= MV_THRESHOLD
+              || abs(pu.mvdL0SubPu[num].ver - pu.mvdL0SubPu[num - 1].ver) >= MV_THRESHOLD
+              || abs(pu.mvdL0SubPu[num].hor - pu.mvdL0SubPu[num - widthInSubPu].hor) >= MV_THRESHOLD
+              || abs(pu.mvdL0SubPu[num].ver - pu.mvdL0SubPu[num - widthInSubPu].ver) >= MV_THRESHOLD)
+            {
+              riskArtifact = true;
+            }
+          }
+        }
+#endif
+
         num++;
       }
     }
+#if JVET_AD0045
+    if (xDmvrGetEncoderCheckFlag())
+    {
+      pu.dmvrImpreciseMv = riskArtifact;
+    }
+#endif
+
   }
   JVET_J0090_SET_CACHE_ENABLE(true);
 }
