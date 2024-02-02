@@ -134,7 +134,10 @@ public:
 #if JVET_AA0057_CCCM
   void        cccmFlag                  ( PredictionUnit&               pu );
 #endif
-#if JVET_AD0188_CCP_MERGE
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  void        decoderDerivedCcpModes    ( PredictionUnit&               pu );
+#endif
+#if JVET_AD0188_CCP_MERGE || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   void        nonLocalCCPIndex          ( PredictionUnit&               pu );
 #endif
 #if JVET_AD0120_LBCCP

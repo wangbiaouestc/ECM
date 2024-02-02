@@ -1589,6 +1589,10 @@ static const int EXT_PICTURE_SIZE =                             16;
 static const int IBC_BVD_PREDICTION_MAX_BIN_NUM =                4;
 #endif
 
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+static const int MAX_DDCCP_CAND_LIST_SIZE = 6; // 2 CCCM-S, 2 CCCM-M, 1 GLCCCM-S, 1 CCLM-S
+static const int MAX_CCP_FUSION_NUM = 12;
+#endif
 #if JVET_AD0188_CCP_MERGE
 static const int MAX_CCP_CAND_LIST_SIZE = 12;
 static const int MAX_NUM_HCCP_CANDS     = 6;

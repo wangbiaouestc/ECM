@@ -2709,6 +2709,32 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
 #if JVET_AD0202_CCCM_MDF
   m_pcIntraSearch->m_skipCCCMwithMdfSATD = false;
 #endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  if (tempCS->slice->getSPS()->getUseDdCcpFusion())
+  {
+    m_pcIntraSearch->m_skipDdCcpListConstruction = false;
+    m_pcIntraSearch->firstTransformDdccp = true;
+    CodingUnit cu(tempCS->area);
+    cu.cs = tempCS;
+    cu.slice = tempCS->slice;
+    cu.tileIdx = tempCS->pps->getTileIdx(tempCS->area.lumaPos());
+    PredictionUnit pu(tempCS->area);
+    pu.cu = &cu;
+    pu.cs = tempCS;
+    CodingStructure &cs = *cu.cs;
+    const UnitArea localUnitArea(cs.area.chromaFormat, Area(0, 0, (pu.Cb().width) << 1, (pu.Cb().height) << 1));
+    m_pcIntraSearch->m_ddCcpStorageTemp = m_pcIntraSearch->m_ddCcpStorage.getBuf(localUnitArea);
+    for (int i = 0; i < 2; i++)
+    {
+      m_pcIntraSearch->m_ddCcpFusionStorageTemp[i] = m_pcIntraSearch->m_ddCcpFusionStorage[i].getBuf(localUnitArea);
+    }
+    m_pcIntraSearch->m_skipDdCcpMergeFusionList = false;
+    for (int i = 0; i < 2; i++)
+    {
+      m_pcIntraSearch->m_ddccpMergeFusionCost[i] = MAX_DOUBLE;
+    }
+  }
+#endif
   for( int trGrpIdx = 0; trGrpIdx < grpNumMax; trGrpIdx++ )
   {
     const uint8_t startMtsFlag = trGrpIdx > 0;

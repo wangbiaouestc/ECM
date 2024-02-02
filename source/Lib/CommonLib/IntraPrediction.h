@@ -109,8 +109,7 @@ public:
 typedef short TrainDataType;
 #endif
 
-#if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA || JVET_AC0119_LM_CHROMA_FUSION || JVET_AG0058_EIP
-
+#if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA || JVET_AC0119_LM_CHROMA_FUSION || JVET_AG0058_EIP || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
 typedef int64_t TCccmCoeff;
 #define FIXED_MULT(x, y) TCccmCoeff((int64_t(x)*(y) + CCCM_DECIM_ROUND) >> CCCM_DECIM_BITS )
 #if !JVET_AB0174_CCCM_DIV_FREE
@@ -235,13 +234,16 @@ public:
 #else
   Pel* m_cccmLumaBuf;
 #endif
-#if JVET_AA0057_CCCM
+#if JVET_AA0057_CCCM || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   CccmCovariance m_cccmSolver;
 
   Pel m_samples[CCCM_NUM_PARAMS_MAX];
   Pel m_a[CCCM_NUM_PARAMS_MAX][CCCM_REF_SAMPLES_MAX];
   Pel m_cb[CCCM_REF_SAMPLES_MAX];
   Pel m_cr[CCCM_REF_SAMPLES_MAX];
+#endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  int m_mmlmThreshold2;
 #endif
 
 #if SECONDARY_MPM
@@ -277,7 +279,7 @@ private:
   int  m_yuvExtSize2;
 #endif
 
-#if JVET_AA0057_CCCM || JVET_AC0119_LM_CHROMA_FUSION || JVET_AG0058_EIP
+#if JVET_AA0057_CCCM || JVET_AC0119_LM_CHROMA_FUSION || JVET_AG0058_EIP || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   Area m_cccmBlkArea;
 #if JVET_AB0174_CCCM_DIV_FREE
   int  m_cccmLumaOffset;
@@ -288,7 +290,7 @@ private:
   Pel* m_tmpRefBuf[MTMP_NUM];
 #endif
 
-#if JVET_AA0057_CCCM
+#if JVET_AA0057_CCCM || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   Area m_cccmRefArea;
 #if JVET_AE0100_BVGCCCM
   Pel* m_bvgCccmLumaBuf[NUM_BVG_CCCM_CANDS];
@@ -351,8 +353,16 @@ private:
 
   IntraPredParam m_ipaParam;
 
-#if JVET_AD0120_LBCCP
+#if JVET_AD0120_LBCCP || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   Pel* m_pCCFilterTemp;
+#endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  Pel* m_decoderDerivedCcpProbeTemplateT[2];
+  Pel* m_decoderDerivedCcpProbeTemplateL[2];
+  Pel* m_ddCCPFusionTempCb[MAX_DDCCP_CAND_LIST_SIZE];
+  Pel* m_ddCCPFusionTempCr[MAX_DDCCP_CAND_LIST_SIZE];
+  Pel* m_CCPFusionTempCb[MAX_CCP_CAND_LIST_SIZE];
+  Pel* m_CCPFusionTempCr[MAX_CCP_CAND_LIST_SIZE];
 #endif
 #if JVET_AF0073_INTER_CCP_MERGE
   Pel* m_pCcpMerge[2];
@@ -541,7 +551,7 @@ public:
 
   void init                       (ChromaFormat chromaFormatIDC, const unsigned bitDepthY);
 
-#if JVET_AA0057_CCCM || JVET_AC0119_LM_CHROMA_FUSION
+#if JVET_AA0057_CCCM || JVET_AC0119_LM_CHROMA_FUSION || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   Pel    xCccmGetLumaVal(const PredictionUnit& pu, const CPelBuf pi, const int x, const int y
 #if JVET_AD0202_CCCM_MDF
     , int downsFilterIdx = 0
@@ -551,15 +561,23 @@ public:
   void   xCccmSetLumaRefValue(const PredictionUnit& pu);
 #endif
 #endif
-#if JVET_AA0057_CCCM
+#if JVET_AA0057_CCCM || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
 #if JVET_AD0188_CCP_MERGE
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  void   predIntraCCCM            ( PredictionUnit& pu, PelBuf &predCb, PelBuf &predCr, int intraDir, bool ccpModelStorage = true, CCPModelCandidate ccpModel2 = {} );
+#else
   void   predIntraCCCM            ( PredictionUnit& pu, PelBuf &predCb, PelBuf &predCr, int intraDir );
+#endif
+#else
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  void   predIntraCCCM            (const PredictionUnit& pu, PelBuf &predCb, PelBuf &predCr, int intraDir, bool ccpModelStorage = true, CCPModelCandidate ccpModel2 = {});
 #else
   void   predIntraCCCM            (const PredictionUnit& pu, PelBuf &predCb, PelBuf &predCr, int intraDir);
 #endif
+#endif
 
   void   xCccmCalcModels          (const PredictionUnit& pu, CccmModel& cccmModelCb, CccmModel& cccmModelCr, int modelId, int modelThr
-#if JVET_AD0120_LBCCP
+#if JVET_AD0120_LBCCP || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
     , int trainingRange = -1
 #endif
 #if JVET_AF0073_INTER_CCP_MERGE
@@ -588,7 +606,7 @@ public:
 #endif
   ) const;
   int    xCccmCalcRefAver         (const PredictionUnit& pu
-#if JVET_AD0120_LBCCP
+#if JVET_AD0120_LBCCP || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
                                     , int trainingRange = -1
 #endif
   ) const;
@@ -643,15 +661,31 @@ public:
   void   xCflmCalcRefArea         (const PredictionUnit& pu, const CompArea& chromaArea);
 #endif
 
-#if JVET_AD0188_CCP_MERGE
+#if JVET_AD0188_CCP_MERGE || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  void reorderCCPCandidates       ( PredictionUnit &pu, CCPModelCandidate candList[], int reorderlistSize, int* fusionList );
+  int  xGetOneCCPCandCost         ( PredictionUnit &pu, CCPModelCandidate &ccpCand, const int candIdx = 0 );
+#else
   void reorderCCPCandidates       ( PredictionUnit &pu, CCPModelCandidate candList[], int reorderlistSize );
   int  xGetOneCCPCandCost         ( PredictionUnit &pu, CCPModelCandidate &ccpCand );
+#endif
   void predCCPCandidate           ( PredictionUnit &pu, PelBuf &predCb, PelBuf &predCr);
 
   void xCclmApplyModel            (const PredictionUnit &pu, const ComponentID compId, CccmModel& cccmModel, int modelId, int modelThr, PelBuf &piPred);
   void xCccmApplyModelOffset      (const PredictionUnit& pu, const ComponentID compId, CccmModel& cccmModel, int modelId, int modelThr, PelBuf& piPred, int lumaOffset, int chromaOffset[2], int type, int refSizeX = 0, int refSizeY = 0 );
   void xGlmApplyModelOffset       (const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, CccmModel& glmModel, int glmIdc, PelBuf& piPred, int lumaOffset, int chromaOffset);  
 
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  int xGetCostCCPFusion(const PredictionUnit& pu, const ComponentID compID, const CompArea& chromaArea, int candIdx0, int candIdx1);
+  template <const bool updateOffsets>
+  int xUpdateOffsetsAndGetCostCCLM(const PredictionUnit &pu, const ComponentID compID, const CompArea &chromaArea, CclmModel &cclmModel, int modelNum, int glmIdc, int candIdx = 0);
+
+  template <const bool updateOffsets>
+  int xUpdateOffsetsAndGetCostCCCM(const PredictionUnit &pu, const ComponentID compID, const CompArea &chromaArea, CccmModel cccmModel[2], int modelThr, int lumaOffset, int chromaOffset[2], int type, int candIdx = 0, int refSizeX = 0, int refSizeY = 0, const int cccmMultiFilterIdx = -1);
+
+  template <const bool updateOffsets>
+  int xUpdateOffsetsAndGetCostGLM(const PredictionUnit& pu, const ComponentID compID, const CompArea& chromaArea, CccmModel& glmModel, int glmIdc, int lumaOffset, int& chromaOffset, int candIdx = 0);
+#else
   template <const bool updateOffsets>
   int xUpdateOffsetsAndGetCostCCLM(const PredictionUnit &pu, const ComponentID compID, const CompArea &chromaArea, CclmModel &cclmModel, int modelNum, int glmIdc);
 
@@ -661,12 +695,28 @@ public:
   template <const bool updateOffsets>
   int xUpdateOffsetsAndGetCostGLM(const PredictionUnit& pu, const ComponentID compID, const CompArea& chromaArea, CccmModel& glmModel, int glmIdc, int lumaOffset, int& chromaOffset);
 #endif
+#endif
 
-#if JVET_AF0073_INTER_CCP_MERGE
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  void filterPredInsideProbeLine(const ComponentID compID, const PredictionUnit &pu, bool above); // training stage
+  int ddccpFusionTemplateCost(const PredictionUnit& pu, const ComponentID compID, const CompArea& chromaArea, int candIdx0, int candIdx1, int cost0, int cost1);
+  int decoderDerivedCccmCost(const PredictionUnit &pu, int currIdx, const ComponentID compID, int intraDir, const CompArea &chromaArea, CccmModel cccmModel[2], int modelThr); // training stage
+  int decoderDerivedCclmCost(const PredictionUnit &pu, int currIdx, const ComponentID compID, int intraDir, const CompArea  &chromaArea, const CclmModel &cclmModel);
+  int tmCostDecoderDerivedCcp(PredictionUnit& pu, int currIdx, int intraDir, bool isCcpMerge = false); // training stage 
+  void predDecoderDerivedIntraCCCMFusions(PredictionUnit& pu, PelBuf &predCb, PelBuf &predCr, std::vector<DecoderDerivedCcpCandidate> &decoderDerivedCcpList);
+  int decoderDerivedCcp(PredictionUnit& pu, std::vector<DecoderDerivedCcpCandidate> &decoderDerivedCcpList); // training stage
+  void   predDecoderDerivedCcpMergeFusion(PredictionUnit& pu, PelBuf &predCb, PelBuf &predCr, CCPModelCandidate decoderDerivedCcp1, CCPModelCandidate decoderDerivedCcp2);
+#endif
+
+#if JVET_AF0073_INTER_CCP_MERGE || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   void xInterCccmApplyModelOffset(const PredictionUnit &pu, const ComponentID compId, CccmModel &cccmModel,
                                   PelBuf &piPred, int lumaOffset, int chromaOffset);
   int  xGetCostInterCccm(const PredictionUnit &pu, const ComponentID compID, const CompArea &chromaArea,
-                         CccmModel &cccmModel, int lumaOffset, int chromaOffset);
+                         CccmModel &cccmModel, int lumaOffset, int chromaOffset
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+    , int candIdx = 0
+#endif
+  );
   void xAddOnTheFlyCalcCCPCands4InterBlk(const PredictionUnit &pu, CompArea chromaArea, CCPModelCandidate candList[],
                                          int &validNum);
   void selectCcpMergeCand(PredictionUnit &pu, CCPModelCandidate candList[], int reorderlistSize);
@@ -889,7 +939,7 @@ public:
   void predIntraMip               (const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu);
 #endif
 
-#if JVET_AD0120_LBCCP
+#if JVET_AD0120_LBCCP || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
 #if JVET_AA0057_CCCM
   uint32_t xCalculateCCCMcost     (const PredictionUnit &pu, const ComponentID compID, int intraDir, const CompArea &chromaArea, CccmModel cccmModel[2], int modelThr);
   uint32_t xCalculateCCLMcost     (const PredictionUnit &pu, const ComponentID compID, int intraDir, const CompArea  &chromaArea, const CclmModel &cclmModel);

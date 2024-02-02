@@ -1929,6 +1929,9 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_AD0188_CCP_MERGE
   sps.setUseCcpMerge        ( m_ccpMerge );
 #endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  sps.setUseDdCcpFusion     ( m_ddCcpFusion );
+#endif
 #if ENABLE_OBMC
   sps.setUseOBMC            ( m_OBMC );
 #endif

@@ -916,6 +916,10 @@ void PredictionUnit::initData()
 #endif
   mipTransposedFlag = false;
   multiRefIdx = 0;
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  decoderDerivedCcpMode = 0;
+  ddNonLocalCCPFusion = 0;
+#endif
 #if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
   parseLumaMode = false;
   candId = -1;
@@ -930,12 +934,12 @@ void PredictionUnit::initData()
 #if JVET_AA0126_GLM
   glmIdc      = {};
 #endif
-#if JVET_AA0057_CCCM
+#if JVET_AA0057_CCCM || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   cccmFlag    = 0;
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   cccmNoSubFlag = 0;
 #endif
-#if JVET_AC0054_GLCCCM
+#if JVET_AC0054_GLCCCM || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   glCccmFlag = 0;
 #endif
 #if JVET_AD0202_CCCM_MDF
@@ -956,7 +960,7 @@ void PredictionUnit::initData()
   curCand = {};
   curCand.type = CCP_TYPE_NONE;
 #endif
-#if JVET_AD0120_LBCCP
+#if JVET_AD0120_LBCCP || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   ccInsideFilter = 0;
 #endif
   // inter data
@@ -1123,6 +1127,10 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
 #endif
   mipTransposedFlag = predData.mipTransposedFlag;
   multiRefIdx = predData.multiRefIdx;
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  decoderDerivedCcpMode = predData.decoderDerivedCcpMode;
+  ddNonLocalCCPFusion = predData.ddNonLocalCCPFusion;
+#endif
 #if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
   parseLumaMode = predData.parseLumaMode;
   candId = predData.candId;
@@ -1137,7 +1145,7 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
 #if JVET_AA0126_GLM
   glmIdc      = predData.glmIdc;
 #endif
-#if JVET_AA0057_CCCM
+#if JVET_AA0057_CCCM || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   cccmFlag    = predData.cccmFlag;
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   cccmNoSubFlag = predData.cccmNoSubFlag;
@@ -1162,7 +1170,7 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
   idxNonLocalCCP  = predData.idxNonLocalCCP;
   curCand = predData.curCand;
 #endif
-#if JVET_AD0120_LBCCP
+#if JVET_AD0120_LBCCP || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   ccInsideFilter = predData.ccInsideFilter;
 #endif
   return *this;
@@ -1345,13 +1353,17 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 #endif
   mipTransposedFlag = other.mipTransposedFlag;
   multiRefIdx = other.multiRefIdx;
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  decoderDerivedCcpMode = other.decoderDerivedCcpMode;
+  ddNonLocalCCPFusion = other.ddNonLocalCCPFusion;
+#endif
 #if JVET_Z0050_CCLM_SLOPE
   cclmOffsets = other.cclmOffsets;
 #endif
 #if JVET_AA0126_GLM
   glmIdc      = other.glmIdc;
 #endif
-#if JVET_AA0057_CCCM
+#if JVET_AA0057_CCCM || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   cccmFlag    = other.cccmFlag;
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   cccmNoSubFlag = other.cccmNoSubFlag;
@@ -1377,7 +1389,7 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   curCand = other.curCand;
 #endif
 
-#if JVET_AD0120_LBCCP
+#if JVET_AD0120_LBCCP || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   ccInsideFilter = other.ccInsideFilter;
 #endif
   mergeFlag   = other.mergeFlag;

@@ -2558,7 +2558,19 @@ void CABACReader::glmIdc(PredictionUnit& pu)
 }
 #endif
 
-#if JVET_AD0188_CCP_MERGE
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+void CABACReader::decoderDerivedCcpModes(PredictionUnit &pu)
+{
+  pu.decoderDerivedCcpMode = 0;
+  if (PU::hasDecoderDerivedCCP(pu))
+  {
+    pu.decoderDerivedCcpMode = m_BinDecoder.decodeBin(Ctx::decoderDerivedCCP(0));
+    pu.intraDir[1] = LM_CHROMA_IDX;
+  }
+}
+#endif
+
+#if JVET_AD0188_CCP_MERGE || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
 void CABACReader::nonLocalCCPIndex(PredictionUnit &pu)
 {
   pu.idxNonLocalCCP = 0;
@@ -2568,7 +2580,22 @@ void CABACReader::nonLocalCCPIndex(PredictionUnit &pu)
     pu.idxNonLocalCCP = m_BinDecoder.decodeBin(Ctx::nonLocalCCP(0));
     if (pu.idxNonLocalCCP)
     {
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+      if (pu.cu->slice->getSPS()->getUseDdCcpFusion())
+      {
+        pu.ddNonLocalCCPFusion = m_BinDecoder.decodeBin(Ctx::ddNonLocalCCP(0));
+      }
+      if (pu.ddNonLocalCCPFusion)
+      {
+        pu.ddNonLocalCCPFusion += unary_max_eqprob(MAX_CCP_FUSION_NUM - 1);
+      }
+      else
+      {
+#endif
       pu.idxNonLocalCCP += unary_max_eqprob(MAX_CCP_CAND_LIST_SIZE - 1);
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+      }
+#endif
       pu.cccmFlag    = 0;
       pu.intraDir[1] = LM_CHROMA_IDX;
     }
@@ -2578,7 +2605,14 @@ void CABACReader::nonLocalCCPIndex(PredictionUnit &pu)
 
 bool CABACReader::intra_chroma_lmc_mode(PredictionUnit& pu)
 {
-#if JVET_AD0188_CCP_MERGE
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  decoderDerivedCcpModes(pu);
+  if (pu.decoderDerivedCcpMode)
+  {
+    return true;
+  }
+#endif
+#if JVET_AD0188_CCP_MERGE || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   nonLocalCCPIndex(pu);
   if (pu.idxNonLocalCCP)
   {

@@ -4490,6 +4490,38 @@ const CtxSet ContextSetCfg::nonLocalCCP = ContextSetCfg::addCtxSet({
   { 147 },
 });
 
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+const CtxSet ContextSetCfg::decoderDerivedCCP = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, }, 
+  { DWE, },
+  { DWE, },
+  { DWE, }, 
+  { DWO, },
+  { DWO, },
+	});
+
+const CtxSet ContextSetCfg::ddNonLocalCCP = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { 50, },
+  { DWS, },
+  { DWS, },
+  { 4, },
+  { DWE, },
+  { DWE, },
+  { 11, },
+  { DWO, },
+  { DWO, },
+	});
+#endif
+
 const CtxSet ContextSetCfg::InterCccmFlag = ContextSetCfg::addCtxSet({
   { 33 },
   { 40 },
