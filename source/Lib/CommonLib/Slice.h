@@ -1810,6 +1810,9 @@ private:
 #if JVET_AD0188_CCP_MERGE
   bool              m_ccpMerge;
 #endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  bool              m_ddCcpFusion;
+#endif
 #if JVET_V0130_INTRA_TMP
   bool              m_intraTMP;                                       ///< intra Template Matching 
   unsigned          m_intraTmpMaxSize;                               ///< max CU size for which intra TMP is allowed
@@ -2488,6 +2491,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if JVET_AD0188_CCP_MERGE
   void      setUseCcpMerge     ( bool i )                                        { m_ccpMerge = i; }
   bool      getUseCcpMerge     ()                                      const     { return m_ccpMerge; }
+#endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  void      setUseDdCcpFusion  ( bool i )                                        { m_ddCcpFusion = i; }
+  bool      getUseDdCcpFusion  ()                                      const     { return m_ddCcpFusion; }
 #endif
 #if ENABLE_OBMC
   void      setUseOBMC         ( bool b )                                        { m_OBMC = b; }

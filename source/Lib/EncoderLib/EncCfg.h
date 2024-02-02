@@ -503,6 +503,9 @@ protected:
 #if JVET_AD0188_CCP_MERGE
   bool      m_ccpMerge;
 #endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  bool      m_ddCcpFusion;
+#endif
 #if ENABLE_OBMC
   bool      m_OBMC;
 #endif
@@ -1712,6 +1715,10 @@ public:
 #if JVET_AD0188_CCP_MERGE
   void      setUseCcpMerge               (bool i)         { m_ccpMerge = i; }
   bool      getUseCcpMerge               ()         const { return m_ccpMerge; }
+#endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  void      setUseDdCcpFusion            (bool i)         { m_ddCcpFusion = i; }
+  bool      getUseDdCcpFusion            ()         const { return m_ddCcpFusion; }
 #endif
 #if ENABLE_OBMC
   void      setUseObmc                   ( bool b )       { m_OBMC = b; }

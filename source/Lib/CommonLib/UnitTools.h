@@ -832,7 +832,10 @@ namespace PU
 #if JVET_AD0085_MPM_SORTING
   bool allowMPMSorted(const PredictionUnit& pu);
 #endif
-#if JVET_AD0188_CCP_MERGE
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  bool  hasDecoderDerivedCCP(const PredictionUnit &pu);
+#endif
+#if JVET_AD0188_CCP_MERGE || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   void ccpParamsToCclmModel(const ComponentID compID, const CCPModelCandidate& params, CclmModel& cclmModel);
   void cclmModelToCcpParams(const ComponentID compId, CCPModelCandidate& params, const CclmModel& cclmModel);
 

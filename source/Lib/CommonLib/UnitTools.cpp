@@ -3151,7 +3151,26 @@ bool PU::allowMPMSorted(const PredictionUnit& pu)
 }
 #endif
 
-#if JVET_AD0188_CCP_MERGE
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+bool PU::hasDecoderDerivedCCP(const PredictionUnit &pu)
+{
+  if (!pu.cs->sps->getUseLMChroma() || !pu.cu->slice->getSPS()->getUseDdCcpFusion())
+  {
+    return false;
+  }
+
+  if (pu.chromaSize().width * pu.chromaSize().height <= 16)
+  {
+    return false;
+  }
+
+  const Area area = pu.blocks[COMPONENT_Cb];
+
+  return (area.x > 0 || area.y > 0);
+}
+#endif
+
+#if JVET_AD0188_CCP_MERGE || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
 bool PU::hasNonLocalCCP(const PredictionUnit &pu)
 {
   if (!pu.cs->sps->getUseLMChroma() || !pu.cu->slice->getSPS()->getUseCcpMerge())

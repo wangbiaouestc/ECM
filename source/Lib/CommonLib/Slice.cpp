@@ -3876,6 +3876,9 @@ SPS::SPS()
 #if JVET_AD0188_CCP_MERGE
 , m_ccpMerge                      ( false )
 #endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+, m_ddCcpFusion               ( false )
+#endif
 #endif
 #if JVET_V0130_INTRA_TMP
 , m_intraTMP                  ( false )

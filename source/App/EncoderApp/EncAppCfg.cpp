@@ -1148,6 +1148,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_AD0188_CCP_MERGE
   ( "CCPMerge",                                       m_ccpMerge,                                       true, "Enable cross-componet prediction merge mode for chroma intra coding" )
 #endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  ("DDCCPFusion",                                     m_ddCcpFusion,                                    true, "Enable decoder derived CCP fusion mode for chroma intra coding")
+#endif
 #if ENABLE_OBMC
   ("OBMC",                                            m_OBMC,                                           true, "Overlapping Block Motion Compensation")
 #endif
@@ -4072,6 +4075,13 @@ bool EncAppCfg::xCheckParameter()
       m_ccpMerge = false;
     }
 #endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+    if (m_ddCcpFusion)
+    {
+      msg(WARNING, "DDCCPfusion is forcefully disabled since the enable flag of non-inter-TM tools is set off. \n");
+      m_ddCcpFusion = false;
+    }
+#endif
   }
 #endif
   if ( m_Affine == 0 )
@@ -5745,6 +5755,9 @@ void EncAppCfg::xPrintParameter()
 #endif
 #if JVET_AD0188_CCP_MERGE
   msg(VERBOSE, "CCPmerge:%d ", m_ccpMerge);
+#endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  msg(VERBOSE, "DDCCPfusion:%d ", m_ddCcpFusion);
 #endif
   msg(VERBOSE, ") ");
 #else

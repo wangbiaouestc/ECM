@@ -703,6 +703,44 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
   }
 #endif
   //===== get prediction signal =====
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION	  
+  if (compID != COMPONENT_Y && pu.decoderDerivedCcpMode)
+  {
+    if (compID == COMPONENT_Cb)
+    {
+      m_pcIntraPred->xGetLumaRecPixels(pu, area);
+      pu.cccmFlag = 1;
+      m_pcIntraPred->xGetLumaRecPixels(pu, area);
+      std::vector<DecoderDerivedCcpCandidate> decoderDerivedCcpList;
+      m_pcIntraPred->m_mmlmThreshold2 = m_pcIntraPred->xCccmCalcRefAver(pu, 2);
+      m_pcIntraPred->decoderDerivedCcp(pu, decoderDerivedCcpList);
+
+      pu.intraDir[1] = decoderDerivedCcpList[0].lmIndex;
+      pu.cccmFlag = decoderDerivedCcpList[0].isCccm;
+      pu.glCccmFlag = decoderDerivedCcpList[0].isGlcccm;
+      pu.ccInsideFilter = decoderDerivedCcpList[0].isInsideFilter;
+      pu.curCand = decoderDerivedCcpList[0].ddccpCand;
+      PelBuf predCr = cs.getPredBuf(tu.blocks[COMPONENT_Cr]);
+      if (pu.cccmFlag)
+      {
+        m_pcIntraPred->predIntraCCCM(pu, piPred, predCr, pu.intraDir[1]);
+      }
+      else
+      {
+        CclmModel modelsCb, modelsCr;
+        PU::ccpParamsToCclmModel(COMPONENT_Cb, pu.curCand, modelsCb);
+        PU::ccpParamsToCclmModel(COMPONENT_Cr, pu.curCand, modelsCr);
+        m_pcIntraPred->predIntraChromaLM(compID, piPred, pu, area, pu.intraDir[1], false, &modelsCb);
+        m_pcIntraPred->predIntraChromaLM(COMPONENT_Cr, predCr, pu, area, pu.intraDir[1], false, &modelsCr);
+      }
+      m_pcIntraPred->predDecoderDerivedIntraCCCMFusions(pu, piPred, predCr, decoderDerivedCcpList);
+      pu.cccmFlag = 0;
+      pu.glCccmFlag = 0;
+      pu.ccInsideFilter = 0;
+    }
+  }
+  else
+#endif
 #if JVET_AD0188_CCP_MERGE
   if (compID != COMPONENT_Y && pu.idxNonLocalCCP)
   {
@@ -793,8 +831,21 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
       }
       CHECK(pu.idxNonLocalCCP < 1 || pu.idxNonLocalCCP > MAX_CCP_CAND_LIST_SIZE, " Invalid idxNonLocalCCP index");
 
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+      int FusionList[MAX_CCP_FUSION_NUM * 2] = { MAX_CCP_FUSION_NUM };
+      m_pcIntraPred->reorderCCPCandidates(pu, candList, candNum, FusionList);
+#else
       m_pcIntraPred->reorderCCPCandidates(pu, candList, candNum);
+#endif
       pu.curCand = candList[candIdx];
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+      if (pu.ddNonLocalCCPFusion > 0)
+      {
+        int Idx = 2 * (pu.ddNonLocalCCPFusion - 1);
+        m_pcIntraPred->predDecoderDerivedCcpMergeFusion(pu, piPred, predCr, candList[FusionList[Idx]], candList[FusionList[Idx + 1]]);
+      }
+      else
+#endif
       m_pcIntraPred->predCCPCandidate(pu, piPred, predCr);
     }
   }
@@ -1066,12 +1117,24 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 #if SIGN_PREDICTION
 #if JVET_AA0057_CCCM
 #if JVET_AD0188_CCP_MERGE
-  if (isJCCR && compID == COMPONENT_Cb && !pu.cccmFlag && !pu.idxNonLocalCCP)   // Cr prediction was done already for CCCM
+  if (isJCCR && compID == COMPONENT_Cb && !pu.cccmFlag && !pu.idxNonLocalCCP
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION	  
+    && !pu.decoderDerivedCcpMode
+#endif
+    )   // Cr prediction was done already for CCCM
 #else
-  if(isJCCR && compID == COMPONENT_Cb && !pu.cccmFlag) // Cr prediction was done already for CCCM
+  if(isJCCR && compID == COMPONENT_Cb && !pu.cccmFlag
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION	  
+    && !pu.decoderDerivedCcpMode
+#endif
+    ) // Cr prediction was done already for CCCM
 #endif
 #else
-  if(isJCCR && compID == COMPONENT_Cb)
+  if(isJCCR && compID == COMPONENT_Cb
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION	  
+    && !pu.decoderDerivedCcpMode
+#endif
+    )
 #endif
   {
     m_pcIntraPred->initIntraPatternChType(*tu.cu, areaCr);

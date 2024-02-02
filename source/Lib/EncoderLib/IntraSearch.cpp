@@ -230,6 +230,13 @@ void IntraSearch::destroy()
 #endif
   }
 #endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  m_ddCcpStorage.destroy();
+  for (int i = 0; i < 2; i++)
+  {
+    m_ddCcpFusionStorage[i].destroy();
+  }
+#endif
 
   m_tmpStorageLCU.destroy();
   m_colorTransResiBuf.destroy();
@@ -373,6 +380,13 @@ void IntraSearch::init( EncCfg*        pcEncCfg,
 #else
     m_cccmStorage[cccmIdx].create(UnitArea(cform, Area(0, 0, MAX_CU_SIZE, MAX_CU_SIZE)));
 #endif
+  }
+#endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  m_ddCcpStorage.create(UnitArea(cform, Area(0, 0, maxCUWidth, maxCUHeight)));
+  for (int i = 0; i < 2; i++)
+  {
+    m_ddCcpFusionStorage[i].create(UnitArea(cform, Area(0, 0, maxCUWidth, maxCUHeight)));
   }
 #endif
 #if JVET_AB0155_SGPM
@@ -3142,6 +3156,11 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
     Distortion uiBestDist = 0;
     double     dBestCost = MAX_DOUBLE;
     int32_t bestBDPCMMode = 0;
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+    Distortion bestDist = ULLONG_MAX;
+    int      decoderDerivedCcpModeBest = 0;
+    int      bestDdNonLocalMergeFusion = 0;
+#endif
 #if JVET_AA0057_CCCM
     int      cccmModeBest = 0;
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
@@ -4460,6 +4479,12 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
         //----- compare -----
         if( dCost < dBestCost )
         {
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+          if (uiDist < bestDist)
+          {
+            bestDist = uiDist;
+          }
+#endif
           if( lumaUsesISP && dCost < bestCostSoFar )
           {
             bestCostSoFar = dCost;
@@ -4583,6 +4608,12 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
             //----- compare -----
             if( dCost < dBestCost )
             {
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+              if (uiDist < bestDist)
+              {
+                bestDist = uiDist;
+              }
+#endif
               if( lumaUsesISP && dCost < bestCostSoFar )
               {
                 bestCostSoFar = dCost;
@@ -4795,6 +4826,12 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
           double    dCost = m_pcRdCost->calcRdCost(fracBits, uiDist - baseDist);
           if (dCost < dBestCost)
           {
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+            if (uiDist < bestDist)
+            {
+              bestDist = uiDist;
+            }
+#endif
             if (lumaUsesISP && dCost < bestCostSoFar)
             {
               bestCostSoFar = dCost;
@@ -4902,6 +4939,12 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
             //----- compare -----
             if( dCost < dBestCost )
             {
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+              if (uiDist < bestDist)
+              {
+                bestDist = uiDist;
+              }
+#endif
               if( lumaUsesISP && dCost < bestCostSoFar )
               {
                 bestCostSoFar = dCost;
@@ -5186,6 +5229,12 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
           //----- compare -----
           if( dCost < dBestCost )
           {
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+            if (uiDist < bestDist)
+            {
+              bestDist = uiDist;
+            }
+#endif
             if( lumaUsesISP && dCost < bestCostSoFar )
             {
               bestCostSoFar = dCost;
@@ -5383,6 +5432,12 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
         //----- compare -----
         if (dCost < dBestCost)
         {
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+          if (uiDist < bestDist)
+          {
+            bestDist = uiDist;
+          }
+#endif
           if (lumaUsesISP && dCost < bestCostSoFar)
           {
             bestCostSoFar = dCost;
@@ -5471,7 +5526,13 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
         PelUnitBuf        ccpCandStorage[MAX_CCP_CAND_LIST_SIZE];
         int               numPos = PU::getCCPModelCandidateList(pu, candList);
 
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+        PelUnitBuf ccpFusionStorage[MAX_CCP_FUSION_NUM];
+        int        FusionList[MAX_CCP_FUSION_NUM * 2] = { MAX_CCP_FUSION_NUM };
+        reorderCCPCandidates(pu, candList, numPos, FusionList);
+#else
         reorderCCPCandidates(pu, candList, numPos);
+#endif
 
         const double sqrtLambdaForFirstPass = m_pcRdCost->getMotionLambda() * FRAC_BITS_SCALE;
 
@@ -5541,6 +5602,114 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
           }
         }
 
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+        if ((pu.cu->slice->getSPS()->getUseDdCcpFusion()) && (!m_skipDdCcpMergeFusionList || !(cs.slice->getSliceType() == I_SLICE)))
+        {
+          pu.idxNonLocalCCP = 1;
+          int numRDtestFusion = 2;
+          int numRDtestFusionMinusOne = numRDtestFusion - 1;
+          int orderedCCPFusionCand[MAX_CCP_FUSION_NUM];
+
+          int ccpfusionIdx;
+
+          double orderedCCPFusioncost[MAX_CCP_FUSION_NUM];
+          for (ccpfusionIdx = 0; ccpfusionIdx < MAX_CCP_FUSION_NUM; ccpfusionIdx++)
+          {
+            int ccpMergeIndex0 = FusionList[2 * ccpfusionIdx];
+            int ccpMergeIndex1 = FusionList[2 * ccpfusionIdx + 1];
+            if (ccpMergeIndex0 >= numPos || ccpMergeIndex1 >= numPos)
+            {
+              continue;
+            }
+
+            pu.intraDir[1] = LM_CHROMA_IDX;
+            pu.ddNonLocalCCPFusion = ccpfusionIdx + 1;
+
+            uint64_t         sad = 0;
+            uint64_t         sadCb = 0;
+            uint64_t         satdCb = 0;
+            uint64_t         sadCr = 0;
+            uint64_t         satdCr = 0;
+            CodingStructure &cs = *(pu.cs);
+
+            CompArea areaCb = pu.Cb();
+            PelBuf   orgCb = cs.getOrgBuf(areaCb);
+            PelBuf   srcCb0 = ccpCandStorage[ccpMergeIndex0].Cb();
+            PelBuf   srcCb1 = ccpCandStorage[ccpMergeIndex1].Cb();
+
+            CompArea areaCr = pu.Cr();
+            PelBuf   orgCr = cs.getOrgBuf(areaCr);
+            PelBuf   srcCr0 = ccpCandStorage[ccpMergeIndex0].Cr();
+            PelBuf   srcCr1 = ccpCandStorage[ccpMergeIndex1].Cr();
+
+            ccpFusionStorage[ccpfusionIdx] = m_cccmStorage[0][MAX_CCP_CAND_LIST_SIZE + ccpfusionIdx].getBuf(localUnitArea);   // Borrow the CCCM storage
+
+            PelBuf   predCb = ccpFusionStorage[ccpfusionIdx].Cb();
+            PelBuf   predCr = ccpFusionStorage[ccpfusionIdx].Cr();
+            for (int y = 0; y < areaCb.height; y++)
+            {
+              for (int x = 0; x < areaCb.width; x++)
+              {
+                predCb.at(x, y) = (srcCb0.at(x, y) + srcCb1.at(x, y) + 1) >> 1;
+                predCr.at(x, y) = (srcCr0.at(x, y) + srcCr1.at(x, y) + 1) >> 1;
+              }
+            }
+
+            m_pcRdCost->setDistParam(distParamSad, orgCb, predCb, pu.cs->sps->getBitDepth(CHANNEL_TYPE_CHROMA), COMPONENT_Cb, false);
+            m_pcRdCost->setDistParam(distParamSatd, orgCb, predCb, pu.cs->sps->getBitDepth(CHANNEL_TYPE_CHROMA), COMPONENT_Cb, true);
+            distParamSad.applyWeight = false;
+            distParamSatd.applyWeight = false;
+            sadCb = distParamSad.distFunc(distParamSad) * 2;
+            satdCb = distParamSatd.distFunc(distParamSatd);
+            sad += std::min(sadCb, satdCb);
+
+            m_pcRdCost->setDistParam(distParamSad, orgCr, predCr, pu.cs->sps->getBitDepth(CHANNEL_TYPE_CHROMA), COMPONENT_Cr, false);
+            m_pcRdCost->setDistParam(distParamSatd, orgCr, predCr, pu.cs->sps->getBitDepth(CHANNEL_TYPE_CHROMA), COMPONENT_Cr, true);
+            distParamSad.applyWeight = false;
+            distParamSatd.applyWeight = false;
+            sadCr = distParamSad.distFunc(distParamSad) * 2;
+            satdCr = distParamSatd.distFunc(distParamSatd);
+            sad += std::min(sadCr, satdCr);
+
+            m_CABACEstimator->resetBits();
+            m_CABACEstimator->nonLocalCCPIndex(pu);
+            uint64_t estbits = m_CABACEstimator->getEstFracBits();
+            double   curCost = (double)sad + sqrtLambdaForFirstPass * (double)estbits;
+            orderedCCPFusioncost[ccpfusionIdx] = curCost;
+            orderedCCPFusionCand[ccpfusionIdx] = ccpfusionIdx;
+            int maxNumFusionModeIdxForComparison = std::min(numRDtestFusion, ccpfusionIdx);
+            for (int i = 0; i < maxNumFusionModeIdxForComparison; i++)
+            {
+              if (curCost < orderedCCPFusioncost[i])
+              {
+                for (int j = numRDtestFusionMinusOne; j > i; j--)
+                {
+                  orderedCCPFusioncost[j] = orderedCCPFusioncost[j - 1];
+                  orderedCCPFusionCand[j] = orderedCCPFusionCand[j - 1];
+                }
+                orderedCCPFusioncost[i] = curCost;
+                orderedCCPFusionCand[i] = ccpfusionIdx;
+                break;
+              }
+            }
+          }
+          m_numCcpMergefusionRdo = std::min(ccpfusionIdx, numRDtestFusion);
+          for (int i = 0; i < m_numCcpMergefusionRdo; i++)
+          {
+            m_ddccpMergeFusionCost[i] = orderedCCPFusioncost[i];
+            m_ddCcpMergeFusionModeIndex[i] = orderedCCPFusionCand[i];
+            PelBuf   predCb = m_ddCcpFusionStorageTemp[i].Cb();
+            PelBuf   predCr = m_ddCcpFusionStorageTemp[i].Cr();
+            predCb.copyFrom(ccpFusionStorage[m_ddCcpMergeFusionModeIndex[i]].Cb());
+            predCr.copyFrom(ccpFusionStorage[m_ddCcpMergeFusionModeIndex[i]].Cr());
+          }
+          m_skipDdCcpMergeFusionList = true;
+          pu.ddNonLocalCCPFusion = 0;
+        }
+
+        const int finalNumRDtestFusion = m_numCcpMergefusionRdo;
+#endif
+
         const int numRDtest = std::min(2, numPos);
         for (int rdIdx = 0; rdIdx < numRDtest; rdIdx++)
         {
@@ -5585,6 +5754,12 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
           //----- compare -----
           if (dCost < dBestCost)
           {
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+            if (uiDist < bestDist)
+            {
+              bestDist = uiDist;
+            }
+#endif
             if (lumaUsesISP && dCost < bestCostSoFar)
             {
               bestCostSoFar = dCost;
@@ -5639,8 +5814,113 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
             ccpModelBest   = pu.curCand;
           }
         }
+
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+        if (pu.cu->slice->getSPS()->getUseDdCcpFusion())
+        {
+          pu.idxNonLocalCCP = 1;
+          for (int rdIdx = 0; rdIdx < finalNumRDtestFusion; rdIdx++)
+          {
+            int chromaIntraMode = LM_CHROMA_IDX;
+            pu.ddNonLocalCCPFusion = m_ddCcpMergeFusionModeIndex[rdIdx] + 1;
+            pu.curCand = candList[FusionList[2 * m_ddCcpMergeFusionModeIndex[rdIdx]]];
+
+            // Original RD check code replicated from above
+            cs.setDecomp(pu.Cb(), false);
+            cs.dist = baseDist;
+            //----- restore context models -----
+            m_CABACEstimator->getCtx() = ctxStart;
+
+            //----- chroma coding -----
+            pu.intraDir[1] = chromaIntraMode;
+#if JVET_AB0143_CCCM_TS
+            xRecurIntraChromaCodingQT(cs, partitioner, bestCostSoFar, ispType, m_ddCcpFusionStorageTemp[rdIdx]);
+#else
+            xRecurIntraChromaCodingQT(cs, partitioner, bestCostSoFar, ispType);
+#endif
+            if (lumaUsesISP && cs.dist == MAX_UINT)
+            {
+              continue;
+            }
+
+            if (cs.sps->getTransformSkipEnabledFlag())
+            {
+              m_CABACEstimator->getCtx() = ctxStart;
+            }
+
+            uint64_t   fracBits = xGetIntraFracBitsQT(cs, partitioner, false, true, -1, ispType);
+            Distortion uiDist = cs.dist;
+            double     dCost = m_pcRdCost->calcRdCost(fracBits, uiDist - baseDist);
+
+            //----- compare -----
+            if (dCost < dBestCost)
+            {
+              if (uiDist < bestDist)
+              {
+                bestDist = uiDist;
+              }
+              if (lumaUsesISP && dCost < bestCostSoFar)
+              {
+                bestCostSoFar = dCost;
+              }
+              for (uint32_t i = getFirstComponentOfChannel(CHANNEL_TYPE_CHROMA); i < numberValidComponents; i++)
+              {
+                const CompArea &area = pu.blocks[i];
+
+                saveCS.getRecoBuf(area).copyFrom(cs.getRecoBuf(area));
+#if KEEP_PRED_AND_RESI_SIGNALS
+                saveCS.getPredBuf(area).copyFrom(cs.getPredBuf(area));
+                saveCS.getResiBuf(area).copyFrom(cs.getResiBuf(area));
+#endif
+                saveCS.getPredBuf(area).copyFrom(cs.getPredBuf(area));
+                cs.picture->getPredBuf(area).copyFrom(cs.getPredBuf(area));
+#if !JVET_AB0143_CCCM_TS
+                cs.picture->getRecoBuf(area).copyFrom(cs.getRecoBuf(area));
+#endif
+
+                for (uint32_t j = 0; j < saveCS.tus.size(); j++)
+                {
+                  saveCS.tus[j]->copyComponentFrom(*orgTUs[j], area.compID);
+                }
+              }
+
+              dBestCost = dCost;
+              uiBestDist = uiDist;
+
+              uiBestMode = chromaIntraMode;
+
+              bestBDPCMMode = cu.bdpcmModeChroma;
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+              isChromaFusion = pu.isChromaFusion;
+#endif
+#if JVET_Z0050_CCLM_SLOPE
+              bestCclmOffsets = pu.cclmOffsets;
+#endif
+              cccmModeBest = pu.cccmFlag;
+#if JVET_AA0126_GLM
+              bestGlmIdc = pu.glmIdc;
+#endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+              cccmNoSubBest = pu.cccmNoSubFlag;
+#endif
+#if JVET_AC0054_GLCCCM
+              glCccmBest = pu.glCccmFlag;
+#endif
+#if JVET_AD0202_CCCM_MDF
+              cccmMultiFilterIdxBest = pu.cccmMultiFilterIdx;
+#endif
+              bestNonAdjCCCM = pu.idxNonLocalCCP;
+              ccpModelBest = pu.curCand;
+              bestDdNonLocalMergeFusion = pu.ddNonLocalCCPFusion;
+            }
+          }
+        }
+#endif
       }
       pu.idxNonLocalCCP = 0;
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+      pu.ddNonLocalCCPFusion = 0;
+#endif
 #if JVET_AD0188_CCP_MERGE
       pu.curCand = {};
 #endif
@@ -5697,6 +5977,12 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
             //----- compare -----
             if (dCost < dBestCost)
             {
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+              if (uiDist < bestDist)
+              {
+                bestDist = uiDist;
+              }
+#endif
               if (lumaUsesISP && dCost < bestCostSoFar)
               {
                 bestCostSoFar = dCost;
@@ -5751,6 +6037,9 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
 #endif
               bestCCInsideFilter = pu.ccInsideFilter;
               bestNonAdjCCCM = pu.idxNonLocalCCP;
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+              bestDdNonLocalMergeFusion = pu.ddNonLocalCCPFusion;
+#endif
               ccpModelBest   = pu.curCand;
             }
           }
@@ -5758,6 +6047,146 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
       }
       pu.bvgCccmFlag = 0;
       pu.cccmFlag = 0;
+#endif
+
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+      if (PU::hasDecoderDerivedCCP(pu))
+      {
+        if (!m_skipDdCcpListConstruction || !(cs.slice->getSliceType() == I_SLICE))
+        {
+          m_decoderDerivedCcpList.clear();
+          pu.cccmFlag = 1;
+          m_mmlmThreshold2 = xCccmCalcRefAver(pu, 2);
+          decoderDerivedCcp(pu, m_decoderDerivedCcpList);
+          m_skipDdCcpListConstruction = true;
+        }
+        int numDdccpModes = int(m_decoderDerivedCcpList.size());
+
+        for (int idx = 0; idx < std::min(numDdccpModes, 1); idx++)
+        {
+          pu.decoderDerivedCcpMode = idx + 1;
+          pu.intraDir[1] = m_decoderDerivedCcpList[idx].lmIndex;
+#if JVET_AA0057_CCCM
+          pu.cccmFlag = m_decoderDerivedCcpList[idx].isCccm;
+#endif
+#if JVET_AC0054_GLCCCM
+          pu.glCccmFlag = m_decoderDerivedCcpList[idx].isGlcccm;
+#endif
+#if JVET_AD0120_LBCCP
+          pu.ccInsideFilter = m_decoderDerivedCcpList[idx].isInsideFilter;
+#endif
+#if JVET_AD0188_CCP_MERGE
+          pu.curCand = m_decoderDerivedCcpList[idx].ddccpCand;
+#endif
+
+          // Original RD check code replicated from above
+          cs.setDecomp(pu.Cb(), false);
+          cs.dist = baseDist;
+          //----- restore context models -----
+          m_CABACEstimator->getCtx() = ctxStart;
+
+          //----- chroma coding -----
+          xRecurIntraChromaCodingQT(cs, partitioner, bestCostSoFar, ispType, (firstTransformDdccp || !(cs.slice->getSliceType() == I_SLICE)) ? UnitBuf<Pel>() : m_ddCcpStorageTemp
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+            , pcInterPred
+#endif
+          );
+          if (lumaUsesISP && cs.dist == MAX_UINT)
+          {
+            continue;
+          }
+
+          if (cs.sps->getTransformSkipEnabledFlag())
+          {
+            m_CABACEstimator->getCtx() = ctxStart;
+          }
+
+          uint64_t   fracBits = xGetIntraFracBitsQT(cs, partitioner, false, true, -1, ispType);
+          Distortion uiDist = cs.dist;
+          double     dCost = m_pcRdCost->calcRdCost(fracBits, uiDist - baseDist);
+
+          //----- compare -----
+          if ((dCost < dBestCost) && ((cs.slice->getSliceType() == I_SLICE) || (uiDist < 1.1 * bestDist)))
+          {
+            if (lumaUsesISP && dCost < bestCostSoFar)
+            {
+              bestCostSoFar = dCost;
+            }
+            for (uint32_t i = getFirstComponentOfChannel(CHANNEL_TYPE_CHROMA); i < numberValidComponents; i++)
+            {
+              const CompArea &area = pu.blocks[i];
+
+              saveCS.getRecoBuf(area).copyFrom(cs.getRecoBuf(area));
+#if KEEP_PRED_AND_RESI_SIGNALS
+              saveCS.getPredBuf(area).copyFrom(cs.getPredBuf(area));
+              saveCS.getResiBuf(area).copyFrom(cs.getResiBuf(area));
+#endif
+              saveCS.getPredBuf(area).copyFrom(cs.getPredBuf(area));
+              cs.picture->getPredBuf(area).copyFrom(cs.getPredBuf(area));
+#if !JVET_AB0143_CCCM_TS
+              cs.picture->getRecoBuf(area).copyFrom(cs.getRecoBuf(area));
+#endif
+
+              for (uint32_t j = 0; j < saveCS.tus.size(); j++)
+              {
+                saveCS.tus[j]->copyComponentFrom(*orgTUs[j], area.compID);
+              }
+            }
+
+            dBestCost = dCost;
+            uiBestDist = uiDist;
+
+            uiBestMode = pu.intraDir[1];
+            bestBDPCMMode = cu.bdpcmModeChroma;
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+            isChromaFusion = 0;
+#endif
+            decoderDerivedCcpModeBest = pu.decoderDerivedCcpMode;
+#if JVET_AA0057_CCCM
+            cccmModeBest = 0;
+#endif
+#if JVET_AD0202_CCCM_MDF
+            cccmMultiFilterIdxBest = 0;
+#endif
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+            cccmNoSubBest = 0;
+#endif
+#if JVET_AC0054_GLCCCM
+            glCccmBest = 0;
+#endif
+#if JVET_AE0100_BVGCCCM
+            bvgCccmBest = 0;
+#endif
+#if JVET_AD0120_LBCCP
+            bestCCInsideFilter = 0;
+#endif
+#if JVET_Z0050_CCLM_SLOPE
+            bestCclmOffsets = pu.cclmOffsets;
+#endif
+#if JVET_AA0126_GLM
+            bestGlmIdc = pu.glmIdc;
+#endif
+#if JVET_AD0188_CCP_MERGE
+            ccpModelBest = pu.curCand;
+            bestDdNonLocalMergeFusion = pu.ddNonLocalCCPFusion;
+#endif
+            bestNonAdjCCCM = pu.idxNonLocalCCP;
+          }
+        }
+        pu.decoderDerivedCcpMode = 0;
+#if JVET_AA0057_CCCM
+        pu.cccmFlag = 0;
+#endif
+#if JVET_AC0054_GLCCCM
+        pu.glCccmFlag = 0;
+#endif
+#if JVET_AD0120_LBCCP
+        pu.ccInsideFilter = 0;
+#endif
+#if JVET_AD0188_CCP_MERGE
+        pu.curCand = {};
+#endif
+      }
 #endif
 
       for( uint32_t i = getFirstComponentOfChannel( CHANNEL_TYPE_CHROMA ); i < numberValidComponents; i++ )
@@ -5788,6 +6217,10 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
     pu.intraDir[1] = uiBestMode;
     cs.dist        = uiBestDist;
     cu.bdpcmModeChroma = bestBDPCMMode;
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+    pu.decoderDerivedCcpMode = decoderDerivedCcpModeBest;
+    pu.ddNonLocalCCPFusion = bestDdNonLocalMergeFusion;
+#endif
 #if JVET_Z0050_CCLM_SLOPE
     pu.cclmOffsets     = bestCclmOffsets;
 #endif
@@ -10538,9 +10971,50 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
     initIntraPatternChType( *currTU.cu, cbArea);
     initIntraPatternChType( *currTU.cu, crArea);
 
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION	  
+    if (pu.decoderDerivedCcpMode)
+    {
+      if (!predStorage.bufs.empty())
+      {
+        piPredCb.copyFrom(predStorage.Cb());
+        piPredCr.copyFrom(predStorage.Cr());
+      }
+      else
+      {
+        if (pu.cccmFlag)
+        {
+          predIntraCCCM(pu, piPredCb, piPredCr, predMode);
+        }
+        else
+        {
+          CclmModel modelsCb, modelsCr;
+          PU::ccpParamsToCclmModel(COMPONENT_Cb, pu.curCand, modelsCb);
+          PU::ccpParamsToCclmModel(COMPONENT_Cr, pu.curCand, modelsCr);
+          predIntraChromaLM(COMPONENT_Cb, piPredCb, pu, cbArea, predMode, false, &modelsCb);
+          predIntraChromaLM(COMPONENT_Cr, piPredCr, pu, crArea, predMode, false, &modelsCr);
+        }
+        predDecoderDerivedIntraCCCMFusions(pu, piPredCb, piPredCr, m_decoderDerivedCcpList);
+        PelBuf   predCb = m_ddCcpStorageTemp.Cb();
+        PelBuf   predCr = m_ddCcpStorageTemp.Cr();
+        predCb.copyFrom(piPredCb);
+        predCr.copyFrom(piPredCr);
+        firstTransformDdccp = false;
+      }
+    }
+    else
+#endif
  #if JVET_AD0188_CCP_MERGE
     if (pu.idxNonLocalCCP)
     {
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+      if (pu.ddNonLocalCCPFusion > 0)
+      {
+        piPredCb.copyFrom(predStorage.Cb());
+        piPredCr.copyFrom(predStorage.Cr());
+      }
+      else
+      {
+#endif
       if (!predStorage.bufs.empty())
       {
         piPredCb.copyFrom(predStorage.Cb());
@@ -10550,6 +11024,9 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
       {
         predCCPCandidate(pu, piPredCb, piPredCr);
       }
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+      }
+#endif
     }
     else
 #endif

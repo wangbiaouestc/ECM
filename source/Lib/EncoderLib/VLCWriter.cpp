@@ -1690,6 +1690,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if JVET_AD0188_CCP_MERGE
   WRITE_UVLC(pcSPS->getUseCcpMerge(), "sps_ccp_merge");
 #endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  WRITE_UVLC(pcSPS->getUseDdCcpFusion(), "sps_ddccp_fusion");
+#endif
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
   }
   else

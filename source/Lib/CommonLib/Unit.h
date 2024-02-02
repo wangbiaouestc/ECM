@@ -540,13 +540,17 @@ struct IntraPredictionData
 #endif
   bool      mipTransposedFlag;
   int8_t    multiRefIdx;
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  int       decoderDerivedCcpMode;
+  int       ddNonLocalCCPFusion;
+#endif
 #if JVET_Z0050_CCLM_SLOPE
   CclmOffsets cclmOffsets;
 #endif
 #if JVET_AA0126_GLM
   GlmIdc    glmIdc;
 #endif
-#if JVET_AA0057_CCCM
+#if JVET_AA0057_CCCM || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   int       cccmFlag;
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   int       cccmNoSubFlag;
@@ -568,7 +572,7 @@ struct IntraPredictionData
   int       idxNonLocalCCP;
   CCPModelCandidate curCand;
 #endif
-#if JVET_AD0120_LBCCP
+#if JVET_AD0120_LBCCP || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   int       ccInsideFilter;
 #endif
 };
