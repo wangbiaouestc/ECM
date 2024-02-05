@@ -8041,7 +8041,13 @@ void CABACWriter::residual_coding( const TransformUnit& tu, ComponentID compID, 
 
     if (cuCtx && tu.mtsIdx[compID] != MTS_SKIP && tu.blocks[compID].height >= 4 && tu.blocks[compID].width >= 4)
     {
+#if JVET_AG0061_INTER_LFNST_NSPT
+      const int lfnstLastScanPosTh = CU::isIntra(*(tu.cu))
+                                       ? (isLuma(compID) ? LFNST_LAST_SIG_LUMA : LFNST_LAST_SIG_CHROMA)
+                                       : (isLuma(compID) ? LFNST_LAST_SIG_LUMA_INTER : LFNST_LAST_SIG_CHROMA_INTER);
+#else
       const int lfnstLastScanPosTh = isLuma(compID) ? LFNST_LAST_SIG_LUMA : LFNST_LAST_SIG_CHROMA;
+#endif
       cuCtx->lfnstLastScanPos |= cctx.scanPosLast() >= lfnstLastScanPosTh;
     }
     if (cuCtx && isLuma(compID) && tu.mtsIdx[compID] != MTS_SKIP)
@@ -8316,7 +8322,11 @@ void CABACWriter::residual_lfnst_mode( const CodingUnit& cu, CUCtx& cuCtx )
   }
 #endif
 
-  if( cu.cs->sps->getUseLFNST() && CU::isIntra( cu ) )
+#if JVET_AG0061_INTER_LFNST_NSPT
+  if (cu.cs->sps->getUseLFNST() && (CU::isIntra(cu) || CU::isInter(cu)))
+#else
+  if (cu.cs->sps->getUseLFNST() && CU::isIntra(cu))
+#endif
   {
 #if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
     const bool lumaFlag                   = CS::isDualITree(*cu.cs) ? (isLuma(cu.chType) ? true : false) : true;
@@ -8348,31 +8358,50 @@ void CABACWriter::residual_lfnst_mode( const CodingUnit& cu, CUCtx& cuCtx )
   {
     return;
   }
-
-
-  unsigned cctx = 0;
+#if JVET_AG0061_INTER_LFNST_NSPT
+  if (CU::isInter(cu))
+  {
+    uint32_t idxLFNST = cu.lfnstIdx;
+    assert(idxLFNST < 4);
+    m_BinEncoder.encodeBin(idxLFNST > 0, Ctx::InterLFNSTIdx(0));
+    if (idxLFNST > 0)
+    {
+      m_BinEncoder.encodeBin(idxLFNST > 1, Ctx::InterLFNSTIdx(1));
+      if (idxLFNST > 1)
+      {
+        m_BinEncoder.encodeBin(idxLFNST > 2, Ctx::InterLFNSTIdx(2));
+      }
+    }
+  }
+  else
+  {
+#endif
+    unsigned cctx = 0;
 #if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
-  if (CS::isDualITree(*cu.cs)) cctx++;
+    if (CS::isDualITree(*cu.cs)) cctx++;
 #else
-  if ( cu.isSepTree() ) cctx++;
+    if ( cu.isSepTree() ) cctx++;
 #endif
 #if EXTENDED_LFNST || JVET_W0119_LFNST_EXTENSION
-  uint32_t idxLFNST = cu.lfnstIdx;
-  assert( idxLFNST < 4);
+    uint32_t idxLFNST = cu.lfnstIdx;
+    assert(idxLFNST < 4);
 
-  uint32_t firstBit = idxLFNST & 1;
-  uint32_t secondBit = (idxLFNST >> 1) & 1 ;
-  m_BinEncoder.encodeBin( firstBit, Ctx::LFNSTIdx( cctx ) );
-  cctx = 2 + firstBit;
-  m_BinEncoder.encodeBin(secondBit, Ctx::LFNSTIdx( cctx ) );
+    uint32_t firstBit  = idxLFNST & 1;
+    uint32_t secondBit = (idxLFNST >> 1) & 1;
+    m_BinEncoder.encodeBin(firstBit, Ctx::LFNSTIdx(cctx));
+    cctx = 2 + firstBit;
+    m_BinEncoder.encodeBin(secondBit, Ctx::LFNSTIdx(cctx));
 #else
-  const uint32_t idxLFNST = cu.lfnstIdx;
-  assert( idxLFNST < 3 );
-  m_BinEncoder.encodeBin( idxLFNST ? 1 : 0, Ctx::LFNSTIdx( cctx ) );
+    const uint32_t idxLFNST = cu.lfnstIdx;
+    assert( idxLFNST < 3 );
+    m_BinEncoder.encodeBin( idxLFNST ? 1 : 0, Ctx::LFNSTIdx( cctx ) );
 
-  if( idxLFNST )
-  {
-    m_BinEncoder.encodeBin( (idxLFNST - 1) ? 1 : 0, Ctx::LFNSTIdx(2));
+    if( idxLFNST )
+    {
+      m_BinEncoder.encodeBin( (idxLFNST - 1) ? 1 : 0, Ctx::LFNSTIdx(2));
+    }
+#endif
+#if JVET_AG0061_INTER_LFNST_NSPT
   }
 #endif
   DTRACE( g_trace_ctx, D_SYNTAX, "residual_lfnst_mode() etype=%d pos=(%d,%d) mode=%d\n", COMPONENT_Y, cu.lx(), cu.ly(), ( int ) cu.lfnstIdx );

@@ -436,6 +436,9 @@ private:
 #if JVET_AA0133_INTER_MTS_OPT
   double                m_mtsCostSave;
 #endif
+#if JVET_AG0061_INTER_LFNST_NSPT
+  double                m_LNCostSave;
+#endif
 #if JVET_W0097_GPM_MMVD_TM
   MergeCtx              m_mergeCand;
   bool                  m_mergeCandAvail;

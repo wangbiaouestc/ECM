@@ -24997,7 +24997,13 @@ bool CU::bdpcmAllowed( const CodingUnit& cu, const ComponentID compID )
        }
   return bdpcmAllowed;
 }
-
+#if JVET_AG0061_INTER_LFNST_NSPT
+bool CU::isLfnstAllowed(const CodingUnit &cu, const ComponentID compID)
+{
+  bool lfnstAllowed = cu.chType == CHANNEL_TYPE_LUMA && compID == COMPONENT_Y;
+  return lfnstAllowed;
+}
+#endif
 bool CU::isMTSAllowed(const CodingUnit &cu, const ComponentID compID)
 {
   SizeType tsMaxSize = 1 << cu.cs->sps->getLog2MaxTransformSkipBlockSize();
@@ -26174,6 +26180,16 @@ uint32_t PU::getFinalIntraModeForTransform( const TransformUnit &tu, const Compo
 #endif
   }
 #endif
+#if JVET_AG0061_INTER_LFNST_NSPT
+  if (CU::isInter(*tu.cu))
+  {
+    intraMode = tu.cu->dimdDerivedIntraDir;
+  }
+  if (tu.cu->geoFlag)
+  {
+    intraMode = g_geoAngle2IntraAng[g_geoParams[tu.cu->firstPU->geoSplitDir][0]];
+  }
+#endif
 #if JVET_AB0155_SGPM
   if( PU::isSgpm( *tu.cs->getPU( area.pos(), toChannelType( compID ) ), toChannelType( compID ) ) )
   {
@@ -26246,6 +26262,12 @@ uint32_t PU::getNSPTIntraMode( int wideAngPredMode )
 bool CU::isNSPTAllowed( const TransformUnit &tu, const ComponentID compID, int width, int height, bool isIntra )
 {
   bool allowNSPT = isIntra;
+#if JVET_AG0061_INTER_LFNST_NSPT
+  if (CU::isInter(*tu.cu))
+  {
+    allowNSPT = true;
+  }
+#endif
   if( allowNSPT )
   {
     allowNSPT = ( ( width == 4 && height ==  4 ) || ( width ==  8 && height == 8 ) || ( width == 4 && height ==  8 ) || ( width ==  8 && height == 4 ) ||
@@ -26539,6 +26561,107 @@ void fillNonMPMList(uint8_t* mpm, uint8_t* non_mpm)
     }
   }
   CHECK(numNonMPM != NUM_LUMA_MODE - NUM_MOST_PROBABLE_MODES, "");
+}
+#endif
+#if JVET_AG0061_INTER_LFNST_NSPT
+int buildHistogram(const Pel *pReco, int iStride, uint32_t uiHeight, uint32_t uiWidth, int *piHistogram, int direction,
+                   int bw, int bh)
+{
+  const int wStep = 1, hStep = 1;
+  int       angTable[17]   = { 0,     2048,  4096,  6144,  8192,  12288, 16384, 20480, 24576,
+                       28672, 32768, 36864, 40960, 47104, 53248, 59392, 65536 };
+  int       offsets[4]     = { HOR_IDX, HOR_IDX, VER_IDX, VER_IDX };
+  int       dirs[4]        = { -1, 1, -1, 1 };
+  int       mapXgrY1[2][2] = { { 1, 0 }, { 0, 1 } };
+  int       mapXgrY0[2][2] = { { 2, 3 }, { 3, 2 } };
+
+  for (uint32_t y = 0; y < uiHeight; y += hStep)
+  {
+    for (uint32_t x = 0; x < uiWidth; x += wStep)
+    {
+      if ((direction == 3) && x == (uiWidth - 1) && y == (uiHeight - 1))
+      {
+        continue;
+      }
+
+      const Pel *pRec = pReco + y * iStride + x;
+
+      int iDy =
+        pRec[-iStride - 1] + 2 * pRec[-1] + pRec[iStride - 1] - pRec[-iStride + 1] - 2 * pRec[+1] - pRec[iStride + 1];
+      int iDx = pRec[iStride - 1] + 2 * pRec[iStride] + pRec[iStride + 1] - pRec[-iStride - 1] - 2 * pRec[-iStride]
+                - pRec[-iStride + 1];
+
+      if (iDy == 0 && iDx == 0)
+      {
+        continue;
+      }
+
+      int iAmp       = (int) (abs(iDx) + abs(iDy));
+      int iAngUneven = -1;
+      // for determining region
+      if (iDx != 0 && iDy != 0)   // pure angles are not concerned
+      {
+        // get the region
+        int signx  = iDx < 0 ? 1 : 0;
+        int signy  = iDy < 0 ? 1 : 0;
+        int absx   = iDx < 0 ? -iDx : iDx;
+        int absy   = iDy < 0 ? -iDy : iDy;
+        int gtY    = absx > absy ? 1 : 0;
+        int region = gtY ? mapXgrY1[signy][signx] : mapXgrY0[signy][signx];
+        // region = (region == 1 ? 2 : (region == 2 ? 1 : (region == 3 ? 4 : 3)));
+#if JVET_X0149_TIMD_DIMD_LUT
+        int s0   = gtY ? absy : absx;
+        int s1   = gtY ? absx : absy;
+        int x    = floorLog2(s1);
+        int norm = (s1 << 4 >> x) & 15;
+        int v    = g_gradDivTable[norm] | 8;
+        x += (norm != 0);
+        int shift = 13 - x;
+        int ratio;
+        if (shift < 0)
+        {
+          shift   = -shift;
+          int add = (1 << (shift - 1));
+          ratio   = (s0 * v + add) >> shift;
+        }
+        else
+        {
+          ratio = (s0 * v) << shift;
+        }
+
+        // iRatio after integerization can go beyond 2^16
+#else
+        float fRatio = gtY ? static_cast<float>(absy) / static_cast<float>(absx)
+                           : static_cast<float>(absx) / static_cast<float>(absy);
+        float fRatioScaled = fRatio * (1 << 16);
+        int ratio = static_cast<int>(fRatioScaled);
+#endif
+        // get ang_idx
+        int idx = 16;
+        for (int i = 1; i < 17; i++)
+        {
+          if (ratio <= angTable[i])
+          {
+            idx = ratio - angTable[i - 1] < angTable[i] - ratio ? i - 1 : i;
+            break;
+          }
+        }
+
+        iAngUneven = offsets[region] + dirs[region] * idx;
+        // iAngUneven = offsets[region - 1] + dirs[region - 1] * idx;
+      }
+      else
+      {
+        iAngUneven = iDx == 0 ? VER_IDX : HOR_IDX;
+      }
+
+      CHECK(iAngUneven < 0, "Wrong mode in DIMD histogram");
+      CHECK(iAngUneven >= NUM_LUMA_MODE, "Wrong mode in DIMD histogram");
+
+      piHistogram[iAngUneven] += iAmp;
+    }
+  }
+  return 0;
 }
 #endif
 

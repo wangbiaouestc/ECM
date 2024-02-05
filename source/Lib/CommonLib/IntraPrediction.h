@@ -734,7 +734,9 @@ public:
 #if JVET_AB0067_MIP_DIMD_LFNST && ENABLE_DIMD
   static int deriveDimdMipMode(PelBuf& reducedPred, int width, int height, CodingUnit& cu);
 #endif
+#if !JVET_AG0061_INTER_LFNST_NSPT
   static int  buildHistogram      ( const Pel *pReco, int iStride, uint32_t uiHeight, uint32_t uiWidth, int* piHistogram, int direction, int bw, int bh );
+#endif
 #endif
 #if JVET_W0123_TIMD_FUSION || JVET_AC0119_LM_CHROMA_FUSION
   void xIntraPredTimdHorVerPdpc   (Pel* pDsty,const int dstStride, Pel* refSide, const int width, const int height, int xOffset, int yOffset, int scale, const Pel* refMain, const ClpRng& clpRng);

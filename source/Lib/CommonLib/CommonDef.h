@@ -727,6 +727,10 @@ static const int MAX_LFNST_COEF_NUM =                              16;
 
 static const int LFNST_LAST_SIG_LUMA =                              1;
 static const int LFNST_LAST_SIG_CHROMA =                            1;
+#if JVET_AG0061_INTER_LFNST_NSPT
+static const int LFNST_LAST_SIG_LUMA_INTER   =                      1;
+static const int LFNST_LAST_SIG_CHROMA_INTER =                      0;
+#endif
 
 #if EXTENDED_LFNST || JVET_W0119_LFNST_EXTENSION
 static const int NUM_LFNST_NUM_PER_SET =                            4;

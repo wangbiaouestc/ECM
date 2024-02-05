@@ -904,6 +904,36 @@ void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, cons
 // ====================================================================================================================
 // Public member functions
 // ====================================================================================================================
+#if JVET_AG0061_INTER_LFNST_NSPT
+int InterPrediction::deriveInterDimdMode(const CodingUnit cu, CPelBuf predBuf)
+{
+  int        sigcnt  = 0;
+  const Pel *pPred   = predBuf.buf;
+  const int  iStride = predBuf.stride;
+  int        height  = predBuf.height;
+  int        width   = predBuf.width;
+
+  int piHistogramClean[NUM_LUMA_MODE] = { 0 };
+
+  pPred = pPred + iStride + 1;
+  sigcnt += buildHistogram(pPred, iStride, height - 2, width - 2, piHistogramClean, 0, width - 2, height - 2);
+
+  int firstAmp = 0, curAmp = 0;
+  int firstMode = 0, curMode = 0;
+  for (int i = 0; i < NUM_LUMA_MODE; i++)
+  {
+    curAmp  = piHistogramClean[i];
+    curMode = i;
+    if (curAmp > firstAmp)
+    {
+      firstAmp  = curAmp;
+      firstMode = curMode;
+    }
+  }
+  return firstMode;
+}
+#endif
+
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
 bool InterPrediction::xCheckIdenticalMotionSubTMVP(const PredictionUnit &pu)
 {
