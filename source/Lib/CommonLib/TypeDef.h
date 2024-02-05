@@ -138,6 +138,10 @@
 #define JVET_AD0086_ENHANCED_INTRA_TMP                    1 // JVET-AD0086: Enhanced intra TMP
 #define JVET_AE0077_EXT_INTRATMP                          1 // JVET-AE0077: Extended search areas for intraTMP
 #define JVET_AF0079_STORING_INTRATMP                      1 // JVET-AF0079: Storing fractional-pel intraTMP BV
+#define JVET_AG0136_INTRA_TMP_LIC                         1 // JVET-AG0136: Intra TMP extension to LIC
+#define JVET_AG0151_INTRA_TMP_MERGE_MODE                  1 // JVET-AG0151: Intra TMP with merge candidates
+#define JVET_AG0152_SGPM_ITMP_IBC                         1 // JVET-AG0152: SGPM with Intra TMP and IBC
+#define JVET_AG0146_DIMD_ITMP_IBC                         1 // JVET-AG0146: DIMD with Intra TMP and IBC
 #endif
 
 #define JVET_W0123_TIMD_FUSION                            1 // JVET-W0123: Template based intra mode derivation and fusion
@@ -198,6 +202,8 @@
 #define JVET_AD0120_LBCCP                                 1 // JVET-AD0120: Local-Boosting Cross-Component Prediction, wherein the template part is controlled by CCCM SPS
 #define JVET_AE0043_CCP_MERGE_TEMPORAL                    1 // JVET-AE0043: Cross-component merge mode with temporal candidates
 #define JVET_AG0058_EIP                                   1 // JVET-AG0058: Extrapolation filter-based intra prediction mode
+#define JVET_AG0154_DECODER_DERIVED_CCP_FUSION            1 // JVET-AG0154: Decoder derived CCP mode with fusion candidates
+#define JVET_AG0059_CCP_MERGE_ENHANCEMENT                 1 // JVET-AG0059: Enhancements on CCP merge for chroma intra coding
 
 //IBC
 #define JVET_Y0058_IBC_LIST_MODIFY                        1 // JVET-Y0058: Modifications of IBC merge/AMVP list construction, ARMC-TM-IBC part is included under JVET_W0090_ARMC_TM
@@ -379,6 +385,7 @@
 #define JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST              1 // JVET-AC0115: Modifications of MTS/LFNST for Intra TMP coded block
 #define JVET_AE0125_SHIFT_QUANTIZATION_CENTER             1 // JVET-AE0125: Shifting quantization center
 #define JVET_AE0102_LFNST_CTX                             1 // JVET-AE0102: Context modelling for transform coefficients for LFNST/NSPT
+#define JVET_AG0061_INTER_LFNST_NSPT                      1 // JVET-AG0061: 3.3 Utilizing LFNST/NSPT for inter coding
 #define JVET_AG0100_TRANSFORM_COEFFICIENT_CODING          1 // JVET_AG0100: 3.2b Transform coefficient coding
 #define JVET_AG0143_INTER_INTRA                           1 // JVET_AG0143: 3.1c CABAC inter/intra model switch
 
@@ -417,6 +424,7 @@
 #define JVET_AF0112_BIF_DYNAMIC_SCALING                   1 // JVET-AF0112: Dynamic TU scale factor for BIF with LUTs interpolation
 #define JVET_AG0157_ALF_CHROMA_FIXED_FILTER               1 // JVET-AG0157: Fixed filter for chroma ALF
 #define JVET_AG0158_ALF_LUMA_COEFF_PRECISION              1 // JVET-AG0158: adaptive precision for luma ALF coefficients
+#define JVET_AG0145_ADAPTIVE_CLIPPING                     1 // JVET-AG0145: Adaptive clipping with signalled lower and upper bounds
 
 // SIMD optimizations
 #if IF_12TAP
@@ -1850,7 +1858,7 @@ struct EIPInfo
 };
 #endif
 
-#if JVET_AB0155_SGPM
+#if JVET_AB0155_SGPM && !JVET_AG0152_SGPM_ITMP_IBC
 struct SgpmInfo
 {
   int sgpmSplitDir;

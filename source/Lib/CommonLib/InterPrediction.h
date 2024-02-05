@@ -186,6 +186,9 @@ public:
   bool isMvOOB(const Mv& rcMv, const struct Position pos, const struct Size size, const SPS* sps, const PPS* pps, bool *mcMask, bool *mcMaskChroma, bool lumaOnly = false);
   bool isMvOOBSubBlk(const Mv& rcMv, const struct Position pos, const struct Size size, const SPS* sps, const PPS* pps, bool *mcMask, int mcStride, bool *mcMaskChroma, int mcCStride, bool lumaOnly = false);
 #endif
+#if JVET_AG0061_INTER_LFNST_NSPT
+  static int deriveInterDimdMode(const CodingUnit cu, CPelBuf predBuf);
+#endif
 #if INTER_LIC || (TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC // note: already refactor
   Reshape*          m_pcReshape;
 #endif
@@ -198,6 +201,9 @@ private:
   int               m_LICMultApprox[64];
 #endif
 
+#if JVET_AG0136_INTRA_TMP_LIC
+  std::array<int, 7> m_arrayLicParams;
+#endif
 #if INTER_LIC || JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   // buffer size for left/above current templates and left/above reference templates
 #if JVET_AD0213_LIC_IMP
@@ -655,6 +661,9 @@ public:
     , bool &isMvdDerivedVecOrigSpecified
 #endif
   );
+#if JVET_AG0136_INTRA_TMP_LIC
+  std::array<int, 7>& getArrayLicParams() { return m_arrayLicParams; }
+#endif
 
 
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
@@ -720,6 +729,17 @@ public:
       m_storeBeforeLIC  = storeBeforeLIC;
     }
 #endif
+  }
+#endif
+#if JVET_AG0136_INTRA_TMP_LIC
+  inline void LicItmp(PredictionUnit &pu, PelBuf &dstBuf, const bool isLinearTransformDone)
+  {
+    CHECKD(pu.cu->ibcLicFlag!=pu.cu->tmpLicFlag, "InterPrediction::LicItmp: abnormal: pu.cu->ibcLicFlag and pu.cu->tmpLicFlag should be equal");
+    CHECKD((pu.cu)->ibcFilterFlag, "`pu.cu->ibcFilterFlag` is not false.");
+    if(pu.cu->ibcLicFlag || pu.cu->tmpLicFlag )
+    {
+      xLocalIlluComp(pu, COMPONENT_Y, pu.mv[0], dstBuf, isLinearTransformDone);
+    }
   }
 #endif
 #if ENABLE_OBMC
@@ -1296,7 +1316,11 @@ public:
 
 #if JVET_AC0112_IBC_LIC
   void xGetSublkTemplate (const CodingUnit& cu, const ComponentID compID, const Mv& bv, const int sublkWidth, const int sublkHeight, const int posW, const int posH, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate);
-  void xLocalIlluComp (const PredictionUnit& pu, const ComponentID compID, const Mv& bv, PelBuf& dstBuf);
+  void xLocalIlluComp (const PredictionUnit& pu, const ComponentID compID, const Mv& bv, PelBuf& dstBuf
+#if JVET_AG0136_INTRA_TMP_LIC
+                       , const bool isLinearTransformDone
+#endif
+                       );
   template <bool trueAfalseL>
   void xGetIbcLicPredBlkTpl(const CodingUnit& cu, const ComponentID compID, const CPelBuf& refBuf, const Mv& mv, const int posW, const int posH, const int tplSize, Pel* predBlkTpl);
 #endif

@@ -134,7 +134,10 @@ public:
 #if JVET_AA0057_CCCM
   void        cccmFlag                  ( PredictionUnit&               pu );
 #endif
-#if JVET_AD0188_CCP_MERGE
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  void        decoderDerivedCcpModes    ( PredictionUnit&               pu );
+#endif
+#if JVET_AD0188_CCP_MERGE || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   void        nonLocalCCPIndex          ( PredictionUnit&               pu );
 #endif
 #if JVET_AD0120_LBCCP
@@ -372,26 +375,6 @@ public:
   void        isp_mode                  ( CodingUnit&                   cu );
   int         last_sig_coeff            ( CoeffCodingContext&           cctx,   TransformUnit& tu, ComponentID   compID );
 
-#if JVET_AG0143_INTER_INTRA
-#if TCQ_8STATES
-#if SIGN_PREDICTION
-#if JVET_AE0102_LFNST_CTX
-  void        residual_coding_subblock(CoeffCodingContext& cctx, TCoeff* coeff, SIGN_PRED_TYPE* sign, const uint64_t stateTransTable, int& state, const CodingUnit &cu, ComponentID compID, int lfnstIdx);
-#else
-  void        residual_coding_subblock(CoeffCodingContext& cctx, TCoeff* coeff, SIGN_PRED_TYPE* sign, const uint64_t stateTransTable, int& state, const CodingUnit &cu, ComponentID compID);
-#endif
-#else
-  void residual_coding_subblock(CoeffCodingContext &cctx, TCoeff *coeff, const uint64_t stateTransTable, int &state, const CodingUnit &cu, ComponentID compID);
-#endif
-#else
-#if SIGN_PREDICTION
-  void        residual_coding_subblock(CoeffCodingContext &cctx, TCoeff *coeff, SIGN_PRED_TYPE *sign,
-    const int stateTransTable, int &state, const CodingUnit &cu, ComponentID compID);
-#else
-  void residual_coding_subblock(CoeffCodingContext &cctx, TCoeff *coeff, const int stateTransTable, int &state, const CodingUnit &cu, ComponentID compID);
-#endif
-#endif
-#else
 #if TCQ_8STATES
 #if SIGN_PREDICTION
 #if JVET_AE0102_LFNST_CTX
@@ -411,19 +394,11 @@ public:
 #endif
 #endif
 
-
-#endif
 #if SIGN_PREDICTION
   void        parsePredictedSigns       ( TransformUnit &tu, ComponentID compID);
 #endif
 	void        residual_codingTS         ( TransformUnit&                tu,     ComponentID     compID );
-#if JVET_AG0143_INTER_INTRA
-
-  void residual_coding_subblockTS(CoeffCodingContext &cctx, TCoeff *coeff, const CodingUnit &cu,
-                                        ComponentID compID);
-#else
   void   residual_coding_subblockTS(CoeffCodingContext &cctx, TCoeff *coeff);
-#endif
   void        joint_cb_cr               ( TransformUnit&                tu,     const int cbfMask );
 
 

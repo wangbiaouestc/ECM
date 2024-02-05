@@ -1882,6 +1882,7 @@ void EncSlice::setJointCbCrModes( CodingStructure& cs, const Position topLeftLum
   cs.picHeader->setJointCbCrSignFlag( sgnFlag );
 }
 
+
 void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, const bool bFastDeltaQP, EncLib* pEncLib )
 {
   CodingStructure&  cs            = *pcPic->cs;
@@ -1890,6 +1891,98 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
   const uint32_t        widthInCtus   = pcv.widthInCtus;
 #if ENABLE_QPA
   const int iQPIndex              = pcSlice->getSliceQpBase();
+#endif
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+  int pelMax = pcPic->getLumaClpRng().max;
+  int pelMin = pcPic->getLumaClpRng().min;
+  int targetMin = 64, targetMax = 940;
+  if (cs.slice->getSliceType() != I_SLICE)
+  {
+    const Picture* const pColPic = pcPic->cs->slice->getRefPic(RefPicList(1 - pcPic->cs->slice->getColFromL0Flag()), pcPic->cs->slice->getColRefIdx());
+    ClpRng colLumaClpRng = pColPic->getLumaClpRng();
+    targetMin = colLumaClpRng.min;
+    targetMax = colLumaClpRng.max;
+  }
+  int clipDeltaShift = 0;
+  if (cs.slice->getSliceType()!=I_SLICE && cs.slice->getCheckLDC())
+  {
+    clipDeltaShift = ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_1;
+    pcPic->cs->slice->setAdaptiveClipQuant(true);
+  }
+  else
+  {
+    clipDeltaShift = ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_0;
+    pcPic->cs->slice->setAdaptiveClipQuant(false);
+  }
+  int pelMaxOF = 0;
+  int pelMinOF = (1 << pcPic->cs->sps->getBitDepth(toChannelType(COMPONENT_Y))) - 1;
+  const int orgPelMin = pelMin;
+  {
+    int deltaMinToSignal = (pelMin - targetMin);
+    if (deltaMinToSignal < 0)
+    {
+      int absDelta = ((targetMin - pelMin) >> clipDeltaShift) << clipDeltaShift;
+      pelMin = targetMin - absDelta;
+      while (pelMin > orgPelMin)
+      {
+        pelMin -= (1 << clipDeltaShift);
+      }
+      while (pelMin < 0)
+      {
+        pelMinOF = pelMin;
+        pelMin = 0;
+      }
+      CHECK(pelMin < 0, "this is not possible");
+    }
+    else if (deltaMinToSignal > 0)
+    {
+      int absDelta = (deltaMinToSignal >> clipDeltaShift) << clipDeltaShift;
+      pelMin = targetMin + absDelta;
+      CHECK(pelMin > orgPelMin, "this is not possible");
+      CHECK(pelMin < 0, "this is not possible");
+    }
+    else
+    {
+      CHECK(pelMin != targetMin, "this is not possible");
+    }
+  }
+
+  const int orgPelMax = pelMax;
+  {
+    int deltaMaxToSignal = (pelMax - targetMax);
+    if (deltaMaxToSignal < 0)
+    {
+      int absDelta = ((targetMax - pelMax) >> clipDeltaShift) << clipDeltaShift;
+      pelMax = targetMax - absDelta;
+      CHECK(pelMax < orgPelMax, "this is not possible");
+      CHECK(pelMax > (1 << pcPic->cs->sps->getBitDepth(toChannelType(COMPONENT_Y))) - 1, "this is not possible");
+    }
+    else if (deltaMaxToSignal > 0)
+    {
+      int absDelta = (deltaMaxToSignal >> clipDeltaShift) << clipDeltaShift;
+      pelMax = targetMax + absDelta;
+      while (pelMax < orgPelMax)
+      {
+        pelMax += (1 << clipDeltaShift);
+      }
+      while (pelMax >= (1 << pcPic->cs->sps->getBitDepth(toChannelType(COMPONENT_Y))))
+      {
+        pelMaxOF = pelMax;
+        pelMax = (1 << pcPic->cs->sps->getBitDepth(toChannelType(COMPONENT_Y))) - 1;
+      }
+      CHECK(pelMax > (1 << pcPic->cs->sps->getBitDepth(toChannelType(COMPONENT_Y))) - 1, "this is not possible");
+    }
+    else
+    {
+      CHECK(pelMax != targetMax, "this is not possible");
+    }
+  }
+  pcPic->cs->slice->setLumaPelMax(pelMax);
+  pcPic->cs->slice->setLumaPelMin(pelMin);
+  pcPic->lumaClpRng.min = pelMin;
+  pcPic->lumaClpRng.max = pelMax;
+  pcPic->lumaClpRngforQuant.min = min(pelMin, pelMinOF);
+  pcPic->lumaClpRngforQuant.max = max(pelMax, pelMaxOF);
 #endif
 
 #if ENABLE_SPLIT_PARALLELISM
@@ -2406,7 +2499,6 @@ void EncSlice::encodeSlice   ( Picture* pcPic, OutputBitstream* pcSubstreams, ui
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   static Ctx storedCtx;
 #endif
-
   // for every CTU in the slice...
   for( uint32_t ctuIdx = 0; ctuIdx < pcSlice->getNumCtuInSlice(); ctuIdx++ )
   {
@@ -2522,7 +2614,6 @@ void EncSlice::encodeSlice   ( Picture* pcPic, OutputBitstream* pcSubstreams, ui
       uiSubStrm++;
     }
   } // CTU-loop
-
   if(pcSlice->getPPS()->getCabacInitPresentFlag())
   {
     m_encCABACTableIdx = m_CABACWriter->getCtxInitId( *pcSlice );

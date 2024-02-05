@@ -169,6 +169,9 @@ void create(
   void finalInit( const VPS* vps, const SPS& sps, const PPS& pps, PicHeader *picHeader, APS** alfApss, APS* lmcsAps, APS* scalingListAps );
 
   int  getPOC()                               const { return poc; }
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+  ClpRng getLumaClpRng()                      const { return lumaClpRng; }
+#endif
   int  getDecodingOrderNumber()               const { return m_decodingOrderNumber; }
   void setDecodingOrderNumber(const int val)        { m_decodingOrderNumber = val;  }
   NalUnitType getPictureType()                const { return m_pictureType;         }
@@ -250,6 +253,10 @@ public:
 #endif
 
   int  poc;
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+  ClpRng lumaClpRng;
+  ClpRng lumaClpRngforQuant;
+#endif
   uint32_t temporalId;
   int      layerId;
 #if JVET_S0258_SUBPIC_CONSTRAINTS

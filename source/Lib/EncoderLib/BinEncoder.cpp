@@ -386,7 +386,6 @@ void TBinEncoder<BinProbModel>::encodeBin( unsigned bin, unsigned ctxId )
       }
     }
   }
-
   rcProbModel.update( bin );
   BinEncoderBase::m_BinStore.addBin( bin, ctxId );
 

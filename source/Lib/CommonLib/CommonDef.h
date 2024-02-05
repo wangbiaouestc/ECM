@@ -266,6 +266,10 @@ static const double LAMBDA_DEC_SIDE[MAX_QP+1] = {
 };
 #endif
 
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+static const int ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_1 =                5;
+static const int ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_0 =                1;
+#endif
 static const int MAX_TLAYER =                                       7; ///< Explicit temporal layer QP offset - max number of temporal layer
 
 static const int ADAPT_SR_SCALE =                                   1; ///< division factor for adaptive search range
@@ -723,6 +727,10 @@ static const int MAX_LFNST_COEF_NUM =                              16;
 
 static const int LFNST_LAST_SIG_LUMA =                              1;
 static const int LFNST_LAST_SIG_CHROMA =                            1;
+#if JVET_AG0061_INTER_LFNST_NSPT
+static const int LFNST_LAST_SIG_LUMA_INTER   =                      1;
+static const int LFNST_LAST_SIG_CHROMA_INTER =                      0;
+#endif
 
 #if EXTENDED_LFNST || JVET_W0119_LFNST_EXTENSION
 static const int NUM_LFNST_NUM_PER_SET =                            4;
@@ -1585,6 +1593,10 @@ static const int EXT_PICTURE_SIZE =                             16;
 static const int IBC_BVD_PREDICTION_MAX_BIN_NUM =                4;
 #endif
 
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+static const int MAX_DDCCP_CAND_LIST_SIZE = 6; // 2 CCCM-S, 2 CCCM-M, 1 GLCCCM-S, 1 CCLM-S
+static const int MAX_CCP_FUSION_NUM = 12;
+#endif
 #if JVET_AD0188_CCP_MERGE
 static const int MAX_CCP_CAND_LIST_SIZE = 12;
 static const int MAX_NUM_HCCP_CANDS     = 6;
@@ -2013,6 +2025,9 @@ static const int TMP_TEMPLATE_SIZE =            4; // must be multiple of 4 for 
 static const int TMP_MAXSIZE_DEPTH =            6; // should be log2(TMP_TEMPLATE_SIZE): keep as 6 to avoid any error
 static const int USE_MORE_BLOCKSIZE_DEPTH_MAX = TMP_MAXSIZE_DEPTH - 1;
 static const int INIT_THRESHOULD_SHIFTBITS =    2;  ///< (default 2) Early skip threshold for checking distance.
+#if JVET_AG0136_INTRA_TMP_LIC
+static const int INIT_THRESHOLD_SHIFTBITS_SUPP = 4;
+#endif
 static const int TMP_SEARCH_RANGE_MULT_FACTOR = 5;
 #if JVET_AD0086_ENHANCED_INTRA_TMP
 static const int TMP_FUSION_NUM      = 5;
@@ -2020,8 +2035,14 @@ static const int TMP_GROUP_IDX       = 3;
 static const int FUSION_IDX_NUM      = TMP_FUSION_NUM * TMP_GROUP_IDX;
 static const int MTMP_NUM            = 19;
 static const int MTMP_NUM_SPARSE     = 30;
+#if JVET_AG0136_INTRA_TMP_LIC 
+static const int MTMP_NUM_SPARSE_FOR_LIC = 15;
+#endif
 static const int TL_NUM              = 3;
 static const int TL_NUM_SPARSE       = TL_NUM << 1;
+#if JVET_AG0136_INTRA_TMP_LIC 
+static const int TL_NUM_SPARSE_FOR_LIC = TL_NUM;
+#endif
 static const int TMP_MINSR           = 64;
 static const int TMP_FILTER_PADDING  = 1;
 static const int TMP_BEST_CANDIDATES = TMP_FUSION_NUM;
@@ -2029,7 +2050,12 @@ static const int TMP_FUSION_PARAMS   = TMP_BEST_CANDIDATES + 1;
 static const int TMP_FLM_PARAMS      = 6;
 static const int TMP_FUSHION_CCCM_MAX_REF_SAMPLES =
   (2 * (TMP_TEMPLATE_SIZE * MAX_CU_SIZE) + TMP_TEMPLATE_SIZE * TMP_TEMPLATE_SIZE);
+#if JVET_AG0136_INTRA_TMP_LIC
+static const int TMP_SAMPLING_LIC_MODE_1 = 3;
+static const int TMP_SAMPLING_LIC_MODE_0 = 4;
+#else
 static const int TMP_SAMPLING       = 3;
+#endif
 static const int TMP_SUBPEL_PAD_NUM = 2;
 static const int TMP_MAX_SUBPEL_DIR = 8;
 struct IntraTMPFusionInfo
@@ -2048,6 +2074,14 @@ static const int LOG2_TMP_SAMPLING = 1;
 static const int TMP_SAMPLING = 1 << LOG2_TMP_SAMPLING;
 #endif
 #endif 
+#endif
+
+#if JVET_AG0151_INTRA_TMP_MERGE_MODE
+static const int TMP_NUM_MERGE_CANDS = 10;
+#endif
+#if JVET_AG0152_SGPM_ITMP_IBC
+static const int SGPM_NUM_BVS = 6; // maximum BVs to be considered into the list for Itmp-Sgpm
+static const int SGPM_BV_START_IDX = NUM_LUMA_MODE;
 #endif
 
 #endif // end of #ifndef  __COMMONDEF__

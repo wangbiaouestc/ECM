@@ -543,6 +543,10 @@ public:
 #if JVET_AD0188_CCP_MERGE
   static const CtxSet   nonLocalCCP;
 #endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  static const CtxSet   decoderDerivedCCP;
+  static const CtxSet   ddNonLocalCCP;
+#endif
 #if JVET_Z0050_DIMD_CHROMA_FUSION
 #if ENABLE_DIMD
   static const CtxSet   DimdChromaMode;
@@ -562,6 +566,10 @@ public:
 #if JVET_AD0086_ENHANCED_INTRA_TMP
   static const CtxSet   TmpIdx;
   static const CtxSet   TmpFusion;
+#if JVET_AG0136_INTRA_TMP_LIC
+  static const CtxSet   TmpLic;
+  static const CtxSet   ItmpLicIndex;
+#endif
 #endif  
 #endif
 #if MMLM
@@ -723,6 +731,9 @@ public:
   static const CtxSet   TransformSkipFlag;
   static const CtxSet   MTSIdx;
   static const CtxSet   LFNSTIdx;
+#if JVET_AG0061_INTER_LFNST_NSPT
+  static const CtxSet   InterLFNSTIdx;
+#endif
   static const CtxSet   PLTFlag;
   static const CtxSet   RotationFlag;
   static const CtxSet   RunTypeFlag;
@@ -805,6 +816,10 @@ public:
 #endif
 #if JVET_AG0058_EIP
   static const CtxSet   EipFlag;
+#endif
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+  static const CtxSet   CCPMergeFusionFlag;
+  static const CtxSet   CCPMergeFusionType;
 #endif
   static const unsigned NumberOfContexts;
 

@@ -2648,6 +2648,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_AD0188_CCP_MERGE
   READ_UVLC(uiCode, "sps_ccp_merge");                               pcSPS->setUseCcpMerge(uiCode);
 #endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  READ_UVLC(uiCode, "sps_ddccp_fusion");                            pcSPS->setUseDdCcpFusion(uiCode);
+#endif
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
   }
   else
@@ -2790,6 +2793,10 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #endif
 #if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
     READ_FLAG( uiCode, "sps_ibc_non_adjacent_spatial_candidates_enabled_flag");    pcSPS->setUseIbcNonAdjCand(uiCode != 0);
+#endif
+#if JVET_AG0136_INTRA_TMP_LIC
+    READ_FLAG( uiCode, "sps_itmp_lic_extension_flag" );                    pcSPS->setItmpLicExtension ( uiCode != 0 );
+    READ_FLAG( uiCode, "sps_itmp_lic_mode_flag" );                              pcSPS->setItmpLicMode ( uiCode != 0 );
 #endif
   }
   else
@@ -5470,6 +5477,53 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
       READ_CODE(8,ignore_,"slice_segment_header_extension_data_byte");
     }
   }
+
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+  READ_FLAG(uiCode, "adaptive_clip_quant"); pcSlice->setAdaptiveClipQuant(uiCode ? true : false);
+  int clipDeltaShift = 0;
+  if (pcSlice->getAdaptiveClipQuant())
+  {
+    clipDeltaShift = ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_1;
+  }
+  else
+  {
+    clipDeltaShift = ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_0;
+  }
+  if (pcSlice->getSliceType() == I_SLICE)
+  {
+    READ_SVLC(iCode, "clip_luma_pel_max");
+    int deltaMax = iCode;
+    if (deltaMax > 0)
+    {
+      deltaMax = (deltaMax << clipDeltaShift);
+    }
+    else if (deltaMax < 0)
+    {
+      deltaMax = -((-deltaMax) << clipDeltaShift);
+    }
+    READ_SVLC(iCode, "clip_luma_pel_min");
+    int deltaMin = iCode;
+    if (deltaMin > 0)
+    {
+      deltaMin = (deltaMin << clipDeltaShift);
+    }
+    else if (deltaMin < 0)
+    {
+      deltaMin = -((-deltaMin) << clipDeltaShift);
+    }
+    pcSlice->setLumaPelMax(std::min(deltaMax + 940, (1 << sps->getBitDepth(toChannelType(COMPONENT_Y))) - 1));
+    pcSlice->setLumaPelMin(std::max(0, deltaMin + 64));
+  }
+  else
+  {
+    READ_SVLC(iCode, "clip_luma_pel_max");
+    int deltaMax = iCode;
+    READ_SVLC(iCode, "clip_luma_pel_min");
+    int deltaMin = iCode;
+    pcSlice->setLumaPelMax(deltaMax);
+    pcSlice->setLumaPelMin(deltaMin);
+  }
+#endif
 
   std::vector<uint32_t> entryPointOffset;
 

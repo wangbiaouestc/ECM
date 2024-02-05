@@ -337,6 +337,9 @@ struct CCPModelCandidate
 #if JVET_AA0126_GLM
   int8_t  glmIdc = 0;
 #endif
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+  int ccInsideFilter = 0;
+#endif
 
   template<int NUM>
   inline bool isTheSameParams(const CCPModelCandidate& p) const
@@ -637,4 +640,18 @@ struct LutEIP
 };
 #endif
 #endif
+
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+struct DecoderDerivedCcpCandidate
+{
+  CCPModelCandidate ddccpCand;
+  int    cost;           // TM cost 
+  int    lmIndex;        // LM_CHROMA_IDX, MMLM_CHROMA_IDX, MDLM_L_IDX, MDLM_T_IDX, MMLM_L_IDX, MMLM_T_IDX
+  int    isCccm;         // 1: LM_CHROMA_IDX, MMLM_CHROMA_IDX; 2:MDLM_L_IDX, MMLM_L_IDX; 3: MDLM_T_IDX, MMLM_T_IDX
+  int    isGlcccm;       // 1: if glCccmFlag true
+  int    isInsideFilter; // 1: if LBCCP true
+  bool   isFusion;       // enable two CCP fusion
+};
+#endif
+
 #endif

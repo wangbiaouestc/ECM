@@ -278,12 +278,19 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   rootCbf           = other.rootCbf;
   sbtInfo           = other.sbtInfo;
   mtsFlag           = other.mtsFlag;
+#if JVET_AG0061_INTER_LFNST_NSPT
+  lfnstFlag         = other.lfnstFlag;
+#endif
   lfnstIdx          = other.lfnstIdx;
   tileIdx           = other.tileIdx;
 #if JVET_AC0105_DIRECTIONAL_PLANAR
   plIdx = other.plIdx;
 #endif
 #if ENABLE_DIMD
+#if JVET_AG0146_DIMD_ITMP_IBC
+  isBvDimd = other.isBvDimd;
+  bvDimd = other.bvDimd;
+#endif
   dimd = other.dimd;
   dimdBlending = other.dimdBlending;
 #if JVET_AC0098_LOC_DEP_DIMD
@@ -328,9 +335,16 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #endif
 #if TMP_FAST_ENC
 #if JVET_AD0086_ENHANCED_INTRA_TMP
+#if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
+  tmpXdisp = other.tmpXdisp;
+  tmpYdisp = other.tmpYdisp;
+#endif
   tmpIdx        = other.tmpIdx;
   tmpFusionFlag = other.tmpFusionFlag;
   tmpFlmFlag    = other.tmpFlmFlag;
+#if JVET_AG0136_INTRA_TMP_LIC
+  tmpLicFlag    = other.tmpLicFlag;
+#endif
   tmpIsSubPel  = other.tmpIsSubPel;
   tmpSubPelIdx = other.tmpSubPelIdx;
 #endif
@@ -359,6 +373,10 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #if JVET_AB0155_SGPM
   timdHor      = other.timdHor;
   timdVer      = other.timdVer;
+#if JVET_AG0152_SGPM_ITMP_IBC
+  sgpmBv0       = other.sgpmBv0;
+  sgpmBv1       = other.sgpmBv1;
+#endif
   sgpm         = other.sgpm;
   sgpmIdx      = other.sgpmIdx;
   sgpmSplitDir = other.sgpmSplitDir;
@@ -390,6 +408,9 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   tmpFlag           = other.tmpFlag;
 #if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST 
   intraTmpDimdMode = other.intraTmpDimdMode;
+#endif
+#if JVET_AG0061_INTER_LFNST_NSPT
+  dimdDerivedIntraDir = other.dimdDerivedIntraDir;
 #endif
 #endif
 #if INTER_LIC
@@ -486,12 +507,19 @@ void CodingUnit::initData()
   rootCbf           = true;
   sbtInfo           = 0;
   mtsFlag           = 0;
+#if JVET_AG0061_INTER_LFNST_NSPT
+  lfnstFlag         = 0;
+#endif
   lfnstIdx          = 0;
   tileIdx           = 0;
 #if JVET_AC0105_DIRECTIONAL_PLANAR
   plIdx = 0;
 #endif
 #if ENABLE_DIMD
+#if JVET_AG0146_DIMD_ITMP_IBC
+  isBvDimd  = 0;
+  bvDimd    = Mv(0, 0);
+#endif
   dimd = false;
   dimdBlending = false;
 #if JVET_AC0098_LOC_DEP_DIMD
@@ -536,11 +564,18 @@ void CodingUnit::initData()
 #endif
 #if TMP_FAST_ENC
 #if JVET_AD0086_ENHANCED_INTRA_TMP
+#if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
+  tmpXdisp = 0;
+  tmpYdisp = 0;
+#endif
   tmpIdx        = 0;
   tmpFusionFlag = false;
   tmpFlmFlag    = false;
   tmpIsSubPel  = 0;
   tmpSubPelIdx = -1;
+#if JVET_AG0136_INTRA_TMP_LIC
+  tmpLicFlag   = false;
+#endif
 #endif
 #endif
 #if JVET_W0123_TIMD_FUSION
@@ -575,6 +610,10 @@ void CodingUnit::initData()
   sgpmSplitDir = -1;
   sgpmMode0    = -1;
   sgpmMode1    = -1;
+#if JVET_AG0152_SGPM_ITMP_IBC
+  sgpmBv0      = Mv(0,0);
+  sgpmBv1      = Mv(0,0);
+#endif
 #endif
 #if JVET_AG0058_EIP
   eipFlag = false;
@@ -599,6 +638,9 @@ void CodingUnit::initData()
   tmpFlag = false;
 #if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST 
   intraTmpDimdMode = -1;
+#endif
+#if JVET_AG0061_INTER_LFNST_NSPT
+  dimdDerivedIntraDir = 0;
 #endif
 #endif
 #if INTER_LIC
@@ -843,23 +885,6 @@ uint8_t CodingUnit::getSbtTuSplit() const
   return sbtTuSplitType;
 }
 
-#if JVET_AG0143_INTER_INTRA
-bool CodingUnit::getSwitchCondition(ChannelType channelType) const
-{
-  bool            condition     = 
-    predMode == MODE_INTRA && slice->getSliceType() != I_SLICE && 
-      ((!tmpFlag && channelType == CHANNEL_TYPE_LUMA)||(channelType == CHANNEL_TYPE_CHROMA && firstPU->intraDir[1] != DBV_CHROMA_IDX));
- assert(slice->getSliceType() != I_SLICE || channelType == chType);
-  int tmpMaxSize = cs->sps->getIntraTMPMaxSize();
-  condition = condition || (predMode == MODE_IBC && channelType == CHANNEL_TYPE_LUMA && slice->getSliceType() == I_SLICE)
-    || (predMode == MODE_INTRA && ((channelType == CHANNEL_TYPE_LUMA && tmpFlag && !bdpcmMode && !dimd
-      && lwidth() <= tmpMaxSize && lheight() <= tmpMaxSize) || 
-      (channelType == CHANNEL_TYPE_CHROMA && firstPU->intraDir[1] == DBV_CHROMA_IDX)) && slice->getSliceType() == I_SLICE);
-  return condition;
-}
-#endif
-
-
 // ---------------------------------------------------------------------------
 // prediction unit method definitions
 // ---------------------------------------------------------------------------
@@ -886,6 +911,10 @@ void PredictionUnit::initData()
 #endif
   mipTransposedFlag = false;
   multiRefIdx = 0;
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  decoderDerivedCcpMode = 0;
+  ddNonLocalCCPFusion = 0;
+#endif
 #if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
   parseLumaMode = false;
   candId = -1;
@@ -900,12 +929,12 @@ void PredictionUnit::initData()
 #if JVET_AA0126_GLM
   glmIdc      = {};
 #endif
-#if JVET_AA0057_CCCM
+#if JVET_AA0057_CCCM || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   cccmFlag    = 0;
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   cccmNoSubFlag = 0;
 #endif
-#if JVET_AC0054_GLCCCM
+#if JVET_AC0054_GLCCCM || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   glCccmFlag = 0;
 #endif
 #if JVET_AD0202_CCCM_MDF
@@ -926,8 +955,12 @@ void PredictionUnit::initData()
   curCand = {};
   curCand.type = CCP_TYPE_NONE;
 #endif
-#if JVET_AD0120_LBCCP
+#if JVET_AD0120_LBCCP || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   ccInsideFilter = 0;
+#endif
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+  ccpMergeFusionFlag = 0;
+  ccpMergeFusionType = 0;
 #endif
   // inter data
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
@@ -1093,6 +1126,10 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
 #endif
   mipTransposedFlag = predData.mipTransposedFlag;
   multiRefIdx = predData.multiRefIdx;
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  decoderDerivedCcpMode = predData.decoderDerivedCcpMode;
+  ddNonLocalCCPFusion = predData.ddNonLocalCCPFusion;
+#endif
 #if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
   parseLumaMode = predData.parseLumaMode;
   candId = predData.candId;
@@ -1107,7 +1144,7 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
 #if JVET_AA0126_GLM
   glmIdc      = predData.glmIdc;
 #endif
-#if JVET_AA0057_CCCM
+#if JVET_AA0057_CCCM || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   cccmFlag    = predData.cccmFlag;
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   cccmNoSubFlag = predData.cccmNoSubFlag;
@@ -1132,8 +1169,12 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
   idxNonLocalCCP  = predData.idxNonLocalCCP;
   curCand = predData.curCand;
 #endif
-#if JVET_AD0120_LBCCP
+#if JVET_AD0120_LBCCP || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   ccInsideFilter = predData.ccInsideFilter;
+#endif
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+  ccpMergeFusionFlag = predData.ccpMergeFusionFlag;
+  ccpMergeFusionType = predData.ccpMergeFusionType;
 #endif
   return *this;
 }
@@ -1315,13 +1356,17 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 #endif
   mipTransposedFlag = other.mipTransposedFlag;
   multiRefIdx = other.multiRefIdx;
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  decoderDerivedCcpMode = other.decoderDerivedCcpMode;
+  ddNonLocalCCPFusion = other.ddNonLocalCCPFusion;
+#endif
 #if JVET_Z0050_CCLM_SLOPE
   cclmOffsets = other.cclmOffsets;
 #endif
 #if JVET_AA0126_GLM
   glmIdc      = other.glmIdc;
 #endif
-#if JVET_AA0057_CCCM
+#if JVET_AA0057_CCCM || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   cccmFlag    = other.cccmFlag;
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   cccmNoSubFlag = other.cccmNoSubFlag;
@@ -1347,8 +1392,12 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   curCand = other.curCand;
 #endif
 
-#if JVET_AD0120_LBCCP
+#if JVET_AD0120_LBCCP || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   ccInsideFilter = other.ccInsideFilter;
+#endif
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+  ccpMergeFusionFlag = other.ccpMergeFusionFlag;
+  ccpMergeFusionType = other.ccpMergeFusionType;
 #endif
   mergeFlag   = other.mergeFlag;
   regularMergeFlag = other.regularMergeFlag;
@@ -1810,6 +1859,9 @@ void TransformUnit::initData()
   {
     cbf[i]           = 0;
     mtsIdx[i]        = MTS_DCT2_DCT2;
+#if JVET_AG0061_INTER_LFNST_NSPT
+    lfnstIdx[i]      = 0;
+#endif
   }
   depth              = 0;
   noResidual         = false;
@@ -1902,7 +1954,10 @@ TransformUnit& TransformUnit::operator=(const TransformUnit& other)
       if (m_runType[i]   && other.m_runType[i]   && m_runType[i]   != other.m_runType[i]  ) memcpy(m_runType[i],   other.m_runType[i],   sizeof(bool) * area);
     }
     cbf[i]           = other.cbf[i];
-    mtsIdx[i] = other.mtsIdx[i];
+    mtsIdx[i]        = other.mtsIdx[i];
+#if JVET_AG0061_INTER_LFNST_NSPT
+    lfnstIdx[i]      = other.lfnstIdx[i];
+#endif
   }
   depth              = other.depth;
   noResidual         = other.noResidual;
@@ -1947,6 +2002,9 @@ void TransformUnit::copyComponentFrom(const TransformUnit& other, const Componen
   cbf[i]           = other.cbf[i];
   depth            = other.depth;
   mtsIdx[i]        = other.mtsIdx[i];
+#if JVET_AG0061_INTER_LFNST_NSPT
+  lfnstIdx[i]      = other.lfnstIdx[i];
+#endif
   noResidual       = other.noResidual;
   jointCbCr        = isChroma( i ) ? other.jointCbCr : jointCbCr;
 #if JVET_AE0059_INTER_CCCM

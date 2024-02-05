@@ -904,6 +904,36 @@ void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, cons
 // ====================================================================================================================
 // Public member functions
 // ====================================================================================================================
+#if JVET_AG0061_INTER_LFNST_NSPT
+int InterPrediction::deriveInterDimdMode(const CodingUnit cu, CPelBuf predBuf)
+{
+  int        sigcnt  = 0;
+  const Pel *pPred   = predBuf.buf;
+  const int  iStride = predBuf.stride;
+  int        height  = predBuf.height;
+  int        width   = predBuf.width;
+
+  int piHistogramClean[NUM_LUMA_MODE] = { 0 };
+
+  pPred = pPred + iStride + 1;
+  sigcnt += buildHistogram(pPred, iStride, height - 2, width - 2, piHistogramClean, 0, width - 2, height - 2);
+
+  int firstAmp = 0, curAmp = 0;
+  int firstMode = 0, curMode = 0;
+  for (int i = 0; i < NUM_LUMA_MODE; i++)
+  {
+    curAmp  = piHistogramClean[i];
+    curMode = i;
+    if (curAmp > firstAmp)
+    {
+      firstAmp  = curAmp;
+      firstMode = curMode;
+    }
+  }
+  return firstMode;
+}
+#endif
+
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
 bool InterPrediction::xCheckIdenticalMotionSubTMVP(const PredictionUnit &pu)
 {
@@ -3805,7 +3835,11 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
 #endif
       )
     {
-      xLocalIlluComp(pu, compID, mv, dstBuf);
+      xLocalIlluComp(pu, compID, mv, dstBuf
+#if JVET_AG0136_INTRA_TMP_LIC
+                     , true
+#endif
+                     );
     }
     return;
   }
@@ -17139,7 +17173,11 @@ void InterPrediction::xIntraBlockCopy(PredictionUnit &pu, PelUnitBuf &predBuf, c
     )
   {
     PelBuf dstBuf = predBuf.bufs[compID];
-    xLocalIlluComp(pu, compID, pu.mv[0], dstBuf);
+    xLocalIlluComp(pu, compID, pu.mv[0], dstBuf
+#if JVET_AG0136_INTRA_TMP_LIC
+                   , true
+#endif
+                   );
   }
 #endif
 }
@@ -18738,6 +18776,9 @@ void InterPrediction::xLocalIlluComp(const PredictionUnit& pu,
                                      const ComponentID     compID,
                                      const Mv&             bv,
                                      PelBuf&               dstBuf
+#if JVET_AG0136_INTRA_TMP_LIC
+                                     , const bool isLinearTransformDone
+#endif
 )
 {
 #if JVET_AE0159_FIBC
@@ -18765,6 +18806,10 @@ void InterPrediction::xLocalIlluComp(const PredictionUnit& pu,
     xGetLICParamGeneral(*pu.cu, compID, numTemplate, refLeftTemplate, refAboveTemplate, recLeftTemplate, recAboveTemplate, shift, scale, offset);
 #endif
 
+#if JVET_AG0136_INTRA_TMP_LIC
+    if (isLinearTransformDone)
+    {
+#endif
     const ClpRng& clpRng = pu.cu->cs->slice->clpRng(compID);
 #if JVET_AE0078_IBC_LIC_EXTENSION
     if (pu.cu->ibcLicFlag && pu.cu->ibcLicIdx == IBC_LIC_IDX_M)
@@ -18774,6 +18819,19 @@ void InterPrediction::xLocalIlluComp(const PredictionUnit& pu,
     }
 #endif
     dstBuf.linearTransform(scale, shift, offset, true, clpRng);
+#if JVET_AG0136_INTRA_TMP_LIC
+    }
+    else
+    {
+      m_arrayLicParams[0] = shift;
+      m_arrayLicParams[1] = scale;
+      m_arrayLicParams[2] = offset;
+      m_arrayLicParams[3] = shift2;
+      m_arrayLicParams[4] = scale2;
+      m_arrayLicParams[5] = offset2;
+      m_arrayLicParams[6] = mean;
+    }
+#endif
   }
   else if ((pu.cu->ibcLicFlag) && (pu.cu->ibcFilterFlag ))
   {

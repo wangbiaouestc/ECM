@@ -13075,18 +13075,29 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
 
 #if JVET_AA0133_INTER_MTS_OPT
       const bool mtsAllowed = CU::isMTSAllowed(*tu.cu, compID) && cu.mtsFlag;
+#if JVET_AG0061_INTER_LFNST_NSPT
+      const bool tsAllowed = TU::isTSAllowed(tu, compID) && ((isLuma(compID) && !cu.mtsFlag) || (isChroma(compID) && m_pcEncCfg->getUseChromaTS())) && !cu.lfnstFlag;
+#else
       const bool tsAllowed = TU::isTSAllowed(tu, compID) && ((isLuma(compID) && !cu.mtsFlag) || (isChroma(compID) && m_pcEncCfg->getUseChromaTS()));
+#endif
 #else
       const bool tsAllowed = TU::isTSAllowed(tu, compID) && (isLuma(compID) || (isChroma(compID) && m_pcEncCfg->getUseChromaTS()));
       const bool mtsAllowed = CU::isMTSAllowed( *tu.cu, compID );
 #endif
+#if JVET_AG0061_INTER_LFNST_NSPT
+      const bool lfnstAllowed = CU::isLfnstAllowed(*tu.cu, compID) && cu.lfnstFlag;
+#endif
 
+#if JVET_AG0061_INTER_LFNST_NSPT
+      uint8_t nNumTransformCands = 0;
+#else 
       uint8_t nNumTransformCands = 1 + ( tsAllowed ? 1 : 0 ) + ( mtsAllowed ? 4 : 0 ); // DCT + TS + 4 MTS = 6 tests
 #if JVET_AA0133_INTER_MTS_OPT
       if (cu.mtsFlag && compID == COMPONENT_Y)
       {
         nNumTransformCands = (mtsAllowed ? 4 : 0);
       }
+#endif
 #endif
       std::vector<TrMode> trModes;
 #if TU_256
@@ -13098,53 +13109,67 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
       else
       {
 #endif
-      if (m_pcEncCfg->getCostMode() == COST_LOSSLESS_CODING && slice.isLossless())
-      {
-        nNumTransformCands = 0;
-      }
-#if JVET_AA0133_INTER_MTS_OPT
-      else if(!(cu.mtsFlag && compID == COMPONENT_Y))
-#else
-      else
-#endif
-      {
-      trModes.push_back( TrMode( 0, true ) ); //DCT2
-      nNumTransformCands = 1;
-      }
-#if JVET_AA0133_INTER_MTS_OPT
-      else
-      {
-        nNumTransformCands = 0;
-      }
-#endif
-      //for a SBT-no-residual TU, the RDO process should be called once, in order to get the RD cost
-      if( tsAllowed && !tu.noResidual )
-      {
-        trModes.push_back( TrMode( 1, true ) );
-        nNumTransformCands++;
-      }
-
-#if APPLY_SBT_SL_ON_MTS
-      //skip MTS if DCT2 is the best
-      if( mtsAllowed && ( !tu.cu->slice->getSPS()->getUseSBT() || CU::getSbtIdx( m_histBestSbt ) != SBT_OFF_DCT ) )
-#else
-      if( mtsAllowed )
-#endif
-      {
-        for( int i = 2; i < 6; i++ )
+        if (m_pcEncCfg->getCostMode() == COST_LOSSLESS_CODING && slice.isLossless())
         {
-#if APPLY_SBT_SL_ON_MTS
-          //skip the non-best Mts mode
-          if( !tu.cu->slice->getSPS()->getUseSBT() || ( m_histBestMtsIdx == MAX_UCHAR || m_histBestMtsIdx == i ) )
-          {
-#endif
-          trModes.push_back( TrMode( i, true ) );
-          nNumTransformCands++;
-#if APPLY_SBT_SL_ON_MTS
-          }
-#endif
+          nNumTransformCands = 0;
         }
-      }
+#if JVET_AG0061_INTER_LFNST_NSPT
+        else if (!((cu.mtsFlag || cu.lfnstFlag) && compID == COMPONENT_Y))
+#elif JVET_AA0133_INTER_MTS_OPT
+        else if (!(cu.mtsFlag && compID == COMPONENT_Y))
+#else
+        else
+#endif
+        {
+          trModes.push_back(TrMode(0, true)); //DCT2
+          nNumTransformCands = 1;
+        }
+#if JVET_AA0133_INTER_MTS_OPT
+        else
+        {
+          nNumTransformCands = 0;
+        }
+#endif
+        // for a SBT-no-residual TU, the RDO process should be called once, in order to get the RD cost
+        if (tsAllowed && !tu.noResidual)
+        {
+          trModes.push_back(TrMode(1, true));
+          nNumTransformCands++;
+        }
+
+#if APPLY_SBT_SL_ON_MTS && !JVET_AG0061_INTER_LFNST_NSPT
+        // skip MTS if DCT2 is the best
+        if (mtsAllowed && (!tu.cu->slice->getSPS()->getUseSBT() || CU::getSbtIdx(m_histBestSbt) != SBT_OFF_DCT))
+#else
+        if (mtsAllowed)
+#endif
+        {
+          for (int i = 2; i < 6; i++)
+          {
+#if APPLY_SBT_SL_ON_MTS
+            // skip the non-best Mts mode
+            if (!tu.cu->slice->getSPS()->getUseSBT() || (m_histBestMtsIdx == MAX_UCHAR || m_histBestMtsIdx == i))
+            {
+#endif
+              trModes.push_back(TrMode(i, true));
+              nNumTransformCands++;
+#if APPLY_SBT_SL_ON_MTS
+            }
+#endif
+          }
+        }
+#if JVET_AG0061_INTER_LFNST_NSPT
+        if (lfnstAllowed)
+        {
+          for (int i = NUM_TRAFO_MODES_MTS; i < NUM_TRAFO_MODES_MTS + 3; i++)   // 3 lfnst
+          {
+            {
+              trModes.push_back(TrMode(i, true));
+              nNumTransformCands++;
+            }
+          }
+        }
+#endif
 #if TU_256
       }
 #endif
@@ -13183,7 +13208,23 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
         {
           lumaPredBuf.rspSignal(m_pcReshape->getFwdLUT());
         }
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+        ClpRng clpRng = tu.cs->slice->clpRng(COMPONENT_Y);
+        if (cs.picHeader->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag())
+        {
+          std::vector<Pel>& fwdLUT = m_pcReshape->getFwdLUT();
+          clpRng.min = fwdLUT[tu.cu->cs->slice->getLumaPelMin()];
+          clpRng.max = fwdLUT[tu.cu->cs->slice->getLumaPelMax()];
+        }
+        else
+        {
+          clpRng.min = tu.cu->cs->slice->getLumaPelMin();
+          clpRng.max = tu.cu->cs->slice->getLumaPelMax();
+        }
+        lumaRecoBuf.reconstruct(lumaPredBuf, csFull->getResiBuf(tu.blocks[COMPONENT_Y]), clpRng);
+#else
         lumaRecoBuf.reconstruct(lumaPredBuf, csFull->getResiBuf(tu.blocks[COMPONENT_Y]), cs.slice->clpRng(COMPONENT_Y));
+#endif
         if (CU::isIBC(cu) && cu.rribcFlipType)
         {
           lumaRecoBuf.flipSignal(cu.rribcFlipType == 1);
@@ -13302,18 +13343,34 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
           {
             if (!(m_pcEncCfg->getCostMode() == COST_LOSSLESS_CODING && slice.isLossless()))
             {
-            if (bestTU.mtsIdx[compID] == MTS_SKIP && m_pcEncCfg->getUseTransformSkipFast())
+              if (bestTU.mtsIdx[compID] == MTS_SKIP && m_pcEncCfg->getUseTransformSkipFast())
+              {
+                continue;
+              }
+              if (!trModes[transformMode].second)
+              {
+                continue;
+              }
+            }
+#if JVET_AG0061_INTER_LFNST_NSPT
+            tu.mtsIdx[compID]   = trModes[transformMode].first < NUM_TRAFO_MODES_MTS ? trModes[transformMode].first : 0;
+            tu.lfnstIdx[compID] = trModes[transformMode].first < NUM_TRAFO_MODES_MTS
+                                    ? 0
+                                    : trModes[transformMode].first - NUM_TRAFO_MODES_MTS + 1;
+            if (compID == COMPONENT_Y)
             {
-              continue;
+              tu.cu->lfnstIdx = tu.lfnstIdx[compID];
             }
-            if( !trModes[transformMode].second )
-            {
-              continue;
-            }
-            }
+#else
             tu.mtsIdx[compID] = trModes[transformMode].first;
+#endif
           }
-#if JVET_AA0133_INTER_MTS_OPT
+#if JVET_AG0061_INTER_LFNST_NSPT
+          if (compID == COMPONENT_Y && (cu.mtsFlag || cu.lfnstFlag) && skipRemainingMTS)
+          {
+            break;
+          }
+#elif JVET_AA0133_INTER_MTS_OPT
           if (compID == COMPONENT_Y && cu.mtsFlag && skipRemainingMTS)
           {
             break;
@@ -13355,8 +13412,19 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
           {
             if( transformMode == 0 )
             {
-              m_pcTrQuant->transformNxN( tu, compID, cQP, &trModes, m_pcEncCfg->getMTSInterMaxCand() );
+#if JVET_AG0061_INTER_LFNST_NSPT
+              m_pcTrQuant->transformNxN(tu, compID, cQP, &trModes, m_pcEncCfg->getMTSInterMaxCand() + 3);
+              tu.mtsIdx[compID] = trModes[0].first < NUM_TRAFO_MODES_MTS ? trModes[0].first : 0;
+              tu.lfnstIdx[compID] =
+                trModes[0].first < NUM_TRAFO_MODES_MTS ? 0 : trModes[0].first - NUM_TRAFO_MODES_MTS + 1;
+              if (compID == COMPONENT_Y)
+              {
+                tu.cu->lfnstIdx = tu.lfnstIdx[compID];
+              }
+#else
+              m_pcTrQuant->transformNxN(tu, compID, cQP, &trModes, m_pcEncCfg->getMTSInterMaxCand());
               tu.mtsIdx[compID] = trModes[0].first;
+#endif
             }
             if (!(m_pcEncCfg->getCostMode() == COST_LOSSLESS_CODING && slice.isLossless() && tu.mtsIdx[compID] == 0))
             {
@@ -13438,7 +13506,11 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
           {
             *puiZeroDist += nonCoeffDist; // initialized with zero residual distortion
           }
+#if JVET_AG0061_INTER_LFNST_NSPT
+          if (m_pcEncCfg->getCostMode() == COST_LOSSLESS_CODING && slice.isLossless() && tu.mtsIdx[compID] == 0&&cu.lfnstIdx == 0)
+#else
           if (m_pcEncCfg->getCostMode() == COST_LOSSLESS_CODING && slice.isLossless() && tu.mtsIdx[compID] == 0)
+#endif
           {
             currAbsSum = 0;
           }
@@ -13476,12 +13548,19 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
               m_CABACEstimator->joint_cb_cr( tu, cbfMask );
             }
 
+#if JVET_AG0061_INTER_LFNST_NSPT
+            bool bMtsLfnstVialateScanPos = false;
+#endif
 #if SIGN_PREDICTION
             if ( sps.getNumPredSigns() > 0)
             {
 #if JVET_Y0141_SIGN_PRED_IMPROVE
               bool doSignPrediction = true;
+#if JVET_AG0061_INTER_LFNST_NSPT
+              if ((isLuma(compID) && tu.mtsIdx[COMPONENT_Y] > MTS_SKIP) || (isLuma(compID) && cu.lfnstIdx))
+#else
               if (isLuma(compID) && tu.mtsIdx[COMPONENT_Y] > MTS_SKIP)
+#endif
               {
                 bool signHiding = slice.getSignDataHidingEnabledFlag();
                 CoeffCodingContext  cctx(tu, COMPONENT_Y, signHiding);
@@ -13499,6 +13578,9 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
                 if (scanPosLast < 1)
                 {
                   doSignPrediction = false;
+#if JVET_AG0061_INTER_LFNST_NSPT
+                  bMtsLfnstVialateScanPos = true;
+#endif
                 }
               }
               if (doSignPrediction)
@@ -13555,125 +13637,165 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
               }
 #endif
             }
+#if JVET_AG0061_INTER_LFNST_NSPT
+            else
+            {
+              CoeffCodingContext cctx(tu, COMPONENT_Y, false);
+              int                scanPosLast = -1;
+              TCoeff *           coeff       = tu.getCoeffs(compID).buf;
+              for (int scanPos = cctx.maxNumCoeff() - 1; scanPos >= 0; scanPos--)
+              {
+                unsigned blkPos = cctx.blockPos(scanPos);
+                if (coeff[blkPos])
+                {
+                  scanPosLast = scanPos;
+                  break;
+                }
+              }
+              if (scanPosLast < 1)
+              {
+                bMtsLfnstVialateScanPos = true;
+              }
+            }
 #endif
-
-            CUCtx cuCtx;
-            cuCtx.isDQPCoded = true;
-            cuCtx.isChromaQpAdjCoded = true;
-            m_CABACEstimator->residual_coding(tu, compID, &cuCtx);
-            m_CABACEstimator->mts_idx(cu, &cuCtx);
-
-            if (compID == COMPONENT_Y && tu.mtsIdx[compID] > MTS_SKIP && !cuCtx.mtsLastScanPos)
+#endif
+#if JVET_AG0061_INTER_LFNST_NSPT
+            if (bMtsLfnstVialateScanPos)
             {
               currCompCost = MAX_DOUBLE;
             }
             else
             {
+#endif
+              CUCtx cuCtx;
+              cuCtx.isDQPCoded         = true;
+              cuCtx.isChromaQpAdjCoded = true;
+              m_CABACEstimator->residual_coding(tu, compID, &cuCtx);
 
-            currCompFracBits = m_CABACEstimator->getEstFracBits();
+#if JVET_AG0061_INTER_LFNST_NSPT
+              if (isLuma(compID) && CU::isInter(cu))
+              {
+                m_CABACEstimator->residual_lfnst_mode(cu, cuCtx);
+              }
+              if (isLuma(compID))
+#endif
+                m_CABACEstimator->mts_idx(cu, &cuCtx);
 
-            PelBuf resiBuf = csFull->getResiBuf(compArea);
+              if (compID == COMPONENT_Y && tu.mtsIdx[compID] > MTS_SKIP && !cuCtx.mtsLastScanPos)
+              {
+                currCompCost = MAX_DOUBLE;
+              }
+              else
+              {
+                currCompFracBits = m_CABACEstimator->getEstFracBits();
+
+                PelBuf resiBuf = csFull->getResiBuf(compArea);
 #if JVET_S0234_ACT_CRS_FIX
 #if JVET_AE0059_INTER_CCCM
 #if JVET_AF0073_INTER_CCP_MERGE
-            CPelBuf orgResiBuf = colorTransFlag ? colorTransResidual.bufs[compID] : ((isChroma(compID) && tu.interCccm) ? interCccmOrgResiBuf[compID] : ((isChroma(compID) && tu.interCcpMerge) ? interCcpMergeOrgResiBuf[compID-1] : csFull->getOrgResiBuf(compArea)));
+                CPelBuf orgResiBuf = colorTransFlag ? colorTransResidual.bufs[compID] : ((isChroma(compID) && tu.interCccm) ? interCccmOrgResiBuf[compID] : ((isChroma(compID) && tu.interCcpMerge) ? interCcpMergeOrgResiBuf[compID-1] : csFull->getOrgResiBuf(compArea)));
 #else
-            CPelBuf orgResiBuf = colorTransFlag ? colorTransResidual.bufs[compID] : ((isChroma(compID) && tu.interCccm) ? interCccmOrgResiBuf[compID] : csFull->getOrgResiBuf(compArea));
+                CPelBuf orgResiBuf = colorTransFlag ? colorTransResidual.bufs[compID] : ((isChroma(compID) && tu.interCccm) ? interCccmOrgResiBuf[compID] : csFull->getOrgResiBuf(compArea));
 #endif
 #else
-            CPelBuf orgResiBuf = colorTransFlag ? colorTransResidual.bufs[compID] : csFull->getOrgResiBuf(compArea);
+                CPelBuf orgResiBuf = colorTransFlag ? colorTransResidual.bufs[compID] : csFull->getOrgResiBuf(compArea);
 #endif
 #else
-            CPelBuf orgResiBuf = csFull->getOrgResiBuf(compArea);
+                CPelBuf orgResiBuf = csFull->getOrgResiBuf(compArea);
 #endif
 
-            m_pcTrQuant->invTransformNxN(tu, compID, resiBuf, cQP);
+                m_pcTrQuant->invTransformNxN(tu, compID, resiBuf, cQP);
 #if JVET_S0234_ACT_CRS_FIX
-            if (!colorTransFlag && slice.getLmcsEnabledFlag() && isChroma(compID) && slice.getPicHeader()->getLmcsChromaResidualScaleFlag() && tu.blocks[compID].width*tu.blocks[compID].height > 4)
+                if (!colorTransFlag && slice.getLmcsEnabledFlag() && isChroma(compID) && slice.getPicHeader()->getLmcsChromaResidualScaleFlag() && tu.blocks[compID].width*tu.blocks[compID].height > 4)
 #else
-            if (slice.getLmcsEnabledFlag() && isChroma(compID) && slice.getPicHeader()->getLmcsChromaResidualScaleFlag() && tu.blocks[compID].width * tu.blocks[compID].height > 4)
+                if (slice.getLmcsEnabledFlag() && isChroma(compID) && slice.getPicHeader()->getLmcsChromaResidualScaleFlag() && tu.blocks[compID].width * tu.blocks[compID].height > 4)
 #endif
-            {
-              resiBuf.scaleSignal(tu.getChromaAdj(), 0, tu.cu->cs->slice->clpRng(compID));
-            }
+                {
+                  resiBuf.scaleSignal(tu.getChromaAdj(), 0, tu.cu->cs->slice->clpRng(compID));
+                }
 
 #if JVET_V0094_BILATERAL_FILTER
 #if JVET_AF0112_BIF_DYNAMIC_SCALING
-            bool applyBIF = cs.pps->getUseBIF() && isLuma(compID) && m_bilateralFilter->getApplyBIF(tu, compID);
+                bool applyBIF = cs.pps->getUseBIF() && isLuma(compID) && m_bilateralFilter->getApplyBIF(tu, compID);
 #else
-            bool isInter = (cu.predMode == MODE_INTER) ? true : false;
-            // getCbf() is going to be 1 since currAbsSum > 0 here, according to the if-statement a couple of lines up.
-            bool applyBIF = cs.pps->getUseBIF() && isLuma(compID) && tu.cu->qp > 17 && 128 > std::max(tu.lumaSize().width, tu.lumaSize().height) && (!isInter || 32 > std::min(tu.lumaSize().width, tu.lumaSize().height));
+                bool isInter = (cu.predMode == MODE_INTER) ? true : false;
+                // getCbf() is going to be 1 since currAbsSum > 0 here, according to the if-statement a couple of lines up.
+                bool applyBIF = cs.pps->getUseBIF() && isLuma(compID) && tu.cu->qp > 17 && 128 > std::max(tu.lumaSize().width, tu.lumaSize().height) && (!isInter || 32 > std::min(tu.lumaSize().width, tu.lumaSize().height));
 #endif
-            if(applyBIF)
-            {
-              CompArea tmpArea1( compID, tu.chromaFormat, Position(0, 0), Size(resiBuf.width, resiBuf.height));
-              PelBuf tmpRecLuma = m_tmpStorageLCU.getBuf(tmpArea1);
-              tmpRecLuma.copyFrom(resiBuf);
-              
-              const CPelBuf predBuf = csFull->getPredBuf(compArea);
-              PelBuf recIPredBuf = csFull->slice->getPic()->getRecoBuf(compArea);
-              std::vector<Pel> invLUT;
-              m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpRecLuma, predBuf, tmpRecLuma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, false, false, &invLUT );
-
-              currCompDist = m_pcRdCost->getDistPart(orgResiBuf, tmpRecLuma, channelBitDepth, compID, DF_SSE);
-            }
-            else
-#endif
-            {
-#if JVET_X0071_CHROMA_BILATERAL_FILTER
-              if(isChroma(compID))
-              {
-#if JVET_AF0112_BIF_DYNAMIC_SCALING
-                bool applyChromaBIF = cs.pps->getUseChromaBIF() && m_bilateralFilter->getApplyBIF(tu, compID);
-#else
-                bool applyChromaBIF = cs.pps->getUseChromaBIF() && isChroma(compID) && (tu.cu->qp > 17);
-#endif
-                if (applyChromaBIF)
+                if (applyBIF)
                 {
-                  //chroma and bilateral
                   CompArea tmpArea1(compID, tu.chromaFormat, Position(0, 0), Size(resiBuf.width, resiBuf.height));
-                  PelBuf tmpRecChroma = m_tmpStorageLCU.getBuf(tmpArea1);
-                  tmpRecChroma.copyFrom(resiBuf);
+                  PelBuf   tmpRecLuma = m_tmpStorageLCU.getBuf(tmpArea1);
+                  tmpRecLuma.copyFrom(resiBuf);
+
+                  const CPelBuf    predBuf     = csFull->getPredBuf(compArea);
+                  PelBuf           recIPredBuf = csFull->slice->getPic()->getRecoBuf(compArea);
+                  std::vector<Pel> invLUT;
+                  m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpRecLuma, predBuf, tmpRecLuma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, false, false, &invLUT );
+
+                  currCompDist = m_pcRdCost->getDistPart(orgResiBuf, tmpRecLuma, channelBitDepth, compID, DF_SSE);
+                }
+                else
+#endif
+                {
+#if JVET_X0071_CHROMA_BILATERAL_FILTER
+                  if (isChroma(compID))
+                  {
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+                    bool applyChromaBIF = cs.pps->getUseChromaBIF() && m_bilateralFilter->getApplyBIF(tu, compID);
+#else
+                    bool applyChromaBIF = cs.pps->getUseChromaBIF() && isChroma(compID) && (tu.cu->qp > 17);
+#endif
+                    if (applyChromaBIF)
+                    {
+                      // chroma and bilateral
+                      CompArea tmpArea1(compID, tu.chromaFormat, Position(0, 0), Size(resiBuf.width, resiBuf.height));
+                      PelBuf   tmpRecChroma = m_tmpStorageLCU.getBuf(tmpArea1);
+                      tmpRecChroma.copyFrom(resiBuf);
 
 #if JVET_AE0059_INTER_CCCM
 #if JVET_AF0073_INTER_CCP_MERGE
-                  const CPelBuf predBuf = tu.interCccm ? interCccmPredBuf[compID] : (tu.interCcpMerge ? interCcpMergePredBuf[compID-1] : csFull->getPredBuf(compArea));
+                      const CPelBuf predBuf = tu.interCccm ? interCccmPredBuf[compID] : (tu.interCcpMerge ? interCcpMergePredBuf[compID-1] : csFull->getPredBuf(compArea));
 #else
-                  const CPelBuf predBuf = tu.interCccm ? interCccmPredBuf[compID] : csFull->getPredBuf(compArea);
+                      const CPelBuf predBuf = tu.interCccm ? interCccmPredBuf[compID] : csFull->getPredBuf(compArea);
 #endif
 #else
-                  const CPelBuf predBuf = csFull->getPredBuf(compArea);
+                      const CPelBuf predBuf = csFull->getPredBuf(compArea);
 #endif
-                  PelBuf recIPredBuf = csFull->slice->getPic()->getRecoBuf(compArea);
-                  m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpRecChroma, predBuf, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, false );
-                  currCompDist = m_pcRdCost->getDistPart(orgResiBuf, tmpRecChroma, channelBitDepth, compID, DF_SSE);
-                }
-                else
-                {   //chroma but not bilateral
-                  currCompDist = m_pcRdCost->getDistPart(orgResiBuf, resiBuf, channelBitDepth, compID, DF_SSE);
-                }
-              }
-              else
-              { //luma but not bilateral
+                      PelBuf recIPredBuf = csFull->slice->getPic()->getRecoBuf(compArea);
+                      m_bilateralFilter->bilateralFilterRDOdiamond5x5( compID, tmpRecChroma, predBuf, tmpRecChroma, tu.cu->qp, recIPredBuf, cs.slice->clpRng(compID), tu, false );
+                      currCompDist = m_pcRdCost->getDistPart(orgResiBuf, tmpRecChroma, channelBitDepth, compID, DF_SSE);
+                    }
+                    else
+                    {   // chroma but not bilateral
+                      currCompDist = m_pcRdCost->getDistPart(orgResiBuf, resiBuf, channelBitDepth, compID, DF_SSE);
+                    }
+                  }
+                  else
+                  {   // luma but not bilateral
+                    currCompDist = m_pcRdCost->getDistPart(orgResiBuf, resiBuf, channelBitDepth, compID, DF_SSE);
+                  }
+#else
                 currCompDist = m_pcRdCost->getDistPart(orgResiBuf, resiBuf, channelBitDepth, compID, DF_SSE);
-              }
-#else
-              currCompDist = m_pcRdCost->getDistPart(orgResiBuf, resiBuf, channelBitDepth, compID, DF_SSE);
 #endif
-            }
+                }
 
 #if WCG_EXT
-            currCompCost = m_pcRdCost->calcRdCost(currCompFracBits, currCompDist, false);
+                currCompCost = m_pcRdCost->calcRdCost(currCompFracBits, currCompDist, false);
 #else
-            currCompCost = m_pcRdCost->calcRdCost(currCompFracBits, currCompDist);
+              currCompCost = m_pcRdCost->calcRdCost(currCompFracBits, currCompDist);
 #endif
+              }
+#if JVET_AG0061_INTER_LFNST_NSPT
             }
+#endif
           }
-#if JVET_AA0133_INTER_MTS_OPT
+#if JVET_AG0061_INTER_LFNST_NSPT
+          else if ((cu.mtsFlag && compID == COMPONENT_Y) || (transformMode > 0) || (cu.lfnstFlag && compID == COMPONENT_Y))
+#elif JVET_AA0133_INTER_MTS_OPT
           else if ((cu.mtsFlag && compID == COMPONENT_Y) || (transformMode > 0))
 #else
-          else if( transformMode > 0 )
+          else if (transformMode > 0)
 #endif
           {
             currCompCost = MAX_DOUBLE;
@@ -13687,10 +13809,20 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
             tu.cbf[compID] = 0;
           }
 #if JVET_AA0133_INTER_MTS_OPT
+#if JVET_AG0061_INTER_LFNST_NSPT
+          if (compID == COMPONENT_Y && (cu.mtsFlag || cu.lfnstFlag) && currCompCost < MAX_DOUBLE)
+#else
           if (compID == COMPONENT_Y && cu.mtsFlag && currCompCost < MAX_DOUBLE)
+#endif
           {
             double globalMinCost = std::min(minCost[compID], m_bestDCT2PassLumaCost);
             double fac = std::max((1.0 + 1.0 / sqrt(tu.lumaSize().width * tu.lumaSize().height)), 1.06);
+#if JVET_AG0061_INTER_LFNST_NSPT
+            if (cu.lfnstFlag)
+            {
+              fac *= 1.1;
+            }
+#endif
             if (currCompCost > fac*globalMinCost)
             {
               skipRemainingMTS = true;
@@ -13741,7 +13873,11 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
 #if JVET_AA0133_INTER_MTS_OPT
       if (compID == 0)
       {
+#if JVET_AG0061_INTER_LFNST_NSPT
+        if (cu.mtsFlag || cu.lfnstFlag)
+#else
         if (cu.mtsFlag)
+#endif
         {
           if (minCost[compID] == MAX_DOUBLE || bestTU.cbf[0] == 0) //When checking only MTS cands, cbf can't be zero, or just only contain DC coefficients.
           {
@@ -13761,9 +13897,15 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
         }
       }
 #endif
-        // copy component
-        tu.copyComponentFrom( bestTU, compID );
-        csFull->getResiBuf( compArea ).copyFrom( saveCS.getResiBuf( compArea ) );
+      // copy component
+      tu.copyComponentFrom(bestTU, compID);
+#if JVET_AG0061_INTER_LFNST_NSPT
+      if (compID == COMPONENT_Y)
+      {
+        tu.cu->lfnstIdx = tu.lfnstIdx[compID];
+      }
+#endif
+      csFull->getResiBuf( compArea ).copyFrom( saveCS.getResiBuf( compArea ) );
       if (colorTransFlag && (m_pcEncCfg->getCostMode() != COST_LOSSLESS_CODING || !slice.isLossless()))
       {
         m_pcTrQuant->lambdaAdjustColorTrans(false);
@@ -14551,6 +14693,21 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
       }
 #endif
     }
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+    ClpRngs clpRngs = cu.slice->clpRngs();
+    if (cs.picHeader->getLmcsEnabledFlag()) // LMCS enabled
+    {
+      std::vector<Pel>& fwdLUT = m_pcReshape->getFwdLUT();
+      clpRngs.comp[COMPONENT_Y].min = fwdLUT[cu.cs->slice->getLumaPelMin()];
+      clpRngs.comp[COMPONENT_Y].max = fwdLUT[cu.cs->slice->getLumaPelMax()];
+    }
+    else
+    {
+      clpRngs.comp[COMPONENT_Y].min = cu.cs->slice->getLumaPelMin();
+      clpRngs.comp[COMPONENT_Y].max = cu.cs->slice->getLumaPelMax();
+    }
+    cs.getRecoBuf().copyClip(cs.getRecoBuf(), clpRngs);
+#endif
 
     // add empty TU(s)
     cs.addEmptyTUs( partitioner );
@@ -14815,23 +14972,29 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
   else
   {
     zeroDistortion = 0;
-  if (luma)
-  {
-    cs.getOrgResiBuf().bufs[0].copyFrom(orgResidual.bufs[0]);
-  }
-  if (chroma && isChromaEnabled(cs.pcv->chrFormat))
-  {
-    cs.getOrgResiBuf().bufs[1].copyFrom(orgResidual.bufs[1]);
-    cs.getOrgResiBuf().bufs[2].copyFrom(orgResidual.bufs[2]);
-  }
+    if (luma)
+    {
+      cs.getOrgResiBuf().bufs[0].copyFrom(orgResidual.bufs[0]);
+    }
+    if (chroma && isChromaEnabled(cs.pcv->chrFormat))
+    {
+      cs.getOrgResiBuf().bufs[1].copyFrom(orgResidual.bufs[1]);
+      cs.getOrgResiBuf().bufs[2].copyFrom(orgResidual.bufs[2]);
+    }
 #if JVET_AA0133_INTER_MTS_OPT
-  bool isValidReturn = xEstimateInterResidualQT(cs, partitioner, &zeroDistortion, luma, chroma);
-  if (cu.mtsFlag && !isValidReturn)
-  {
-    return false;
-  }
+    bool isValidReturn = xEstimateInterResidualQT(cs, partitioner, &zeroDistortion, luma, chroma);
+    if (cu.mtsFlag && !isValidReturn)
+    {
+      return false;
+    }
+#if JVET_AG0061_INTER_LFNST_NSPT
+    if (cu.lfnstFlag && !isValidReturn)
+    {
+      return false;
+    }
+#endif
 #else
-  xEstimateInterResidualQT(cs, partitioner, &zeroDistortion, luma, chroma);
+    xEstimateInterResidualQT(cs, partitioner, &zeroDistortion, luma, chroma);
 #endif
   }
   TransformUnit &firstTU = *cs.getTU( partitioner.chType );
@@ -14954,12 +15117,37 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
         PelBuf tmpPred = m_tmpStorageLCU.getBuf( tmpArea );
         tmpPred.rspSignal( cs.getPredBuf( COMPONENT_Y ), m_pcReshape->getFwdLUT() );
 
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+        ClpRng clpRng = cs.slice->clpRng(COMPONENT_Y);
+        std::vector<Pel>& fwdLUT = m_pcReshape->getFwdLUT();
+        clpRng.min = fwdLUT[cs.slice->getLumaPelMin()];
+        clpRng.max = fwdLUT[cs.slice->getLumaPelMax()];
+        cs.getRecoBuf(COMPONENT_Y).reconstruct(tmpPred, cs.getResiBuf(COMPONENT_Y), clpRng);
+#else
         cs.getRecoBuf( COMPONENT_Y ).reconstruct( tmpPred, cs.getResiBuf( COMPONENT_Y ), cs.slice->clpRng( COMPONENT_Y ) );
+#endif
       }
       else
       {
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+        ClpRng clpRng = cs.slice->clpRng(COMPONENT_Y);
+        if (cs.slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag())
+        {
+          std::vector<Pel>& fwdLUT = m_pcReshape->getFwdLUT();
+          clpRng.min = fwdLUT[cs.slice->getLumaPelMin()];
+          clpRng.max = fwdLUT[cs.slice->getLumaPelMax()];
+        }
+        else
+        {
+          clpRng.min = cs.slice->getLumaPelMin();
+          clpRng.max = cs.slice->getLumaPelMax();
+        }
+        cs.getRecoBuf(COMPONENT_Y)
+          .reconstruct(cs.getPredBuf(COMPONENT_Y), cs.getResiBuf(COMPONENT_Y), clpRng);
+#else
         cs.getRecoBuf(COMPONENT_Y)
           .reconstruct(cs.getPredBuf(COMPONENT_Y), cs.getResiBuf(COMPONENT_Y), cs.slice->clpRng(COMPONENT_Y));
+#endif
 #if JVET_AA0070_RRIBC
         if (CU::isIBC(cu) && cu.rribcFlipType)
         {
@@ -14970,7 +15158,31 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
     }
     else
     {
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+      ClpRng clpRng = cs.slice->clpRng(COMPONENT_Y);
+      if (cs.slice->getSPS()->getUseLmcs() && cs.slice->getLmcsEnabledFlag())
+      {
+        if (m_pcReshape->getCTUFlag() && !cu.firstPU->ciipFlag && !cu.firstPU->gpmIntraFlag && !CU::isIBC(cu))
+        {
+          clpRng.min = cs.slice->getLumaPelMin();
+          clpRng.max = cs.slice->getLumaPelMax();
+        }
+        else
+        {
+          std::vector<Pel>& fwdLUT = m_pcReshape->getFwdLUT();
+          clpRng.min = fwdLUT[cs.slice->getLumaPelMin()];
+          clpRng.max = fwdLUT[cs.slice ->getLumaPelMax()];
+        }
+      }
+      else
+      {
+        clpRng.min = cs.slice->getLumaPelMin();
+        clpRng.max = cs.slice->getLumaPelMax();
+      }
+      cs.getRecoBuf().bufs[0].reconstruct(cs.getPredBuf().bufs[0], cs.getResiBuf().bufs[0], clpRng);
+#else
       cs.getRecoBuf().bufs[0].reconstruct(cs.getPredBuf().bufs[0], cs.getResiBuf().bufs[0], cs.slice->clpRngs().comp[0]);
+#endif
 #if JVET_Y0065_GPM_INTRA
       if (cs.slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag() && !cu.firstPU->ciipFlag && !cu.firstPU->gpmIntraFlag && !CU::isIBC(cu))
 #else
@@ -14979,6 +15191,21 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
       {
         cs.getRecoBuf().bufs[0].rspSignal(m_pcReshape->getFwdLUT());
       }
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+      ClpRng clpRngTmp = cs.slice->clpRng(COMPONENT_Y);
+      if (cs.slice->getSPS()->getUseLmcs() && cs.slice->getLmcsEnabledFlag())
+      {
+        std::vector<Pel>& fwdLUT = m_pcReshape->getFwdLUT();
+        clpRngTmp.min = fwdLUT[cs.slice->getLumaPelMin()];
+        clpRngTmp.max = fwdLUT[cs.slice->getLumaPelMax()];
+      }
+      else
+      {
+        clpRngTmp.min = cs.slice->getLumaPelMin();
+        clpRngTmp.max = cs.slice->getLumaPelMax();
+      }
+      cs.getRecoBuf().bufs[0].copyClip(cs.getRecoBuf().bufs[0], clpRngTmp);
+#endif
 #if JVET_AA0070_RRIBC
       if (CU::isIBC(cu) && cu.rribcFlipType)
       {

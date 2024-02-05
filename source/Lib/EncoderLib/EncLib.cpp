@@ -1929,6 +1929,9 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_AD0188_CCP_MERGE
   sps.setUseCcpMerge        ( m_ccpMerge );
 #endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  sps.setUseDdCcpFusion     ( m_ddCcpFusion );
+#endif
 #if ENABLE_OBMC
   sps.setUseOBMC            ( m_OBMC );
 #endif
@@ -2015,6 +2018,10 @@ void EncLib::xInitSPS( SPS& sps )
 #endif
 #if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
   sps.setUseIbcNonAdjCand                   ( m_ibcNonAdjCand );
+#endif
+#if JVET_AG0136_INTRA_TMP_LIC
+  sps.setItmpLicExtension                   ( m_itmpLicExtension );
+  sps.setItmpLicMode                        ( m_itmpLicMode );
 #endif
   sps.setWrapAroundEnabledFlag                      ( m_wrapAround );
 #if MULTI_HYP_PRED

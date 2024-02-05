@@ -503,6 +503,9 @@ protected:
 #if JVET_AD0188_CCP_MERGE
   bool      m_ccpMerge;
 #endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  bool      m_ddCcpFusion;
+#endif
 #if ENABLE_OBMC
   bool      m_OBMC;
 #endif
@@ -581,6 +584,10 @@ protected:
 #endif
 #if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
   bool      m_ibcNonAdjCand;
+#endif
+#if JVET_AG0136_INTRA_TMP_LIC
+  bool      m_itmpLicExtension;
+  bool      m_itmpLicMode;
 #endif
 
   bool      m_wrapAround;
@@ -1565,6 +1572,12 @@ public:
   void      setIbcNonAdjCand                 ( bool b )       { m_ibcNonAdjCand = b; }
   bool      getIbcNonAdjCand                 ()         const { return m_ibcNonAdjCand; }
 #endif
+#if JVET_AG0136_INTRA_TMP_LIC
+  void      setItmpLicExtension              ( bool b )       { m_itmpLicExtension = b; }
+  bool      getItmpLicExtension              ()         const { return m_itmpLicExtension; }
+  void      setItmpLicMode                   ( bool b )       { m_itmpLicMode = b; }
+  bool      getItmpLicMode                   ()         const { return m_itmpLicMode; }
+#endif
 
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   void      setUseDMVDMode                  (bool b)         { m_DMVDMode = b; }
@@ -1702,6 +1715,10 @@ public:
 #if JVET_AD0188_CCP_MERGE
   void      setUseCcpMerge               (bool i)         { m_ccpMerge = i; }
   bool      getUseCcpMerge               ()         const { return m_ccpMerge; }
+#endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  void      setUseDdCcpFusion            (bool i)         { m_ddCcpFusion = i; }
+  bool      getUseDdCcpFusion            ()         const { return m_ddCcpFusion; }
 #endif
 #if ENABLE_OBMC
   void      setUseObmc                   ( bool b )       { m_OBMC = b; }

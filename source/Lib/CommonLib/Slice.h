@@ -1570,6 +1570,10 @@ private:
 #if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
   bool              m_ibcNonAdjCand;
 #endif
+#if JVET_AG0136_INTRA_TMP_LIC
+  bool              m_itmpLicExtension;
+  bool              m_itmpLicMode;
+#endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   bool              m_DMVDMode;
 #endif
@@ -1805,6 +1809,9 @@ private:
 #endif
 #if JVET_AD0188_CCP_MERGE
   bool              m_ccpMerge;
+#endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  bool              m_ddCcpFusion;
 #endif
 #if JVET_V0130_INTRA_TMP
   bool              m_intraTMP;                                       ///< intra Template Matching 
@@ -2209,6 +2216,12 @@ void                    setCCALFEnabledFlag( bool b )                           
   void                    setUseIbcNonAdjCand(bool b)                                                     { m_ibcNonAdjCand = b; }
   bool                    getUseIbcNonAdjCand() const                                                     { return m_ibcNonAdjCand; }
 #endif
+#if JVET_AG0136_INTRA_TMP_LIC
+  void                    setItmpLicExtension(bool b)                                                     { m_itmpLicExtension = b; }
+  bool                    getItmpLicExtension() const                                                     { return m_itmpLicExtension; }
+  void                    setItmpLicMode(bool b)                                                     { m_itmpLicMode = b; }
+  bool                    getItmpLicMode() const                                                     { return m_itmpLicMode; }
+#endif
 
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   void                    setUseDMVDMode(bool b)                                                          { m_DMVDMode = b; }
@@ -2478,6 +2491,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if JVET_AD0188_CCP_MERGE
   void      setUseCcpMerge     ( bool i )                                        { m_ccpMerge = i; }
   bool      getUseCcpMerge     ()                                      const     { return m_ccpMerge; }
+#endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  void      setUseDdCcpFusion  ( bool i )                                        { m_ddCcpFusion = i; }
+  bool      getUseDdCcpFusion  ()                                      const     { return m_ddCcpFusion; }
 #endif
 #if ENABLE_OBMC
   void      setUseOBMC         ( bool b )                                        { m_OBMC = b; }
@@ -3624,6 +3641,11 @@ private:
   bool                       m_disableSATDForRd;
   bool                       m_isLossless;
 
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+  int                        m_lumaPelMax;
+  int                        m_lumaPelMin;
+  bool                       m_adaptiveClipQuant;
+#endif
 #if MULTI_HYP_PRED
   int                        m_numMultiHypRefPics = 0;
 
@@ -4124,6 +4146,14 @@ public:
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   bool                        getUseIBC()                                   const { return m_useIBC; }
   void                        setUseIBC(bool b) { m_useIBC = b; }
+#endif
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+  void                        setLumaPelMax(int u)                                { m_lumaPelMax = u; }
+  int                         getLumaPelMax()                               const { return  m_lumaPelMax; }
+  void                        setLumaPelMin(int u)                                { m_lumaPelMin = u; }
+  int                         getLumaPelMin()                               const { return  m_lumaPelMin; }
+  void                        setAdaptiveClipQuant(bool b)                        { m_adaptiveClipQuant = b; };
+  bool                        getAdaptiveClipQuant()                        const { return m_adaptiveClipQuant; };
 #endif
 
 protected:

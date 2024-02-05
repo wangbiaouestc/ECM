@@ -94,6 +94,9 @@ namespace CU
 #if JVET_AG0058_EIP
   void saveModelsInHEIP               (const CodingUnit &cu);
 #endif
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+  void saveCcInsideFilterFlagInCCP    (CodingUnit& cu);
+#endif
 
   PartSplit getSplitAtDepth           (const CodingUnit& cu, const unsigned depth);
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
@@ -110,6 +113,9 @@ namespace CU
   uint8_t deriveBcwIdx                (uint8_t bcwLO, uint8_t bcwL1);
   bool bdpcmAllowed                   (const CodingUnit& cu, const ComponentID compID);
   bool isMTSAllowed                   (const CodingUnit& cu, const ComponentID compID);
+#if JVET_AG0061_INTER_LFNST_NSPT
+  bool isLfnstAllowed                 (const CodingUnit &cu, const ComponentID compID);
+#endif
 #if INTER_LIC
   bool isLICFlagPresent               (const CodingUnit& cu);
 #endif
@@ -180,6 +186,11 @@ namespace CU
 // PU tools
 namespace PU
 {
+#if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
+  int  getItmpMergeCandidate      (const PredictionUnit& pu, std::vector<Mv>& pBvs);
+  bool validItmpBv                (const PredictionUnit& pu, int tmpXdisp, int tmpYdisp);
+  bool checkValidIntraTmpMergeCand(const PredictionUnit& pu, Mv Bv);
+#endif
 #if JVET_AD0184_REMOVAL_OF_DIVISION_OPERATIONS
   int getMeanValue(int sum, int div);
 #endif
@@ -818,6 +829,9 @@ namespace PU
   bool hasCcInsideFilterFlag(const PredictionUnit &pu, int intraMode);
   bool isModetobeFiltered(int intraMode);
 #endif
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+  bool hasCCPMergeFusionFlag(const PredictionUnit& pu);
+#endif
 #if JVET_AC0071_DBV
   bool hasChromaBvFlag(const PredictionUnit &pu);
 #endif
@@ -827,7 +841,10 @@ namespace PU
 #if JVET_AD0085_MPM_SORTING
   bool allowMPMSorted(const PredictionUnit& pu);
 #endif
-#if JVET_AD0188_CCP_MERGE
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  bool  hasDecoderDerivedCCP(const PredictionUnit &pu);
+#endif
+#if JVET_AD0188_CCP_MERGE || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   void ccpParamsToCclmModel(const ComponentID compID, const CCPModelCandidate& params, CclmModel& cclmModel);
   void cclmModelToCcpParams(const ComponentID compId, CCPModelCandidate& params, const CclmModel& cclmModel);
 
@@ -1299,4 +1316,7 @@ bool     getAllowedEipMerge(const CodingUnit &cu, const ComponentID compId);
 bool     getAllowedEip(const CodingUnit &cu, const ComponentID compId);
 int getAllowedCurEip(const CodingUnit& cu, const ComponentID compId, static_vector<EIPInfo, NUM_DERIVED_EIP>& eipInfoList);
 #endif
+#endif
+#if JVET_AG0061_INTER_LFNST_NSPT
+int buildHistogram(const Pel *pReco, int iStride, uint32_t uiHeight, uint32_t uiWidth, int *piHistogram, int direction, int bw, int bh);
 #endif

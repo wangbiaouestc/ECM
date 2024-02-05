@@ -1148,6 +1148,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_AD0188_CCP_MERGE
   ( "CCPMerge",                                       m_ccpMerge,                                       true, "Enable cross-componet prediction merge mode for chroma intra coding" )
 #endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  ("DDCCPFusion",                                     m_ddCcpFusion,                                    true, "Enable decoder derived CCP fusion mode for chroma intra coding")
+#endif
 #if ENABLE_OBMC
   ("OBMC",                                            m_OBMC,                                           true, "Overlapping Block Motion Compensation")
 #endif
@@ -1259,6 +1262,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("IBCNonAdjCand",                                   m_ibcNonAdjCand,                                    false, "IBC with non-adjacent spatial candidates (0:off, 1:on)  [default: off]" )
 #endif
 
+#if JVET_AG0136_INTRA_TMP_LIC
+  ("ItmpLicExtension",                                m_itmpLicExtension,                               false, "extended Itmp LIC(0:off, 1:on)  [default: off]" )
+#endif
   ("WrapAround",                                      m_wrapAround,                                     false, "Enable horizontal wrap-around motion compensation for inter prediction (0:off, 1:on)  [default: off]")
   ("WrapAroundOffset",                                m_wrapAroundOffset,                                  0u, "Offset in luma samples used for computing the horizontal wrap-around position")
 #if MULTI_HYP_PRED
@@ -1961,6 +1967,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   }
 #endif
 
+#if JVET_AG0136_INTRA_TMP_LIC
+  m_itmpLicMode = (m_iIntraPeriod != 1) ? 1 : 0;
+#endif
 #if JVET_AC0096
 #if JVET_AG0116
   if (m_gopBasedRPREnabledFlag)
@@ -4066,6 +4075,13 @@ bool EncAppCfg::xCheckParameter()
       m_ccpMerge = false;
     }
 #endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+    if (m_ddCcpFusion)
+    {
+      msg(WARNING, "DDCCPfusion is forcefully disabled since the enable flag of non-inter-TM tools is set off. \n");
+      m_ddCcpFusion = false;
+    }
+#endif
   }
 #endif
   if ( m_Affine == 0 )
@@ -5565,6 +5581,10 @@ void EncAppCfg::xPrintParameter()
 #if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
   msg(VERBOSE, "IBCNonAdjCand:%d ", m_ibcNonAdjCand);
 #endif
+#if JVET_AG0136_INTRA_TMP_LIC
+  msg( VERBOSE, "TmpLicExtension:%d ", m_itmpLicExtension );
+  msg( VERBOSE, "TmpLicMode:%d ", m_itmpLicMode );
+#endif
   msg( VERBOSE, "HashME:%d ", m_HashME );
   msg( VERBOSE, "WrapAround:%d ", m_wrapAround);
   if( m_wrapAround )
@@ -5735,6 +5755,9 @@ void EncAppCfg::xPrintParameter()
 #endif
 #if JVET_AD0188_CCP_MERGE
   msg(VERBOSE, "CCPmerge:%d ", m_ccpMerge);
+#endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  msg(VERBOSE, "DDCCPfusion:%d ", m_ddCcpFusion);
 #endif
   msg(VERBOSE, ") ");
 #else

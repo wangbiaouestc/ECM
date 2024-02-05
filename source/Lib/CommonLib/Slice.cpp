@@ -237,6 +237,10 @@ void Slice::initSlice()
   m_useLTforDRAP         = false;
   m_isDRAP               = false;
   m_latestDRAPPOC        = MAX_INT;
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+  m_lumaPelMax           = 0;
+  m_lumaPelMin           = 0;
+#endif
 #if JVET_W0066_CCSAO
   m_ccSaoComParam.reset();
   resetCcSaoEnabledFlag();
@@ -3707,6 +3711,9 @@ SPS::SPS()
 #if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
   , m_ibcNonAdjCand           ( false )
 #endif
+#if JVET_AG0136_INTRA_TMP_LIC
+  , m_itmpLicExtension        ( false )
+#endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
  , m_DMVDMode                 ( false )
 #endif
@@ -3868,6 +3875,9 @@ SPS::SPS()
 #endif
 #if JVET_AD0188_CCP_MERGE
 , m_ccpMerge                      ( false )
+#endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+, m_ddCcpFusion               ( false )
 #endif
 #endif
 #if JVET_V0130_INTRA_TMP

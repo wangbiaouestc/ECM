@@ -1690,6 +1690,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if JVET_AD0188_CCP_MERGE
   WRITE_UVLC(pcSPS->getUseCcpMerge(), "sps_ccp_merge");
 #endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  WRITE_UVLC(pcSPS->getUseDdCcpFusion(), "sps_ddccp_fusion");
+#endif
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
   }
   else
@@ -1810,6 +1813,10 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #endif
 #if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
     WRITE_FLAG(pcSPS->getUseIbcNonAdjCand() ? 1 : 0, "sps_ibc_non_adjacent_spatial_candidates_enabled_flag");
+#endif
+#if JVET_AG0136_INTRA_TMP_LIC
+    WRITE_FLAG( pcSPS->getItmpLicExtension ( ) ? 1 : 0 , "sps_itmp_lic_extension_flag" );
+    WRITE_FLAG( pcSPS->getItmpLicMode ( ) ? 1 : 0 , "sps_itmp_lic_mode_flag" );
 #endif
   }
 #if !JVET_S0074_SPS_REORDER
@@ -3445,6 +3452,69 @@ void HLSWriter::codeSliceHeader         ( Slice* pcSlice )
     WRITE_UVLC(0,"slice_segment_header_extension_length");
   }
 
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+  WRITE_FLAG(pcSlice->getAdaptiveClipQuant() ? 1 : 0, "adaptive_clip_quant");
+  int clipDeltaShift = 0;
+  if (pcSlice->getAdaptiveClipQuant())
+  {
+    clipDeltaShift = ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_1;
+  }
+  else
+  {
+    clipDeltaShift = ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_0;
+  }
+  if (pcSlice->getSliceType() == I_SLICE)
+  {
+    int deltaMin = pcSlice->getPic()->lumaClpRngforQuant.min - 64;
+    if (deltaMin > 0)
+    {
+      deltaMin = (deltaMin >> clipDeltaShift);
+    }
+    else if (deltaMin < 0)
+    {
+      deltaMin = -((-deltaMin) >> clipDeltaShift);
+    }
+    int deltaMax = pcSlice->getPic()->lumaClpRngforQuant.max - 940;
+    if (deltaMax > 0)
+    {
+      deltaMax = (deltaMax >> clipDeltaShift);
+    }
+    else if (deltaMax < 0)
+    {
+      deltaMax = -((-deltaMax) >> clipDeltaShift);
+    }
+    WRITE_SVLC(deltaMax, "clip_luma_pel_max");
+    WRITE_SVLC(deltaMin, "clip_luma_pel_min");
+  }
+  else
+  {
+    const Picture* const pColPic = pcSlice->getRefPic(RefPicList(1 - pcSlice->getColFromL0Flag()), pcSlice->getColRefIdx());
+    ClpRng colLumaClpRng = pColPic->getLumaClpRng();
+    int colLumaMin = colLumaClpRng.min;
+    int colLumaMax = colLumaClpRng.max;
+    int deltaMin = pcSlice->getPic()->lumaClpRngforQuant.min - colLumaMin;
+    int deltaMax = pcSlice->getPic()->lumaClpRngforQuant.max - colLumaMax;
+    if (deltaMin > 0)
+    {
+      deltaMin = (deltaMin >> clipDeltaShift);
+    }
+    else if (deltaMin < 0)
+    {
+      deltaMin = -((-deltaMin) >> clipDeltaShift);
+    }
+
+    if (deltaMax > 0)
+    {
+      deltaMax = (deltaMax >> clipDeltaShift);
+    }
+    else if (deltaMax < 0)
+    {
+      deltaMax = -((-deltaMax) >> clipDeltaShift);
+    }
+    WRITE_SVLC(deltaMax, "clip_luma_pel_max");
+    WRITE_SVLC(deltaMin, "clip_luma_pel_min");
+  }
+#endif
 }
 
 void  HLSWriter::codeConstraintInfo  ( const ConstraintInfo* cinfo )

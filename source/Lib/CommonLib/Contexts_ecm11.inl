@@ -3180,6 +3180,38 @@ const CtxSet ContextSetCfg::nonLocalCCP = ContextSetCfg::addCtxSet
      });
 #endif
 
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+const CtxSet ContextSetCfg::decoderDerivedCCP = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, }, 
+  { DWE, },
+  { DWE, },
+  { DWE, }, 
+  { DWO, },
+  { DWO, },
+	});
+
+const CtxSet ContextSetCfg::ddNonLocalCCP = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { 50, },
+  { DWS, },
+  { DWS, },
+  { 4, },
+  { DWE, },
+  { DWE, },
+  { 11, },
+  { DWO, },
+  { DWO, },
+	});
+#endif
+
 #if JVET_AE0059_INTER_CCCM
 const CtxSet ContextSetCfg::InterCccmFlag = ContextSetCfg::addCtxSet
   ({
@@ -3229,6 +3261,37 @@ const CtxSet ContextSetCfg::EipFlag = ContextSetCfg::addCtxSet
      { DWO, DWO, },
      { DWO, DWO, },
      });
+#endif
+
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+const CtxSet ContextSetCfg::CCPMergeFusionFlag = ContextSetCfg::addCtxSet
+({
+   { CNU },
+   { CNU },
+   { CNU },
+   { DWS },
+   { DWS },
+   { DWS },
+   { DWE },
+   { DWE },
+   { DWE },
+   { DWO },
+   { DWO },
+    });
+const CtxSet ContextSetCfg::CCPMergeFusionType = ContextSetCfg::addCtxSet
+({
+     { CNU },
+     { CNU },
+     { CNU },
+     { DWS },
+     { DWS },
+     { DWS },
+     { DWE },
+     { DWE },
+     { DWE },
+     { DWO },
+     { DWO },
+    });
 #endif
 #endif
 #endif

@@ -44,7 +44,6 @@
 #include "MotionInfo.h"
 #include "ChromaFormat.h"
 
-
 // ---------------------------------------------------------------------------
 // tools
 // ---------------------------------------------------------------------------
@@ -326,6 +325,10 @@ struct CodingUnit : public UnitArea
   uint8_t        plIdx;
 #endif
 #if ENABLE_DIMD
+#if JVET_AG0146_DIMD_ITMP_IBC
+  bool           isBvDimd;
+  Mv             bvDimd;
+#endif
   bool           dimd;
   bool           dimdBlending;
 #if JVET_AC0098_LOC_DEP_DIMD
@@ -352,7 +355,14 @@ struct CodingUnit : public UnitArea
 #endif
 #if TMP_FAST_ENC
 #if JVET_AD0086_ENHANCED_INTRA_TMP
+#if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
+  int                tmpXdisp;
+  int                tmpYdisp;
+#endif
   bool               tmpFlmFlag;
+#if JVET_AG0136_INTRA_TMP_LIC
+  bool               tmpLicFlag;
+#endif
   uint8_t            tmpIdx;
   bool               tmpFusionFlag;
   int                tmpIsSubPel;
@@ -379,6 +389,10 @@ struct CodingUnit : public UnitArea
 #if JVET_AB0155_SGPM
   int            timdHor;
   int            timdVer;
+#if JVET_AG0152_SGPM_ITMP_IBC
+  Mv             sgpmBv0;
+  Mv             sgpmBv1;
+#endif
   bool           sgpm;
   int            sgpmIdx;
   int            sgpmSplitDir;
@@ -395,6 +409,12 @@ struct CodingUnit : public UnitArea
   bool           isobmcMC;
 #endif
   uint8_t        mtsFlag;
+#if JVET_AG0061_INTER_LFNST_NSPT
+  uint8_t        lfnstFlag;
+#endif
+#if JVET_AG0061_INTER_LFNST_NSPT
+  int            dimdDerivedIntraDir;
+#endif
   uint8_t        lfnstIdx;
   uint8_t        bcwIdx;
 #if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
@@ -493,9 +513,6 @@ struct CodingUnit : public UnitArea
   const bool        isConsInter() const { return modeType == MODE_TYPE_INTER; }
   const bool        isConsIntra() const { return modeType == MODE_TYPE_INTRA; }
 #endif
-#if JVET_AG0143_INTER_INTRA
-  bool getSwitchCondition(ChannelType channelType) const;
-#endif
 };
 
 // ---------------------------------------------------------------------------
@@ -525,13 +542,17 @@ struct IntraPredictionData
 #endif
   bool      mipTransposedFlag;
   int8_t    multiRefIdx;
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  int       decoderDerivedCcpMode;
+  int       ddNonLocalCCPFusion;
+#endif
 #if JVET_Z0050_CCLM_SLOPE
   CclmOffsets cclmOffsets;
 #endif
 #if JVET_AA0126_GLM
   GlmIdc    glmIdc;
 #endif
-#if JVET_AA0057_CCCM
+#if JVET_AA0057_CCCM || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   int       cccmFlag;
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   int       cccmNoSubFlag;
@@ -553,8 +574,12 @@ struct IntraPredictionData
   int       idxNonLocalCCP;
   CCPModelCandidate curCand;
 #endif
-#if JVET_AD0120_LBCCP
+#if JVET_AD0120_LBCCP || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   int       ccInsideFilter;
+#endif
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+  int       ccpMergeFusionFlag;
+  int       ccpMergeFusionType;
 #endif
 };
 
@@ -824,6 +849,9 @@ struct TransformUnit : public UnitArea
   int              m_chromaResScaleInv;
   uint8_t        depth;
   uint8_t        mtsIdx     [ MAX_NUM_TBLOCKS ];
+#if JVET_AG0061_INTER_LFNST_NSPT
+  uint8_t        lfnstIdx   [ MAX_NUM_TBLOCKS ];
+#endif
   bool           noResidual;
   uint8_t        jointCbCr;
   uint8_t        cbf        [ MAX_NUM_TBLOCKS ];
@@ -1015,6 +1043,29 @@ struct MEResult
   MEResult() { predBuf = nullptr; predBufIdx = -1; }
 };
 typedef std::vector<MEResult> MEResultVec;
+#endif
+
+#if JVET_AG0152_SGPM_ITMP_IBC
+struct SgpmInfo
+{
+  int sgpmSplitDir;
+  int sgpmMode0;
+  int sgpmMode1;
+  Mv   sgpmBv0;
+  Mv   sgpmBv1;
+  SgpmInfo() : sgpmSplitDir(0), sgpmMode0(0), sgpmMode1(0), sgpmBv0(0, 0), sgpmBv1(0, 0) {}
+  SgpmInfo(const int sd, const int sm0, const int sm1, const Mv sbv0, const Mv sbv1) : sgpmSplitDir(sd), sgpmMode0(sm0), sgpmMode1(sm1), sgpmBv0(sbv0), sgpmBv1(sbv1) {}
+
+  SgpmInfo& operator=(const SgpmInfo& other)
+  {
+    sgpmSplitDir = other.sgpmSplitDir;
+    sgpmMode0 = other.sgpmMode0;
+    sgpmMode1 = other.sgpmMode1;
+    sgpmBv0 = other.sgpmBv0;
+    sgpmBv1 = other.sgpmBv1;
+    return *this;
+  }
+};
 #endif
 #endif
 

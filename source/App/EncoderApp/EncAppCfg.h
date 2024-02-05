@@ -496,6 +496,9 @@ protected:
 #if JVET_AD0188_CCP_MERGE
   bool      m_ccpMerge;
 #endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  bool      m_ddCcpFusion;
+#endif
 #if ENABLE_OBMC
   bool      m_OBMC;
 #endif
@@ -570,6 +573,10 @@ protected:
 #endif
 #if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
   bool      m_ibcNonAdjCand;
+#endif
+#if JVET_AG0136_INTRA_TMP_LIC
+  bool      m_itmpLicExtension;
+  bool      m_itmpLicMode;
 #endif
 
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
