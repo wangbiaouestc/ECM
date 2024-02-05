@@ -278,6 +278,9 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   rootCbf           = other.rootCbf;
   sbtInfo           = other.sbtInfo;
   mtsFlag           = other.mtsFlag;
+#if JVET_AG0061_INTER_LFNST_NSPT
+  lfnstFlag         = other.lfnstFlag;
+#endif
   lfnstIdx          = other.lfnstIdx;
   tileIdx           = other.tileIdx;
 #if JVET_AC0105_DIRECTIONAL_PLANAR
@@ -406,6 +409,9 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST 
   intraTmpDimdMode = other.intraTmpDimdMode;
 #endif
+#if JVET_AG0061_INTER_LFNST_NSPT
+  dimdDerivedIntraDir = other.dimdDerivedIntraDir;
+#endif
 #endif
 #if INTER_LIC
   licFlag           = other.licFlag;
@@ -501,6 +507,9 @@ void CodingUnit::initData()
   rootCbf           = true;
   sbtInfo           = 0;
   mtsFlag           = 0;
+#if JVET_AG0061_INTER_LFNST_NSPT
+  lfnstFlag         = 0;
+#endif
   lfnstIdx          = 0;
   tileIdx           = 0;
 #if JVET_AC0105_DIRECTIONAL_PLANAR
@@ -629,6 +638,9 @@ void CodingUnit::initData()
   tmpFlag = false;
 #if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST 
   intraTmpDimdMode = -1;
+#endif
+#if JVET_AG0061_INTER_LFNST_NSPT
+  dimdDerivedIntraDir = 0;
 #endif
 #endif
 #if INTER_LIC
@@ -1835,6 +1847,9 @@ void TransformUnit::initData()
   {
     cbf[i]           = 0;
     mtsIdx[i]        = MTS_DCT2_DCT2;
+#if JVET_AG0061_INTER_LFNST_NSPT
+    lfnstIdx[i]      = 0;
+#endif
   }
   depth              = 0;
   noResidual         = false;
@@ -1927,7 +1942,10 @@ TransformUnit& TransformUnit::operator=(const TransformUnit& other)
       if (m_runType[i]   && other.m_runType[i]   && m_runType[i]   != other.m_runType[i]  ) memcpy(m_runType[i],   other.m_runType[i],   sizeof(bool) * area);
     }
     cbf[i]           = other.cbf[i];
-    mtsIdx[i] = other.mtsIdx[i];
+    mtsIdx[i]        = other.mtsIdx[i];
+#if JVET_AG0061_INTER_LFNST_NSPT
+    lfnstIdx[i]      = other.lfnstIdx[i];
+#endif
   }
   depth              = other.depth;
   noResidual         = other.noResidual;
@@ -1972,6 +1990,9 @@ void TransformUnit::copyComponentFrom(const TransformUnit& other, const Componen
   cbf[i]           = other.cbf[i];
   depth            = other.depth;
   mtsIdx[i]        = other.mtsIdx[i];
+#if JVET_AG0061_INTER_LFNST_NSPT
+  lfnstIdx[i]      = other.lfnstIdx[i];
+#endif
   noResidual       = other.noResidual;
   jointCbCr        = isChroma( i ) ? other.jointCbCr : jointCbCr;
 #if JVET_AE0059_INTER_CCCM

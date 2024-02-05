@@ -173,7 +173,11 @@ protected:
 
 private:
   DepQuant *m_quant;          //!< Quantizer
-  TCoeff    m_mtsCoeffs[NUM_TRAFO_MODES_MTS][MAX_TB_SIZEY * MAX_TB_SIZEY];
+#if JVET_AG0061_INTER_LFNST_NSPT
+  TCoeff   m_mtsCoeffs[NUM_TRAFO_MODES_MTS + 3][MAX_TB_SIZEY * MAX_TB_SIZEY];
+#else
+  TCoeff   m_mtsCoeffs[NUM_TRAFO_MODES_MTS][MAX_TB_SIZEY * MAX_TB_SIZEY];
+#endif
 #if JVET_W0119_LFNST_EXTENSION
   TCoeff   m_tempInMatrix [ L16W_ZO ];
   TCoeff   m_tempOutMatrix[ L16W_ZO ];

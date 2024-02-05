@@ -3517,6 +3517,26 @@ const CtxSet ContextSetCfg::LFNSTIdx = ContextSetCfg::addCtxSet({
   { 119, 116, 116, 117 },
 });
 
+#if JVET_AG0061_INTER_LFNST_NSPT
+const CtxSet ContextSetCfg::InterLFNSTIdx = ContextSetCfg::addCtxSet({
+  {  CNU, CNU, CNU, },
+  {  CNU, CNU, CNU, },
+  {  CNU, CNU, CNU, },
+  {  DWS, DWS, DWS, },
+  {  DWS, DWS, DWS, },
+  {  DWS, DWS, DWS, },
+  {  DWE, DWE, DWE, },
+  {  DWE, DWE, DWE, },
+  {  DWE, DWE, DWE, },
+  {  DWO, DWO, DWO, },
+  {  DWO, DWO, DWO, },
+  {  DWO, DWO, DWO, },
+  {  DWO, DWO, DWO, },
+  {  DWO, DWO, DWO, },
+  {  DWO, DWO, DWO, },
+});
+#endif
+
 const CtxSet ContextSetCfg::PLTFlag = ContextSetCfg::addCtxSet({
   { 0 },
   { 0 },

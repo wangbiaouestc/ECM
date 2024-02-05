@@ -2380,6 +2380,13 @@ void DecCu::xDecodeInterTexture(CodingUnit &cu)
     return;
   }
 
+#if JVET_AG0061_INTER_LFNST_NSPT
+  if (cu.lfnstIdx)
+  {
+    cu.dimdDerivedIntraDir = m_pcInterPred->deriveInterDimdMode(cu, cu.cs->getPredBuf(*cu.firstPU).Y());
+  }
+#endif
+
   const uint32_t uiNumVaildComp = getNumberValidComponents(cu.chromaFormat);
 
 #if JVET_S0234_ACT_CRS_FIX

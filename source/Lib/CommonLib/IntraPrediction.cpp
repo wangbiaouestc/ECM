@@ -8985,7 +8985,7 @@ int IntraPrediction::deriveDimdMipMode(PelBuf& reducedPred, int width, int heigh
   return firstMode;
 }
 #endif
-
+#if !JVET_AG0061_INTER_LFNST_NSPT
 int IntraPrediction::buildHistogram(const Pel *pReco, int iStride, uint32_t uiHeight, uint32_t uiWidth, int* piHistogram, int direction, int bw, int bh)
 {
   const int wStep = 1, hStep = 1;
@@ -9080,7 +9080,7 @@ int IntraPrediction::buildHistogram(const Pel *pReco, int iStride, uint32_t uiHe
   }
   return 0;
 }
-
+#endif
 
 #if JVET_W0123_TIMD_FUSION && JVET_AG0092_ENHANCED_TIMD_FUSION
 void xLocationdepBlending(Pel *pDst, int strideDst, Pel *pVer, int strideVer, Pel *pHor, int strideHor,Pel *pNonLocDep, int strideNonLocDep, int width, int height, int mode, int wVer, int wHor, int wNonLocDep, int range)

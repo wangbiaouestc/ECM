@@ -110,6 +110,9 @@ namespace CU
   uint8_t deriveBcwIdx                (uint8_t bcwLO, uint8_t bcwL1);
   bool bdpcmAllowed                   (const CodingUnit& cu, const ComponentID compID);
   bool isMTSAllowed                   (const CodingUnit& cu, const ComponentID compID);
+#if JVET_AG0061_INTER_LFNST_NSPT
+  bool isLfnstAllowed                 (const CodingUnit &cu, const ComponentID compID);
+#endif
 #if INTER_LIC
   bool isLICFlagPresent               (const CodingUnit& cu);
 #endif
@@ -1307,4 +1310,7 @@ bool     getAllowedEipMerge(const CodingUnit &cu, const ComponentID compId);
 bool     getAllowedEip(const CodingUnit &cu, const ComponentID compId);
 int getAllowedCurEip(const CodingUnit& cu, const ComponentID compId, static_vector<EIPInfo, NUM_DERIVED_EIP>& eipInfoList);
 #endif
+#endif
+#if JVET_AG0061_INTER_LFNST_NSPT
+int buildHistogram(const Pel *pReco, int iStride, uint32_t uiHeight, uint32_t uiWidth, int *piHistogram, int direction, int bw, int bh);
 #endif

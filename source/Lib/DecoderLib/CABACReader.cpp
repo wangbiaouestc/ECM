@@ -8389,7 +8389,13 @@ void CABACReader::residual_coding( TransformUnit& tu, ComponentID compID, CUCtx&
 
   if( tu.mtsIdx[compID] != MTS_SKIP && tu.blocks[compID].height >= 4 && tu.blocks[compID].width >= 4 )
   {
+#if JVET_AG0061_INTER_LFNST_NSPT
+    const int lfnstLastScanPosTh = CU::isIntra(*(tu.cu))
+                                     ? (isLuma(compID) ? LFNST_LAST_SIG_LUMA : LFNST_LAST_SIG_CHROMA)
+                                     : (isLuma(compID) ? LFNST_LAST_SIG_LUMA_INTER : LFNST_LAST_SIG_CHROMA_INTER);
+#else
     const int lfnstLastScanPosTh = isLuma( compID ) ? LFNST_LAST_SIG_LUMA : LFNST_LAST_SIG_CHROMA;
+#endif
     cuCtx.lfnstLastScanPos |= cctx.scanPosLast() >= lfnstLastScanPosTh;
   }
   if (isLuma(compID) && tu.mtsIdx[compID] != MTS_SKIP)
@@ -8652,8 +8658,11 @@ void CABACReader::residual_lfnst_mode( CodingUnit& cu,  CUCtx& cuCtx  )
   }
 #endif
 
-
-  if( cu.cs->sps->getUseLFNST() && CU::isIntra( cu ) )
+#if JVET_AG0061_INTER_LFNST_NSPT
+  if (cu.cs->sps->getUseLFNST() && (CU::isIntra(cu) || CU::isInter(cu)))
+#else
+  if (cu.cs->sps->getUseLFNST() && CU::isIntra(cu))
+#endif
   {
 #if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
     const bool lumaFlag              = CS::isDualITree(*cu.cs) ? (isLuma(cu.chType) ? true : false) : true;
@@ -8688,27 +8697,48 @@ void CABACReader::residual_lfnst_mode( CodingUnit& cu,  CUCtx& cuCtx  )
     return;
   }
 
-  unsigned cctx = 0;
-#if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
-  if (CS::isDualITree(*cu.cs)) cctx++;
-#else
-  if (cu.isSepTree()) cctx++;
+#if JVET_AG0061_INTER_LFNST_NSPT
+  if (CU::isInter(cu))
+  {
+    uint32_t idxLFNST = m_BinDecoder.decodeBin(Ctx::InterLFNSTIdx(0));
+    if (idxLFNST)
+    {
+      idxLFNST += m_BinDecoder.decodeBin(Ctx::InterLFNSTIdx(1));
+      if (idxLFNST == 2)
+      {
+        idxLFNST += m_BinDecoder.decodeBin(Ctx::InterLFNSTIdx(2));
+      }
+    }
+    cu.lfnstIdx = idxLFNST;
+  }
+  else
+  {
 #endif
 
-  RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE2(STATS__CABAC_BITS__LFNST, cu.blocks[chIdx].lumaSize(), ChannelType(chIdx));
-#if EXTENDED_LFNST || JVET_W0119_LFNST_EXTENSION
-  uint32_t firstBit = m_BinDecoder.decodeBin(Ctx::LFNSTIdx(cctx));
-  cctx = 2 + firstBit;
-  uint32_t secondBit = m_BinDecoder.decodeBin(Ctx::LFNSTIdx(cctx));
-  uint32_t idxLFNST = firstBit + (secondBit << 1);
+    unsigned cctx = 0;
+#if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+    if (CS::isDualITree(*cu.cs)) cctx++;
 #else
-  uint32_t idxLFNST = m_BinDecoder.decodeBin( Ctx::LFNSTIdx( cctx ) );
-  if( idxLFNST )
-  {
-    idxLFNST += m_BinDecoder.decodeBin(Ctx::LFNSTIdx(2));
+    if (cu.isSepTree()) cctx++;
+#endif
+
+    RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE2(STATS__CABAC_BITS__LFNST, cu.blocks[chIdx].lumaSize(), ChannelType(chIdx));
+#if EXTENDED_LFNST || JVET_W0119_LFNST_EXTENSION
+    uint32_t firstBit  = m_BinDecoder.decodeBin(Ctx::LFNSTIdx(cctx));
+    cctx               = 2 + firstBit;
+    uint32_t secondBit = m_BinDecoder.decodeBin(Ctx::LFNSTIdx(cctx));
+    uint32_t idxLFNST  = firstBit + (secondBit << 1);
+#else
+    uint32_t idxLFNST = m_BinDecoder.decodeBin(Ctx::LFNSTIdx(cctx));
+    if (idxLFNST)
+    {
+      idxLFNST += m_BinDecoder.decodeBin(Ctx::LFNSTIdx(2));
+    }
+#endif
+    cu.lfnstIdx = idxLFNST;
+#if JVET_AG0061_INTER_LFNST_NSPT
   }
 #endif
-  cu.lfnstIdx = idxLFNST;
 
   DTRACE( g_trace_ctx, D_SYNTAX, "residual_lfnst_mode() etype=%d pos=(%d,%d) mode=%d\n", COMPONENT_Y, cu.lx(), cu.ly(), ( int ) cu.lfnstIdx );
 }

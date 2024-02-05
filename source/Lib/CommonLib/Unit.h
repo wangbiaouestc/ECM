@@ -409,6 +409,12 @@ struct CodingUnit : public UnitArea
   bool           isobmcMC;
 #endif
   uint8_t        mtsFlag;
+#if JVET_AG0061_INTER_LFNST_NSPT
+  uint8_t        lfnstFlag;
+#endif
+#if JVET_AG0061_INTER_LFNST_NSPT
+  int            dimdDerivedIntraDir;
+#endif
   uint8_t        lfnstIdx;
   uint8_t        bcwIdx;
 #if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
@@ -839,6 +845,9 @@ struct TransformUnit : public UnitArea
   int              m_chromaResScaleInv;
   uint8_t        depth;
   uint8_t        mtsIdx     [ MAX_NUM_TBLOCKS ];
+#if JVET_AG0061_INTER_LFNST_NSPT
+  uint8_t        lfnstIdx   [ MAX_NUM_TBLOCKS ];
+#endif
   bool           noResidual;
   uint8_t        jointCbCr;
   uint8_t        cbf        [ MAX_NUM_TBLOCKS ];

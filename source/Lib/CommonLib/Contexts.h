@@ -731,6 +731,9 @@ public:
   static const CtxSet   TransformSkipFlag;
   static const CtxSet   MTSIdx;
   static const CtxSet   LFNSTIdx;
+#if JVET_AG0061_INTER_LFNST_NSPT
+  static const CtxSet   InterLFNSTIdx;
+#endif
   static const CtxSet   PLTFlag;
   static const CtxSet   RotationFlag;
   static const CtxSet   RunTypeFlag;
