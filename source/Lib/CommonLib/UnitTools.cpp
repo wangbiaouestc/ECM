@@ -3114,6 +3114,29 @@ bool PU::hasCcInsideFilterFlag(const PredictionUnit &pu, int intraMode)
 }
 #endif
 
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+bool PU::hasCCPMergeFusionFlag(const PredictionUnit& pu)
+{
+  if (pu.cs->slice->getSliceType() != I_SLICE)
+  {
+    return false;
+  }
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+  if (!pu.cu->slice->getSPS()->getUseDimd())
+  {
+    return false;
+  }
+#endif
+#if JVET_AA0057_CCCM
+  if (pu.cu->slice->getSPS()->getUseCccm() == 0)
+  {
+    return false;
+  }
+#endif
+  return true;
+}
+#endif
+
 #if JVET_AC0071_DBV
 bool PU::hasChromaBvFlag(const PredictionUnit &pu)
 {
@@ -4206,6 +4229,26 @@ void CU::saveModelsInHCCP(const CodingUnit &cu)
   }
 #endif
 }
+
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+void CU::saveCcInsideFilterFlagInCCP(CodingUnit& cu)
+{
+  bool lumaUsesISP = !CS::isDualITree(*cu.cs) && cu.ispMode;
+  if (cu.chromaFormat == CHROMA_400 || (CS::isDualITree(*cu.cs) && cu.chType == CHANNEL_TYPE_LUMA) || !CU::isIntra(cu))
+  {
+    return;
+  }
+  if (lumaUsesISP)
+  {
+    return;
+  }
+  PredictionUnit& pu = *cu.firstPU;
+  if (PU::isLMCMode(pu.intraDir[1]) && pu.curCand.type != CCP_TYPE_NONE && pu.ccInsideFilter)
+  {
+    pu.curCand.ccInsideFilter = pu.ccInsideFilter;
+  }
+}
+#endif
 
 void PU::ccpParamsToCclmModel(const ComponentID compId, const CCPModelCandidate& params, CclmModel& cclmModel)
 {

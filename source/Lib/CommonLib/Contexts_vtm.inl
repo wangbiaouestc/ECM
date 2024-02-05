@@ -1226,3 +1226,19 @@ const CtxSet ContextSetCfg::EipFlag = ContextSetCfg::addCtxSet
      { DWS, DWS, },
      });
 #endif
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+const CtxSet ContextSetCfg::CCPMergeFusionFlag = ContextSetCfg::addCtxSet
+({
+   { CNU },
+   { CNU },
+   { CNU },
+   { DWS },
+    });
+const CtxSet ContextSetCfg::CCPMergeFusionType = ContextSetCfg::addCtxSet
+({
+   { CNU },
+   { CNU },
+   { CNU },
+   { DWS },
+    });
+#endif

@@ -3262,6 +3262,37 @@ const CtxSet ContextSetCfg::EipFlag = ContextSetCfg::addCtxSet
      { DWO, DWO, },
      });
 #endif
+
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+const CtxSet ContextSetCfg::CCPMergeFusionFlag = ContextSetCfg::addCtxSet
+({
+   { CNU },
+   { CNU },
+   { CNU },
+   { DWS },
+   { DWS },
+   { DWS },
+   { DWE },
+   { DWE },
+   { DWE },
+   { DWO },
+   { DWO },
+    });
+const CtxSet ContextSetCfg::CCPMergeFusionType = ContextSetCfg::addCtxSet
+({
+     { CNU },
+     { CNU },
+     { CNU },
+     { DWS },
+     { DWS },
+     { DWS },
+     { DWE },
+     { DWE },
+     { DWE },
+     { DWO },
+     { DWO },
+    });
+#endif
 #endif
 #endif
 

@@ -2316,6 +2316,16 @@ void CABACWriter::nonLocalCCPIndex(const PredictionUnit &pu)
         {
 #endif
         unary_max_eqprob(pu.idxNonLocalCCP - 1, MAX_CCP_CAND_LIST_SIZE - 1);
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+        if (PU::hasCCPMergeFusionFlag(pu))
+        {
+          m_BinEncoder.encodeBin(pu.ccpMergeFusionFlag ? 1 : 0, Ctx::CCPMergeFusionFlag(0));
+          if (pu.ccpMergeFusionFlag)
+          {
+            m_BinEncoder.encodeBin(pu.ccpMergeFusionType ? 1 : 0, Ctx::CCPMergeFusionType(0));
+          }
+        }
+#endif
 #if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
         }
 #endif

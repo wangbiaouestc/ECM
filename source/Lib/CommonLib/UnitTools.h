@@ -94,6 +94,9 @@ namespace CU
 #if JVET_AG0058_EIP
   void saveModelsInHEIP               (const CodingUnit &cu);
 #endif
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+  void saveCcInsideFilterFlagInCCP    (CodingUnit& cu);
+#endif
 
   PartSplit getSplitAtDepth           (const CodingUnit& cu, const unsigned depth);
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
@@ -822,6 +825,9 @@ namespace PU
 #if JVET_AD0120_LBCCP
   bool hasCcInsideFilterFlag(const PredictionUnit &pu, int intraMode);
   bool isModetobeFiltered(int intraMode);
+#endif
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+  bool hasCCPMergeFusionFlag(const PredictionUnit& pu);
 #endif
 #if JVET_AC0071_DBV
   bool hasChromaBvFlag(const PredictionUnit &pu);

@@ -2593,6 +2593,16 @@ void CABACReader::nonLocalCCPIndex(PredictionUnit &pu)
       {
 #endif
       pu.idxNonLocalCCP += unary_max_eqprob(MAX_CCP_CAND_LIST_SIZE - 1);
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+      if (PU::hasCCPMergeFusionFlag(pu))
+      {
+        pu.ccpMergeFusionFlag = m_BinDecoder.decodeBin(Ctx::CCPMergeFusionFlag(0));
+        if (pu.ccpMergeFusionFlag)
+        {
+          pu.ccpMergeFusionType = m_BinDecoder.decodeBin(Ctx::CCPMergeFusionType(0));
+        }
+      }
+#endif
 #if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
       }
 #endif

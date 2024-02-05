@@ -16928,6 +16928,103 @@ void IntraPrediction::predCCPCandidate(PredictionUnit &pu, PelBuf &predCb, PelBu
         THROW("Invalid Type");
       }
     }
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+    if (pu.curCand.ccInsideFilter)
+    {
+      filterPredInside(COMPONENT_Cb, predCb, pu);
+      filterPredInside(COMPONENT_Cr, predCr, pu);
+    }
+
+    if (pu.ccpMergeFusionFlag == 1)
+    {
+      int width = predCb.width;
+      int height = predCb.height;
+
+      const int scaleX = getComponentScaleX(COMPONENT_Cb, pu.chromaFormat);
+      const int scaleY = getComponentScaleY(COMPONENT_Cb, pu.chromaFormat);
+      const UnitArea localUnitArea(pu.chromaFormat, Area(0, 0, width << scaleX, height << scaleY));
+
+      PelBuf predBufferCb = m_tempBuffer[0].getBuf(localUnitArea.Cb());
+      PelBuf predBufferCr = m_tempBuffer[0].getBuf(localUnitArea.Cr());
+      PredictionUnit pu2 = pu;
+      if (pu.ccpMergeFusionType == 0)
+      {
+        const int                         bitDepth = pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA);
+        static CccmModel cccmModelCb[2] = { CccmModel(CCCM_NUM_PARAMS, bitDepth), CccmModel(CCCM_NUM_PARAMS, bitDepth) };
+        static CccmModel cccmModelCr[2] = { CccmModel(CCCM_NUM_PARAMS, bitDepth), CccmModel(CCCM_NUM_PARAMS, bitDepth) };
+
+        pu2.cccmFlag = 1;
+#if JVET_AC0054_GLCCCM
+        pu2.glCccmFlag = 0;
+#endif
+#if JVET_AD0202_CCCM_MDF
+        pu2.cccmMultiFilterIdx = 0;
+#endif
+#if MMLM
+        pu2.intraDir[1] = MMLM_CHROMA_IDX;
+
+        static int modelThr = 0;
+
+        modelThr = xCccmCalcRefAver(pu2);
+        xCccmCalcModels(pu2, cccmModelCb[0], cccmModelCr[0], 1, modelThr);
+        xCccmCalcModels(pu2, cccmModelCb[1], cccmModelCr[1], 2, modelThr);
+
+        xCccmApplyModel(pu2, COMPONENT_Cb, cccmModelCb[0], 1, modelThr, predBufferCb);
+        xCccmApplyModel(pu2, COMPONENT_Cb, cccmModelCb[1], 2, modelThr, predBufferCb);
+
+        xCccmApplyModel(pu2, COMPONENT_Cr, cccmModelCr[0], 1, modelThr, predBufferCr);
+        xCccmApplyModel(pu2, COMPONENT_Cr, cccmModelCr[1], 2, modelThr, predBufferCr);
+#else
+        pu2.intraDir[1] = LM_CHROMA_IDX;
+
+        xCccmCalcModels(pu2, cccmModelCb[0], cccmModelCr[0], 0, 0);
+
+        xCccmApplyModel(pu2, COMPONENT_Cb, cccmModelCb[0], 0, 0, predBufferCb);
+        xCccmApplyModel(pu2, COMPONENT_Cr, cccmModelCr[0], 0, 0, predBufferCr);
+#endif
+      }
+      else
+      {
+        pu.intraDir[1] = DIMD_CHROMA_IDX;
+        initIntraPatternChType(*pu.cu, pu.blocks[COMPONENT_Cb]);
+        initIntraPatternChType(*pu.cu, pu.blocks[COMPONENT_Cr]);
+        predIntraAng(COMPONENT_Cb, predBufferCb, pu);
+        predIntraAng(COMPONENT_Cr, predBufferCr, pu);
+        pu.intraDir[1] = LM_CHROMA_IDX;
+      }
+
+      int w0 = 2;
+      int w1 = 2;
+      int shift = 2;
+
+      Pel* pelPredCb = predCb.buf;
+      Pel* pelPredCr = predCr.buf;
+
+      Pel* pelPredCb2 = predBufferCb.buf;
+      Pel* pelPredCr2 = predBufferCr.buf;
+
+      for (int y = 0; y < height; y++)
+      {
+        for (int x = 0; x < width; x++)
+        {
+          int blend = pelPredCb[x] * w0;
+          blend += pelPredCb2[x] * w1;
+          blend += 2;
+          pelPredCb[x] = (Pel)(blend >> shift);
+
+          blend = pelPredCr[x] * w0;
+          blend += pelPredCr2[x] * w1;
+          blend += 2;
+          pelPredCr[x] = (Pel)(blend >> shift);
+        }
+        pelPredCb += predCb.stride;
+        pelPredCb2 += predBufferCb.stride;
+
+        pelPredCr += predCr.stride;
+        pelPredCr2 += predBufferCr.stride;
+      }
+    }
+#endif
   }
 }
 #endif

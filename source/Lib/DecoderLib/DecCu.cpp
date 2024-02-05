@@ -551,6 +551,9 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
 #if JVET_AG0058_EIP
         CU::saveModelsInHEIP(currCU);
 #endif
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+        CU::saveCcInsideFilterFlagInCCP(currCU);
+#endif
         break;
       default:
         THROW( "Invalid prediction mode" );
@@ -616,7 +619,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
   }
 #endif
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+  if ((pu.intraDir[1] == DIMD_CHROMA_IDX || pu.ccpMergeFusionType == 1) && compID == COMPONENT_Cb)
+#else
   if (pu.intraDir[1] == DIMD_CHROMA_IDX && compID == COMPONENT_Cb)
+#endif
   {
     CompArea areaCb = pu.Cb();
     CompArea areaCr = pu.Cr();
@@ -829,6 +836,13 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
           THROW("Invalid type");
         }
       }
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+      if (pu.ccpMergeFusionFlag && pu.ccpMergeFusionType == 0 && !hasFilteredCCCM)
+      {
+        m_pcIntraPred->xCccmCreateLumaRef(pu, area, 0);
+        hasFilteredCCCM = true;
+      }
+#endif
       CHECK(pu.idxNonLocalCCP < 1 || pu.idxNonLocalCCP > MAX_CCP_CAND_LIST_SIZE, " Invalid idxNonLocalCCP index");
 
 #if JVET_AG0154_DECODER_DERIVED_CCP_FUSION

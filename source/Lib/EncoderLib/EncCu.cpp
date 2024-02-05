@@ -1704,7 +1704,18 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     }
   }
 #endif
-
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+  {
+    CodingUnit& cu = *bestCS->cus.front();
+    bool              lumaUsesISP = !CS::isDualITree(*bestCS) && cu.ispMode;
+    if (!(cu.chromaFormat == CHROMA_400 || (CS::isDualITree(*bestCS) && cu.chType == CHANNEL_TYPE_LUMA))
+      && CU::isIntra(cu) && !lumaUsesISP && bestCS->cus.size() == 1
+      && bestCS->area.Cb() == (*bestCS->cus.back()).Cb())
+    {
+      CU::saveCcInsideFilterFlagInCCP(cu);
+    }
+  }
+#endif
 #if JVET_AF0073_INTER_CCP_MERGE
   {
     CodingUnit& cu = *bestCS->cus.front();

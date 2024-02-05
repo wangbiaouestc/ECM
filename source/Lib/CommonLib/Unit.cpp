@@ -946,6 +946,10 @@ void PredictionUnit::initData()
 #if JVET_AD0120_LBCCP || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   ccInsideFilter = 0;
 #endif
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+  ccpMergeFusionFlag = 0;
+  ccpMergeFusionType = 0;
+#endif
   // inter data
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   colIdx = 0;
@@ -1155,6 +1159,10 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
 #endif
 #if JVET_AD0120_LBCCP || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   ccInsideFilter = predData.ccInsideFilter;
+#endif
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+  ccpMergeFusionFlag = predData.ccpMergeFusionFlag;
+  ccpMergeFusionType = predData.ccpMergeFusionType;
 #endif
   return *this;
 }
@@ -1374,6 +1382,10 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 
 #if JVET_AD0120_LBCCP || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   ccInsideFilter = other.ccInsideFilter;
+#endif
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+  ccpMergeFusionFlag = other.ccpMergeFusionFlag;
+  ccpMergeFusionType = other.ccpMergeFusionType;
 #endif
   mergeFlag   = other.mergeFlag;
   regularMergeFlag = other.regularMergeFlag;
