@@ -817,6 +817,10 @@ public:
 #if JVET_AG0058_EIP
   static const CtxSet   EipFlag;
 #endif
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+  static const CtxSet   CCPMergeFusionFlag;
+  static const CtxSet   CCPMergeFusionType;
+#endif
   static const unsigned NumberOfContexts;
 
   // combined sets for less complex copying

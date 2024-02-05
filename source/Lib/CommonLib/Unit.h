@@ -577,6 +577,10 @@ struct IntraPredictionData
 #if JVET_AD0120_LBCCP || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   int       ccInsideFilter;
 #endif
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+  int       ccpMergeFusionFlag;
+  int       ccpMergeFusionType;
+#endif
 };
 
 struct InterPredictionData

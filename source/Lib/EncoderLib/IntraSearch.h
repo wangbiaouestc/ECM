@@ -654,6 +654,10 @@ private:
   };
 #endif
 
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+  PelStorage      m_predCCPFusionStorage[2];
+#endif
+
 protected:
   // interface to option
   EncCfg*         m_pcEncCfg;
@@ -856,6 +860,10 @@ protected:
 #endif
 #if JVET_AA0126_GLM
   void xFindBestGlmIdcSATD                ( PredictionUnit &pu, ComponentID compID, int &idcBest, int64_t &satdBest );
+#endif
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+  void getPredForCCPMrgFusion(PredictionUnit& pu, PelBuf& predCb, PelBuf& predCr);
+  void xCalcCcpMrgPred(const PredictionUnit& pu, const ComponentID compID, PelBuf& piPredNonLm, PelBuf& piPredLm);
 #endif
 };// END CLASS DEFINITION EncSearch
 

@@ -337,6 +337,9 @@ struct CCPModelCandidate
 #if JVET_AA0126_GLM
   int8_t  glmIdc = 0;
 #endif
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+  int ccInsideFilter = 0;
+#endif
 
   template<int NUM>
   inline bool isTheSameParams(const CCPModelCandidate& p) const
