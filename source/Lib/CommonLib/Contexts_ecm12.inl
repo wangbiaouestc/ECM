@@ -4524,6 +4524,10 @@ const CtxSet ContextSetCfg::decoderDerivedCCP = ContextSetCfg::addCtxSet
   { DWE, }, 
   { DWO, },
   { DWO, },
+  { DWO, },
+  { DWO, },
+  { DWO, },
+  { DWO, },
 	});
 
 const CtxSet ContextSetCfg::ddNonLocalCCP = ContextSetCfg::addCtxSet
@@ -4537,6 +4541,10 @@ const CtxSet ContextSetCfg::ddNonLocalCCP = ContextSetCfg::addCtxSet
   { DWE, },
   { DWE, },
   { 11, },
+  { DWO, },
+  { DWO, },
+  { DWO, },
+  { DWO, },
   { DWO, },
   { DWO, },
 	});
