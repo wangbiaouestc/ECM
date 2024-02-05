@@ -143,6 +143,10 @@ const CtxSet ContextSetCfg::AffineGPMFlag = ContextSetCfg::addCtxSet
   { DWE, DWE, DWE, },
   { 116, 119, 148, },
   { 117, 117, 116, },
+  { 116, 119, 148, },
+  { 117, 117, 116, },
+  { 116, 119, 148, },
+  { 117, 117, 116, },
 });
 
 const CtxSet ContextSetCfg::GpmMergeIdx = ContextSetCfg::addCtxSet
@@ -158,6 +162,10 @@ const CtxSet ContextSetCfg::GpmMergeIdx = ContextSetCfg::addCtxSet
   {  18,  18,   4,   4,   4, DWE, DWE, DWE, DWE, DWE, },
   { 119, 134, 126, 126, 198, 119, 119, 119, 119, 119, },
   { 117, 105, 117, 116, 238, 119, 119, 119, 119, 119, },
+  { 119, 134, 126, 126, 198, 119, 119, 119, 119, 119, },
+  { 117, 105, 117, 116, 238, 119, 119, 119, 119, 119, },
+  { 119, 134, 126, 126, 198, 119, 119, 119, 119, 119, },
+  { 117, 105, 117, 116, 238, 119, 119, 119, 119, 119, },
 });
 
 const CtxSet ContextSetCfg::GpmAffMergeIdx = ContextSetCfg::addCtxSet
@@ -171,6 +179,10 @@ const CtxSet ContextSetCfg::GpmAffMergeIdx = ContextSetCfg::addCtxSet
   {  18,  18,  18,  18,  11, DWE, DWE, DWE, DWE, DWE, },
   {  18,  18,  18,  18,  11, DWE, DWE, DWE, DWE, DWE, },
   {  18,  18,   4,   4,   4, DWE, DWE, DWE, DWE, DWE, },
+  { 119, 134, 126, 126, 198, 119, 119, 119, 119, 119, },
+  { 117, 105, 117, 116, 238, 119, 119, 119, 119, 119, },
+  { 119, 134, 126, 126, 198, 119, 119, 119, 119, 119, },
+  { 117, 105, 117, 116, 238, 119, 119, 119, 119, 119, },
   { 119, 134, 126, 126, 198, 119, 119, 119, 119, 119, },
   { 117, 105, 117, 116, 238, 119, 119, 119, 119, 119, },
 });
@@ -190,6 +202,10 @@ const CtxSet ContextSetCfg::GeoBlendFlag = ContextSetCfg::addCtxSet
   {  DWE, },
   {  DWO, },
   {  DWO, },
+  {  DWO, },
+  {  DWO, },
+  {  DWO, },
+  {  DWO, },
 });
 #endif
 
@@ -205,6 +221,10 @@ const CtxSet ContextSetCfg::CiipAffineFlag = ContextSetCfg::addCtxSet
   {  11,  11,   4, },
   {   4,   4,  11, },
   {  18,  18,  18, },
+  { 108, 122, 133, },
+  { 116, 117, 116, },
+  { 108, 122, 133, },
+  { 116, 117, 116, },
   { 108, 122, 133, },
   { 116, 117, 116, },
 });
