@@ -890,6 +890,10 @@ const CtxSet ContextSetCfg::TmpLic = ContextSetCfg::addCtxSet
   { DWE },
   { DWO },
   { DWO },
+  { DWO },
+  { DWO },
+  { DWO },
+  { DWO },
   });
 
 const CtxSet ContextSetCfg::ItmpLicIndex = ContextSetCfg::addCtxSet
@@ -903,6 +907,10 @@ const CtxSet ContextSetCfg::ItmpLicIndex = ContextSetCfg::addCtxSet
   { DWE, DWE, },
   { DWE, DWE, },
   { DWE, DWE, },
+  { DWO, DWO, },
+  { DWO, DWO, },
+  { DWO, DWO, },
+  { DWO, DWO, },
   { DWO, DWO, },
   { DWO, DWO, },
   });
