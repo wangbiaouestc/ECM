@@ -1615,7 +1615,7 @@ static const int MAX_NUM_CANDS =                                64;
 #if JVET_AA0057_CCCM
 #if JVET_AG0058_EIP
 // max number of parameters used in CCCM related methods
-static const int CCCM_NUM_PARAMS_MAX = std::max(EIP_FILTER_TAP, CCCM_NO_SUB_NUM_PARAMS);
+static const int CCCM_NUM_PARAMS_MAX =              EIP_FILTER_TAP;
 #else
 // max number of parameters used in CCCM related methods
 static const int CCCM_NUM_PARAMS_MAX =      CCCM_NO_SUB_NUM_PARAMS;
