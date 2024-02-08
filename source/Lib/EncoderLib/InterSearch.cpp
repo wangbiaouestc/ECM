@@ -5936,6 +5936,9 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
                                             pu.cu->imv <= (pu.cu->slice->getSPS()->getAMVREnabledFlag() ? IMV_4PEL : 0));
   CodingUnit *bestCU  = pu.cu->cs->bestCS != nullptr ? pu.cu->cs->bestCS->getCU( CHANNEL_TYPE_LUMA ) : nullptr;
   bool trySmvd        = ( bestCU != nullptr && pu.cu->imv == 2 && checkAffine ) ? ( !bestCU->firstPU->mergeFlag && !bestCU->affine ) : true;
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+  trySmvd &= pu.cu->licDelta == 0;
+#endif
 #if JVET_AG0098_AMVP_WITH_SBTMVP
   bool bestSubTmvp = (bestCU != NULL && (bestCU->firstPU->mergeType == MRG_TYPE_SUBPU_ATMVP || bestCU->firstPU->amvpSbTmvpFlag)) ? true : false;
   bool tryAmvpSbTmvp = cs.sps->getSbTMVPEnabledFlag() && cs.slice->getAmvpSbTmvpEnabledFlag() && !cu.licFlag && checkNonAffine && bcwIdx == BCW_DEFAULT ? true : false;
@@ -6222,6 +6225,9 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
       //  Bi-predictive Motion estimation
 #if JVET_AD0213_LIC_IMP
       bool condOn = cu.slice->getCheckLDC() || bcwIdx == BCW_DEFAULT || !m_affineModeSelected || !m_pcEncCfg->getUseBcwFast() || (cu.licFlag && bcwIdx != BCW_DEFAULT);
+#endif
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+      condOn &= cu.licDelta == 0;
 #endif
       if( ( cs.slice->isInterB() ) && ( PU::isBipredRestriction( pu ) == false )
 #if JVET_AD0213_LIC_IMP
@@ -7500,6 +7506,12 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
 #if JVET_X0083_BM_AMVP_MERGE_MODE
     if (pu.bdmvrRefine)
     {
+#if JVET_AG0276_LIC_BDOF_BDMVR
+      if (cu.licFlag == true)
+      {
+        memset((void*)getBdofSubPuMvOffset(), 0, BDOF_SUBPU_MAX_NUM * sizeof(Mv));
+      }
+#endif
       PU::spanMotionInfo(*cu.firstPU, MergeCtx(),
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
         pu.colIdx,
@@ -7896,6 +7908,10 @@ void InterSearch::predInterSearchAdditionalHypothesis(PredictionUnit& pu, const 
   const int numWeights = sps.getNumAddHypWeights();
   unsigned idx1, idx2, idx3, idx4;
   getAreaIdx(pu.Y(), *pu.cs->slice->getPPS()->pcv, idx1, idx2, idx3, idx4);
+#if JVET_AG0276_NLIC
+  bool savedAltLMFlag = pu.cu->altLMFlag;
+  AltLMInterUnit savedAltLMParaUnit = pu.cu->altLMParaUnit;
+#endif
 #if INTER_LIC
   auto savedLICFlag = pu.cu->licFlag;
 #endif
@@ -7953,6 +7969,10 @@ void InterSearch::predInterSearchAdditionalHypothesis(PredictionUnit& pu, const 
         fakePredData.refIdx[1 - refList] = -1;
         fakePredData.cu->affine = false;
         fakePredData.cu->imv = m_geoMrgCtx.useAltHpelIf[i] ? IMV_HPEL : 0;
+#if JVET_AG0276_NLIC
+        fakePredData.cu->altLMFlag = m_geoMrgCtx.altLMFlag[i];
+        fakePredData.cu->altLMParaUnit = m_geoMrgCtx.altLMParaNeighbours[i];
+#endif
         fakePredData.mvRefine = true;
         if (savedLICFlag)
         {
@@ -7964,6 +7984,10 @@ void InterSearch::predInterSearchAdditionalHypothesis(PredictionUnit& pu, const 
         }
         fakePredData.mvRefine = false;
         // the restore of affine flag and imv flag has to be here
+#if JVET_AG0276_NLIC
+        fakePredData.cu->altLMFlag = savedAltLMFlag;
+        fakePredData.cu->altLMParaUnit = savedAltLMParaUnit;
+#endif
         fakePredData.cu->imv = savedIMV;
         fakePredData.cu->affine = savedAffine;
       }
@@ -8128,11 +8152,19 @@ void InterSearch::predInterSearchAdditionalHypothesis(PredictionUnit& pu, const 
           cMv = cMvPred;
         }
         Distortion uiCostTemp = 0;
+#if JVET_AG0276_NLIC
+        pu.cu->altLMFlag = false;
+        pu.cu->altLMParaUnit.resetAltLinearModel();
+#endif
 #if INTER_LIC
         pu.cu->licFlag = tempMHPredData.licFlag;
 #endif
         xMotionEstimation(pu, tempOrigBuf, eRefPicList, cMvPred, iRefIdxPred, cMv, tempMHPredData.mvpIdx, uiBits, uiCostTemp, amvpInfo, false, g_addHypWeight[tempMHPredData.weightIdx]);
         xCheckBestMVP(eRefPicList, cMv, cMvPred, tempMHPredData.mvpIdx, amvpInfo, uiBits, uiCostTemp, pu.cu->imv);
+#if JVET_AG0276_NLIC
+        pu.cu->altLMFlag = savedAltLMFlag;
+        pu.cu->altLMParaUnit = savedAltLMParaUnit;
+#endif
 #if INTER_LIC
         pu.cu->licFlag = savedLICFlag;
 #endif
@@ -11023,6 +11055,9 @@ void InterSearch::xPredAffineInterSearch( PredictionUnit&       pu,
     // In case refIdx4Para[i] is NOT_VALID, uiMotBits[i] would be undefined since list i will not be searched in 6-para model.
     // Therefore, the undefined bits would be stored in MHP candidates.
     && !(pu.cu->affineType == AFFINEMODEL_6PARAM && (refIdx4Para[0] == NOT_VALID || refIdx4Para[1] == NOT_VALID))
+#endif
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+    && pu.cu->licDelta == 0
 #endif
 #if INTER_LIC && !JVET_AD0213_LIC_IMP
     && !pu.cu->licFlag

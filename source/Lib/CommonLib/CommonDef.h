@@ -233,6 +233,11 @@ static const int RMVF_NUM_SUBBLK_THRED = 255;
 static const int RMVF_PARAM_THRED = (1 << 20);
 #endif
 #endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+static const int AFF_MRG_MAX_NUM_CANDS_OPPOSITELIC =                8;
+static const int REG_MRG_MAX_NUM_CANDS_OPPOSITELIC =                5;
+static const int TM_MRG_MAX_NUM_CANDS_OPPOSITELIC =                 3;
+#endif
 static const int IBC_MRG_MAX_NUM_CANDS =                            6; ///< IBC MERGE
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
 static const int IBC_MRG_MAX_NUM_CANDS_MEM =                        28;   ///< IBC AMVP- max number of candidates
@@ -1156,6 +1161,14 @@ static const int ADAPTIVE_SUB_GROUP_SIZE_MMVD_AFF = AF_MMVD_MAX_REFINE_NUM >> 1;
 #else
 static const int ADAPTIVE_SUB_GROUP_SIZE_MMVD_AFF = AF_MMVD_MAX_REFINE_NUM;
 #endif
+#endif
+
+#if JVET_AG0276_NLIC
+static const int ALT_MRG_MAX_NUM_CANDS     = 16;
+static const int ALT_AFF_MRG_MAX_NUM_CANDS = 6;
+#endif
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+static const int LIC_SLOPE_MAX_NUM_DELTA  = 2;
 #endif
 
 #if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA || JVET_AC0119_LM_CHROMA_FUSION

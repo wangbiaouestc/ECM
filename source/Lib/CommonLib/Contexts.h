@@ -500,6 +500,11 @@ public:
 #endif
   static const CtxSet   SkipFlag;
   static const CtxSet   MergeFlag;
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  static const CtxSet   MergeFlagOppositeLic;
+  static const CtxSet   TmMergeFlagOppositeLic;
+  static const CtxSet   AffineFlagOppositeLic;
+#endif
   static const CtxSet   RegularMergeFlag;
   static const CtxSet   MergeIdx;
 #if JVET_AG0164_AFFINE_GPM
@@ -783,6 +788,9 @@ public:
   static const CtxSet   JointCbCrFlag;
 #if INTER_LIC
   static const CtxSet   LICFlag;
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+  static const CtxSet   LicDelta;
+#endif
 #endif
 #if SIGN_PREDICTION
   static const CtxSet   signPred[2];

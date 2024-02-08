@@ -4522,6 +4522,12 @@ void CABACWriter::merge_data(const PredictionUnit& pu)
       affBmFlag(pu);
     }
 #endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+    if (PU::hasOppositeLICFlag(pu) && !pu.afMmvdFlag && !pu.affBMMergeFlag && pu.cs->sps->getUseAffMergeOppositeLic())
+    {
+      m_BinEncoder.encodeBin(pu.affineOppositeLic, Ctx::AffineFlagOppositeLic(0));
+    }
+#endif
     merge_idx(pu);
     return;
   }
@@ -4602,6 +4608,19 @@ void CABACWriter::merge_data(const PredictionUnit& pu)
     }
     else
     {
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+      if (pu.regularMergeFlag && PU::hasOppositeLICFlag(pu) && !pu.bmMergeFlag)
+      {
+        if (pu.tmMergeFlag && pu.cs->sps->getUseTMMergeOppositeLic())
+        {
+          m_BinEncoder.encodeBin(pu.tmMergeFlagOppositeLic, Ctx::TmMergeFlagOppositeLic(0));
+        }
+        else if (pu.cs->sps->getUseMergeOppositeLic())
+        {
+          m_BinEncoder.encodeBin(pu.mergeOppositeLic, Ctx::MergeFlagOppositeLic(0));
+        }
+      }
+#endif
       merge_idx(pu);
     }
   }
@@ -4826,6 +4845,12 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
     }
 #endif
     int numCandminus1 = int( pu.cs->picHeader->getMaxNumAffineMergeCand() ) - 1;
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+    if (pu.affineOppositeLic)
+    {
+      numCandminus1 = int(pu.cs->picHeader->getMaxNumAffineOppositeLicMergeCand()) - 1;
+    }
+#endif
     if ( numCandminus1 > 0 )
     {
 #if JVET_AA0128_AFFINE_MERGE_CTX_INC
@@ -5142,6 +5167,17 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
 #endif
     else
       numCandminus1 = int(pu.cs->sps->getMaxNumMergeCand()) - 1;
+
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+    if (pu.mergeOppositeLic)
+    {
+      numCandminus1 = int(pu.cs->sps->getMaxNumOppositeLicMergeCand()) - 1;
+    }
+    else if (pu.tmMergeFlagOppositeLic)
+    {
+      numCandminus1 = int(pu.cs->sps->getMaxNumTMOppositeLicMergeCand()) - 1;
+    }
+#endif
   if( numCandminus1 > 0 )
   {
 #if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
@@ -9427,8 +9463,24 @@ void CABACWriter::cu_lic_flag(const CodingUnit& cu)
 {
   if (CU::isLICFlagPresent(cu))
   {
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+    unsigned ctxId = DeriveCtx::CtxLicFlag( cu );
+    m_BinEncoder.encodeBin(cu.licFlag ? 1 : 0, Ctx::LICFlag(ctxId));
+#else
     m_BinEncoder.encodeBin(cu.licFlag ? 1 : 0, Ctx::LICFlag(0));
+#endif
     DTRACE(g_trace_ctx, D_SYNTAX, "cu_lic_flag() lic_flag=%d\n", cu.licFlag ? 1 : 0);
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+    if (cu.licFlag && CU::isLicSlopeAllowed(cu) && cu.firstPU->interDir != 3)
+    {
+      int delta = cu.licDelta;
+      m_BinEncoder.encodeBin( delta != 0 ? 1 : 0, Ctx::LicDelta(0) );
+      if ( delta )
+      {
+        m_BinEncoder.encodeBin( delta < 0 ? 1 : 0, Ctx::LicDelta(1) );
+      }
+    }
+#endif
   }
 }
 #endif

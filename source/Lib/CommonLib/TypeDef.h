@@ -255,6 +255,10 @@
 #if INTER_LIC
 #define JVET_AD0213_LIC_IMP                               1 // JVET-AD0213: bi-predictive LIC and the combination of LIC and OBMC
 #define JVET_AF0128_LIC_MERGE_TM                          1 // JVET-AF0128: LIC flag derivation for merge candidates with template costs
+#define JVET_AG0276_NLIC                                  1 // JVET-AG0276: non-local LIC
+#define JVET_AG0276_LIC_FLAG_SIGNALING                    1 // JVET-AG0276: signal LIC flag for merge mode
+#define JVET_AG0276_LIC_BDOF_BDMVR                        1 // JVET-AG0276: LIC BDOF and BDMVR
+#define JVET_AG0276_LIC_SLOPE_ADJUST                      1 // JVET-AG0276: LIC with slope adjustment
 #endif
 #define NON_ADJACENT_MRG_CAND                             1 // Add non-adjacent merge candidates
 #define MULTI_HYP_PRED                                    1 // Multiple hypothesis prediction

@@ -654,4 +654,35 @@ struct DecoderDerivedCcpCandidate
 };
 #endif
 
+#if JVET_AG0276_NLIC
+struct AltLMInterUnit
+{
+  int scale[MAX_NUM_COMPONENT];
+  int offset[MAX_NUM_COMPONENT];
+
+  void resetAltLinearModel()
+  {
+    for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
+    {
+      scale[comp] = 32;
+      offset[comp] = 0;
+    }
+  }
+
+  AltLMInterUnit()
+  {
+    resetAltLinearModel();
+  }
+
+  AltLMInterUnit &operator=(const AltLMInterUnit &other)
+  {
+    for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
+    {
+      scale[comp] = other.scale[comp];
+      offset[comp] = other.offset[comp];
+    }
+    return *this;
+  }
+};
+#endif
 #endif

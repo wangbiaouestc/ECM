@@ -450,5 +450,8 @@ extern uint32_t g_picAmvpSbTmvpEnabledArea;
 extern const Position g_eipFilter[NUM_EIP_SHAPE][EIP_FILTER_TAP];
 extern const EIPInfo  g_eipInfoLut[4][4][9];
 #endif
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+extern const int g_licSlopeDeltaSet[LIC_SLOPE_MAX_NUM_DELTA + 1];
+#endif
 #endif  //__TCOMROM__
 

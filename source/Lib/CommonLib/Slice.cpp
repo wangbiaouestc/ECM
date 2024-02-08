@@ -3446,6 +3446,9 @@ PicHeader::PicHeader()
 , m_picColFromL0Flag                              ( true )
 , m_mvdL1ZeroFlag                                 ( 0 )
 , m_maxNumAffineMergeCand                         ( AFFINE_MRG_MAX_NUM_CANDS )
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+, m_maxNumAffineOppositeLicMergeCand              ( AFF_MRG_MAX_NUM_CANDS_OPPOSITELIC )
+#endif
 , m_disFracMMVD                                   ( 0 )
 , m_disBdofFlag                                   ( 0 )
 , m_disDmvrFlag                                   ( 0 )
@@ -3544,6 +3547,9 @@ void PicHeader::initPicHeader()
   m_picColFromL0Flag                              = true;
   m_mvdL1ZeroFlag                                 = 0;
   m_maxNumAffineMergeCand                         = AFFINE_MRG_MAX_NUM_CANDS;
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  m_maxNumAffineOppositeLicMergeCand              = AFF_MRG_MAX_NUM_CANDS_OPPOSITELIC;
+#endif
   m_disFracMMVD                                   = 0;
   m_disBdofFlag                                   = 0;
   m_disDmvrFlag                                   = 0;
@@ -3851,6 +3857,9 @@ SPS::SPS()
 , m_AffineType                ( false )
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
 , m_useAffineTM               ( false )
+#if JVET_AG0276_NLIC
+, m_useAffAltLMTM             ( false )
+#endif
 #endif
 , m_PROF                      ( false )
 #if ENABLE_DIMD
@@ -3923,6 +3932,15 @@ SPS::SPS()
 , m_MIP                       ( false )
 #if JVET_W0090_ARMC_TM
 , m_AML                       ( false )
+#if JVET_AG0276_NLIC
+, m_altLM                     ( false )
+, m_affAltLM                  ( false )
+#endif
+#endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+, m_mergeOppositeLic          ( false )
+, m_mergeTMOppositeLic        ( false )
+, m_mergeAffOppositeLic       ( false )
 #endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
 , m_armcRefinedMotion         ( false )
@@ -3936,10 +3954,16 @@ SPS::SPS()
 , m_rprSwitchingQPOffsetOrderList{ 0 }
 #endif
 , m_maxNumMergeCand(MRG_MAX_NUM_CANDS)
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+, m_maxNumOppositeLicMergeCand(REG_MRG_MAX_NUM_CANDS_OPPOSITELIC)
+#endif
 #if JVET_X0049_ADAPT_DMVR
 , m_maxNumBMMergeCand(BM_MRG_MAX_NUM_CANDS)
 #endif
 , m_maxNumAffineMergeCand(AFFINE_MRG_MAX_NUM_CANDS)
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+, m_maxNumAffineOppositeLicMergeCand(AFF_MRG_MAX_NUM_CANDS_OPPOSITELIC)
+#endif
 , m_maxNumIBCMergeCand(IBC_MRG_MAX_NUM_CANDS)
 , m_maxNumGeoCand(0)
 #if JVET_AG0164_AFFINE_GPM

@@ -5156,6 +5156,13 @@ void CABACReader::merge_data( PredictionUnit& pu )
         affBmFlag(pu);
       }
 #endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+      pu.affineOppositeLic = false;
+      if (PU::hasOppositeLICFlag(pu) && !pu.afMmvdFlag && !pu.affBMMergeFlag && pu.cs->sps->getUseAffMergeOppositeLic())
+      {
+        pu.affineOppositeLic = m_BinDecoder.decodeBin(Ctx::AffineFlagOppositeLic(0));
+      }
+#endif
       merge_idx(pu);
       cu.firstPU->regularMergeFlag = false;
       return;
@@ -5334,6 +5341,21 @@ void CABACReader::merge_data( PredictionUnit& pu )
   }
   else
   {
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+    pu.mergeOppositeLic = false;
+    pu.tmMergeFlagOppositeLic = false;
+    if (pu.regularMergeFlag && PU::hasOppositeLICFlag(pu) && !pu.bmMergeFlag)
+    {
+      if (pu.tmMergeFlag && pu.cs->sps->getUseTMMergeOppositeLic())
+      {
+        pu.tmMergeFlagOppositeLic = m_BinDecoder.decodeBin(Ctx::TmMergeFlagOppositeLic(0));
+      }
+      else if (pu.cs->sps->getUseMergeOppositeLic())
+      {
+        pu.mergeOppositeLic = m_BinDecoder.decodeBin(Ctx::MergeFlagOppositeLic(0));
+      }
+    }
+#endif
     merge_idx(pu);
   }
 }
@@ -5359,6 +5381,12 @@ void CABACReader::merge_idx( PredictionUnit& pu )
     }
 #endif
     int numCandminus1 = int( pu.cs->picHeader->getMaxNumAffineMergeCand() ) - 1;
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+    if (pu.affineOppositeLic)
+    {
+      numCandminus1 = int(pu.cs->picHeader->getMaxNumAffineOppositeLicMergeCand()) - 1;
+    }
+#endif
     pu.mergeIdx = 0;
     if ( numCandminus1 > 0 )
     {
@@ -5658,6 +5686,16 @@ void CABACReader::merge_idx( PredictionUnit& pu )
   else if (pu.bmMergeFlag)
   {
     numCandminus1 = int(pu.cs->sps->getMaxNumBMMergeCand()) - 1;
+  }
+#endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  if (pu.mergeOppositeLic)
+  {
+    numCandminus1 = int(pu.cs->sps->getMaxNumOppositeLicMergeCand()) - 1;
+  }
+  else if (pu.tmMergeFlagOppositeLic)
+  {
+    numCandminus1 = int(pu.cs->sps->getMaxNumTMOppositeLicMergeCand()) - 1;
   }
 #endif
   if( numCandminus1 > 0 )
@@ -9596,8 +9634,24 @@ void CABACReader::cu_lic_flag( CodingUnit& cu )
   if( CU::isLICFlagPresent( cu ) )
   {
     RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE( STATS__CABAC_BITS__LIC_FLAG, cu.lumaSize() );
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+    unsigned ctxId = DeriveCtx::CtxLicFlag( cu );
+    cu.licFlag = m_BinDecoder.decodeBin( Ctx::LICFlag( ctxId ) );
+#else
     cu.licFlag = m_BinDecoder.decodeBin( Ctx::LICFlag( 0 ) );
+#endif
     DTRACE( g_trace_ctx, D_SYNTAX, "cu_lic_flag() lic_flag=%d\n", cu.licFlag ? 1 : 0 );
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+    if (cu.licFlag && CU::isLicSlopeAllowed(cu) && cu.firstPU->interDir != 3)
+    {
+      int delta = m_BinDecoder.decodeBin(Ctx::LicDelta(0)) ? 1 : 0;
+      if (delta)
+      {
+        delta *= m_BinDecoder.decodeBin(Ctx::LicDelta(1)) ? -1 : +1;
+      }
+      cu.licDelta = delta;
+    }
+#endif
   }
 }
 #endif

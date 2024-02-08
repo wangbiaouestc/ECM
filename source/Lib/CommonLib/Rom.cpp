@@ -5597,4 +5597,7 @@ const int8_t g_amvpSbTmvp_mvd_offset[6] = { 4, 8, 12, 16, 24, 32 };
 uint32_t g_picAmvpSbTmvpEnabledArea = 0;
 #endif
 
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+const int g_licSlopeDeltaSet[LIC_SLOPE_MAX_NUM_DELTA + 1] = {0, 1, -1};
+#endif
 //! \}

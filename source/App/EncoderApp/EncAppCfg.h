@@ -399,6 +399,9 @@ protected:
   bool      m_AffineType;
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
   bool      m_useAffineTM;
+#if JVET_AG0276_NLIC
+  bool      m_useAffAltLMTM;
+#endif
 #endif
 #if JVET_AG0135_AFFINE_CIIP
   bool      m_useCiipAffine;
@@ -440,6 +443,15 @@ protected:
   bool      m_BIO;
 #if JVET_W0090_ARMC_TM
   bool      m_AML;
+#if JVET_AG0276_NLIC
+  bool      m_altLM;
+  bool      m_affAltLM;
+#endif
+#endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  bool      m_mergeOppositeLic;
+  bool      m_mergeTMOppositeLic;
+  bool      m_mergeAffOppositeLic;
 #endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   bool      m_armcRefinedMotion;
@@ -913,6 +925,10 @@ protected:
 
   uint32_t      m_log2ParallelMergeLevel;                         ///< Parallel merge estimation region
   uint32_t      m_maxNumMergeCand;                                ///< Max number of merge candidates
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  uint32_t      m_maxNumOppositeLicMergeCand;                     ///< Max number of merge candidates with opposite LIC flag
+  uint32_t      m_maxNumAffineOppositeLicMergeCand;               ///< Max number of affine merge candidates with opposite LIC flag
+#endif
 #if JVET_X0049_ADAPT_DMVR
   uint32_t      m_maxNumBMMergeCand;                                ///< Max number of BM merge candidates
 #endif
@@ -1013,6 +1029,9 @@ protected:
 #if INTER_LIC
   bool        m_lic;
   bool        m_fastPicLevelLIC;
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+  bool        m_licSlopeAdjust;
+#endif
 #endif
 
   double      m_scalingRatioHor;

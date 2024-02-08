@@ -2243,6 +2243,12 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #endif
 #if INTER_LIC
   READ_FLAG( uiCode, "sps_lic_enabled_flag" );                      pcSPS->setLicEnabledFlag( uiCode );
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+  if (pcSPS->getLicEnabledFlag())
+  {
+    READ_FLAG( uiCode, "sps_lic_slope_adjust_enabled_flag" ); pcSPS->setLicSlopeAdjustEnabledFlag( uiCode );
+  }
+#endif
 #endif
 
   READ_FLAG(uiCode, "sps_ref_wraparound_enabled_flag");                  pcSPS->setWrapAroundEnabledFlag( uiCode ? true : false );
@@ -2391,6 +2397,12 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   {
     pcSPS->setFpelMmvdEnabledFlag( false );
   }
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  pcSPS->setUseMergeOppositeLic( false );
+  pcSPS->setUseTMMergeOppositeLic( false );
+  READ_FLAG(uiCode, "sps_oppositelic_merge_enabled_flag");                     pcSPS->setUseMergeOppositeLic(uiCode != 0);
+  READ_FLAG(uiCode, "sps_TM_oppositelic_merge_enabled_flag");                     pcSPS->setUseTMMergeOppositeLic(uiCode != 0);
+#endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
   uiCode = 0;
@@ -2402,6 +2414,13 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   READ_UVLC(uiCode, "six_minus_max_num_merge_cand");
   CHECK(MRG_MAX_NUM_CANDS <= uiCode, "Incorrrect max number of merge candidates!");
   pcSPS->setMaxNumMergeCand(MRG_MAX_NUM_CANDS - uiCode);
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  if (pcSPS->getUseMergeOppositeLic())
+  {
+    READ_UVLC(uiCode, "five_max_num_oppolic_merge_cand");
+    pcSPS->setMaxNumOppositeLicMergeCand(REG_MRG_MAX_NUM_CANDS_OPPOSITELIC - uiCode);
+  }
+#endif
   READ_FLAG(uiCode, "sps_sbt_enabled_flag");                        pcSPS->setUseSBT                 ( uiCode != 0 );
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   READ_FLAG( uiCode,    "sps_dmvd_enabled_flag" );                      pcSPS->setUseDMVDMode( uiCode != 0 );
@@ -2437,6 +2456,29 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   pcSPS->setMaxNumBMMergeCand(BM_MRG_MAX_NUM_CANDS - uiCode);
 #endif
   READ_FLAG( uiCode,    "sps_affine_enabled_flag" );                            pcSPS->setUseAffine              ( uiCode != 0 );
+#if JVET_AG0276_NLIC
+  pcSPS->setUseAltLM(false);
+  pcSPS->setUseAffAltLM(false);
+  if (pcSPS->getUseAML()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+    && pcSPS->getTMToolsEnableFlag()
+#endif
+    )
+  {
+    READ_FLAG( uiCode, "sps_alt_lm_enabled_flag" );                     pcSPS->setUseAltLM( uiCode != 0 );
+    if (pcSPS->getUseAffine())
+    {
+      READ_FLAG( uiCode, "sps_affine_alt_lm_enabled_flag" );            pcSPS->setUseAffAltLM( uiCode != 0 );
+    }
+  }
+#endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  pcSPS->setUseAffMergeOppositeLic(false);
+  if (pcSPS->getUseAffine())
+  {
+    READ_FLAG(uiCode, "sps_affine_oppolic_merge_enabled_flag");            pcSPS->setUseAffMergeOppositeLic(uiCode != 0);
+  }
+#endif
   if ( pcSPS->getUseAffine() )
   {
     READ_UVLC(uiCode, "five_minus_max_num_subblock_merge_cand");
@@ -2454,6 +2496,13 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
     READ_FLAG( uiCode,  "sps_affine_type_flag" );                       pcSPS->setUseAffineType          ( uiCode != 0 );
 #if AFFINE_MMVD
     READ_FLAG( uiCode, "sps_affine_mmvd_enabled_flag" );                pcSPS->setUseAffineMmvdMode      ( uiCode != 0 );
+#endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+    if (pcSPS->getUseAffMergeOppositeLic())
+    {
+      READ_UVLC(uiCode, "eight_minus_max_num_aff_oppolic_merge_cand");
+      pcSPS->setMaxNumAffineOppositeLicMergeCand(AFF_MRG_MAX_NUM_CANDS_OPPOSITELIC - uiCode);
+    }
 #endif
     if( pcSPS->getAMVREnabledFlag())
     {
@@ -2481,6 +2530,16 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
     else
     {
       pcSPS->setUseAffineTM( false );
+    }
+#endif
+#if JVET_AG0276_NLIC
+    if (pcSPS->getUseAffineTM() && pcSPS->getUseAffAltLM())
+    {
+      READ_FLAG(uiCode, "sps_affine_alt_lm_tm_flag");                pcSPS->setUseAffAltLMTM(uiCode != 0);
+    }
+    else
+    {
+      pcSPS->setUseAffAltLMTM(false);
     }
 #endif
 #endif
@@ -4103,10 +4162,16 @@ void HLSyntaxReader::parsePictureHeader( PicHeader* picHeader, ParameterSetManag
     if ( sps->getUseAffine() )
     {
       picHeader->setMaxNumAffineMergeCand(sps->getMaxNumAffineMergeCand());
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+      picHeader->setMaxNumAffineOppositeLicMergeCand(sps->getMaxNumAffineOppositeLicMergeCand());
+#endif
     }
     else
     {
       picHeader->setMaxNumAffineMergeCand(sps->getSbTMVPEnabledFlag() && picHeader->getEnableTMVPFlag());
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+      picHeader->setMaxNumAffineOppositeLicMergeCand(0);
+#endif
     }
 
   // full-pel MMVD flag
