@@ -173,6 +173,9 @@ public:
   bool              m_isAddHypMC;
 #endif
   bool              m_storeBeforeLIC;
+#if JVET_AG0276_NLIC
+  bool              m_skipDoLic;
+#endif
 #endif
 #if JVET_AD0140_MVD_PREDICTION
   struct MvdDerivedInfo
@@ -1066,6 +1069,10 @@ public:
     , int sortedCandNum = -1
 #endif
   );
+#if JVET_AG0276_NLIC
+  void    adjustAffineMergeCandidates(PredictionUnit &pu, AffineMergeCtx& affMrgCtx, AltLMAffineMergeCtx& altLMAffMrgCtx, AltLMAffineMergeCtx& altLMRMVFMrgCtx);
+  void    updateAffineCandInThreeGrp(PredictionUnit &pu, AffineMergeCtx& affMrgCtx, AffineMergeCtx& altLMAffMrgCtx, AffineMergeCtx& altLMAffMrgCtx1, uint32_t* rdCandList, uint32_t* rdCandGrpList, int listsize);
+#endif
   void    updateAffineCandInfo(PredictionUnit &pu, AffineMergeCtx& affMrgCtx, 
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION  
     uint32_t(*RdCandList)[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE], 
@@ -1146,6 +1153,9 @@ public:
 #if JVET_Z0102_NO_ARMC_FOR_ZERO_CAND
   void adjustMergeCandidates(PredictionUnit& pu, MergeCtx& smvpMergeCandCtx, int numRetrievedMergeCand);
 #endif
+#if JVET_AG0276_NLIC
+  void adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMergeCandCtx, AltLMMergeCtx& altLMMrgCtx, int numRetrievedMergeCand);
+#endif
 #if JVET_AB0079_TM_BCW_MRG
   void adjustMergeCandidatesBcwIdx(PredictionUnit& pu, MergeCtx& mrgCtx, const int mergeIdx = -1);
 #endif
@@ -1162,6 +1172,10 @@ public:
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
   void    updateCandInTwoCandidateGroups(MergeCtx& mrgCtx, uint32_t* rdCandList, int numCandInCategory, MergeCtx mrgCtx2);
 #endif
+#endif
+#if JVET_AG0276_NLIC
+  void    updateCandList(uint32_t uiCand, uint32_t uiCandGrp, Distortion uiCost, uint32_t uiMrgCandNum, uint32_t* rdCandList, uint32_t* rdCandGrpList, Distortion* candCostList);
+  void    updateCandInThreeCandidateGroups(MergeCtx& mrgCtx, MergeCtx mrgCtx2, MergeCtx mrgCtx3, uint32_t* rdCandList, uint32_t* rdCandGrpList, int numCandInCategory);
 #endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   void    adjustMergeCandidatesInOneCandidateGroup(PredictionUnit &pu, MergeCtx& smvpMergeCandCtx, bool* applyBDMVR, Mv** mvBufBDMVR, Mv** mvBufBDMVRTmp, int numRetrievedMergeCand, bool subRefineList[][2] = NULL, bool subRefineListTmp[][2] = NULL, int mrgCandIdx = -1);
@@ -1265,9 +1279,17 @@ public:
 #endif
 #if INTER_LIC || JVET_AC0112_IBC_LIC
 #if JVET_AE0078_IBC_LIC_EXTENSION
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+  void xGetLICParamGeneral (const CodingUnit& cu, const ComponentID compID, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate, int& shift, int& scale, int& offset, int* shift2 = nullptr, int* scale2 = nullptr, int* offset2 = nullptr, int* mean = nullptr, int *midVal = nullptr);
+#else
   void xGetLICParamGeneral (const CodingUnit& cu, const ComponentID compID, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate, int& shift, int& scale, int& offset, int* shift2 = nullptr, int* scale2 = nullptr, int* offset2 = nullptr, int* mean = nullptr);
+#endif
+#else
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+  void xGetLICParamGeneral (const CodingUnit& cu, const ComponentID compID, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate, int& shift, int& scale, int& offset, int *midVal = nullptr);
 #else
   void xGetLICParamGeneral (const CodingUnit& cu, const ComponentID compID, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate, int& shift, int& scale, int& offset);
+#endif
 #endif
 #endif
 #if JVET_AE0159_FIBC
@@ -1301,6 +1323,9 @@ public:
   void setLicParam(int refList, int compID, int& licScale, int& licOffset) { licScale = m_scale[refList][compID]; licOffset = m_offset[refList][compID]; }
   void resetFillLicTpl() { m_fillLicTpl[COMPONENT_Y] = m_fillLicTpl[COMPONENT_Cb] = m_fillLicTpl[COMPONENT_Cr] = false; }
   void xLicCompAdj(const PredictionUnit& pu, PelUnitBuf& pcYuvPred, const bool lumaOnly, const bool chromaOnly);
+#if JVET_AG0276_LIC_BDOF_BDMVR
+  void xLicCompAdjBdof(const PredictionUnit& pu, PelUnitBuf& pcYuvPred, const bool lumaOnly, const bool chromaOnly);
+#endif
 #endif
   template <bool trueAfalseL>
   void xGetPredBlkTpl(const CodingUnit& cu, const ComponentID compID, const CPelBuf& refBuf, const Mv& mv, const int posW, const int posH, const int tplSize, Pel* predBlkTpl
@@ -1312,6 +1337,9 @@ public:
                       , const std::pair<int, int>* scalingRatio = NULL
 #endif
                       );
+#endif
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+  void xUpdateLicModel (int &scale, int &offset, int &shift, int midVal, int delta);
 #endif
 
 #if JVET_AC0112_IBC_LIC
@@ -1507,6 +1535,141 @@ private:
 public:
   void setFillCurTplAboveARMC(bool b) { m_fillCurTplAboveARMC = b; }
   void setFillCurTplLeftARMC(bool b) { m_fillCurTplLeftARMC = b; }
+#endif
+
+#if JVET_AG0276_NLIC
+public:
+  void xPredWoRefinement(PredictionUnit& pu, PelUnitBuf &pcYuvPred, const bool luma = true, const bool chroma = true);
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  template <bool isBRcand>
+#endif
+  void xDevSecLicPara(CodingUnit&     cu, PelUnitBuf& predBuf, PelUnitBuf& dstBuf)
+  {
+    for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
+    {
+      ComponentID compID = ComponentID(comp);
+      Pel* pred = predBuf.get(compID).buf;
+      int  predStride = predBuf.get(compID).stride;
+      Pel* rec = dstBuf.get(compID).buf;
+      int  recStride = dstBuf.get(compID).stride;
+
+      const int cuWidth = cu.blocks[compID].width;
+      const int cuHeight = cu.blocks[compID].height;
+
+      const int bitDepth = cu.cs->sps->getBitDepth(toChannelType(compID));
+      const int precShift = std::max(0, bitDepth - 12);
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+      const int maxNumMinus1 = isBRcand ? (30 - 2 * std::min(bitDepth, 12) - 1) : (30 - 2 * std::min(bitDepth, 12));
+#else
+      const int maxNumMinus1 = 30 - 2 * std::min(bitDepth, 12);
+#endif
+      const int minDimBit = floorLog2(std::min(cuHeight, cuWidth));
+      const int minDim = 1 << minDimBit;
+      int       minStepBit = minDim > 8 ? 1 : 0;
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+      while (isBRcand ? (minDimBit > minStepBit + maxNumMinus1) : (((minDimBit - minStepBit) << 1) > maxNumMinus1))
+#else
+      while (((minDimBit - minStepBit) << 1) > maxNumMinus1) 
+#endif
+      { minStepBit++; } //make sure 2*log2(minDim/tmpStep) + 2*min(bitDepth,12) <= 30
+      const int numSteps = minDim >> minStepBit;
+      const int dimShift = minDimBit - minStepBit;
+
+      //----- get correlation data -----
+      int x = 0, y = 0, xx = 0, xy = 0;
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+      int cntShift = 0;
+      if (isBRcand)
+      {
+        Pel* refBottom = pred + (cuHeight - 1) * predStride;
+        Pel* recBottom = rec + (cuHeight - 1) * recStride;
+        for (int k = 0; k < numSteps; k++)
+        {
+          int idx = (k * cuWidth) >> dimShift;
+          int refVal = refBottom[idx];
+          int recVal = recBottom[idx];
+          x += refVal;
+          y += recVal;
+          xx += refVal * refVal;
+          xy += refVal * recVal;
+        }
+        cntShift = dimShift;
+
+        Pel* refRight = pred + cuWidth - 1;
+        Pel* recRight = rec + cuWidth - 1;
+        for (int k = 0; k < numSteps; k++)
+        {
+          int idx = (k * cuHeight) >> dimShift;
+          int refVal = refRight[idx * predStride];
+          int recVal = recRight[idx * recStride];
+          x += refVal;
+          y += recVal;
+          xx += refVal * refVal;
+          xy += refVal * recVal;
+        }
+        cntShift += (cntShift ? 1 : dimShift);
+      }
+      else
+#endif
+      {
+        for (int h = 0; h < numSteps; h++)
+        {
+          int vDim = ((h * cuHeight) >> dimShift);
+
+          for (int w = 0; w < numSteps; w++)
+          {
+            int hDim = ((w * cuWidth) >> dimShift);
+
+            int predVal = pred[vDim * predStride + hDim] >> precShift;
+            int recVal = rec[vDim * recStride + hDim] >> precShift;
+
+            x += predVal;
+            y += recVal;
+            xx += predVal * predVal;
+            xy += predVal * recVal;
+          }
+        }
+      }
+
+      int  shift = m_LICShift;
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+      int& scale = isBRcand ? cu.altLMBRParaUnit.scale[compID] : cu.altLMParaUnit.scale[compID];
+      int& offset = isBRcand ? cu.altLMBRParaUnit.offset[compID] : cu.altLMParaUnit.offset[compID];
+      if (!isBRcand)
+      {
+        cntShift = (dimShift << 1); 
+        CHECK(!cntShift, "cntShift == 0");
+      }
+#else
+      int& scale = cu.altLMParaUnit.scale[compID];
+      int& offset = cu.altLMParaUnit.offset[compID];
+      cntShift = (dimShift << 1); CHECK(!cntShift, "cntShift == 0");
+#endif
+      const int cropShift = std::max(0, bitDepth - precShift + cntShift - 15);
+      const int xzOffset = (xx >> m_LICRegShift);
+      const int sumX = (x << precShift);
+      const int sumY = (y << precShift);
+      const int sumXX = ((xx + xzOffset) >> (cropShift << 1)) << cntShift;
+      const int sumXY = ((xy + xzOffset) >> (cropShift << 1)) << cntShift;
+      const int sumXsumX = (x >> cropShift) * (x >> cropShift);
+      const int sumXsumY = (x >> cropShift) * (y >> cropShift);
+      int       a1 = sumXY - sumXsumY;
+      int       a2 = sumXX - sumXsumX;
+      int       scaleShiftA2 = getMSB(abs(a2)) - 6;
+      int       scaleShiftA1 = scaleShiftA2 - m_LICShiftDiff;
+      scaleShiftA2 = std::max(0, scaleShiftA2);
+      scaleShiftA1 = std::max(0, scaleShiftA1);
+      const int scaleShiftA = scaleShiftA2 + 15 - shift - scaleShiftA1;
+      a1 = a1 >> scaleShiftA1;
+      a2 = Clip3(0, 63, a2 >> scaleShiftA2);
+      scale = int((int64_t(a1) * int64_t(m_LICMultApprox[a2])) >> scaleShiftA);
+      scale = Clip3(0, 1 << (shift + 2), scale);
+      const int maxOffset = (1 << (bitDepth - 1)) - 1;
+      const int minOffset = -1 - maxOffset;
+      offset = (sumY - ((scale * sumX) >> shift) + ((1 << (cntShift)) >> 1)) >> cntShift;
+      offset = Clip3(minOffset, maxOffset, offset);
+    }
+  }
 #endif
 
 #if JVET_AA0096_MC_BOUNDARY_PADDING

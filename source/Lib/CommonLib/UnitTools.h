@@ -64,6 +64,12 @@ namespace CS
 // CU tools
 namespace CU
 {
+#if JVET_AG0276_NLIC
+  bool isSecLicParaNeeded             (const CodingUnit &cu);
+  bool isPredRefined                  (const CodingUnit &cu);
+  bool isAllowSecLicPara              (const CodingUnit &cu);
+  bool isTLCond                       (const CodingUnit &cu);
+#endif
   bool isIntra                        (const CodingUnit &cu);
   bool isInter                        (const CodingUnit &cu);
   bool isIBC                          (const CodingUnit &cu);
@@ -118,6 +124,10 @@ namespace CU
 #endif
 #if INTER_LIC
   bool isLICFlagPresent               (const CodingUnit& cu);
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+  bool isLicSlopeAllowed              (const CodingUnit& cu);
+  bool licSlopeSizeTlCond             (const int bw, const int bh, const int layerId);
+#endif
 #endif
 #if JVET_AC0130_NSPT
   bool  isNSPTAllowed                 ( const TransformUnit& tu, const ComponentID compID, int width, int height, bool isIntra );
@@ -304,6 +314,16 @@ namespace PU
     , bool enableTh4Gpm = false
 #endif
   );
+#if JVET_AG0276_NLIC
+  void     getAltMergeCandidates    (const PredictionUnit &pu, AltLMMergeCtx& cMrgCtx);
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  void     getAltBRMergeCandidates  (const PredictionUnit &pu, AltLMMergeCtx& cMrgCtx);
+  bool     isValidAltMergeCandidate (const PredictionUnit &pu, bool isBRCand = false);
+#else
+  bool     isValidAltMergeCandidate (const PredictionUnit &pu);
+#endif
+  uint32_t getAltMergeMvdThreshold  (const PredictionUnit &pu);
+#endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   void getNonAdjacentMergeCandSubTMVP(const PredictionUnit &pu, MergeCtx& mvpMrgCtx, int col);
@@ -428,7 +448,14 @@ namespace PU
     , const MvpDir &eDir
 #endif
   );
-  void getRMVFAffineGuideCand(const PredictionUnit &pu, const PredictionUnit &abovePU, AffineMergeCtx &affMrgCtx, std::vector<RMVFInfo> mvp[NUM_REF_PIC_LIST_01][MAX_NUM_REF], int mrgCandIdx = -1);
+  void getRMVFAffineGuideCand(const PredictionUnit &pu, const PredictionUnit &abovePU, AffineMergeCtx &affMrgCtx, std::vector<RMVFInfo> mvp[NUM_REF_PIC_LIST_01][MAX_NUM_REF], int mrgCandIdx = -1
+#if JVET_AG0276_NLIC
+    , AltLMAffineMergeCtx* altAffineMergeCtx = NULL
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+    , AltLMAffineMergeCtx* altBRAffineMergeCtx = NULL
+#endif
+#endif
+  );
   Position convertNonAdjAffineBlkPos(const Position &pos, int curCtuX, int curCtuY);
   void collectNeiMotionInfo(std::vector<RMVFInfo> mvpInfoVec[NUM_REF_PIC_LIST_01][MAX_NUM_REF], const PredictionUnit &pu);
 #endif
@@ -603,9 +630,23 @@ namespace PU
                           , bool noSbTMVP = false
 #endif
   );
+#if JVET_AG0276_NLIC
+  void getAltLMAffineMergeCand(const PredictionUnit &pu, AltLMAffineMergeCtx& altLMAffMrgCtx);
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  void getAltLMBRAffineMergeCand(const PredictionUnit &pu, AltLMAffineMergeCtx& altLMAffMrgCtx);
+#endif
+#endif
 #if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
   bool isAffBMMergeFlagCoded(const PredictionUnit& pu);
-  void getRMVFAffineCand(const PredictionUnit &pu, AffineMergeCtx& affineMergeRMVFCtx, AffineMergeCtx& affineMergeRMVFOriCtx, InterPrediction* m_pcInterSearch, uint16_t &numCand);
+  void getRMVFAffineCand(const PredictionUnit &pu, AffineMergeCtx& affineMergeRMVFCtx, AffineMergeCtx& affineMergeRMVFOriCtx, InterPrediction* m_pcInterSearch
+  , uint16_t &numCand
+#if JVET_AG0276_NLIC
+    , AltLMAffineMergeCtx& altAffineMergeRMVFCtx
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+    , AltLMAffineMergeCtx& altBRAffineMergeRMVFCtx
+#endif
+#endif
+  );
   void getBMAffineMergeCand(const PredictionUnit &pu, AffineMergeCtx& affineBMMergeCtx, AffineMergeCtx affineMergeRMVFCtx, int mrgCandIdx = -1);
   bool getBMNonAdjCstMergeCand(const PredictionUnit &pu, AffineMergeCtx &affMrgCtx, const int mrgCandIdx = -1);
 #endif
@@ -773,6 +814,9 @@ namespace PU
 #else
   bool checkBDMVRCondition(const PredictionUnit& pu);
 #endif
+#if JVET_AG0276_LIC_BDOF_BDMVR
+  bool checkBDMVRCondition4Aff(const PredictionUnit& pu);
+#endif
 #endif
 #if INTER_LIC && RPR_ENABLE
   bool checkRprLicCondition(const PredictionUnit& pu);
@@ -888,6 +932,10 @@ namespace PU
   void getBvgCccmCands(PredictionUnit &pu, bool &validBv);
   bool isBvgCccmCand(const PredictionUnit &pu, Mv &chromaBv, int& rrIbcType, int candIdx = 0);
   bool checkIsChromaBvCandidateValid(const PredictionUnit &pu, const Mv chromaBv, int &iWidth, int &iHeight, bool isRefTemplate = false, bool isRefAbove = false);
+#endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  bool isOppositeLIC(const PredictionUnit &pu);
+  bool hasOppositeLICFlag(const PredictionUnit &pu);
 #endif
 }
 

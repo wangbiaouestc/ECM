@@ -121,6 +121,11 @@ struct ModeInfo
 #if TM_MRG
   bool     isTMMrg;
 #endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  bool     isTMMrgOppositeLic;
+  bool     isOppositeLic;
+  bool     isAffOppositeLic;
+#endif
 #if JVET_X0049_ADAPT_DMVR
   bool     isBMMrg;
   uint8_t  bmDir;
@@ -156,6 +161,11 @@ struct ModeInfo
 #endif
 #if TM_MRG
     , isTMMrg(false)
+#endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+    , isTMMrgOppositeLic(false)
+    , isOppositeLic(false)
+    , isAffOppositeLic(false)
 #endif
 #if JVET_X0049_ADAPT_DMVR
     , isBMMrg(false)
@@ -193,6 +203,11 @@ struct ModeInfo
 #if TM_MRG
     , const bool isTMMrg = false
 #endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+    , const bool isTMMrgOppositeLic = false
+    , const bool isOppositeLic = false
+    , const bool isAffOppositeLic = false
+#endif
   ) :
     mergeCand(mergeCand), isRegularMerge(isRegularMerge), isMMVD(isMMVD), isCIIP(isCIIP)
 #if CIIP_PDPC
@@ -210,6 +225,11 @@ struct ModeInfo
 #endif
 #if TM_MRG
     , isTMMrg(isTMMrg)
+#endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+    , isTMMrgOppositeLic(isTMMrgOppositeLic)
+    , isOppositeLic(isOppositeLic)
+    , isAffOppositeLic(isAffOppositeLic)
 #endif
 #if JVET_X0049_ADAPT_DMVR
     , isBMMrg( false )
@@ -256,6 +276,11 @@ struct ModeInfo
 #endif
 #if TM_MRG
     isTMMrg = pu.tmMergeFlag;
+#endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+    isTMMrgOppositeLic = pu.tmMergeFlagOppositeLic;
+    isOppositeLic = pu.mergeOppositeLic;
+    isAffOppositeLic = pu.affineOppositeLic;
 #endif
 #if JVET_X0049_ADAPT_DMVR
     isBMMrg = pu.bmMergeFlag;
@@ -806,7 +831,13 @@ protected:
   BilateralFilter* m_bilateralFilter;
 #endif
   TrQuant*        m_pcTrQuant;
+#if JVET_AG0276_NLIC
+public:
   EncReshape*     m_pcReshape;
+protected:
+#else
+  EncReshape*     m_pcReshape;
+#endif
 
   // ME parameters
   int             m_iSearchRange;

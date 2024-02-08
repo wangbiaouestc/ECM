@@ -1951,6 +1951,9 @@ void AreaBuf<Pel>::linearTransform( const int scale, const int shift, const int 
 {
   const Pel* src = buf;
         Pel* dst = buf;
+#if JVET_AG0276_NLIC
+  const uint32_t areaT = area();
+#endif
 
 #if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   if (width == 0)
@@ -1961,6 +1964,16 @@ void AreaBuf<Pel>::linearTransform( const int scale, const int shift, const int 
   if( width == 1 )
   {
     THROW( "Blocks of width = 1 not supported" );
+  }
+#endif
+#if JVET_AG0276_NLIC
+  else if (width == stride && (areaT & 7) == 0)
+  {
+    g_pelBufOP.linTf8(src, areaT, dst, areaT, areaT, 1, scale, shift, offset, clpRng, bClip);
+  }
+  else if (width == stride && (areaT & 3) == 0)
+  {
+    g_pelBufOP.linTf4(src, areaT, dst, areaT, areaT, 1, scale, shift, offset, clpRng, bClip);
   }
 #endif
 #if ENABLE_SIMD_OPT_BUFFER && defined(TARGET_SIMD_X86)

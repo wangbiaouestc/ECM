@@ -414,6 +414,9 @@ protected:
   bool      m_AffineType;
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
   bool      m_useAffineTM; 
+#if JVET_AG0276_NLIC
+  bool      m_useAffAltLMTM;
+#endif
 #endif
 #if JVET_AG0135_AFFINE_CIIP
   bool      m_useCiipAffine;
@@ -455,6 +458,15 @@ protected:
   bool      m_BIO;
 #if JVET_W0090_ARMC_TM
   bool      m_AML;
+#if JVET_AG0276_NLIC
+  bool      m_altLM;
+  bool      m_affAltLM;
+#endif
+#endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  bool      m_mergeOppositeLic;
+  bool      m_mergeTMOppositeLic;
+  bool      m_mergeAffOppositeLic;
 #endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   bool      m_armcRefinedMotion;
@@ -905,10 +917,16 @@ protected:
   WeightedPredictionMethod m_weightedPredictionMethod;
   uint32_t      m_log2ParallelMergeLevelMinus2;       ///< Parallel merge estimation region
   uint32_t      m_maxNumMergeCand;                    ///< Maximum number of merge candidates
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  uint32_t      m_maxNumOppositeLicMergeCand;         ///< Maximum number of merge candidates with opposite LIC flag
+#endif
 #if JVET_X0049_ADAPT_DMVR
   uint32_t      m_maxNumBMMergeCand;                  ///< Maximum number of BM merge candidates
 #endif
   uint32_t      m_maxNumAffineMergeCand;              ///< Maximum number of affine merge candidates
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  uint32_t      m_maxNumAffineOppositeLicMergeCand;   ///< Maximum number of affine merge candidates with opposite LIC flag
+#endif
   uint32_t      m_maxNumGeoCand;
 #if JVET_AG0164_AFFINE_GPM
   uint32_t      m_maxNumGpmAffCand;
@@ -1051,6 +1069,9 @@ protected:
   int         m_fastLIC;
   bool        m_fastLICAffine;
   bool        m_fastLICBcw;
+#endif
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+  bool        m_licSlopeAdjust;
 #endif
 #endif
 
@@ -1521,6 +1542,10 @@ public:
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
   void      setUseAffineTM( bool b )                         { m_useAffineTM = b; }
   bool      getUseAffineTM()                           const { return  m_useAffineTM; }
+#if JVET_AG0276_NLIC
+  void      setUseAffAltLMTM( bool b )                       { m_useAffAltLMTM = b; }
+  bool      getUseAffAltLMTM()                         const { return  m_useAffAltLMTM; }
+#endif
 #endif
 #if JVET_AG0135_AFFINE_CIIP
   void      setUseCIIPAffine(bool b)                         { m_useCiipAffine = b; }
@@ -1626,6 +1651,20 @@ public:
 #if JVET_W0090_ARMC_TM
   void      setAML(bool b)                                   { m_AML = b; }
   bool      getAML()                                   const { return m_AML; }
+#if JVET_AG0276_NLIC
+  void      setAltLM(bool b)                                 { m_altLM = b; }
+  bool      getAltLM()                                 const { return m_altLM; }
+  void      setAffAltLM(bool b)                              { m_affAltLM = b; }
+  bool      getAffAltLM()                              const { return m_affAltLM; }
+#endif
+#endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  void      setMergeOppositeLic( bool b )                    { m_mergeOppositeLic = b; }
+  bool      setMergeOppositeLic()                      const { return m_mergeOppositeLic; }
+  void      setMergeTMOppositeLic( bool b )                  { m_mergeTMOppositeLic = b; }
+  bool      setMergeTMOppositeLic()                    const { return m_mergeTMOppositeLic; }
+  void      setMergeAffOppositeLic( bool b )                 { m_mergeAffOppositeLic = b; }
+  bool      setMergeAffOppositeLic()                   const { return m_mergeAffOppositeLic; }
 #endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   void      setArmcRefinedMotion(bool b)                     { m_armcRefinedMotion = b; }
@@ -2503,12 +2542,20 @@ public:
   uint32_t     getLog2ParallelMergeLevelMinus2()                     { return m_log2ParallelMergeLevelMinus2; }
   void         setMaxNumMergeCand                ( uint32_t u )          { m_maxNumMergeCand = u;      }
   uint32_t         getMaxNumMergeCand                ()                  { return m_maxNumMergeCand;   }
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  void         setMaxNumOppositeLicMergeCand( uint32_t u )           { m_maxNumOppositeLicMergeCand = u; }
+  uint32_t     getMaxNumOppositeLicMergeCand()                       { return m_maxNumOppositeLicMergeCand; }
+#endif
 #if JVET_X0049_ADAPT_DMVR
   void         setMaxNumBMMergeCand              ( uint32_t u )          { m_maxNumBMMergeCand = u;      }
   uint32_t         getMaxNumBMMergeCand              ()                  { return m_maxNumBMMergeCand;   }
 #endif
   void         setMaxNumAffineMergeCand          ( uint32_t u )      { m_maxNumAffineMergeCand = u;    }
   uint32_t     getMaxNumAffineMergeCand          ()                  { return m_maxNumAffineMergeCand; }
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  void         setMaxNumAffineOppositeLicMergeCand( uint32_t u )     { m_maxNumAffineOppositeLicMergeCand = u; }
+  uint32_t     getMaxNumAffineOppositeLicMergeCand()                 { return m_maxNumAffineOppositeLicMergeCand; }
+#endif
   void         setMaxNumGeoCand                  ( uint32_t u )      { m_maxNumGeoCand = u;    }
   uint32_t     getMaxNumGeoCand                  ()                  { return m_maxNumGeoCand; }
 #if JVET_AG0164_AFFINE_GPM
@@ -2738,6 +2785,10 @@ public:
   bool        getFastLicAffine()                                const { return m_fastLICAffine; }  
   void        setFastLicBcw( bool b )                           { m_fastLICBcw = b; }
   bool        getFastLicBcw()                                   const { return m_fastLICBcw; }
+#endif
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+  void         setUseLicSlopeAdjust( bool u )                         { m_licSlopeAdjust = u; }
+  bool         getUseLicSlopeAdjust()                           const { return m_licSlopeAdjust; }
 #endif
 #endif
 

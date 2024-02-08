@@ -811,6 +811,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setAffineType                                        ( m_AffineType );
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
   m_cEncLib.setUseAffineTM                                       ( m_useAffineTM );
+#if JVET_AG0276_NLIC
+  m_cEncLib.setUseAffAltLMTM                                     ( m_useAffAltLMTM );
+#endif
 #endif
 #if AFFINE_MMVD
   m_cEncLib.setAffineMmvdMode                                    ( m_AffineMmvdMode );
@@ -852,6 +855,15 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setBIO                                               (m_BIO);
 #if JVET_W0090_ARMC_TM
   m_cEncLib.setAML                                               ( m_AML );
+#if JVET_AG0276_NLIC
+  m_cEncLib.setAltLM                                             ( m_altLM );
+  m_cEncLib.setAffAltLM                                          ( m_affAltLM );
+#endif
+#endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  m_cEncLib.setMergeOppositeLic                                  ( m_mergeOppositeLic );
+  m_cEncLib.setMergeTMOppositeLic                                ( m_mergeTMOppositeLic );
+  m_cEncLib.setMergeAffOppositeLic                               ( m_mergeAffOppositeLic );
 #endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   m_cEncLib.setArmcRefinedMotion                                 ( m_iQP < 25 ? false : m_armcRefinedMotion );
@@ -1132,6 +1144,10 @@ void EncApp::xInitLibCfg()
   }
 
   m_cEncLib.setMaxNumMergeCand                                   ( m_maxNumMergeCand );
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  m_cEncLib.setMaxNumOppositeLicMergeCand                        ( m_maxNumOppositeLicMergeCand );
+  m_cEncLib.setMaxNumAffineOppositeLicMergeCand                  ( m_maxNumAffineOppositeLicMergeCand);
+#endif
 #if JVET_X0049_ADAPT_DMVR
   m_cEncLib.setMaxNumBMMergeCand                                 ( m_maxNumBMMergeCand );
 #endif
@@ -1489,6 +1505,9 @@ void EncApp::xInitLibCfg()
       m_cEncLib.setFastLicAffine(true);
     }
   }
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+  m_cEncLib.setUseLicSlopeAdjust                                 ( m_lic ? m_licSlopeAdjust : false );
+#endif
 #endif
 #endif
 #if DUMP_BEFORE_INLOOP

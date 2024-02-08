@@ -1812,6 +1812,15 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setBDOFEnabledFlag                    ( m_BIO );
 #if JVET_W0090_ARMC_TM
   sps.setUseAML                             ( m_AML );
+#if JVET_AG0276_NLIC
+  sps.setUseAltLM                           ( m_altLM );
+  sps.setUseAffAltLM                        ( m_affAltLM );
+#endif
+#endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  sps.setUseMergeOppositeLic                ( m_mergeOppositeLic );
+  sps.setUseTMMergeOppositeLic              ( m_mergeTMOppositeLic );
+  sps.setUseAffMergeOppositeLic             ( m_mergeAffOppositeLic );
 #endif
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
   sps.setUseFastSubTmvp                     ((m_sourceWidth * m_sourceHeight) > (m_intraPeriod == -1 ? 0 : 832 * 480));
@@ -1820,10 +1829,22 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setUseArmcRefinedMotion               ( m_armcRefinedMotion );
 #endif
   sps.setMaxNumMergeCand(getMaxNumMergeCand());
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  sps.setMaxNumOppositeLicMergeCand( getMaxNumOppositeLicMergeCand() );
+#endif
 #if JVET_X0049_ADAPT_DMVR
   sps.setMaxNumBMMergeCand(getMaxNumBMMergeCand());
 #endif
   sps.setMaxNumAffineMergeCand(getMaxNumAffineMergeCand());
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  sps.setMaxNumAffineOppositeLicMergeCand( getMaxNumAffineOppositeLicMergeCand() );
+  if (getIntraPeriod() < 0 && getBaseQP() > 32 )
+  {
+    sps.setUseMergeOppositeLic(false);
+    sps.setUseTMMergeOppositeLic(false);
+    sps.setUseAffMergeOppositeLic(false);
+  }
+#endif
   sps.setMaxNumIBCMergeCand(getMaxNumIBCMergeCand());
   sps.setMaxNumGeoCand(getMaxNumGeoCand());
 #if JVET_AG0164_AFFINE_GPM
@@ -1836,6 +1857,37 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setUseAffineType         ( m_AffineType );
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
   sps.setUseAffineTM           ( m_useAffineTM );
+#if JVET_AG0276_NLIC
+  sps.setUseAffAltLMTM         ( m_useAffAltLMTM );
+  if (getIntraPeriod() > 0)
+  {
+    if ((getSourceWidth() * getSourceHeight()) > (832 * 480) && ((getSourceWidth() * getSourceHeight()) < (3840 * 2160)))
+    {
+      sps.setUseAffAltLMTM(false);
+    }
+    if (getBaseQP() > 32)
+    {
+      sps.setUseAltLM(false);
+      sps.setUseAffAltLM(false);
+      sps.setUseAffAltLMTM(false);
+    }
+    else if (getBaseQP() < 27)
+    {
+      sps.setUseAltLM(false);
+      sps.setUseAffAltLM(true);
+      sps.setUseAffAltLMTM(true);
+    }
+  }
+  else
+  {
+    sps.setUseAffAltLM(false);
+    sps.setUseAffAltLMTM(false);
+    if (getBaseQP() < 27)
+    {
+      sps.setUseAltLM(false);
+    }
+  }
+#endif
 #endif
 #if JVET_AG0135_AFFINE_CIIP
   sps.setUseCiipAffine         (((m_sourceWidth * m_sourceHeight) > (m_intraPeriod == -1 ? 832 * 480 : 0)) ? m_useCiipAffine : false);
@@ -1882,6 +1934,9 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setUseBcw                ( m_bcw );
 #if INTER_LIC
   sps.setLicEnabledFlag        ( m_lic );
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+  sps.setLicSlopeAdjustEnabledFlag( m_licSlopeAdjust );
+#endif
 #endif
 #if LUMA_ADAPTIVE_DEBLOCKING_FILTER_QP_OFFSET
   sps.setLadfEnabled           ( m_LadfEnabled );
@@ -2709,6 +2764,9 @@ void EncLib::xInitPicHeader(PicHeader &picHeader, const SPS &sps, const PPS &pps
 
   // merge list sizes
   picHeader.setMaxNumAffineMergeCand(getMaxNumAffineMergeCand());
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  picHeader.setMaxNumAffineOppositeLicMergeCand( getMaxNumAffineOppositeLicMergeCand() );
+#endif
   // copy partitioning constraints from SPS
   picHeader.setSplitConsOverrideFlag(false);
   picHeader.setMinQTSizes( sps.getMinQTSizes() );

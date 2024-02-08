@@ -111,6 +111,63 @@ const CtxSet ContextSetCfg::MergeFlag = ContextSetCfg::addCtxSet({
   { 109 },
 });
 
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+const CtxSet ContextSetCfg::MergeFlagOppositeLic = ContextSetCfg::addCtxSet
+({
+  {  12, },
+  {   4, },
+  { CNU, },
+  {   5, },
+  {   5, },
+  { DWS, },
+  {  11, },
+  {   4, },
+  { DWE, },
+  { 132, },
+  { 132, },
+  { 132, },
+  { 132, },
+  { 132, },
+  { 132, },
+  });
+const CtxSet ContextSetCfg::AffineFlagOppositeLic = ContextSetCfg::addCtxSet
+({
+  {  12, },
+  {   4, },
+  { CNU, },
+  {   5, },
+  {   5, },
+  { DWS, },
+  {  11, },
+  {   4, },
+  { DWE, },
+  { 132, },
+  { 132, },
+  { 132, },
+  { 132, },
+  { 132, },
+  { 132, },
+  });
+const CtxSet ContextSetCfg::TmMergeFlagOppositeLic = ContextSetCfg::addCtxSet
+({
+  {  12, },
+  {   4, },
+  { CNU, },
+  {   5, },
+  {   5, },
+  { DWS, },
+  {  11, },
+  {   4, },
+  { DWE, },
+  { 132, },
+  { 132, },
+  { 132, },
+  { 132, },
+  { 132, },
+  { 132, },
+  });
+#endif
+
 const CtxSet ContextSetCfg::RegularMergeFlag = ContextSetCfg::addCtxSet({
   { 30, 14 },
   { 23, 6 },
@@ -1170,6 +1227,23 @@ const CtxSet ContextSetCfg::AffMergeIdx = ContextSetCfg::addCtxSet({
 });
 
 const CtxSet ContextSetCfg::LICFlag = ContextSetCfg::addCtxSet({
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+  {  26, CNU, CNU, },
+  {  11, CNU, CNU, },
+  {  35, CNU, CNU, },
+  {   5, DWS, DWS, },
+  {   5, DWS, DWS, },
+  {   8, DWS, DWS, },
+  {  18, DWE, DWE, },
+  {   4, DWE, DWE, },
+  {  18, DWE, DWE, },
+  { 108, DWO, DWO, },
+  { 122, DWO, DWO, },
+  { 116, 119, 119, },
+  { 148, 119, 119, },
+  { 119, 119, 119, },
+  { 119, 119, 119, },
+#else
   { 26 },
   { 11 },
   { 35 },
@@ -1185,7 +1259,27 @@ const CtxSet ContextSetCfg::LICFlag = ContextSetCfg::addCtxSet({
   { 148 },
   { 119 },
   { 119 },
+#endif
 });
+
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+const CtxSet ContextSetCfg::LicDelta = ContextSetCfg::addCtxSet
+({
+  {  CNU, CNU, },
+  {  CNU, CNU, },
+  {  CNU, CNU, },
+  {  DWS, DWS, },
+  {  DWS, DWS, },
+  {  DWS, DWS, },
+  {  DWE, DWE, },
+  {  DWE, DWE, },
+  {  DWE, DWE, },
+  {  DWO, DWO, },
+  {  DWO, DWO, },
+  {  119, 119, },
+  {  119, 119, },
+  });
+#endif
 
 const CtxSet ContextSetCfg::BcwIdx = ContextSetCfg::addCtxSet({
   { 12 },
