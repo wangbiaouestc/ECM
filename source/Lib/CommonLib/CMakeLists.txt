@@ -11,6 +11,7 @@ file( GLOB BASE_SRC_FILES "*.cpp" )
 
 # get include files
 file( GLOB BASE_INC_FILES "*.h" )
+file( GLOB BASE_INL_FILES "*.inl" )
 
 # get x86 source files
 file( GLOB X86_SRC_FILES "x86/*.cpp" )
@@ -41,7 +42,7 @@ file( GLOB MD5_INC_FILES "../libmd5/*.h" )
 set( SRC_FILES ${BASE_SRC_FILES} ${X86_SRC_FILES} ${SSE41_SRC_FILES} ${SSE42_SRC_FILES} ${AVX_SRC_FILES} ${AVX2_SRC_FILES} ${MD5_SRC_FILES} )
 
 # get all include files
-set( INC_FILES ${BASE_INC_FILES} ${X86_INC_FILES} ${MD5_INC_FILES} )
+set( INC_FILES ${BASE_INC_FILES} ${BASE_INL_FILES} ${X86_INC_FILES} ${MD5_INC_FILES} )
 
 
 # library
