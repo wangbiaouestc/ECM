@@ -2078,7 +2078,7 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
             int numNonEip = numModesForFullRD - numEip;
             int lastModeId = uiRdModeList[numModesForFullRD - 1].modeId;
             bool lastModeIsEip = (lastModeId >= EIP_IDX && lastModeId < EIP_IDX + std::max(NUM_DERIVED_EIP, MAX_MERGE_EIP)) ;
-            bool reduceRD = (pu.Y().area() < 256) && (m_dSavedModeCostEip[0] < candCostList[numModesForFullRD - 1]) && (lastModeIsEip || (numNonEip > 1));
+            bool reduceRD =  m_dSavedModeCostEip.size() ? (pu.Y().area() < 256) && (m_dSavedModeCostEip[0] < candCostList[numModesForFullRD - 1]) && (lastModeIsEip || (numNonEip > 1)) : false;
             if( reduceRD && pu.cs->slice->isIntra())
             {
               uiRdModeList.pop_back();
