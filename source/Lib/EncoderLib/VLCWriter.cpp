@@ -1693,6 +1693,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if JVET_AF0073_INTER_CCP_MERGE
   WRITE_FLAG( pcSPS->getUseInterCcpMerge() ? 1 : 0,                                    "sps_inter_ccp_merge");
 #endif
+#if JVET_AG0058_EIP
+  WRITE_FLAG(pcSPS->getUseEip() ? 1 : 0, "sps_eip_enabled_flag");
+#endif
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
   if (pcSPS->getTMnoninterToolsEnableFlag())
   {
@@ -1722,9 +1725,6 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #endif
 #if JVET_AD0082_TMRL_CONFIG
   WRITE_FLAG(pcSPS->getUseTmrl() ? 1 : 0, "sps_tmrl_enabled_flag");
-#endif
-#if JVET_AG0058_EIP
-  WRITE_FLAG(pcSPS->getUseEip() ? 1 : 0, "sps_eip_enabled_flag");
 #endif
 #if JVET_AD0085_MPM_SORTING
   WRITE_FLAG(pcSPS->getUseMpmSorting() ? 1 : 0, "sps_mpm_sorting_enabled_flag");

@@ -2659,6 +2659,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_AF0073_INTER_CCP_MERGE
   READ_FLAG(uiCode, "sps_inter_ccp_merge");                         pcSPS->setUseInterCcpMerge( uiCode != 0 );
 #endif
+#if JVET_AG0058_EIP
+  READ_FLAG(uiCode, "sps_eip_enabled_flag");                        pcSPS->setUseEip(uiCode != 0);
+#endif
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
   if (pcSPS->getTMnoninterToolsEnableFlag())
   {
@@ -2691,9 +2694,6 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #endif
 #if JVET_AD0082_TMRL_CONFIG
   READ_FLAG(uiCode, "sps_tmrl_enabled_flag");                       pcSPS->setUseTmrl(uiCode != 0);
-#endif
-#if JVET_AG0058_EIP
-  READ_FLAG(uiCode, "sps_eip_enabled_flag");                        pcSPS->setUseEip(uiCode != 0);
 #endif
 #if JVET_AD0085_MPM_SORTING
   READ_FLAG(uiCode, "sps_mpm_sorting_enabled_flag");                pcSPS->setUseMpmSorting(uiCode != 0);
