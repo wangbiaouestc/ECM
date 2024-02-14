@@ -3876,6 +3876,9 @@ SPS::SPS()
   , m_tmrl(false)
 #endif
 , m_tmNoninterToolsEnableFlag ( false )
+#if JVET_AG0058_EIP
+, m_eip(false)
+#endif
 #if JVET_AD0085_MPM_SORTING
 , m_mpmSorting                      ( false )
 #endif
