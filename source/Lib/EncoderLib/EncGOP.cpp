@@ -3844,6 +3844,67 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
 #endif
 #if JVET_AG0098_AMVP_WITH_SBTMVP
       m_pcSliceEncoder->clearAmvpSbTmvpStatArea(pcSlice);
+      if (pcSlice->getPicHeader()->getEnableTMVPFlag() && !pcSlice->isIntra())
+      {
+        int minPoc = abs(pcSlice->getRefPic(RefPicList(1 - pcSlice->getColFromL0Flag()), pcSlice->getColRefIdx())->getPOC() - pcSlice->getPOC());
+        if (pcSlice->isInterB() && pcSlice->getCheckLDC())
+        {
+          int min2ndPoc = abs(pcSlice->getRefPic(RefPicList(1 - pcSlice->getColFromL0Flag2nd()), pcSlice->getColRefIdx2nd())->getPOC() - pcSlice->getPOC());
+          minPoc = min(minPoc, min2ndPoc);
+        }
+        if (minPoc > 4)
+        {
+          pcSlice->setAmvpSbTmvpEnabledFlag(false);
+        }
+        else
+        {
+          pcSlice->setAmvpSbTmvpEnabledFlag(true);
+
+          g_picAmvpSbTmvpEnabledArea = 0;
+          uint32_t prevEnabledArea;
+          bool isExist = m_pcSliceEncoder->loadAmvpSbTmvpStatArea(pcSlice->getTLayer(), prevEnabledArea);
+          if (isExist)
+          {
+            int ratio = int(prevEnabledArea * 100.0 / (pcSlice->getPic()->getPicWidthInLumaSamples() * pcSlice->getPic()->getPicHeightInLumaSamples()));
+            if (ratio < 4)
+            {
+              pcSlice->setAmvpSbTmvpNumOffset(1);
+            }
+            else if (ratio < 7)
+            {
+              pcSlice->setAmvpSbTmvpNumOffset(2);
+            }
+            else
+            {
+              pcSlice->setAmvpSbTmvpNumOffset(3);
+            }
+          }
+          else
+          {
+            pcSlice->setAmvpSbTmvpNumOffset(2);
+          }
+          if (pcSlice->isInterB() && pcSlice->getCheckLDC())
+          {
+            if (pcSlice->getRefPic(RefPicList(1 - pcSlice->getColFromL0Flag()), pcSlice->getColRefIdx())->getPOC() == pcSlice->getRefPic(RefPicList(1 - pcSlice->getColFromL0Flag2nd()), pcSlice->getColRefIdx2nd())->getPOC())
+            {
+              pcSlice->setAmvpSbTmvpNumColPic(1);
+            }
+            else
+            {
+              pcSlice->setAmvpSbTmvpNumColPic(2);
+            }
+          }
+          else
+          {
+            pcSlice->setAmvpSbTmvpNumColPic(1);
+          }
+          pcSlice->setAmvpSbTmvpAmvrEnabledFlag(pcSlice->getPic()->getPicWidthInLumaSamples() * pcSlice->getPic()->getPicHeightInLumaSamples() < 3840 * 2160 ? false : true);
+        }
+      }
+      else
+      {
+        pcSlice->setAmvpSbTmvpEnabledFlag(false);
+      }
 #endif
 
 #if ENABLE_QPA
