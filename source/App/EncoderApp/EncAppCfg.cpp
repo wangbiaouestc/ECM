@@ -4113,6 +4113,9 @@ bool EncAppCfg::xCheckParameter()
 #if AFFINE_MMVD
     xConfirmPara(m_AffineMmvdMode, "Affine MMVD can't be enabled if Affine is disabled.");
 #endif
+#if JVET_AG0135_AFFINE_CIIP
+    xConfirmPara( m_useCiipAffine, "Affine CIIP can't be enabled if Affine is disabled." );
+#endif
     m_maxNumAffineMergeCand = m_sbTmvpEnableFlag ? 1 : 0;
     if (m_PROF) msg(WARNING, "PROF is forcefully disabled when Affine is off \n");
     m_PROF = false;
