@@ -360,6 +360,14 @@ void CU::checkConformanceILRP(Slice *slice)
 #if JVET_AG0276_NLIC
 bool CU::isSecLicParaNeeded(const CodingUnit &cu)
 {
+  if (!(cu.slice->getSPS()->getUseAML()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+    && cu.slice->getSPS()->getTMToolsEnableFlag()
+#endif
+    ))
+  {
+    return false;
+  }
   if (!isInter(cu))
   {
     return false;
