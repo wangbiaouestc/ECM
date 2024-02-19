@@ -647,9 +647,6 @@ const BinFracBits ProbModelTables::m_binFracBits[256] = {
 #endif
 void BinProbModel_Std::init( int qp, int initId )
 {
-#if EXTENSION_CABAC_TRAINING
-  m_ctxBinTrace.resetCounters();
-#endif
   int slope = (initId >> 3) - 4;
   int offset = ((initId & 7) * 18) + 1;
   int inistate = ((slope   * (qp - 16)) >> 1) + offset;
@@ -695,10 +692,7 @@ CtxSet ContextSetCfg::addCtxSet( std::initializer_list<std::initializer_list<uin
   const std::size_t startIdx  = sm_InitTables[0].size();
   const std::size_t numValues = ( *initSet2d.begin() ).size();
   std::size_t setId     = 0;
-#if EXTENSION_CABAC_TRAINING
-  const int ctxSetNameIndex = startIdx == 0 ? 0 : sm_InitTableNameIndexes.back() + 1;
-  sm_InitTableNameIndexes.insert( sm_InitTableNameIndexes.end(),numValues, ctxSetNameIndex );
-#endif
+
   for( auto setIter = initSet2d.begin(); setIter != initSet2d.end() && setId < sm_InitTables.size(); setIter++, setId++ )
   {
     const std::initializer_list<uint8_t>& initSet   = *setIter;
@@ -716,9 +710,6 @@ CtxSet ContextSetCfg::addCtxSet( std::initializer_list<std::initializer_list<uin
 }
 
 #define CNU 35
-#if EXTENSION_CABAC_TRAINING
-std::vector<uint16_t> ContextSetCfg::sm_InitTableNameIndexes;
-#endif
 #if SLICE_TYPE_WIN_SIZE
 #if JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE
 std::vector<std::vector<uint8_t>> ContextSetCfg::sm_InitTables( NUMBER_OF_SLICE_TYPES * 3 + 2 + 4 );

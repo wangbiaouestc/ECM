@@ -477,9 +477,7 @@ unsigned TBinDecoder<BinProbModel>::decodeBin( unsigned ctxId )
 
   //DTRACE_DECR_COUNTER( g_trace_ctx, D_CABAC );
   DTRACE_WITHOUT_COUNT( g_trace_ctx, D_CABAC, "  -  " "%d" "\n", bin );
-#if EXTENSION_CABAC_TRAINING
-  rcProbModel.m_ctxBinTrace.addBin(bin);
-#endif
+
   return  bin;
 }
 
