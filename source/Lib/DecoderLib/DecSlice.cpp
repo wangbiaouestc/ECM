@@ -307,6 +307,12 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
   }
 #endif
   }
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  else
+  {
+    slice->setAmvpSbTmvpEnabledFlag(false);
+  }
+#endif
 #endif
 
   // for every CTU in the slice segment...
