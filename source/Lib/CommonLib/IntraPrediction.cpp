@@ -12322,7 +12322,7 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
       Mv mergeCand = m_bvBasedMergeCandidates[mergeCandIdx];
       if (mergeCand.getHor() >= mvXMin && mergeCand.getHor() <= mvXMax && mergeCand.getVer() >= mvYMin && mergeCand.getVer() <= mvYMax) // merge candidate is inside itmp region
       {
-        bvRegionIdList[mergeCandIdx] = checkIdx;
+        bvRegionIdList[mergeCandIdx] = regionId;
       }
     }
 #endif
