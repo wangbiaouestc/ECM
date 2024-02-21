@@ -1794,6 +1794,11 @@ void Slice::copySliceInfo(Slice *pSrc, bool cpyAlmostAll)
   m_multiHypRefPics = pSrc->m_multiHypRefPics;
   m_numMultiHypRefPics = pSrc->m_numMultiHypRefPics;
 #endif
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+  m_lumaPelMax                              = pSrc->m_lumaPelMax;
+  m_lumaPelMin                              = pSrc->m_lumaPelMin;
+  m_adaptiveClipQuant                       = pSrc->m_adaptiveClipQuant;
+#endif
 }
 
 
