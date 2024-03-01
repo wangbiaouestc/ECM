@@ -23102,8 +23102,8 @@ void IntraPrediction::getNeiEipCands(const PredictionUnit& pu, static_vector<Eip
   if (!slice.isIntra() && compId == COMPONENT_Y)
   {
     const Picture* const pColPic = slice.getRefPic(RefPicList(slice.isInterB() ? 1 - slice.getColFromL0Flag() : 0), slice.getColRefIdx()); 
-
-    if(pColPic)
+    bool isRefScaled = pColPic->isRefScaled(slice.getPPS());
+    if(pColPic && !isRefScaled)
     {
       const PreCalcValues& pcv = *cs.pcv;
       bool c0Avail;
@@ -23275,8 +23275,9 @@ void IntraPrediction::getNeiEipCands(const PredictionUnit& pu, static_vector<Eip
   if (!slice.isIntra() && compId == COMPONENT_Y)
   {
     const Picture* const pColPic = slice.getRefPic(RefPicList(slice.isInterB() ? 1 - slice.getColFromL0Flag() : 0), slice.getColRefIdx()); 
+    bool isRefScaled = pColPic->isRefScaled(slice.getPPS());
 
-    if(pColPic)
+    if (pColPic && !isRefScaled)
     {
       const PreCalcValues& pcv = *cs.pcv;
 
