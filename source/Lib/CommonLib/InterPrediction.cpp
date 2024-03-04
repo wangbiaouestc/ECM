@@ -14029,7 +14029,7 @@ void InterPrediction::adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMer
 
   for (uint32_t j = 0; j < NUM_MERGE_CANDS + MRG_MAX_NUM_CANDS + ALT_MRG_MAX_NUM_CANDS; j++)
   {
-    rdCandList[j] = MAX_UINT;
+    rdCandList[j] = j;
     candCategory[j] = MAX_UINT;
     candCostList[j] = MAX_UINT64;
   }
@@ -16357,7 +16357,7 @@ void InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMerg
 
   for (uint32_t i = 0; i < RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE + (ALT_AFF_MRG_MAX_NUM_CANDS << 1); i++)
   {
-    rdCandList[i] = MAX_UINT;
+    rdCandList[i] = i;
     candCategory[i] = MAX_UINT;
     candCostList[i] = MAX_UINT64;
   }
