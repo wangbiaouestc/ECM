@@ -42,7 +42,6 @@
 #error Include CommonDef.h not TypeDef.h
 #endif
 
-
 #include <vector>
 #include <utility>
 #include <sstream>
@@ -51,6 +50,8 @@
 #include <assert.h>
 #include <cassert>
 #include <cstdint>
+
+
 
 #define BASE_ENCODER                                      1
 #define BASE_NORMATIVE                                    1
@@ -137,11 +138,17 @@
 #define JVET_AD0086_ENHANCED_INTRA_TMP                    1 // JVET-AD0086: Enhanced intra TMP
 #define JVET_AE0077_EXT_INTRATMP                          1 // JVET-AE0077: Extended search areas for intraTMP
 #define JVET_AF0079_STORING_INTRATMP                      1 // JVET-AF0079: Storing fractional-pel intraTMP BV
+#define JVET_AG0136_INTRA_TMP_LIC                         1 // JVET-AG0136: Intra TMP extension to LIC
+#define JVET_AG0151_INTRA_TMP_MERGE_MODE                  1 // JVET-AG0151: Intra TMP with merge candidates
+#define JVET_AG0152_SGPM_ITMP_IBC                         1 // JVET-AG0152: SGPM with Intra TMP and IBC
+#define JVET_AG0146_DIMD_ITMP_IBC                         1 // JVET-AG0146: DIMD with Intra TMP and IBC
 #endif
 
 #define JVET_W0123_TIMD_FUSION                            1 // JVET-W0123: Template based intra mode derivation and fusion
 #if JVET_W0123_TIMD_FUSION
 #define JVET_X0148_TIMD_PDPC                              1 // JVET-X0148: PDPC handling for TIMD
+#define JVET_AG0092_ENHANCED_TIMD_FUSION                  1 // JVET-AG0092: TIMD fusion with non-angular predictor
+#define JVET_AG0128_REF_LINE_OPT_TIMD_FUSION              1 // JVET-AG0128: TIMD fusion reference line determination
 
 #if ENABLE_DIMD
 #define JVET_AC0098_LOC_DEP_DIMD                          1 // JVET-AC0098: Location-dependent Decoder-side Intra Mode Derivation
@@ -194,6 +201,9 @@
 #endif
 #define JVET_AD0120_LBCCP                                 1 // JVET-AD0120: Local-Boosting Cross-Component Prediction, wherein the template part is controlled by CCCM SPS
 #define JVET_AE0043_CCP_MERGE_TEMPORAL                    1 // JVET-AE0043: Cross-component merge mode with temporal candidates
+#define JVET_AG0058_EIP                                   1 // JVET-AG0058: Extrapolation filter-based intra prediction mode
+#define JVET_AG0154_DECODER_DERIVED_CCP_FUSION            1 // JVET-AG0154: Decoder derived CCP mode with fusion candidates
+#define JVET_AG0059_CCP_MERGE_ENHANCEMENT                 1 // JVET-AG0059: Enhancements on CCP merge for chroma intra coding
 
 //IBC
 #define JVET_Y0058_IBC_LIST_MODIFY                        1 // JVET-Y0058: Modifications of IBC merge/AMVP list construction, ARMC-TM-IBC part is included under JVET_W0090_ARMC_TM
@@ -229,6 +239,7 @@
 
 #define JVET_AE0174_NONINTER_TM_TOOLS_CONTROL             1 // JVET-AE0174: Add non-inter TM sps flag to control whether template matching is used for non-inter (Intra and IBC) tools
 #define JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES    1 // JVET-AE0094: IBC with non-adjacent spatial candidates
+#define JVET_AG0091_ARBVP                                 1 // JVET-AG0091: Auto-relocated block vector prediction
 
 #if JVET_AC0071_DBV && JVET_V0130_INTRA_TMP
 #define JVET_AF0066_ENABLE_DBV_4_SINGLE_TREE              1 // JVET-AF0066: Enable DBV mode in single tree configuration
@@ -244,6 +255,10 @@
 #if INTER_LIC
 #define JVET_AD0213_LIC_IMP                               1 // JVET-AD0213: bi-predictive LIC and the combination of LIC and OBMC
 #define JVET_AF0128_LIC_MERGE_TM                          1 // JVET-AF0128: LIC flag derivation for merge candidates with template costs
+#define JVET_AG0276_NLIC                                  1 // JVET-AG0276: non-local LIC
+#define JVET_AG0276_LIC_FLAG_SIGNALING                    1 // JVET-AG0276: signal LIC flag for merge mode
+#define JVET_AG0276_LIC_BDOF_BDMVR                        1 // JVET-AG0276: LIC BDOF and BDMVR
+#define JVET_AG0276_LIC_SLOPE_ADJUST                      1 // JVET-AG0276: LIC with slope adjustment
 #endif
 #define NON_ADJACENT_MRG_CAND                             1 // Add non-adjacent merge candidates
 #define MULTI_HYP_PRED                                    1 // Multiple hypothesis prediction
@@ -308,6 +323,11 @@
 #define JVET_AF0073_INTER_CCP_MERGE                       1 // JVET-AF0073: Cross-component prediction merge mode for inter prediction
 #define JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT          1 // JVET-AF0159: Affine subblock BDOF refinement
 #define JVET_AF0057                                       1 // JVET-AF0057: Encoder only. DMVR with robust MV derivation.
+#define JVET_AG0112_REGRESSION_BASED_GPM_BLENDING         1 // JVET-AG0112: Regression-based GPM blending
+#define JVET_AG0135_AFFINE_CIIP                           1 // JVET-AG0135: CIIP with affine prediction 
+#define JVET_AG0164_AFFINE_GPM                            1 // JVET-AG0164: GPM with affine prediction
+#define JVET_AG0098_AMVP_WITH_SBTMVP                      1 // JVET-AG0098: AMVP with SbTMVP mode
+#define JVET_AG0067_DMVR_EXTENSIONS                       1 // JVET-AG0067: On DMVR Extensions
 
 // Inter template matching tools
 #define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction
@@ -369,6 +389,9 @@
 #define JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST              1 // JVET-AC0115: Modifications of MTS/LFNST for Intra TMP coded block
 #define JVET_AE0125_SHIFT_QUANTIZATION_CENTER             1 // JVET-AE0125: Shifting quantization center
 #define JVET_AE0102_LFNST_CTX                             1 // JVET-AE0102: Context modelling for transform coefficients for LFNST/NSPT
+#define JVET_AG0061_INTER_LFNST_NSPT                      1 // JVET-AG0061: 3.3 Utilizing LFNST/NSPT for inter coding
+#define JVET_AG0100_TRANSFORM_COEFFICIENT_CODING          1 // JVET_AG0100: 3.2b Transform coefficient coding
+#define JVET_AG0143_INTER_INTRA                           1 // JVET_AG0143: 3.1c CABAC inter/intra model switch
 
 // Entropy Coding
 #define EC_HIGH_PRECISION                                 1 // CABAC high precision
@@ -376,6 +399,10 @@
 #define JVET_Z0135_TEMP_CABAC_WIN_WEIGHT                  1 // JVET-Z0135 Test 4.3b: Temporal CABAC, weighted states, windows adjustment
 #define JVET_AD0206_CABAC_INIT_AT_GDR                     1 // JVET-AD0206: Cabac initialization at GDR picture
 #define JVET_AF0133_RETRAINING_ISLICE_CTX                 1 // JVET-AF0133: retrained I-slice context model
+#define JVET_ECM12_CABAC_RETRAIN                          1 // use retrained contexts for ecm-12.0
+#define JVET_AG0196_CABAC_RETRAIN                         1 // JVET-AG0196 5.1 bin dumper
+#define JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE             1 // JVET-AG0196 5.2: window offsets per slice type
+#define JVET_AG0117_CABAC_SPATIAL_TUNING                  1 // JVET-AG0117 5.3: spatial CABAC tuning
 
 // Loop filters
 #define ALF_IMPROVEMENT                                   1 // ALF improvement
@@ -399,6 +426,9 @@
 #define JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO      1 // JVET-AE0151: CCSAO with history offsets and extended edge classifiers
 #define JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF            1 // JVET-AF0197: Luma Residual Tap in CCALF
 #define JVET_AF0112_BIF_DYNAMIC_SCALING                   1 // JVET-AF0112: Dynamic TU scale factor for BIF with LUTs interpolation
+#define JVET_AG0157_ALF_CHROMA_FIXED_FILTER               1 // JVET-AG0157: Fixed filter for chroma ALF
+#define JVET_AG0158_ALF_LUMA_COEFF_PRECISION              1 // JVET-AG0158: adaptive precision for luma ALF coefficients
+#define JVET_AG0145_ADAPTIVE_CLIPPING                     1 // JVET-AG0145: Adaptive clipping with signalled lower and upper bounds
 
 // SIMD optimizations
 #if IF_12TAP
@@ -434,6 +464,7 @@
 #endif
 
 #define JVET_AC0096                                       1 // JVET-AC0096: RPR functionality testing
+#define JVET_AG0116                                       1 // JVET-AG0116: GOP-based RPR encoder control from VTM
 
 
 
@@ -607,10 +638,6 @@ typedef std::pair<int, int>  TrCost;
 
 #ifndef EXTENSION_HDRTOOLS
 #define EXTENSION_HDRTOOLS                                0 //< extension for HDRTools/Metrics support; this macro should be controlled by makefile, as it would be used to control whether the library is built and linked
-#endif
-
-#ifndef EXTENSION_CABAC_TRAINING
-#define EXTENSION_CABAC_TRAINING                          0 //< JVET-AF0133: extension for CABAC context model training; this macro should be controlled by makefile, as it would be used to control whether the library is built and linked
 #endif
 
 #define JVET_O0756_CONFIG_HDRMETRICS                      1
@@ -1800,7 +1827,38 @@ enum RESHAPE_SIGNAL_TYPE
   RESHAPE_SIGNAL_NULL = 100,
 };
 
-#if JVET_AB0155_SGPM
+#if JVET_AG0058_EIP
+enum EIP_REFERENCE_TYPE
+{
+  EIP_A = 0,
+  EIP_AL = 1,
+  EIP_L = 2,
+  EIP_AL_A = 3,
+  EIP_AL_L = 4,
+  EIP_A_L = 5,
+  EIP_AL_A_L = 6,
+  NUM_EIP_TPL_TYPE = 7,
+};
+
+enum EIP_FILTER_TYPE
+{
+  EIP_FILTER_S  = 0,
+  EIP_FILTER_V  = 1,
+  EIP_FILTER_H  = 2,
+  NUM_EIP_SHAPE = 3,
+};
+
+struct EIPInfo
+{
+  int recoType;
+  int filterShape;
+
+  EIPInfo() : recoType(0), filterShape(0) {}
+  EIPInfo(int _recoType, int _filterShape) : recoType(_recoType), filterShape(_filterShape) {}
+};
+#endif
+
+#if JVET_AB0155_SGPM && !JVET_AG0152_SGPM_ITMP_IBC
 struct SgpmInfo
 {
   int sgpmSplitDir;
@@ -1818,6 +1876,82 @@ struct SgpmInfo
   }
 };
 #endif
+
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+struct AffineBlendingModel
+{
+  bool  valid;
+  int params[3];
+  int shift;
+  int offset;
+  int min, max;
+
+  void init()
+  {
+    valid = false;
+    shift = 1;
+    params[0] = 1 << (shift - 1);
+    params[1] = 1 << (shift - 1);
+    params[2] = 0;
+  }
+
+  AffineBlendingModel()
+  {
+    init();
+  }
+
+  AffineBlendingModel( const int s, const int _min, const int _max )
+  {
+    shift = s;
+    params[0] = 1 << (shift - 1);
+    params[1] = 1 << (shift - 1);
+    params[2] = 0;
+    min = _min;
+    max = _max;
+  }
+  void copy( const AffineBlendingModel& other )
+  {
+    if ( other.valid )
+    {
+      *this = other;
+    }
+    else
+    {
+      init();
+    }
+  }
+
+  int compute( const int x, const int y, bool bClip=true )
+  {
+    int weight = (params[0] * x + params[1] * y + params[2] + offset) >> shift ;
+    if ( bClip )
+    {
+      return (weight > max ? max : (weight < min ? min : weight));
+    }
+    else
+    {
+      return weight;
+    }
+  }
+
+  bool isSame( const AffineBlendingModel& other )
+  {
+    bool  bSame = true;
+
+    bSame &= other.valid == valid;
+    bSame &= other.params[0] == params[0];
+    bSame &= other.params[1] == params[1];
+    bSame &= other.params[2] == params[2];
+    bSame &= other.shift == shift;
+    bSame &= other.offset == offset;
+    bSame &= other.min == min;
+    bSame &= other.max == max;
+
+    return bSame;
+  }
+};
+#endif
+
 // ---------------------------------------------------------------------------
 // exception class
 // ---------------------------------------------------------------------------

@@ -937,6 +937,26 @@ public:
   uint32_t       getBitsOfVectorWithPredictor( const int x, const int y, const unsigned imvShift )  { return xGetExpGolombNumberOfBits(((x << m_iCostScale) - m_mvPredictor.getHor())>>imvShift) + xGetExpGolombNumberOfBits(((y << m_iCostScale) - m_mvPredictor.getVer())>>imvShift); }
 #endif
 
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  Distortion     getAmvpSbTmvpCostOfVectorWithPredictor(const int amvpSbTmvpMvdOffset, const int numOffset)
+  {
+    return Distortion(m_motionLambda * getAmvpSbTmvpBitsOfVectorWithPredictor(amvpSbTmvpMvdOffset, numOffset));
+  }
+  const int m_estAmvpSbTmvpIdxBits[3][3] = { { 3, 0, 0 },
+                                             { 4, 4, 0 },
+                                             { 4, 5, 5 } };
+  uint32_t       getAmvpSbTmvpBitsOfVectorWithPredictor(const int amvpSbTmvpMvdOffset, const int numOffset)
+  {
+    if (amvpSbTmvpMvdOffset < 0)
+    {
+      return 1;
+    }
+    else
+    {
+      return m_estAmvpSbTmvpIdxBits[numOffset - 1][amvpSbTmvpMvdOffset];
+    }
+  }
+#endif
 
 #if JVET_Z0131_IBC_BVD_BINARIZATION
   // for block vector cost

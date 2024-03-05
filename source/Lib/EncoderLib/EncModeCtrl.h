@@ -246,6 +246,9 @@ struct ComprCUCtx
     , ispLfnstIdx   ( 0 )
     , stopNonDCT2Transforms
                     ( false )
+#if JVET_AG0058_EIP
+    , eipFlag      ( false )
+#endif
   {
     getAreaIdx( cs.area.Y(), *cs.pcv, cuX, cuY, cuW, cuH );
     partIdx = ( ( cuX << 8 ) | cuY );
@@ -299,6 +302,9 @@ struct ComprCUCtx
   uint8_t                           ispMode;
   uint8_t                           ispLfnstIdx;
   bool                              stopNonDCT2Transforms;
+#if JVET_AG0058_EIP
+  bool                              eipFlag;
+#endif
 
   template<typename T> T    get( int ft )       const { return typeid(T) == typeid(double) ? (T&)extraFeaturesd[ft] : T(extraFeatures[ft]); }
   template<typename T> void set( int ft, T val )      { extraFeatures [ft] = int64_t( val ); }
@@ -418,6 +424,9 @@ public:
   void   setBestISPIntraModeRelCU     ( uint8_t val )           { m_ComprCUCtxList.back().bestISPIntraMode = val; }
 #if JVET_V0130_INTRA_TMP
   void   setTPMFlagISPPass            (bool val)                { m_ComprCUCtxList.back().tmpFlag = val; }
+#endif
+#if JVET_AG0058_EIP
+  void   setAeipFlagISPPass           (bool val)                { m_ComprCUCtxList.back().eipFlag = val; }
 #endif
   void   setMIPFlagISPPass            ( bool val )              { m_ComprCUCtxList.back().mipFlag = val; }
   void   setISPMode                   ( uint8_t val )           { m_ComprCUCtxList.back().ispMode = val; }
@@ -968,10 +977,19 @@ struct CodedCUInfo
 #if JVET_W0097_GPM_MMVD_TM
   bool     skipGPM;
   char     isGPMTested;
+
+#if JVET_AG0164_AFFINE_GPM
+  int      geoDirCandList[GEO_MAX_TRY_WEIGHTED_SATD + 3];
+  int      numGeoDirCand;
+  int      geoMrgIdx0List[GEO_MAX_TRY_WEIGHTED_SATD + 3];
+  int      geoMrgIdx1List[GEO_MAX_TRY_WEIGHTED_SATD + 3];
+#else
   int      geoDirCandList[GEO_MAX_TRY_WEIGHTED_SATD];
   int      numGeoDirCand;
   int      geoMrgIdx0List[GEO_MAX_TRY_WEIGHTED_SATD];
   int      geoMrgIdx1List[GEO_MAX_TRY_WEIGHTED_SATD];
+#endif
+
 #endif
 #if JVET_AD0213_LIC_IMP
   bool    skipLIC;

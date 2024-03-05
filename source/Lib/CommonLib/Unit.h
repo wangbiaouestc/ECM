@@ -44,10 +44,10 @@
 #include "MotionInfo.h"
 #include "ChromaFormat.h"
 
-
 // ---------------------------------------------------------------------------
 // tools
 // ---------------------------------------------------------------------------
+
 struct PLTBuf {
   uint8_t        curPLTSize[MAX_NUM_CHANNEL_TYPE];
   Pel            curPLT[MAX_NUM_COMPONENT][MAXPLTPREDSIZE];
@@ -312,6 +312,9 @@ struct CodingUnit : public UnitArea
   int8_t         affineType;
   bool           colorTransform;
   bool           geoFlag;
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  bool           geoBlendFlag;
+#endif
   int8_t         bdpcmMode;
   int8_t         bdpcmModeChroma;
   uint8_t        imv;
@@ -322,6 +325,10 @@ struct CodingUnit : public UnitArea
   uint8_t        plIdx;
 #endif
 #if ENABLE_DIMD
+#if JVET_AG0146_DIMD_ITMP_IBC
+  bool           isBvDimd;
+  Mv             bvDimd;
+#endif
   bool           dimd;
   bool           dimdBlending;
 #if JVET_AC0098_LOC_DEP_DIMD
@@ -348,7 +355,14 @@ struct CodingUnit : public UnitArea
 #endif
 #if TMP_FAST_ENC
 #if JVET_AD0086_ENHANCED_INTRA_TMP
+#if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
+  int                tmpXdisp;
+  int                tmpYdisp;
+#endif
   bool               tmpFlmFlag;
+#if JVET_AG0136_INTRA_TMP_LIC
+  bool               tmpLicFlag;
+#endif
   uint8_t            tmpIdx;
   bool               tmpFusionFlag;
   int                tmpIsSubPel;
@@ -364,24 +378,48 @@ struct CodingUnit : public UnitArea
 #endif
   int            timdModeSecondary;
   bool           timdIsBlended;
+#if JVET_AG0092_ENHANCED_TIMD_FUSION
+  int            timdModeNonAng;
+  int8_t         timdFusionWeight[TIMD_FUSION_NUM];
+  int8_t         timdLocDep[TIMD_FUSION_NUM];
+#else
   int8_t         timdFusionWeight[2];
+#endif
 #endif
 #if JVET_AB0155_SGPM
   int            timdHor;
   int            timdVer;
+#if JVET_AG0152_SGPM_ITMP_IBC
+  Mv             sgpmBv0;
+  Mv             sgpmBv1;
+#endif
   bool           sgpm;
   int            sgpmIdx;
   int            sgpmSplitDir;
   int            sgpmMode0;
   int            sgpmMode1;
 #endif
+#if JVET_AG0058_EIP
+  bool eipFlag;
+  bool              eipMerge;
+  EipModelCandidate eipModel;
+#endif
 #if ENABLE_OBMC
   bool           obmcFlag;
   bool           isobmcMC;
 #endif
   uint8_t        mtsFlag;
+#if JVET_AG0061_INTER_LFNST_NSPT
+  uint8_t        lfnstFlag;
+#endif
+#if JVET_AG0061_INTER_LFNST_NSPT
+  int            dimdDerivedIntraDir;
+#endif
   uint8_t        lfnstIdx;
   uint8_t        bcwIdx;
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  AffineBlendingModel blendModel;
+#endif
   int8_t         refIdxBi[2];
   bool           mipFlag;
 #if JVET_AB0067_MIP_DIMD_LFNST
@@ -393,11 +431,24 @@ struct CodingUnit : public UnitArea
   int            intraTmpDimdMode;
 #endif
 #endif
+#if JVET_AG0276_NLIC
+  bool           altLMFlag;
+  AltLMInterUnit altLMParaUnit;
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  AltLMInterUnit altLMBRParaUnit;
+#endif
+#if ENABLE_OBMC
+  AltLMInterUnit secAltLMParaUnit;
+#endif
+#endif
 #if INTER_LIC
   bool           licFlag;
 #if JVET_AD0213_LIC_IMP
   int            licScale[2][3];
   int            licOffset[2][3];
+#endif
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+  int            licDelta;
 #endif
 #endif
 #if JVET_AC0112_IBC_LIC
@@ -504,13 +555,17 @@ struct IntraPredictionData
 #endif
   bool      mipTransposedFlag;
   int8_t    multiRefIdx;
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  int       decoderDerivedCcpMode;
+  int       ddNonLocalCCPFusion;
+#endif
 #if JVET_Z0050_CCLM_SLOPE
   CclmOffsets cclmOffsets;
 #endif
 #if JVET_AA0126_GLM
   GlmIdc    glmIdc;
 #endif
-#if JVET_AA0057_CCCM
+#if JVET_AA0057_CCCM || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   int       cccmFlag;
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   int       cccmNoSubFlag;
@@ -532,8 +587,12 @@ struct IntraPredictionData
   int       idxNonLocalCCP;
   CCPModelCandidate curCand;
 #endif
-#if JVET_AD0120_LBCCP
+#if JVET_AD0120_LBCCP || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   int       ccInsideFilter;
+#endif
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+  int       ccpMergeFusionFlag;
+  int       ccpMergeFusionType;
 #endif
 };
 
@@ -612,6 +671,11 @@ struct InterPredictionData
 #if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
   bool        tmMergeFlag;
 #endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  bool        tmMergeFlagOppositeLic;
+  bool        mergeOppositeLic;
+  bool        affineOppositeLic;
+#endif
 #if JVET_X0049_ADAPT_DMVR
   uint8_t     bmMergeFlag;
   uint8_t     bmDir;
@@ -639,6 +703,10 @@ struct InterPredictionData
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   bool      amvpMergeModeFlag[NUM_REF_PIC_LIST_01];
 #endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  bool      amvpSbTmvpFlag;
+  int8_t    amvpSbTmvpMvdIdx;
+#endif
   int8_t     refIdx  [NUM_REF_PIC_LIST_01];
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   int8_t    refIdxLC;
@@ -648,12 +716,25 @@ struct InterPredictionData
   bool      mvRefine;
   Mv        mvdAffi [NUM_REF_PIC_LIST_01][3];
   Mv        mvAffi[NUM_REF_PIC_LIST_01][3];
+
+#if JVET_AG0164_AFFINE_GPM
+  uint8_t     affineGPM[2];
+
+  int8_t       gpmPartRefIdx[2][2];
+  EAffineModel gpmPartAffType[2]; 
+  Mv           gpmPartmvAffi[2][NUM_REF_PIC_LIST_01][3];
+
+#endif
+
   bool      ciipFlag;
 #if JVET_AF0057
   bool      dmvrImpreciseMv;
 #endif
 #if CIIP_PDPC
   bool      ciipPDPC;
+#endif
+#if JVET_AG0135_AFFINE_CIIP
+  bool      ciipAffine;
 #endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
   int       mvsdIdx[NUM_REF_PIC_LIST_01];
@@ -711,7 +792,11 @@ struct PredictionUnit : public UnitArea, public IntraPredictionData, public Inte
   PredictionUnit *next;
 
 #if JVET_Z0139_HIST_AFF
+#if JVET_AG0164_AFFINE_GPM
+  void getAffineMotionInfo(AffineMotionInfo affineMiOut[2], int refIdxOut[2], MvField baseMv[2]) const;
+#else
   void getAffineMotionInfo(AffineMotionInfo affineMiOut[2], int refIdxOut[2]) const;
+#endif
 #endif
 
   // for accessing motion information, which can have higher resolution than PUs (should always be used, when accessing neighboring motion information)
@@ -746,6 +831,30 @@ struct PredictionUnit : public UnitArea, public IntraPredictionData, public Inte
 #endif
 };
 
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+struct GeoBlendInfo
+{
+  AffineBlendingModel blendModel;
+  Distortion  uiCostTmp;  // uicost template
+  MvField     mvFieldA[2];
+  MvField     mvFieldB[2];
+  int         dir[2];     // 0,1 or 2 (bi-dir)
+  int         mergeCand[2];
+  Distortion  sad = 0;    // sad of CU prediction
+  double      uiCost = 0;
+  int         idxBufGeo;  // index of storage in m_acMergeBuffer[]
+  int         iOrder;     // before re-ordering
+  int         iMergeIdx;
+
+  bool isSame( MvField mvOtherFieldA[2], MvField mvOtherFieldB[2] )
+  {
+    bool  bSameA = (mvFieldA[0] == mvOtherFieldA[0]) && (mvFieldA[1] == mvOtherFieldA[1]);
+    bool  bSameB = (mvFieldB[0] == mvOtherFieldB[0]) && (mvFieldB[1] == mvOtherFieldB[1]);
+    return bSameA && bSameB;
+  }
+};
+#endif
+
 // ---------------------------------------------------------------------------
 // transform unit
 // ---------------------------------------------------------------------------
@@ -758,6 +867,9 @@ struct TransformUnit : public UnitArea
   int              m_chromaResScaleInv;
   uint8_t        depth;
   uint8_t        mtsIdx     [ MAX_NUM_TBLOCKS ];
+#if JVET_AG0061_INTER_LFNST_NSPT
+  uint8_t        lfnstIdx   [ MAX_NUM_TBLOCKS ];
+#endif
   bool           noResidual;
   uint8_t        jointCbCr;
   uint8_t        cbf        [ MAX_NUM_TBLOCKS ];
@@ -949,6 +1061,29 @@ struct MEResult
   MEResult() { predBuf = nullptr; predBufIdx = -1; }
 };
 typedef std::vector<MEResult> MEResultVec;
+#endif
+
+#if JVET_AG0152_SGPM_ITMP_IBC
+struct SgpmInfo
+{
+  int sgpmSplitDir;
+  int sgpmMode0;
+  int sgpmMode1;
+  Mv   sgpmBv0;
+  Mv   sgpmBv1;
+  SgpmInfo() : sgpmSplitDir(0), sgpmMode0(0), sgpmMode1(0), sgpmBv0(0, 0), sgpmBv1(0, 0) {}
+  SgpmInfo(const int sd, const int sm0, const int sm1, const Mv sbv0, const Mv sbv1) : sgpmSplitDir(sd), sgpmMode0(sm0), sgpmMode1(sm1), sgpmBv0(sbv0), sgpmBv1(sbv1) {}
+
+  SgpmInfo& operator=(const SgpmInfo& other)
+  {
+    sgpmSplitDir = other.sgpmSplitDir;
+    sgpmMode0 = other.sgpmMode0;
+    sgpmMode1 = other.sgpmMode1;
+    sgpmBv0 = other.sgpmBv0;
+    sgpmBv1 = other.sgpmBv1;
+    return *this;
+  }
+};
 #endif
 #endif
 

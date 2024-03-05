@@ -3889,6 +3889,9 @@ TMatrixCoeff g_trCoreDCT2P256[256][256];
 TMatrixCoeff g_trCoreDCT8P256[256][256];
 TMatrixCoeff g_trCoreDST7P256[256][256];
 #endif
+#if JVET_AG0067_DMVR_EXTENSIONS
+int g_bdofWeight[1600];
+#endif
 #if JVET_W0103_INTRA_MTS
 TMatrixCoeff g_aiTr2[NUM_TRANS_TYPE][2][2];
 TMatrixCoeff g_aiTr4[NUM_TRANS_TYPE][4][4];
@@ -4261,6 +4264,44 @@ const uint8_t g_aucTrSet[80][4] =
 };
 #endif
 #endif
+
+#if JVET_AG0058_EIP
+const Position g_eipFilter[NUM_EIP_SHAPE][EIP_FILTER_TAP] =
+{
+  { Position(-1,  0), Position(-2,  0), Position(-3,  0), Position( 0, -1), Position(-1, -1), Position(-2, -1), Position(-3, -1), Position( 0, -2), Position(-1, -2), Position(-2, -2), Position(-3, -2), Position( 0, -3), Position(-1, -3), Position(-2, -3), Position(-3, -3) },
+  { Position(-1,  0), Position( 0, -1), Position(-1, -1), Position( 0, -2), Position(-1, -2), Position( 0, -3), Position(-1, -3), Position( 0, -4), Position(-1, -4), Position( 0, -5), Position(-1, -5), Position( 0, -6), Position(-1, -6), Position( 0, -7), Position(-1, -7) },
+  { Position( 0, -1), Position(-1,  0), Position(-1, -1), Position(-2,  0), Position(-2, -1), Position(-3,  0), Position(-3, -1), Position(-4,  0), Position(-4, -1), Position(-5,  0), Position(-5, -1), Position(-6,  0), Position(-6, -1), Position(-7,  0), Position(-7, -1) },
+};
+
+const EIPInfo g_eipInfoLut[4][4][9] = 
+{
+  {
+    { EIPInfo(EIP_AL_A_L, EIP_FILTER_S), EIPInfo(EIP_AL_A_L, EIP_FILTER_V), EIPInfo(EIP_AL_A_L, EIP_FILTER_H), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo() }, // 4x4, 3modes
+    { EIPInfo(EIP_AL_A_L, EIP_FILTER_S), EIPInfo(EIP_AL_A_L, EIP_FILTER_V), EIPInfo(EIP_AL_A_L, EIP_FILTER_H), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo() }, // 4x8, 3modes
+    { EIPInfo(EIP_AL_A_L, EIP_FILTER_S), EIPInfo(EIP_AL_A_L, EIP_FILTER_V), EIPInfo(EIP_AL_A_L, EIP_FILTER_H), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo() }, // 4x16, 3modes
+    { EIPInfo(EIP_AL_A_L, EIP_FILTER_S), EIPInfo(EIP_AL_A_L, EIP_FILTER_V), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo() }, // 4x32, 2modes
+  },
+  {
+    { EIPInfo(EIP_AL_A_L, EIP_FILTER_S), EIPInfo(EIP_AL_A_L, EIP_FILTER_H), EIPInfo(EIP_AL_A_L, EIP_FILTER_V), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo() }, // 8x4, 3modes
+    { EIPInfo(EIP_AL_A_L, EIP_FILTER_S), EIPInfo(EIP_AL_A_L, EIP_FILTER_V), EIPInfo(EIP_AL_A_L, EIP_FILTER_H), EIPInfo(EIP_AL_L,   EIP_FILTER_S), EIPInfo(EIP_AL_A,   EIP_FILTER_S), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo() }, // 8x8, 5modes
+    { EIPInfo(EIP_AL_A_L, EIP_FILTER_S), EIPInfo(EIP_AL_A_L, EIP_FILTER_V), EIPInfo(EIP_AL_A_L, EIP_FILTER_H), EIPInfo(EIP_AL_L,   EIP_FILTER_S), EIPInfo(EIP_AL_L,   EIP_FILTER_V), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo() }, // 8x16, 5modes
+    { EIPInfo(EIP_AL_A_L, EIP_FILTER_S), EIPInfo(EIP_AL_A_L, EIP_FILTER_V), EIPInfo(EIP_AL_A_L, EIP_FILTER_H), EIPInfo(EIP_AL_L,   EIP_FILTER_V), EIPInfo(EIP_AL_L,   EIP_FILTER_S), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo() }, // 8x32, 5modes
+  },
+  {
+    { EIPInfo(EIP_AL_A_L, EIP_FILTER_S), EIPInfo(EIP_AL_A_L, EIP_FILTER_H), EIPInfo(EIP_AL_A_L, EIP_FILTER_V), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo() }, // 16x4, 3modes
+    { EIPInfo(EIP_AL_A_L, EIP_FILTER_S), EIPInfo(EIP_AL_A_L, EIP_FILTER_H), EIPInfo(EIP_AL_A_L, EIP_FILTER_V), EIPInfo(EIP_AL_A,   EIP_FILTER_S), EIPInfo(EIP_AL_A,   EIP_FILTER_H), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo() }, // 16x8, 5modes
+    { EIPInfo(EIP_AL_A_L, EIP_FILTER_S), EIPInfo(EIP_AL_A_L, EIP_FILTER_V), EIPInfo(EIP_AL_A_L, EIP_FILTER_H), EIPInfo(EIP_AL_L,   EIP_FILTER_S), EIPInfo(EIP_AL_A,   EIP_FILTER_S), EIPInfo(EIP_AL_A,   EIP_FILTER_H), EIPInfo(EIP_AL_L,   EIP_FILTER_V), EIPInfo(EIP_AL_L,   EIP_FILTER_H), EIPInfo(EIP_AL_A,   EIP_FILTER_V) }, // 16x16, 9modes
+    { EIPInfo(EIP_AL_A_L, EIP_FILTER_S), EIPInfo(EIP_AL_A_L, EIP_FILTER_V), EIPInfo(EIP_AL_A_L, EIP_FILTER_H), EIPInfo(EIP_AL_L,   EIP_FILTER_S), EIPInfo(EIP_AL_A,   EIP_FILTER_S), EIPInfo(EIP_AL_A,   EIP_FILTER_H), EIPInfo(EIP_AL_L,   EIP_FILTER_V), EIPInfo(EIP_AL_L,   EIP_FILTER_H), EIPInfo(EIP_AL_A,   EIP_FILTER_V) }, // 16x32, 9modes
+  },
+  {
+    { EIPInfo(EIP_AL_A_L, EIP_FILTER_S), EIPInfo(EIP_AL_A_L, EIP_FILTER_H), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo() }, // 32x4, 3modes
+    { EIPInfo(EIP_AL_A_L, EIP_FILTER_S), EIPInfo(EIP_AL_A_L, EIP_FILTER_H), EIPInfo(EIP_AL_A_L, EIP_FILTER_V), EIPInfo(EIP_AL_A,   EIP_FILTER_H), EIPInfo(EIP_AL_A,   EIP_FILTER_S), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo() }, // 32x8, 5modes
+    { EIPInfo(EIP_AL_A_L, EIP_FILTER_S), EIPInfo(EIP_AL_A_L, EIP_FILTER_H), EIPInfo(EIP_AL_A_L, EIP_FILTER_V), EIPInfo(EIP_AL_A,   EIP_FILTER_S), EIPInfo(EIP_AL_L,   EIP_FILTER_S), EIPInfo(EIP_AL_L,   EIP_FILTER_V), EIPInfo(EIP_AL_A,   EIP_FILTER_H), EIPInfo(EIP_AL_A,   EIP_FILTER_V), EIPInfo(EIP_AL_L,   EIP_FILTER_H) }, // 32x16, 9modes
+    { EIPInfo(EIP_AL_A_L, EIP_FILTER_S), EIPInfo(EIP_AL_A_L, EIP_FILTER_V), EIPInfo(EIP_AL_A_L, EIP_FILTER_H), EIPInfo(EIP_AL_L,   EIP_FILTER_S), EIPInfo(EIP_AL_A,   EIP_FILTER_S), EIPInfo(EIP_AL_A,   EIP_FILTER_H), EIPInfo(EIP_AL_L,   EIP_FILTER_V), EIPInfo(EIP_AL_L,   EIP_FILTER_H), EIPInfo(EIP_AL_A,   EIP_FILTER_V) }, // 32x32, 9modes
+  },
+};
+#endif
+
 // initialize ROM variables
 void initROM()
 {
@@ -4499,7 +4540,25 @@ void initROM()
     }
   }
 #endif
-
+#if JVET_AG0067_DMVR_EXTENSIONS
+  int bdofWidth[]  =   {8,  8,  8,   12,  12,  12,  20,  20,   20};
+  int bdofHeight[] =   {8, 12, 20,    8,  12,  20,   8,  12,   20};
+  int weightOffset[] = {0, 64, 160, 320, 416, 560, 800, 960, 1200};
+  for (int i = 0; i < 9; i++)
+  {
+    int offset = weightOffset[i];
+    int width  = bdofWidth[i];
+    int height = bdofHeight[i];
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x++)
+      {
+        g_bdofWeight[y * width + x + offset] = (x >= (width/2) ? width - x : x + 1) * (y >= (height/2) ? height - y : y + 1);
+      }
+    }
+  }
+#endif
+  
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   memset(&g_resiBorderTemplate[0][0][0], 0, sizeof(g_resiBorderTemplate));
   memset(&g_resiBorderTemplateLFNST[0][0][0], 0, sizeof(g_resiBorderTemplateLFNST));
@@ -4965,6 +5024,15 @@ const uint32_t g_uiGroupIdx[] = { 0,1,2,3,4,4,5,5,6,6,6,6,7,7,7,7,8,8,8,8,8,8,8,
 };
 #else
 const uint32_t g_uiGroupIdx[MAX_TB_SIZEY] = { 0,1,2,3,4,4,5,5,6,6,6,6,7,7,7,7,8,8,8,8,8,8,8,8,9,9,9,9,9,9,9,9, 10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11 };
+#endif
+#if JVET_AG0100_TRANSFORM_COEFFICIENT_CODING
+const uint32_t g_auiGoRiceParsCoeffGTN[GTN_MAXSUM] =
+{
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1,
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2,
+  2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+  2, 3, 3, 3, 3, 3, 3, 3
+};
 #endif
 const uint32_t g_auiGoRiceParsCoeff[32] =
 {
@@ -5522,4 +5590,14 @@ const int8_t g_ibcGpmSecondSetSplitDir[GEO_NUM_PARTITION_MODE] = {
 
 #endif
 
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+const int8_t g_amvpSbTmvp_mvd_dir[2][8] = { { 1, -1,  0,  0,  1, -1,  1, -1 },
+                                            { 0,  0,  1, -1,  1, -1, -1,  1 } };
+const int8_t g_amvpSbTmvp_mvd_offset[6] = { 4, 8, 12, 16, 24, 32 };
+uint32_t g_picAmvpSbTmvpEnabledArea = 0;
+#endif
+
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+const int g_licSlopeDeltaSet[LIC_SLOPE_MAX_NUM_DELTA + 1] = {0, 1, -1};
+#endif
 //! \}

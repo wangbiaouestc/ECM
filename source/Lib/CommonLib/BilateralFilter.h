@@ -49,7 +49,11 @@ class BIFCabacEst
 {
 public:
   virtual ~BIFCabacEst() {};
+#if JVET_AG0196_CABAC_RETRAIN
+  virtual uint64_t getBits( const ComponentID compID, Slice& slice, const BifParams& htdfParams ) = 0;
+#else
   virtual uint64_t getBits( const ComponentID compID, const Slice& slice, const BifParams& htdfParams) = 0;
+#endif
 };
 #endif
 class BilateralFilter

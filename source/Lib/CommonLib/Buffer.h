@@ -89,8 +89,21 @@ struct PelBufferOps
   void(*bioGradFilter) (Pel* pSrc, int srcStride, int width, int height, int gradStride, Pel* gradX, Pel* gradY, const int bitDepth);
   void(*calcBIOPar)    (const Pel* srcY0Temp, const Pel* srcY1Temp, const Pel* gradX0, const Pel* gradX1, const Pel* gradY0, const Pel* gradY1, int* dotProductTemp1, int* dotProductTemp2, int* dotProductTemp3, int* dotProductTemp5, int* dotProductTemp6, const int src0Stride, const int src1Stride, const int gradStride, const int widthG, const int heightG, const int bitDepth);
 #if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
-  void(*calcBIOParameterHighPrecision)   (const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0, Pel* gradX1, Pel* gradY0, Pel* gradY1, int width, int height, const int src0Stride, const int src1Stride, const int widthG, const int bitDepth, int32_t* s1, int32_t* s2, int32_t* s3, int32_t* s5, int32_t* s6, Pel* dI);
-  void(*calcBIOParamSum4HighPrecision)   (int32_t* s1, int32_t* s2, int32_t* s3, int32_t* s5, int32_t* s6, int width, int height, const int widthG, int32_t* sumS1, int32_t* sumS2, int32_t* sumS3, int32_t* sumS5, int32_t* sumS6);
+  void(*calcBIOParameterHighPrecision)   (const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0, Pel* gradX1, Pel* gradY0, Pel* gradY1, int width, int height, const int src0Stride, const int src1Stride, const int widthG, const int bitDepth, int32_t* s1, int32_t* s2, int32_t* s3, int32_t* s5, int32_t* s6, Pel* dI
+#if JVET_AG0067_DMVR_EXTENSIONS
+                                          ,Pel* gX, Pel* gY
+#endif
+                                          );
+  void(*calcBIOParamSum4HighPrecision)   (int32_t* s1, int32_t* s2, int32_t* s3, int32_t* s5, int32_t* s6, int width, int height, const int widthG, int32_t* sumS1, int32_t* sumS2, int32_t* sumS3, int32_t* sumS5, int32_t* sumS6
+#if JVET_AG0067_DMVR_EXTENSIONS
+                                          ,Pel* dI ,Pel* gX, Pel* gY, bool isGPM, bool isSub
+#endif
+                                          );
+#endif
+#if JVET_AG0067_DMVR_EXTENSIONS
+  void(*calcBIOParamSum4HighPrecision4)   (int32_t* s1, int32_t* s2, int32_t* s3, int32_t* s5, int32_t* s6, int width, int height, const int widthG, int32_t* sumS1, int32_t* sumS2, int32_t* sumS3, int32_t* sumS5, int32_t* sumS6, Pel* dI, Pel* gX, Pel* gY, bool isGPM, bool isSub);
+  void(*calcBIOParamSum4HighPrecision8)   (int32_t* s1, int32_t* s2, int32_t* s3, int32_t* s5, int32_t* s6, int width, int height, const int widthG, int32_t* sumS1, int32_t* sumS2, int32_t* sumS3, int32_t* sumS5, int32_t* sumS6, Pel* dI  ,Pel* gX, Pel* gY, bool isGPM, bool isSub);
+  void(*calcBIOParamSum4HighPrecision16)   (int32_t* s1, int32_t* s2, int32_t* s3, int32_t* s5, int32_t* s6, int width, int height, const int widthG, int32_t* sumS1, int32_t* sumS2, int32_t* sumS3, int32_t* sumS5, int32_t* sumS6, Pel* dI   ,Pel* gX, Pel* gY, bool isGPM, bool isSub);
 #endif
 #if MULTI_PASS_DMVR || SAMPLE_BASED_BDOF
   void(*calcBIOParameter)   (const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0, Pel* gradX1, Pel* gradY0, Pel* gradY1, int width, int height, const int src0Stride, const int src1Stride, const int widthG, const int bitDepth, Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGyGx, Pel* dI);
@@ -159,6 +172,9 @@ void paddingCore(Pel *ptr, int stride, int width, int height, int padSize);
 void copyBufferCore(Pel *src, int srcStride, Pel *Dst, int dstStride, int width, int height);
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
 int64_t getSumOfDifferenceCore(const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height, int rowSubShift, int bitDepth);
+#endif
+#if JVET_AG0067_DMVR_EXTENSIONS
+int getMean(int sum, int div);
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
 void getAbsoluteDifferencePerSampleCore(Pel* dst, int dstStride, const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height);
@@ -268,6 +284,10 @@ struct AreaBuf : public Size
 typedef AreaBuf<      Pel>  PelBuf;
 typedef AreaBuf<const Pel> CPelBuf;
 
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+typedef AreaBuf<      int16_t> WeightBuf;
+#endif
+
 #if JVET_Y0141_SIGN_PRED_IMPROVE
 typedef AreaBuf<      unsigned> IdxBuf;
 typedef AreaBuf<const unsigned> CIdxBuf;
@@ -287,7 +307,10 @@ typedef AreaBuf<const uint8_t> CIpmBuf;
 typedef AreaBuf<      int>   CCPModelIdxBuf;
 typedef AreaBuf<const int>  CCCPModelIdxBuf;
 #endif
-
+#if JVET_AG0058_EIP
+typedef AreaBuf<      int>   EipModelIdxBuf;
+typedef AreaBuf<const int>  CEipModelIdxBuf;
+#endif
 typedef AreaBuf<      TCoeff>  PLTescapeBuf;
 typedef AreaBuf<const TCoeff> CPLTescapeBuf;
 

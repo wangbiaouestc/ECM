@@ -511,6 +511,16 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
       intraMode = PLANAR_IDX;
 #endif
     }
+#if JVET_AG0061_INTER_LFNST_NSPT
+    if (CU::isInter(*tu.cu))
+    {
+      intraMode = tu.cu->dimdDerivedIntraDir;
+    }
+    if (tu.cu->geoFlag)
+    {
+      intraMode = g_geoAngle2IntraAng[g_geoParams[tu.cu->firstPU->geoSplitDir][0]];
+    }
+#endif
 #if JVET_AB0155_SGPM
     if (PU::isSgpm(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
     {
@@ -558,6 +568,12 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
       {
         intraMode = VER_IDX;
       }
+    }
+#endif
+#if JVET_AG0058_EIP
+    if (PU::isEIP(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
+    {
+      intraMode = tu.cu->eipModel.eipDimdMode;
     }
 #endif
 
@@ -794,6 +810,16 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
 #endif
     }
 #endif
+#if JVET_AG0061_INTER_LFNST_NSPT
+    if (CU::isInter(*tu.cu))
+    {
+      intraMode = tu.cu->dimdDerivedIntraDir;
+    }
+    if (tu.cu->geoFlag)
+    {
+      intraMode = g_geoAngle2IntraAng[g_geoParams[tu.cu->firstPU->geoSplitDir][0]];
+    }
+#endif
 #if JVET_AB0155_SGPM
     if (PU::isSgpm(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
     {
@@ -833,6 +859,12 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
       }
     }
 #endif
+#if JVET_AG0058_EIP
+    if (PU::isEIP(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
+    {
+      intraMode = tu.cu->eipModel.eipDimdMode;
+    }
+#endif
 
 #if EXTENDED_LFNST || JVET_W0119_LFNST_EXTENSION
     if ( lfnstIdx < 4 )
@@ -854,8 +886,11 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
 #endif
       TCoeff*         lfnstTemp;
       TCoeff*         coeffTemp;
+#if JVET_AG0061_INTER_LFNST_NSPT
+      TCoeff *        tempCoeff = loadTr ? m_mtsCoeffs[lfnstIdx ? lfnstIdx + NUM_TRAFO_MODES_MTS - 1 : tu.mtsIdx[compID]] : m_tempCoeff;
+#else
       TCoeff *        tempCoeff = loadTr ? m_mtsCoeffs[tu.mtsIdx[compID]] : m_tempCoeff;
-
+#endif
       int y;
       lfnstTemp = m_tempInMatrix;   // forward low frequency non-separable transform
       coeffTemp = tempCoeff;
@@ -1243,10 +1278,17 @@ void TrQuant::getTrTypes(const TransformUnit tu, const ComponentID compID, int &
         predMode = g_geoAngle2IntraAng[g_geoParams[tu.cu->sgpmSplitDir][0]];
       }
 #endif
+
 #if JVET_AD0085_TMRL_EXTENSION
       if (tu.cu->tmrlFlag && compID == COMPONENT_Y)
       {
         predMode = MAP131TO67(predMode);
+      }
+#endif
+#if JVET_AG0058_EIP
+      if (tu.cu->eipFlag && compID == COMPONENT_Y)
+      {
+        predMode = tu.cu->eipModel.eipDimdMode;
       }
 #endif
       int ucMode;
@@ -1905,8 +1947,18 @@ void TrQuant::transformNxN( TransformUnit& tu, const ComponentID& compID, const 
 
   while( it != trModes->end() )
   {
+#if JVET_AG0061_INTER_LFNST_NSPT
+    tu.mtsIdx[compID]   = it->first < NUM_TRAFO_MODES_MTS ? it->first : 0;
+    tu.lfnstIdx[compID] = it->first < NUM_TRAFO_MODES_MTS ? 0 : it->first - NUM_TRAFO_MODES_MTS + 1;
+    if (compID == COMPONENT_Y)
+    {
+      tu.cu->lfnstIdx = tu.lfnstIdx[compID];
+    }
+    CoeffBuf tempCoeff(m_mtsCoeffs[it->first], rect);
+#else
     tu.mtsIdx[compID] = it->first;
     CoeffBuf tempCoeff( m_mtsCoeffs[tu.mtsIdx[compID]], rect);
+#endif
 
     if( tu.noResidual )
     {
@@ -1923,7 +1975,9 @@ void TrQuant::transformNxN( TransformUnit& tu, const ComponentID& compID, const 
     {
       xT( tu, compID, resiBuf, tempCoeff, width, height );
     }
-
+#if JVET_AG0061_INTER_LFNST_NSPT
+    xFwdLfnst(tu, compID, true);
+#endif
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT_VS
     TCoeff sumAbs = 0;
 #else
@@ -1953,7 +2007,11 @@ void TrQuant::transformNxN( TransformUnit& tu, const ComponentID& compID, const 
     it++;
   }
 #if JVET_AA0133_INTER_MTS_OPT
+#if JVET_AG0061_INTER_LFNST_NSPT
+  if (CU::isInter(*tu.cu) && (tu.cu->mtsFlag || tu.cu->lfnstFlag) && compID == COMPONENT_Y)
+#else
   if (CU::isInter(*tu.cu) && tu.cu->mtsFlag && compID == COMPONENT_Y)
+#endif
   {
     std::stable_sort(trCosts.begin(), trCosts.end(), [](const TrCost  l, const TrCost r) {return l.first < r.first; });
     std::vector<TrMode> trModesTemp;
@@ -2044,8 +2102,11 @@ void TrQuant::transformNxN( TransformUnit& tu, const ComponentID& compID, const 
   // transform and quantize
   CHECK(cs.sps->getMaxTbSize() < uiWidth, "Unsupported transformation size");
 
+#if JVET_AG0061_INTER_LFNST_NSPT
+  CoeffBuf tempCoeff(loadTr ? m_mtsCoeffs[tu.lfnstIdx[compID] ? tu.lfnstIdx[compID] + NUM_TRAFO_MODES_MTS - 1 : tu.mtsIdx[compID]] : m_tempCoeff, rect);
+#else
   CoeffBuf tempCoeff(loadTr ? m_mtsCoeffs[tu.mtsIdx[compID]] : m_tempCoeff, rect);
-
+#endif
   DTRACE_PEL_BUF(D_RESIDUALS, resiBuf, tu, tu.cu->predMode, compID);
 
   if (!loadTr)
@@ -2058,12 +2119,19 @@ void TrQuant::transformNxN( TransformUnit& tu, const ComponentID& compID, const 
     {
       xT(tu, compID, resiBuf, tempCoeff, uiWidth, uiHeight);
     }
+#if JVET_AG0061_INTER_LFNST_NSPT
+    if (sps.getUseLFNST())
+    {
+      xFwdLfnst(tu, compID);
+    }
+#endif
   }
-
+#if !JVET_AG0061_INTER_LFNST_NSPT
   if (sps.getUseLFNST())
   {
     xFwdLfnst(tu, compID, loadTr);
   }
+#endif
 
   DTRACE_COEFF_BUF(D_TCOEFF, tempCoeff, tu, tu.cu->predMode, compID);
 
@@ -2642,6 +2710,16 @@ int TrQuant::getLfnstIdx(const TransformUnit &tu, ComponentID compID)
 #endif
   }
 #endif
+#if JVET_AG0061_INTER_LFNST_NSPT
+  if (CU::isInter(*tu.cu))
+  {
+    intraMode = tu.cu->dimdDerivedIntraDir;
+  }
+  if (tu.cu->geoFlag)
+  {
+    intraMode = g_geoAngle2IntraAng[g_geoParams[tu.cu->firstPU->geoSplitDir][0]];
+  }
+#endif
 #if JVET_AB0155_SGPM
   if (PU::isSgpm(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
   {
@@ -2677,6 +2755,12 @@ int TrQuant::getLfnstIdx(const TransformUnit &tu, ComponentID compID)
     {
       intraMode = VER_IDX;
     }
+  }
+#endif
+#if JVET_AG0058_EIP
+  if (PU::isEIP(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
+  {
+    intraMode = tu.cu->eipModel.eipDimdMode;
   }
 #endif
 

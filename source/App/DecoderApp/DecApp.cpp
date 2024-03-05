@@ -98,12 +98,6 @@ uint32_t DecApp::decode()
     EXIT( "Failed to open bitstream file " << m_bitstreamFileName.c_str() << " for reading" ) ;
   }
 
-#if EXTENSION_CABAC_TRAINING
-  bitstreamFile.seekg(0, std::ios_base::end);
-  uint64_t uiSizeOfOpenStream = bitstreamFile.tellg();
-  bitstreamFile.seekg(0, std::ios_base::beg);
-#endif
-
   InputByteStream bytestream(bitstreamFile);
 
   if (!m_outputDecodedSEIMessagesFilename.empty() && m_outputDecodedSEIMessagesFilename!="-")
@@ -179,16 +173,6 @@ uint32_t DecApp::decode()
       {
         // read NAL unit header
         read(nalu);
-#if EXTENSION_CABAC_TRAINING
-        if (nalu.m_nalUnitType == NAL_UNIT_PREFIX_SEI || nalu.m_nalUnitType == NAL_UNIT_SUFFIX_SEI)
-        {
-          uiSizeOfOpenStream -= stats.m_numBytesInNALUnit + stats.m_numStartCodePrefixBytes; // do not regard SEI-related bytes in sequenceBits
-          CHECK(stats.m_numLeadingZero8BitsBytes != 0, "Unexpected nonzero m_numLeadingZero8BitsBytes.");
-          CHECK(stats.m_numZeroByteBytes != 0, "Unexpected nonzero m_numZeroByteBytes.");
-          CHECK(stats.m_numTrailingZero8BitsBytes != 0, "Unexpected nonzero m_numTrailingZero8BitsBytes.");
-          CHECK(stats.m_numStartCodePrefixBytes != 3, "Unexpected: m_numStartCodePrefixBytes not equal to 3.");
-        }
-#endif
 
         // flush output for first slice of an IDR picture
         if(m_cDecLib.getFirstSliceInPicture() &&
@@ -362,6 +346,9 @@ uint32_t DecApp::decode()
         }
 #endif
         m_cDecLib.executeLoopFilters();
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+        m_cDecLib.adaptiveClipToRealRange();
+#endif
 #if JVET_R0270
         m_cDecLib.finishPicture(poc, pcListPic, INFO, m_newCLVS[nalu.m_nuhLayerId]);
 #else
@@ -536,11 +523,6 @@ uint32_t DecApp::decode()
     }
   }
 
-#if EXTENSION_CABAC_TRAINING
-  std::ofstream out("CabacBits_data.xml", std::ios::app);
-  out << "    <sequenceBits>" << (8 * uiSizeOfOpenStream) << "</sequenceBits>" << std::endl;
-  out << "</CabacBits>" << std::endl;
-#endif
   xFlushOutput( pcListPic );
 
   // get the number of checksum errors

@@ -135,7 +135,6 @@ struct AlfFilterShape
               2, 2, 2,
            2, 2, 1, 1
       };
-
       filterType = ALF_FILTER_5;
 #if ALF_IMPROVEMENT
       numOrder = 1;
@@ -161,7 +160,6 @@ struct AlfFilterShape
             2,  2,  2,  2,  2,
         2,  2,  2,  1,  1
       };
-
       filterType = ALF_FILTER_7;
 #if ALF_IMPROVEMENT
       numOrder = 1;
@@ -191,11 +189,16 @@ struct AlfFilterShape
         2,  2,  2,  2,  2,  2,  2,
     2,  2,  2,  2,  1,  1
       };
-
       filterType = ALF_FILTER_9;
 #if ALF_IMPROVEMENT
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+      numCoeff = MAX_NUM_ALF_CHROMA_COEFF;
+      numOrder = 2;
+      indexSecOrder = numCoeff - 2;
+#else
       numOrder = 1;
       indexSecOrder = numCoeff - 1;
+#endif
       offset0 = 0;
 #endif
     }
@@ -527,6 +530,9 @@ struct AlfParam
 #if JVET_X0071_ALF_BAND_CLASSIFIER
   char                         lumaClassifierIdx[MAX_NUM_ALF_ALTERNATIVES_LUMA];
 #endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  char                         coeffBits[MAX_NUM_ALF_ALTERNATIVES_LUMA];
+#endif
   AlfFilterType                filterType[MAX_NUM_CHANNEL_TYPE];
   bool                         nonLinearFlag[MAX_NUM_CHANNEL_TYPE][32]; // alf_[luma/chroma]_clip_flag
   int                          numAlternativesLuma;
@@ -573,6 +579,9 @@ struct AlfParam
 #if JVET_X0071_ALF_BAND_CLASSIFIER
     std::memset( lumaClassifierIdx, 0, sizeof( lumaClassifierIdx ) );
 #endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+    std::memset( coeffBits, 0, sizeof( coeffBits ) );
+#endif
     std::memset( lumaCoeff, 0, sizeof( lumaCoeff ) );
     std::memset( lumaClipp, 0, sizeof( lumaClipp ) );
     numAlternativesChroma = 1;
@@ -600,6 +609,9 @@ struct AlfParam
     std::memcpy( nonLinearFlag, src.nonLinearFlag, sizeof( nonLinearFlag ) );
 #if JVET_X0071_ALF_BAND_CLASSIFIER
     std::memcpy( lumaClassifierIdx, src.lumaClassifierIdx, sizeof( lumaClassifierIdx ) );
+#endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+    std::memcpy( coeffBits, src.coeffBits, sizeof( coeffBits ) );
 #endif
     std::memcpy( lumaCoeff, src.lumaCoeff, sizeof( lumaCoeff ) );
     std::memcpy( lumaClipp, src.lumaClipp, sizeof( lumaClipp ) );
@@ -638,6 +650,12 @@ struct AlfParam
     }
 #if JVET_X0071_ALF_BAND_CLASSIFIER
     if( memcmp( lumaClassifierIdx, other.lumaClassifierIdx, sizeof( lumaClassifierIdx ) ) )
+    {
+      return false;
+    }
+#endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+    if( memcmp( coeffBits, other.coeffBits, sizeof( coeffBits ) ) )
     {
       return false;
     }
@@ -735,7 +753,6 @@ struct CcAlfFilterParam
     numberValidComponents = src.numberValidComponents;
     newCcAlfFilter[0] = src.newCcAlfFilter[0];
     newCcAlfFilter[1] = src.newCcAlfFilter[1];
-
     return *this;
   }
 };

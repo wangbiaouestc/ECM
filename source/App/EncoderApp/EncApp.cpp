@@ -270,6 +270,13 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setScalingRatio2                                     (m_scalingRatioHor2, m_scalingRatioVer2);
   m_cEncLib.setScalingRatio3                                     (m_scalingRatioHor3, m_scalingRatioVer3);
 #endif
+#if JVET_AG0116
+  m_cEncLib.setGOPBasedRPREnabledFlag                            (m_gopBasedRPREnabledFlag);
+  m_cEncLib.setGOPBasedRPRQPThreshold                            (m_gopBasedRPRQPThreshold);
+  m_cEncLib.setPsnrThresholdRPR                                  (m_psnrThresholdRPR, m_psnrThresholdRPR2, m_psnrThresholdRPR3);
+  m_cEncLib.setQpOffsetRPR                                       (m_qpOffsetRPR, m_qpOffsetRPR2, m_qpOffsetRPR3);
+  m_cEncLib.setQpOffsetChromaRPR                                 (m_qpOffsetChromaRPR, m_qpOffsetChromaRPR2, m_qpOffsetChromaRPR3);
+#endif
 #if JVET_AB0082
   m_cEncLib.setUpscaleFilerForDisplay                            (m_upscaleFilterForDisplay);
 #endif
@@ -438,6 +445,10 @@ void EncApp::xInitLibCfg()
     m_cEncLib.setNoTmrlConstraintFlag(m_noTmrlConstraintFlag);
     CHECK(m_noTmrlConstraintFlag && m_tmrl, "TMRL shall be deactivated when m_noTmrlConstraintFlag is equal to 1");
 #endif
+#if JVET_AG0058_EIP
+    m_cEncLib.setNoEipConstraintFlag(m_noEipConstraintFlag);
+    CHECK(m_noEipConstraintFlag && m_eip, "EIP shall be deactivated when m_noTmrlConstraintFlag is equal to 1");
+#endif
 #if ENABLE_OBMC
     m_cEncLib.setNoObmcConstraintFlag(m_noObmcConstraintFlag);
     CHECK(m_noObmcConstraintFlag && m_OBMC, "OBMC shall be deactivated when m_noObmcConstraintFlag is equal to 1");
@@ -580,6 +591,9 @@ void EncApp::xInitLibCfg()
 #endif
 #if JVET_AD0082_TMRL_CONFIG
     m_cEncLib.setNoTmrlConstraintFlag(false);
+#endif
+#if JVET_AG0058_EIP
+    m_cEncLib.setNoEipConstraintFlag(false);
 #endif
 #if ENABLE_OBMC
     m_cEncLib.setNoObmcConstraintFlag(false);
@@ -797,6 +811,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setAffineType                                        ( m_AffineType );
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
   m_cEncLib.setUseAffineTM                                       ( m_useAffineTM );
+#if JVET_AG0276_NLIC
+  m_cEncLib.setUseAffAltLMTM                                     ( m_useAffAltLMTM );
+#endif
 #endif
 #if AFFINE_MMVD
   m_cEncLib.setAffineMmvdMode                                    ( m_AffineMmvdMode );
@@ -821,6 +838,9 @@ void EncApp::xInitLibCfg()
 #if JVET_X0141_CIIP_TIMD_TM && TM_MRG
   m_cEncLib.setUseCIIPTMMode                                     ( m_tmCIIPMode );
 #endif
+#if JVET_AG0135_AFFINE_CIIP
+  m_cEncLib.setUseCIIPAffine                                     ( m_useCiipAffine );
+#endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
   m_cEncLib.setUseTmvpNmvpReordering                             ( m_useTmvpNmvpReorder );
 #endif
@@ -835,6 +855,15 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setBIO                                               (m_BIO);
 #if JVET_W0090_ARMC_TM
   m_cEncLib.setAML                                               ( m_AML );
+#if JVET_AG0276_NLIC
+  m_cEncLib.setAltLM                                             ( m_altLM );
+  m_cEncLib.setAffAltLM                                          ( m_affAltLM );
+#endif
+#endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  m_cEncLib.setMergeOppositeLic                                  ( m_mergeOppositeLic );
+  m_cEncLib.setMergeTMOppositeLic                                ( m_mergeTMOppositeLic );
+  m_cEncLib.setMergeAffOppositeLic                               ( m_mergeAffOppositeLic );
 #endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   m_cEncLib.setArmcRefinedMotion                                 ( m_iQP < 25 ? false : m_armcRefinedMotion );
@@ -897,6 +926,9 @@ void EncApp::xInitLibCfg()
 #if JVET_AD0082_TMRL_CONFIG
   m_cEncLib.setUseTmrl                                           ( m_tmrl );
 #endif
+#if JVET_AG0058_EIP
+  m_cEncLib.setUseEip                                            ( m_eip );
+#endif
 #if JVET_AD0085_MPM_SORTING
   m_cEncLib.setUseMpmSorting                                     ( m_mpmSorting );
 #endif
@@ -905,6 +937,9 @@ void EncApp::xInitLibCfg()
 #endif
 #if JVET_AD0188_CCP_MERGE
   m_cEncLib.setUseCcpMerge                                       ( m_ccpMerge );
+#endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  m_cEncLib.setUseDdCcpFusion                                    ( m_ddCcpFusion );
 #endif
 #if ENABLE_OBMC
   m_cEncLib.setUseObmc                                           ( m_OBMC );
@@ -989,6 +1024,10 @@ void EncApp::xInitLibCfg()
 #endif
 #if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
   m_cEncLib.setIbcNonAdjCand                                     ( m_ibcNonAdjCand);
+#endif
+#if JVET_AG0136_INTRA_TMP_LIC
+  m_cEncLib.setItmpLicExtension                                  ( m_itmpLicExtension );
+  m_cEncLib.setItmpLicMode                                       ( m_itmpLicMode );
 #endif
 
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
@@ -1105,11 +1144,18 @@ void EncApp::xInitLibCfg()
   }
 
   m_cEncLib.setMaxNumMergeCand                                   ( m_maxNumMergeCand );
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  m_cEncLib.setMaxNumOppositeLicMergeCand                        ( m_maxNumOppositeLicMergeCand );
+  m_cEncLib.setMaxNumAffineOppositeLicMergeCand                  ( m_maxNumAffineOppositeLicMergeCand);
+#endif
 #if JVET_X0049_ADAPT_DMVR
   m_cEncLib.setMaxNumBMMergeCand                                 ( m_maxNumBMMergeCand );
 #endif
   m_cEncLib.setMaxNumAffineMergeCand                             ( m_maxNumAffineMergeCand );
   m_cEncLib.setMaxNumGeoCand                                     ( m_maxNumGeoCand );
+#if JVET_AG0164_AFFINE_GPM
+  m_cEncLib.setMaxNumGpmAffCand                                  ( m_maxNumGpmAffCand );
+#endif
   m_cEncLib.setMaxNumIBCMergeCand                                ( m_maxNumIBCMergeCand );
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
   m_cEncLib.setMaxNumMHPCand                                     ( m_maxNumMHPCand );
@@ -1152,6 +1198,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setUseSAO                                            ( m_bUseSAO );
 #if JVET_W0066_CCSAO
   m_cEncLib.setUseCCSAO                                          ( m_CCSAO );
+#endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  m_cEncLib.setUseAlfPrecision                                   ( m_alfPrecision );
 #endif
   m_cEncLib.setTestSAODisableAtPictureLevel                      ( m_bTestSAODisableAtPictureLevel );
   m_cEncLib.setSaoEncodingRate                                   ( m_saoEncodingRate );
@@ -1392,6 +1441,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setReshapeIntraCMD                                   ( m_intraCMD );
   m_cEncLib.setReshapeCW                                         ( m_reshapeCW );
   m_cEncLib.setReshapeCSoffset                                   ( m_CSoffset );
+#if JVET_AG0116
+  m_cEncLib.setGOPBasedRPRQPThreshold                            (m_gopBasedRPRQPThreshold);
+#endif
 #if INTER_LIC
   m_cEncLib.setUseLIC                                            ( m_lic );
   m_cEncLib.setFastPicLevelLIC                                   ( m_lic ? m_fastPicLevelLIC : false );
@@ -1453,6 +1505,9 @@ void EncApp::xInitLibCfg()
       m_cEncLib.setFastLicAffine(true);
     }
   }
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+  m_cEncLib.setUseLicSlopeAdjust                                 ( m_lic ? m_licSlopeAdjust : false );
+#endif
 #endif
 #endif
 #if DUMP_BEFORE_INLOOP
@@ -1617,6 +1672,17 @@ void EncApp::createLib( const int layerIdx )
   m_orgPic->create( unitArea );
   m_trueOrgPic->create( unitArea );
 
+#if JVET_AG0116
+  if (m_resChangeInClvsEnabled && m_gopBasedRPREnabledFlag)
+  {
+      UnitArea unitAreaRPR10(m_chromaFormatIDC, Area(0, 0, m_sourceWidth, sourceHeight));
+      UnitArea unitAreaRPR20(m_chromaFormatIDC, Area(0, 0, m_sourceWidth / 2, sourceHeight / 2));
+      m_rprPic[0] = new PelStorage;
+      m_rprPic[0]->create(unitAreaRPR10);
+      m_rprPic[1] = new PelStorage;
+      m_rprPic[1]->create(unitAreaRPR20);
+  }
+#endif
   if( !m_bitstream.is_open() )
   {
     m_bitstream.open( m_bitstreamFileName.c_str(), fstream::binary | fstream::out );
@@ -1694,7 +1760,16 @@ void EncApp::destroyLib()
   m_trueOrgPic->destroy();
   delete m_trueOrgPic;
   delete m_orgPic;
-
+#if JVET_AG0116
+  if (m_resChangeInClvsEnabled && m_gopBasedRPREnabledFlag)
+  {
+    for (int i = 0; i < 2; i++)
+    {
+      m_rprPic[i]->destroy();
+      delete m_rprPic[i];
+  }
+}
+#endif
 #if JVET_Y0240_BIM
   if ( m_bimEnabled )
   {
@@ -1764,7 +1839,11 @@ bool EncApp::encodePrep( bool& eos )
   }
   else
   {
-    keepDoing = m_cEncLib.encodePrep( eos, m_flush ? 0 : m_orgPic, snrCSC, m_recBufList, m_numEncoded );
+    keepDoing = m_cEncLib.encodePrep(eos, m_flush ? 0 : m_orgPic, snrCSC, m_recBufList, m_numEncoded
+#if JVET_AG0116
+      , m_rprPic
+#endif
+    );
   }
 
   return keepDoing;
@@ -1865,7 +1944,11 @@ void EncApp::xWriteOutput( int iNumEncoded, std::list<PelUnitBuf*>& recBufList )
 #if JVET_AC0096
         const SPS& sps = *m_cEncLib.getSPS(0);
         int ppsID = 0;
+#if JVET_AG0116
+        if (m_rprFunctionalityTestingEnabledFlag || m_gopBasedRPREnabledFlag)
+#else
         if (m_rprFunctionalityTestingEnabledFlag)
+#endif
         {
           const PPS& pps1 = *m_cEncLib.getPPS(ENC_PPS_ID_RPR);
           const PPS& pps2 = *m_cEncLib.getPPS(ENC_PPS_ID_RPR2);

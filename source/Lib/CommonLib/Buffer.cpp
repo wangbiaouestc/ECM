@@ -92,6 +92,35 @@ int64_t getSumOfDifferenceCore(const Pel* src0, int src0Stride, const Pel* src1,
 }
 #endif
 
+#if JVET_AG0067_DMVR_EXTENSIONS
+int getMean(int sum, int div)
+{
+  int sign = 1;
+  if (sum < 0 )
+  {
+    sum  = -sum;
+    sign = -1;
+  }
+  int divTable[16] = { 0, 7, 6, 5, 5, 4, 4, 3, 3, 2, 2, 1, 1, 1, 1, 0 };
+  int x            = floorLog2(div);
+  int normNum1     = (div << 4 >> x) & 15;
+  int v            = divTable[normNum1] | 8;
+  x += (normNum1 != 0);
+  int shift  = 13 - x;
+  int retVal = 0;
+  if (shift < 0)
+  {
+    shift   = -shift;
+    int add = (1 << (shift - 1));
+    retVal  = (sum * v + add) >> shift;
+  }
+  else
+  {
+    retVal = (sum * v) << shift;
+  }
+  return sign * (retVal >> 16);
+}
+#endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
 void getAbsoluteDifferencePerSampleCore(Pel* dst, int dstStride, const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height)
 {
@@ -325,7 +354,11 @@ void addBIOAvgCore(const Pel* src0, int src0Stride, const Pel* src1, int src1Str
 }
 
 #if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
-void calcBIOParameterCoreHighPrecision(const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0, Pel* gradX1, Pel* gradY0, Pel* gradY1, int width, int height, const int src0Stride, const int src1Stride, const int widthG, const int bitDepth, int32_t* s1, int32_t* s2, int32_t* s3, int32_t* s5, int32_t* s6, Pel* dI)
+void calcBIOParameterCoreHighPrecision(const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0, Pel* gradX1, Pel* gradY0, Pel* gradY1, int width, int height, const int src0Stride, const int src1Stride, const int widthG, const int bitDepth, int32_t* s1, int32_t* s2, int32_t* s3, int32_t* s5, int32_t* s6, Pel* dI
+#if JVET_AG0067_DMVR_EXTENSIONS
+                                       ,Pel* gX, Pel* gY
+#endif
+)
 {
   width -= 2;
   height -= 2;
@@ -335,8 +368,12 @@ void calcBIOParameterCoreHighPrecision(const Pel* srcY0Tmp, const Pel* srcY1Tmp,
   gradX0 += bioParamOffset;  gradX1 += bioParamOffset;
   gradY0 += bioParamOffset;  gradY1 += bioParamOffset;
   s1  += bioParamOffset;  s2  += bioParamOffset;
-  s3    += bioParamOffset;  s5    += bioParamOffset;
-  s6 += bioParamOffset;
+  s3  += bioParamOffset;  s5  += bioParamOffset;
+  s6  += bioParamOffset;
+#if JVET_AG0067_DMVR_EXTENSIONS
+  gX  += bioParamOffset;
+  gY  += bioParamOffset;
+#endif
   int shift4 = 4;
   dI += bioParamOffset;
   int32_t  temp=0, tempGX=0, tempGY=0;
@@ -353,6 +390,10 @@ void calcBIOParameterCoreHighPrecision(const Pel* srcY0Tmp, const Pel* srcY1Tmp,
       s5[x] =  tempGY * tempGY;
       s3[x] = tempGX * temp;
       s6[x] = tempGY * temp;
+#if JVET_AG0067_DMVR_EXTENSIONS
+      gX[x] = tempGX;
+      gY[x] = tempGY;
+#endif
       
     }
     srcY0Tmp += src0Stride;
@@ -367,13 +408,49 @@ void calcBIOParameterCoreHighPrecision(const Pel* srcY0Tmp, const Pel* srcY1Tmp,
     s5 += widthG;
     s6 += widthG;
     dI += widthG;
+#if JVET_AG0067_DMVR_EXTENSIONS
+    gX += widthG;
+    gY += widthG;
+#endif
   }
   
   return;
 }
 
-void calcBIOParamSum4CoreHighPrecision(int32_t* s1, int32_t* s2, int32_t* s3, int32_t* s5, int32_t* s6, int width, int height, const int widthG, int32_t* sumS1, int32_t* sumS2, int32_t* sumS3, int32_t* sumS5, int32_t* sumS6)
+void calcBIOParamSum4CoreHighPrecision(int32_t* s1, int32_t* s2, int32_t* s3, int32_t* s5, int32_t* s6, int width, int height, const int widthG, int32_t* sumS1, int32_t* sumS2, int32_t* sumS3, int32_t* sumS5, int32_t* sumS6
+#if JVET_AG0067_DMVR_EXTENSIONS
+                                       ,Pel* dI, Pel* gX, Pel* gY , bool isGPM = false, bool isSub = false
+#endif
+)
 {
+#if JVET_AG0067_DMVR_EXTENSIONS
+  int meanDiff = 0;
+  int absmeanDiff = 0;
+  {
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x++)
+      {
+        meanDiff += dI[x];
+        absmeanDiff += abs(dI[x]);
+      }
+      dI += widthG;
+    }
+    
+    if (isSub )
+    {
+      meanDiff = getMean( meanDiff + (height*width >> 1), height*width);
+    }
+    else
+    {
+      if (isGPM || (absmeanDiff > 2 * abs(meanDiff)))
+      {
+        meanDiff = 0;
+      }
+      meanDiff = getMean( meanDiff + height*width, height*width << 1);
+    }
+  }
+#endif
   for (int y = 0; y < height; y++)
   {
     for (int x = 0; x < width; x++)
@@ -385,12 +462,20 @@ void calcBIOParamSum4CoreHighPrecision(int32_t* s1, int32_t* s2, int32_t* s3, in
       *sumS3 += w * s3[x];
       *sumS5 += w * s5[x];
       *sumS6 += w * s6[x];
+#if JVET_AG0067_DMVR_EXTENSIONS
+      *sumS3 -= w * gX[x]*meanDiff;
+      *sumS6 -= w * gY[x]*meanDiff;
+#endif
     }
     s1 += widthG;
     s2 += widthG;
     s3 += widthG;
     s5 += widthG;
     s6 += widthG;
+#if JVET_AG0067_DMVR_EXTENSIONS
+    gX += widthG;
+    gY += widthG;
+#endif
   }
 }
 #endif
@@ -1095,6 +1180,11 @@ PelBufferOps::PelBufferOps()
 #if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
   calcBIOParameterHighPrecision   = calcBIOParameterCoreHighPrecision;
   calcBIOParamSum4HighPrecision   = calcBIOParamSum4CoreHighPrecision;
+#if JVET_AG0067_DMVR_EXTENSIONS
+  calcBIOParamSum4HighPrecision4  = calcBIOParamSum4CoreHighPrecision;
+  calcBIOParamSum4HighPrecision8  = calcBIOParamSum4CoreHighPrecision;
+  calcBIOParamSum4HighPrecision16 = calcBIOParamSum4CoreHighPrecision;
+#endif
 #endif
 #if MULTI_PASS_DMVR || SAMPLE_BASED_BDOF
   calcBIOParameter   = calcBIOParameterCore;
@@ -1861,6 +1951,9 @@ void AreaBuf<Pel>::linearTransform( const int scale, const int shift, const int 
 {
   const Pel* src = buf;
         Pel* dst = buf;
+#if JVET_AG0276_NLIC
+  const uint32_t areaT = area();
+#endif
 
 #if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   if (width == 0)
@@ -1871,6 +1964,16 @@ void AreaBuf<Pel>::linearTransform( const int scale, const int shift, const int 
   if( width == 1 )
   {
     THROW( "Blocks of width = 1 not supported" );
+  }
+#endif
+#if JVET_AG0276_NLIC
+  else if (width == stride && (areaT & 7) == 0)
+  {
+    g_pelBufOP.linTf8(src, areaT, dst, areaT, areaT, 1, scale, shift, offset, clpRng, bClip);
+  }
+  else if (width == stride && (areaT & 3) == 0)
+  {
+    g_pelBufOP.linTf4(src, areaT, dst, areaT, areaT, 1, scale, shift, offset, clpRng, bClip);
   }
 #endif
 #if ENABLE_SIMD_OPT_BUFFER && defined(TARGET_SIMD_X86)

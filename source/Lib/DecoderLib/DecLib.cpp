@@ -58,6 +58,13 @@
 #include "CommonLib/CodingStatistics.h"
 #endif
 
+#if JVET_AG0196_CABAC_RETRAIN
+namespace CabacRetrain
+{
+  extern void endFrame(int poc,int qp,bool switchBp,SliceType st);
+}
+#endif
+
 bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::string& bitstreamFileName, ParameterSetMap<APS> *apsMap, bool bDecodeUntilPocFound /* = false */, int debugCTU /* = -1*/, int debugPOC /* = -1*/ )
 {
   int      poc;
@@ -157,22 +164,50 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
 
                 if( debugCTU < 0 || poc != debugPOC )
                 {
-                for( int i = 0; i < pic->slices.size(); i++ )
-                {
-                  if( pcEncPic->slices.size() <= i )
+                  for (int i = 0; i < pic->slices.size(); i++)
                   {
-                    pcEncPic->slices.push_back( new Slice );
-                    pcEncPic->slices.back()->initSlice();
-                    pcEncPic->slices.back()->setPPS( pcEncPic->slices[0]->getPPS() );
-                    pcEncPic->slices.back()->setSPS( pcEncPic->slices[0]->getSPS() );
-                    pcEncPic->slices.back()->setVPS( pcEncPic->slices[0]->getVPS() );
-                    pcEncPic->slices.back()->setPic( pcEncPic->slices[0]->getPic() );
+                    if (pcEncPic->slices.size() <= i)
+                    {
+                      pcEncPic->slices.push_back(new Slice);
+                      pcEncPic->slices.back()->initSlice();
+                      pcEncPic->slices.back()->setPPS(pcEncPic->slices[0]->getPPS());
+                      pcEncPic->slices.back()->setSPS(pcEncPic->slices[0]->getSPS());
+                      pcEncPic->slices.back()->setVPS(pcEncPic->slices[0]->getVPS());
+                      pcEncPic->slices.back()->setPic(pcEncPic->slices[0]->getPic());
+                    }
+
+                    // copy decoded PPS and SPS to the encoder
+                    auto& pps = *const_cast<PPS*>(pcEncPic->slices[i]->getPPS());
+                    auto* pcv = pcEncPic->slices[i]->getPPS()->pcv;
+                    pps = *(pic->slices[i]->getPPS());
+                    pps.pcv = pcv;
+
+                    // RPL is not initizlized after parsing at decoder, so we save the encoder RPL and copy it to the decoded SPS
+                    auto& sps = *const_cast<SPS*>(pcEncPic->slices[i]->getSPS());
+                    auto rplList0 = *sps.getRPLList0();
+                    auto rplList1 = *sps.getRPLList1();
+                    bool isAllEntriesinRPLHasSameSignFlag = sps.getAllActiveRplEntriesHasSameSignFlag();
+                    sps = *(pic->slices[i]->getSPS());
+                    *(sps.getRPLList0()) = rplList0;
+                    *(sps.getRPLList1()) = rplList1;
+                    sps.setAllActiveRplEntriesHasSameSignFlag(isAllEntriesinRPLHasSameSignFlag);
+                    
+                    pcEncPic->slices[i]->copySliceInfo(pic->slices[i], false);
                   }
-                  pcEncPic->slices[i]->copySliceInfo( pic->slices[i], false );
-                }
                 }
 
+                pcEncPic->cs->pps   = pcEncPic->slices.back()->getPPS();
+                pcEncPic->cs->sps   = pcEncPic->slices.back()->getSPS();
                 pcEncPic->cs->slice = pcEncPic->slices.back();
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+                pcEncPic->cs->slice->setLumaPelMin(pic->cs->slice->getLumaPelMin());
+                pcEncPic->cs->slice->setLumaPelMax(pic->cs->slice->getLumaPelMax());
+                pcEncPic->cs->slice->setAdaptiveClipQuant(pic->cs->slice->getAdaptiveClipQuant());
+                pcEncPic->lumaClpRng.min = pic->cs->slice->getLumaPelMin();
+                pcEncPic->lumaClpRng.max = pic->cs->slice->getLumaPelMax();
+                pcEncPic->lumaClpRngforQuant.min = pic->cs->slice->getLumaPelMin();
+                pcEncPic->lumaClpRngforQuant.max = pic->cs->slice->getLumaPelMax();
+#endif
 
                 if( debugCTU >= 0 && poc == debugPOC )
                 {
@@ -250,7 +285,13 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
                     pcEncPic->slices[i]->setAlfAPSs(pic->slices[i]->getAlfAPSs());
                     pcEncPic->slices[i]->setTileGroupApsIdChroma(pic->slices[i]->getTileGroupApsIdChroma());
 #if ALF_IMPROVEMENT 
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+                    pcEncPic->slices[i]->setTileGroupAlfFixedFilterSetIdx(COMPONENT_Y, pic->slices[i]->getTileGroupAlfFixedFilterSetIdx(COMPONENT_Y));
+                    pcEncPic->slices[i]->setTileGroupAlfFixedFilterSetIdx(COMPONENT_Cb, pic->slices[i]->getTileGroupAlfFixedFilterSetIdx(COMPONENT_Cb));
+                    pcEncPic->slices[i]->setTileGroupAlfFixedFilterSetIdx(COMPONENT_Cr, pic->slices[i]->getTileGroupAlfFixedFilterSetIdx(COMPONENT_Cr));
+#else
                     pcEncPic->slices[i]->setTileGroupAlfFixedFilterSetIdx(pic->slices[i]->getTileGroupAlfFixedFilterSetIdx());
+#endif
 #endif
                     pcEncPic->slices[i]->setTileGroupAlfEnabledFlag(COMPONENT_Y,  pic->slices[i]->getTileGroupAlfEnabledFlag(COMPONENT_Y));
                     pcEncPic->slices[i]->setTileGroupAlfEnabledFlag(COMPONENT_Cb, pic->slices[i]->getTileGroupAlfEnabledFlag(COMPONENT_Cb));
@@ -263,6 +304,9 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
                 }
 
                 pcDecLib->executeLoopFilters();
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+                pcDecLib->adaptiveClipToRealRange();
+#endif
 #if JVET_V0094_BILATERAL_FILTER
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
                 if ( pic->cs->sps->getSAOEnabledFlag() || pic->cs->pps->getUseBIF() || pic->cs->pps->getUseChromaBIF())
@@ -281,7 +325,7 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
                 {
                   pcEncPic->copySAO( *pic, 1 );
                 }
-
+                pcEncPic->cs->initStructData();
                 pcEncPic->cs->copyStructure( *pic->cs, CH_L, true, true );
 
                 if( CS::isDualITree( *pcEncPic->cs ) )
@@ -299,6 +343,9 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
           if (!bRet)
           {
             pcDecLib->executeLoopFilters();
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+            pcDecLib->adaptiveClipToRealRange();
+#endif
           }
 
           pcDecLib->finishPicture( poc, pcListPic, DETAILS );
@@ -459,9 +506,6 @@ DecLib::DecLib()
   , m_parameterSetManager()
   , m_apcSlicePilot(NULL)
   , m_SEIs()
-#if EXTENSION_CABAC_TRAINING
-  , m_binFileByteOffset(0)
-#endif
   , m_cIntraPred()
   , m_cInterPred()
   , m_cTrQuant()
@@ -806,7 +850,12 @@ void DecLib::executeLoopFilters()
     CS::saveTemporalCcpModel(cs);
   }
 #endif
-
+#if JVET_AG0058_EIP
+  if ((cs.picture->temporalId == 0) || (cs.picture->temporalId < cs.slice->getSPS()->getMaxTLayers() - 1))
+  {
+    CS::saveTemporalEipModel(cs);
+  }
+#endif
 #if JVET_W0066_CCSAO
   if (cs.sps->getCCSAOEnabledFlag())
   {
@@ -887,6 +936,30 @@ void DecLib::finishPictureLight(int& poc, PicList*& rpcListPic )
   m_puCounter++;
 }
 
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+void DecLib::adaptiveClipToRealRange()
+{
+  ClpRng clpRng;
+  clpRng.min = m_pcPic->cs->slice->getLumaPelMin();
+  clpRng.max = m_pcPic->cs->slice->getLumaPelMax();
+  m_pcPic->lumaClpRng.max = clpRng.max;
+  m_pcPic->lumaClpRng.min = clpRng.min;
+  int compIdx = 0;
+  ComponentID compID = ComponentID(compIdx);
+  int width = m_pcPic->cs->pps->getPicWidthInLumaSamples();
+  int height = m_pcPic->cs->pps->getPicHeightInLumaSamples();
+  Pel* reconPel = m_pcPic->getRecoBuf().get(compID).buf;
+  int stride = m_pcPic->getRecoBuf().get(compID).stride;
+  for (uint32_t yPos = 0; yPos < height; yPos++)
+  {
+    for (uint32_t xPos = 0; xPos < width; xPos++)
+    {
+      reconPel[yPos * stride + xPos] = ClipPel(reconPel[yPos * stride + xPos], clpRng);
+    }
+  }
+}
+#endif
+
 #if JVET_R0270
 void DecLib::finishPicture(int &poc, PicList *&rpcListPic, MsgLevel msgl, bool associatedWithNewClvs)
 #else
@@ -912,7 +985,9 @@ void DecLib::finishPicture(int& poc, PicList*& rpcListPic, MsgLevel msgl )
   {
     c += 32;  // tolower
   }
-
+#if JVET_AG0196_CABAC_RETRAIN
+  CabacRetrain::endFrame(pcSlice->getPOC(),pcSlice->getSliceQp(),pcSlice->getCabacInitFlag(),pcSlice->isIntra()?I_SLICE:pcSlice->isInterP()?P_SLICE:B_SLICE);
+#endif
   if (pcSlice->isDRAP()) c = 'D';
 
   //-- For time output for each slice
@@ -1928,7 +2003,11 @@ void DecLib::xActivateParameterSets( const InputNALUnit nalu )
     // RdCost
     m_cRdCost.setCostMode ( COST_STANDARD_LOSSY ); // not used in decoder side RdCost stuff -> set to default
 
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+    m_cSliceDecoder.create(pps->getPicWidthInLumaSamples(), sps->getMaxCUWidth());
+#else
     m_cSliceDecoder.create();
+#endif
 
     if( sps->getALFEnabledFlag() )
     {
@@ -2954,6 +3033,47 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
     //---------------
     pcSlice->setRefPOCList();
 #endif
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+    int clipDeltaShift = 0;
+    if (pcSlice->getAdaptiveClipQuant())
+    {
+      clipDeltaShift = ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_1;
+    }
+    else
+    {
+      clipDeltaShift = ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_0;
+    }
+    if (pcSlice->getSliceType() != I_SLICE)
+    {
+      int deltaMax = pcSlice->getLumaPelMax();
+      if (deltaMax > 0)
+      {
+        deltaMax = (deltaMax << clipDeltaShift);
+      }
+      else if (deltaMax < 0)
+      {
+        deltaMax = -((-deltaMax) << clipDeltaShift);
+      }
+      int deltaMin = pcSlice->getLumaPelMin();
+      if (deltaMin > 0)
+      {
+        deltaMin = (deltaMin << clipDeltaShift);
+      }
+      else if (deltaMin < 0)
+      {
+        deltaMin = -((-deltaMin) << clipDeltaShift);
+      }
+      const Picture* const pColPic = pcSlice->getRefPic(RefPicList(1 - pcSlice->getColFromL0Flag()), pcSlice->getColRefIdx());
+      ClpRng colLumaClpRng = pColPic->getLumaClpRng();
+      int lumaPelMax = std::min(deltaMax + colLumaClpRng.max, (1 << pcSlice->getSPS()->getBitDepth(toChannelType(COMPONENT_Y))) - 1);
+      int lumaPelMin = std::max(0, deltaMin + colLumaClpRng.min);
+      CHECK(lumaPelMax > (1 << pcSlice->getSPS()->getBitDepth(toChannelType(COMPONENT_Y))) - 1, "this is not possible");
+      CHECK(lumaPelMin < 0, "this is not possible");
+      CHECK(lumaPelMin > lumaPelMax, "this is not possible");
+      pcSlice->setLumaPelMax(lumaPelMax);
+      pcSlice->setLumaPelMin(lumaPelMin);
+    }
+#endif
 
     if (pcSlice->getSPS()->getUseSMVD() && pcSlice->getCheckLDC() == false
       && pcSlice->getPicHeader()->getMvdL1ZeroFlag() == false
@@ -3241,10 +3361,6 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
 
   //  Decode a picture
   m_cSliceDecoder.decompressSlice( pcSlice, &( nalu.getBitstream() ), ( m_pcPic->poc == getDebugPOC() ? getDebugCTU() : -1 ) );
-#if EXTENSION_CABAC_TRAINING
-  CABACReader&   cabacReader = *(m_CABACDecoder.getCABACReader(0));
-  cabacReader.traceStoredCabacBits(pcSlice, getBinFileByteOffset());
-#endif
 
   m_bFirstSliceInPicture = false;
   m_uiSliceSegmentIdx++;

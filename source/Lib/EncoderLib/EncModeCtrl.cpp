@@ -1733,6 +1733,9 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
     )
 #endif
   {
+#if JVET_AG0276_NLIC
+    if (encTestmode.type != ETM_POST_DONT_SPLIT)
+#endif
     return false;
   }
 
@@ -1776,7 +1779,11 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
   const uint32_t             numComp     = getNumberValidComponents( slice.getSPS()->getChromaFormatIdc() );
   const uint32_t             width       = partitioner.currArea().lumaSize().width;
   const CodingStructure *bestCS      = cuECtx.bestCS;
+#if JVET_AG0276_NLIC
+  CodingUnit            *bestCU = cuECtx.bestCU;
+#else
   const CodingUnit      *bestCU      = cuECtx.bestCU;
+#endif
   const EncTestMode      bestMode    = bestCS ? getCSEncMode( *bestCS ) : EncTestMode();
 
   CodedCUInfo    &relatedCU          = getBlkInfo( partitioner.currArea() );
@@ -2443,6 +2450,9 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
 #if JVET_V0130_INTRA_TMP
             int bit7 = cuECtx.tmpFlag;
 #endif
+#if JVET_AG0058_EIP
+            int bit8 = cuECtx.eipFlag;
+#endif
             int val =
               (bit0) |
               (bit1 << 1) |
@@ -2453,6 +2463,9 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
               (bit6 << 6) |
 #if JVET_V0130_INTRA_TMP
               (bit7 << 7) |
+#endif
+#if JVET_AG0058_EIP
+              (bit8 << 8) |
 #endif
               ( cuECtx.bestPredModeDCT2 << 9 );
             relatedCU.ispPredModeVal     = val;
@@ -2492,6 +2505,99 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
         CacheBlkInfoCtrl::touch(partitioner.currArea());
 #endif
         cuECtx.set( IS_BEST_NOSPLIT_SKIP, bestCU->skip );
+#if JVET_AG0276_NLIC
+        if (cuECtx.bestCU->altLMFlag)
+        {
+          cuECtx.bestCU->secAltLMParaUnit = cuECtx.bestCU->altLMParaUnit;
+        }
+        else
+        {
+          cuECtx.bestCU->secAltLMParaUnit = cuECtx.bestCU->altLMParaUnit;
+        }
+        cuECtx.bestCU->altLMParaUnit.resetAltLinearModel();
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+        cuECtx.bestCU->altLMBRParaUnit.resetAltLinearModel();
+#endif
+        if (CU::isSecLicParaNeeded(*bestCU))
+        {
+          UnitArea   localUnitArea(bestCU->chromaFormat, Area(0, 0, bestCU->lumaSize().width, bestCU->lumaSize().height));
+          PelUnitBuf predBeforeMCAdjBuffer = m_pcInterSearch->m_acPredBeforeLICBuffer[REF_PIC_LIST_0].getBuf(localUnitArea);
+
+          bool isPredSampleRefined = CU::isPredRefined(*bestCU);
+          if (!isPredSampleRefined)
+          {
+            bool obmcApplied = true;
+            if (bestCU->cs->sps->getUseOBMC() == false || bestCU->obmcFlag == false || bestCU->lwidth() * bestCU->lheight() < 32)
+            {
+              obmcApplied = false;
+            }
+            if (obmcApplied && bestCU->firstPU->mergeFlag)
+            {
+              if (m_pcInterSearch->isSCC(*bestCU->firstPU))
+              {
+                obmcApplied = false;
+              }
+            }
+            if (obmcApplied)
+            {
+              isPredSampleRefined = true;
+            }
+          }
+          if (CU::isAllowSecLicPara(*bestCU))
+          {
+            if (isPredSampleRefined)
+            {
+#if INTER_LIC
+              bool orgLicFlag = bestCU->licFlag;
+              bestCU->licFlag = false;
+#endif
+              bool orgCiipFlag = bestCU->firstPU->ciipFlag;
+              bestCU->firstPU->ciipFlag = false;
+              m_pcInterSearch->xPredWoRefinement(*bestCU->firstPU, predBeforeMCAdjBuffer);
+#if INTER_LIC
+              bestCU->licFlag = orgLicFlag;
+#endif
+              bestCU->firstPU->ciipFlag = orgCiipFlag;
+            }
+            else
+            {
+              m_pcInterSearch->motionCompensation(*cuECtx.bestCU);
+              predBeforeMCAdjBuffer.copyFrom(cuECtx.bestCU->cs->getPredBuf(*cuECtx.bestCU->firstPU));
+            }
+          }
+          else
+          {
+            if (cuECtx.bestCU->affine && cuECtx.bestCU->firstPU->mergeFlag && cuECtx.bestCU->cs->sps->getUseOBMC() && cuECtx.bestCU->obmcFlag && (cuECtx.bestCU->cs->sps->getUseAltLM() || cuECtx.bestCU->cs->sps->getUseAffAltLM()))
+            {
+              if (cuECtx.bestCU->obmcFlag && m_pcInterSearch->isSCC(*cuECtx.bestCU->firstPU) && !CU::isTLCond(*cuECtx.bestCU))
+              {
+                cuECtx.bestCU->obmcFlag = false;
+              }
+            }
+          }
+          if (CU::isAllowSecLicPara(*bestCU))
+          {
+            PelUnitBuf recBuf = m_pcInterSearch->m_acPredBeforeLICBuffer[REF_PIC_LIST_1].getBuf(localUnitArea);
+            recBuf.copyFrom(cuECtx.bestCU->cs->getRecoBuf(*cuECtx.bestCU->firstPU));
+            if (bestCS->slice->getLmcsEnabledFlag() && m_pcInterSearch->m_pcReshape->getCTUFlag())
+            {
+              recBuf.Y().rspSignal(m_pcInterSearch->m_pcReshape->getInvLUT());
+            }
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+            m_pcInterSearch->xDevSecLicPara<false>(*cuECtx.bestCU, predBeforeMCAdjBuffer, recBuf);
+#else
+            m_pcInterSearch->xDevSecLicPara(*cuECtx.bestCU, predBeforeMCAdjBuffer, recBuf);
+#endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+            m_pcInterSearch->xDevSecLicPara<true>(*cuECtx.bestCU, predBeforeMCAdjBuffer, recBuf);
+            if ((cuECtx.bestCU->altLMBRParaUnit.scale[COMPONENT_Y] == cuECtx.bestCU->altLMParaUnit.scale[COMPONENT_Y]) && (cuECtx.bestCU->altLMBRParaUnit.offset[COMPONENT_Y] == cuECtx.bestCU->altLMParaUnit.offset[COMPONENT_Y]))
+            {
+              cuECtx.bestCU->altLMBRParaUnit.resetAltLinearModel();
+            }
+#endif
+          }
+        }
+#endif
       }
     }
 

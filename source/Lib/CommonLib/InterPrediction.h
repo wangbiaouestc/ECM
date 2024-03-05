@@ -64,7 +64,6 @@ class Reshape;
 //! \ingroup CommonLib
 //! \{
 
-
 // ====================================================================================================================
 // Class definition
 // ====================================================================================================================
@@ -82,6 +81,84 @@ struct BMSubBlkInfo : Area
   PosType  m_cYInPU; // y coordinate of center relative to PU's top left sample
 };
 #endif
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+class TplMatchingBuffers
+{
+  static const int nbCandMax = GEO_MAX_NUM_UNI_CANDS;
+  std::vector<Pel> m_acYuvRefAMLTemplate[nbCandMax][2];   // [idxCand][0: top, 1: left]  predicted samples
+  bool  m_availRec;
+  bool  m_availPred[nbCandMax];
+  int   m_idxCand[2];  // the current 2 idx candidates of the 2 partitions
+
+public:
+  TplMatchingBuffers()
+  {
+    reset();
+  }
+
+  void reset()
+  {
+    std::memset( m_availPred, false, sizeof(bool) * nbCandMax );
+    m_availRec    = false;
+    m_idxCand[0]  = -1;
+    m_idxCand[1]  = -1;
+  }
+
+  void set( int idx0, int idx1, Size cuSize )
+  {
+    if ( idx0 >= nbCandMax || idx1 >= nbCandMax )
+    {
+      return;
+    }
+
+    m_idxCand[0] = idx0;
+    m_idxCand[1] = idx1;
+    for (int iPart = 0; iPart < 2; iPart++)
+    {
+      int idxCand = m_idxCand[iPart];
+      if ( idxCand < 0 || idxCand >= nbCandMax )
+      {
+        continue;
+      }
+      if ( m_acYuvRefAMLTemplate[idxCand][0].size() < cuSize.width )
+      {
+        m_acYuvRefAMLTemplate[idxCand][0].resize(cuSize.width);
+      }
+      if ( m_acYuvRefAMLTemplate[idxCand][1].size() < cuSize.height )
+      {
+        m_acYuvRefAMLTemplate[idxCand][1].resize(cuSize.height);
+      }
+    }
+  }
+
+  bool getAvailRec() { return m_availRec; }
+  bool getAvailPred( const int iPart )
+  {
+    int idxCand = m_idxCand[iPart];
+    return m_availPred[idxCand];
+  }
+  void  setAvailRec() { m_availRec = true;}
+  void  setAvailPred( const int iPart )
+  {
+    int idxCand = m_idxCand[iPart];
+    m_availPred[idxCand] = true;
+  }
+
+  Pel* getPred( const int iPart, const int iTopLeft, bool checkAvail=true ) 
+  { 
+    int idxCand = m_idxCand[iPart];
+    if ( (checkAvail && !m_availPred[idxCand]) || idxCand == (-1) )
+    {
+      return nullptr;
+    }
+    else
+    {
+      return m_acYuvRefAMLTemplate[idxCand][iTopLeft].data();
+    }
+  }
+};
+#endif
+
 #if JVET_AD0213_LIC_IMP
 class TplMatchingCtrl;
 #endif
@@ -96,6 +173,9 @@ public:
   bool              m_isAddHypMC;
 #endif
   bool              m_storeBeforeLIC;
+#if JVET_AG0276_NLIC
+  bool              m_skipDoLic;
+#endif
 #endif
 #if JVET_AD0140_MVD_PREDICTION
   struct MvdDerivedInfo
@@ -109,6 +189,9 @@ public:
   bool isMvOOB(const Mv& rcMv, const struct Position pos, const struct Size size, const SPS* sps, const PPS* pps, bool *mcMask, bool *mcMaskChroma, bool lumaOnly = false);
   bool isMvOOBSubBlk(const Mv& rcMv, const struct Position pos, const struct Size size, const SPS* sps, const PPS* pps, bool *mcMask, int mcStride, bool *mcMaskChroma, int mcCStride, bool lumaOnly = false);
 #endif
+#if JVET_AG0061_INTER_LFNST_NSPT
+  static int deriveInterDimdMode(const CodingUnit cu, CPelBuf predBuf);
+#endif
 #if INTER_LIC || (TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC // note: already refactor
   Reshape*          m_pcReshape;
 #endif
@@ -121,6 +204,9 @@ private:
   int               m_LICMultApprox[64];
 #endif
 
+#if JVET_AG0136_INTRA_TMP_LIC
+  std::array<int, 7> m_arrayLicParams;
+#endif
 #if INTER_LIC || JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   // buffer size for left/above current templates and left/above reference templates
 #if JVET_AD0213_LIC_IMP
@@ -303,6 +389,10 @@ protected:
   int32_t*             m_piDotProduct5;
   int32_t*             m_piDotProduct6;
 #endif
+#if JVET_AG0067_DMVR_EXTENSIONS
+  Pel*                 m_Gx;
+  Pel*                 m_Gy;
+#endif
   bool                 m_subPuMC;
 
   int                  m_ibcBufferWidth;
@@ -317,6 +407,10 @@ protected:
 #endif
 #if JVET_AC0158_PIXEL_AFFINE_MC
   Mv                   m_pixelAffineMotionBuf[MAX_CU_SIZE][MAX_CU_SIZE];
+#endif
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  std::vector <int16_t> m_bcwBlendBuf;
+  std::vector<Pel>      m_tempPel[2];
 #endif
 
 #if JVET_AD0140_MVD_PREDICTION
@@ -494,7 +588,11 @@ protected:
 #endif
 
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  MotionInfo      m_subPuMiBuf[SUB_BUFFER_SIZE][(MAX_CU_SIZE * MAX_CU_SIZE) >> (MIN_CU_LOG2 << 1)];
+#else
   MotionInfo      m_subPuMiBuf[SUB_TMVP_NUM][(MAX_CU_SIZE * MAX_CU_SIZE) >> (MIN_CU_LOG2 << 1)];
+#endif
 #else
   MotionInfo      m_subPuMiBuf[(MAX_CU_SIZE * MAX_CU_SIZE) >> (MIN_CU_LOG2 << 1)];
 #endif
@@ -566,6 +664,9 @@ public:
     , bool &isMvdDerivedVecOrigSpecified
 #endif
   );
+#if JVET_AG0136_INTRA_TMP_LIC
+  std::array<int, 7>& getArrayLicParams() { return m_arrayLicParams; }
+#endif
 
 
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
@@ -633,6 +734,17 @@ public:
 #endif
   }
 #endif
+#if JVET_AG0136_INTRA_TMP_LIC
+  inline void LicItmp(PredictionUnit &pu, PelBuf &dstBuf, const bool isLinearTransformDone)
+  {
+    CHECKD(pu.cu->ibcLicFlag!=pu.cu->tmpLicFlag, "InterPrediction::LicItmp: abnormal: pu.cu->ibcLicFlag and pu.cu->tmpLicFlag should be equal");
+    CHECKD((pu.cu)->ibcFilterFlag, "`pu.cu->ibcFilterFlag` is not false.");
+    if(pu.cu->ibcLicFlag || pu.cu->tmpLicFlag )
+    {
+      xLocalIlluComp(pu, COMPONENT_Y, pu.mv[0], dstBuf, isLinearTransformDone);
+    }
+  }
+#endif
 #if ENABLE_OBMC
   void    subBlockOBMC(PredictionUnit  &pu, PelUnitBuf *pDst = nullptr);
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
@@ -678,16 +790,34 @@ public:
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG
                            , MergeCtx(&geoTmMrgCtx)[GEO_NUM_TM_MV_CAND]
 #endif
+#if JVET_AG0164_AFFINE_GPM
+                           , AffineMergeCtx& affGeoMrgCtx
+#endif
 #if JVET_Y0065_GPM_INTRA
                            , IntraPrediction* pcIntraPred
 #endif
   );
+#endif
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  std::pair<int8_t,int8_t> getGeoBlendCandIndexes( const int idxCand, std::vector<int8_t>& listMergeCand0, std::vector<int8_t>& listMergeCand1, int8_t* nbZscanPairList = 0 );
+  bool    getGeoBlendCand( const CodingUnit& cu, MergeCtx& geoMrgCtx, const int idxCand, GeoBlendInfo& geoBIdst, GeoBlendInfo* geoBlendInfoList=nullptr, int* numGeoBlendInfoList=nullptr );
+  void    motionCompensationGeoBlend( CodingUnit& cu, MergeCtx& geoMrgCtx
+#if JVET_AE0046_BI_GPM
+                              , Mv(&subMvBuf)[MRG_MAX_NUM_CANDS << 1][MAX_NUM_SUBCU_DMVR]
+                              , Mv(&subBdofBuf)[MRG_MAX_NUM_CANDS][BDOF_SUBPU_MAX_NUM]
+#endif
+    );
+
+  TplMatchingBuffers  m_tplBuffers;
 #endif
 
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   void    motionCompensationGeo(CodingUnit &cu, MergeCtx &geoMrgCtx
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG
                               , MergeCtx (&geoTmMrgCtx)[GEO_NUM_TM_MV_CAND]
+#endif
+#if JVET_AG0164_AFFINE_GPM
+                              , AffineMergeCtx &gpmAffMrgCtx
 #endif
 #if JVET_AE0046_BI_GPM
                               , Mv(&subMvBuf)[MRG_MAX_NUM_CANDS << 1][MAX_NUM_SUBCU_DMVR]
@@ -729,6 +859,11 @@ public:
 #if JVET_Y0065_GPM_INTRA
   void    weightedGeoBlkRounded( PredictionUnit &pu, const uint8_t splitDir, int32_t channel, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1);
 #endif
+#endif
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  void    weightedBlendBlk( const PredictionUnit& pu, int32_t channel, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1, WeightBuf& weightBuf, const int log2WeightBase, const bool roundOutputBD);
+  void    weightedBlend( const PredictionUnit& pu, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1, const bool chromaOnly, const bool lumaOnly, const bool roundOutputBD = false);
+  void    weightedAffineBlk( const PredictionUnit& pu, WeightBuf& weightBuf, const int log2WeightBase, AffineBlendingModel& blendModel );
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG
@@ -914,7 +1049,8 @@ public:
 #endif
 #if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
 #if JVET_AA0093_ENHANCED_MMVD_EXTENSION
-  void    getBlkAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft, int8_t posList0 = -1, int8_t posList1 = -1, bool load0 = false, bool load1 = false);
+  void    getBlkAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft,
+    int8_t posList0 = -1, int8_t posList1 = -1, bool load0 = false, bool load1 = false);
 #else
   void    getBlkAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft);
 #endif
@@ -933,6 +1069,10 @@ public:
     , int sortedCandNum = -1
 #endif
   );
+#if JVET_AG0276_NLIC
+  void    adjustAffineMergeCandidates(PredictionUnit &pu, AffineMergeCtx& affMrgCtx, AltLMAffineMergeCtx& altLMAffMrgCtx, AltLMAffineMergeCtx& altLMRMVFMrgCtx);
+  void    updateAffineCandInThreeGrp(PredictionUnit &pu, AffineMergeCtx& affMrgCtx, AffineMergeCtx& altLMAffMrgCtx, AffineMergeCtx& altLMAffMrgCtx1, uint32_t* rdCandList, uint32_t* rdCandGrpList, int listsize);
+#endif
   void    updateAffineCandInfo(PredictionUnit &pu, AffineMergeCtx& affMrgCtx, 
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION  
     uint32_t(*RdCandList)[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE], 
@@ -987,6 +1127,14 @@ public:
   void    getAffAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft);
 #endif
 
+#if JVET_AG0164_AFFINE_GPM
+  bool getAffAMLRefTemplateImp(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+                            ,bool isBilinear, AffineMergeCtx affMrgCtx
+#endif
+);
+#endif
+
 #if JVET_AD0140_MVD_PREDICTION
   template <int iAbove1Left2All3 = 3>
   bool    getAffAMLRefTemplateMvdPredUni(PredictionUnit& pu, PelUnitBuf& pcBufPredRefTop, PelUnitBuf& pcBufPredRefLeft,
@@ -1005,11 +1153,18 @@ public:
 #if JVET_Z0102_NO_ARMC_FOR_ZERO_CAND
   void adjustMergeCandidates(PredictionUnit& pu, MergeCtx& smvpMergeCandCtx, int numRetrievedMergeCand);
 #endif
+#if JVET_AG0276_NLIC
+  void adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMergeCandCtx, AltLMMergeCtx& altLMMrgCtx, int numRetrievedMergeCand);
+#endif
 #if JVET_AB0079_TM_BCW_MRG
   void adjustMergeCandidatesBcwIdx(PredictionUnit& pu, MergeCtx& mrgCtx, const int mergeIdx = -1);
 #endif
 #if JVET_AF0128_LIC_MERGE_TM
   void adjustMergeCandidatesLicFlag(PredictionUnit& pu, MergeCtx& mrgCtx, const int mergeIdx = -1);
+#endif
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  Distortion  deriveBcwBlending( PredictionUnit& pu, bool bUniDir[2] );
+  Distortion  deriveBcwBlendingBiDir( PredictionUnit& pu, MvField mvfld0[2], MvField mvfld1[2] );
 #endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
   void    adjustMergeCandidatesInOneCandidateGroup(PredictionUnit &pu, MergeCtx& smvpMergeCandCtx, int numRetrievedMergeCand, int mrgCandIdx = -1);
@@ -1017,6 +1172,10 @@ public:
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
   void    updateCandInTwoCandidateGroups(MergeCtx& mrgCtx, uint32_t* rdCandList, int numCandInCategory, MergeCtx mrgCtx2);
 #endif
+#endif
+#if JVET_AG0276_NLIC
+  void    updateCandList(uint32_t uiCand, uint32_t uiCandGrp, Distortion uiCost, uint32_t uiMrgCandNum, uint32_t* rdCandList, uint32_t* rdCandGrpList, Distortion* candCostList);
+  void    updateCandInThreeCandidateGroups(MergeCtx& mrgCtx, MergeCtx mrgCtx2, MergeCtx mrgCtx3, uint32_t* rdCandList, uint32_t* rdCandGrpList, int numCandInCategory);
 #endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   void    adjustMergeCandidatesInOneCandidateGroup(PredictionUnit &pu, MergeCtx& smvpMergeCandCtx, bool* applyBDMVR, Mv** mvBufBDMVR, Mv** mvBufBDMVRTmp, int numRetrievedMergeCand, bool subRefineList[][2] = NULL, bool subRefineListTmp[][2] = NULL, int mrgCandIdx = -1);
@@ -1063,17 +1222,43 @@ public:
     }
     PelUnitBuf pcBufPredRefTop  = (PelUnitBuf(pu.chromaFormat, PelBuf(bufTop,  pu.lwidth(),          GEO_MODE_SEL_TM_SIZE)));
     PelUnitBuf pcBufPredRefLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(bufLeft, GEO_MODE_SEL_TM_SIZE, pu.lheight()        )));
+
+#if JVET_AG0164_AFFINE_GPM
+    if (pu.cu->affine)
+    {
+      CHECK(pu.mergeType == MRG_TYPE_SUBPU_ATMVP, "Invalid merge type");
+      getAffAMLRefTemplateImp(pu, pcBufPredRefTop, pcBufPredRefLeft, false, AffineMergeCtx());
+      return;
+    }
+#endif
     getBlkAMLRefTemplate(pu, pcBufPredRefTop, pcBufPredRefLeft);
   }
 
   template <uint8_t partIdx, bool useDefaultPelBuffer = true>
+
+#if JVET_AG0164_AFFINE_GPM
+  void    fillPartGPMRefTemplate(PredictionUnit &pu, MergeCtx& geoMrgCtx, int candIdx, int geoMmvdIdx = -1, Pel* bufTop = nullptr, Pel* bufLeft = nullptr, const AffineMergeCtx* affGeoMrgCtx = nullptr)
+#else
   void    fillPartGPMRefTemplate(PredictionUnit &pu, MergeCtx& geoMrgCtx, int candIdx, int geoMmvdIdx = -1, Pel* bufTop = nullptr, Pel* bufLeft = nullptr)
+#endif
   {
 #if JVET_Y0065_GPM_INTRA
+#if JVET_AG0164_AFFINE_GPM
+    if (candIdx >= GEO_MAX_ALL_INTER_UNI_CANDS)
+#else
     if (candIdx >= GEO_MAX_NUM_UNI_CANDS)
+#endif
     {
       return;
     }
+#endif
+#if JVET_AG0164_AFFINE_GPM
+    if (pu.affineGPM[partIdx])
+    {
+      CHECK(affGeoMrgCtx == nullptr, "Invalid affine merge ctx!");
+      affGeoMrgCtx->setAffMergeInfo( pu, candIdx, geoMmvdIdx);
+    }
+    else
 #endif
 #if JVET_W0097_GPM_MMVD_TM
     if (geoMmvdIdx >= 0)
@@ -1087,13 +1272,24 @@ public:
     }
     
     fillPartGPMRefTemplate<partIdx, useDefaultPelBuffer>(pu, bufTop, bufLeft);
+#if JVET_AG0164_AFFINE_GPM
+    pu.cu->affine = false;
+#endif
   }
 #endif
 #if INTER_LIC || JVET_AC0112_IBC_LIC
 #if JVET_AE0078_IBC_LIC_EXTENSION
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+  void xGetLICParamGeneral (const CodingUnit& cu, const ComponentID compID, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate, int& shift, int& scale, int& offset, int* shift2 = nullptr, int* scale2 = nullptr, int* offset2 = nullptr, int* mean = nullptr, int *midVal = nullptr);
+#else
   void xGetLICParamGeneral (const CodingUnit& cu, const ComponentID compID, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate, int& shift, int& scale, int& offset, int* shift2 = nullptr, int* scale2 = nullptr, int* offset2 = nullptr, int* mean = nullptr);
+#endif
+#else
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+  void xGetLICParamGeneral (const CodingUnit& cu, const ComponentID compID, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate, int& shift, int& scale, int& offset, int *midVal = nullptr);
 #else
   void xGetLICParamGeneral (const CodingUnit& cu, const ComponentID compID, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate, int& shift, int& scale, int& offset);
+#endif
 #endif
 #endif
 #if JVET_AE0159_FIBC
@@ -1127,6 +1323,9 @@ public:
   void setLicParam(int refList, int compID, int& licScale, int& licOffset) { licScale = m_scale[refList][compID]; licOffset = m_offset[refList][compID]; }
   void resetFillLicTpl() { m_fillLicTpl[COMPONENT_Y] = m_fillLicTpl[COMPONENT_Cb] = m_fillLicTpl[COMPONENT_Cr] = false; }
   void xLicCompAdj(const PredictionUnit& pu, PelUnitBuf& pcYuvPred, const bool lumaOnly, const bool chromaOnly);
+#if JVET_AG0276_LIC_BDOF_BDMVR
+  void xLicCompAdjBdof(const PredictionUnit& pu, PelUnitBuf& pcYuvPred, const bool lumaOnly, const bool chromaOnly);
+#endif
 #endif
   template <bool trueAfalseL>
   void xGetPredBlkTpl(const CodingUnit& cu, const ComponentID compID, const CPelBuf& refBuf, const Mv& mv, const int posW, const int posH, const int tplSize, Pel* predBlkTpl
@@ -1139,10 +1338,17 @@ public:
 #endif
                       );
 #endif
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+  void xUpdateLicModel (int &scale, int &offset, int &shift, int midVal, int delta);
+#endif
 
 #if JVET_AC0112_IBC_LIC
   void xGetSublkTemplate (const CodingUnit& cu, const ComponentID compID, const Mv& bv, const int sublkWidth, const int sublkHeight, const int posW, const int posH, int* numTemplate, Pel* refLeftTemplate, Pel* refAboveTemplate, Pel* recLeftTemplate, Pel* recAboveTemplate);
-  void xLocalIlluComp (const PredictionUnit& pu, const ComponentID compID, const Mv& bv, PelBuf& dstBuf);
+  void xLocalIlluComp (const PredictionUnit& pu, const ComponentID compID, const Mv& bv, PelBuf& dstBuf
+#if JVET_AG0136_INTRA_TMP_LIC
+                       , const bool isLinearTransformDone
+#endif
+                       );
   template <bool trueAfalseL>
   void xGetIbcLicPredBlkTpl(const CodingUnit& cu, const ComponentID compID, const CPelBuf& refBuf, const Mv& mv, const int posW, const int posH, const int tplSize, Pel* predBlkTpl);
 #endif
@@ -1329,6 +1535,141 @@ private:
 public:
   void setFillCurTplAboveARMC(bool b) { m_fillCurTplAboveARMC = b; }
   void setFillCurTplLeftARMC(bool b) { m_fillCurTplLeftARMC = b; }
+#endif
+
+#if JVET_AG0276_NLIC
+public:
+  void xPredWoRefinement(PredictionUnit& pu, PelUnitBuf &pcYuvPred, const bool luma = true, const bool chroma = true);
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  template <bool isBRcand>
+#endif
+  void xDevSecLicPara(CodingUnit&     cu, PelUnitBuf& predBuf, PelUnitBuf& dstBuf)
+  {
+    for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
+    {
+      ComponentID compID = ComponentID(comp);
+      Pel* pred = predBuf.get(compID).buf;
+      int  predStride = predBuf.get(compID).stride;
+      Pel* rec = dstBuf.get(compID).buf;
+      int  recStride = dstBuf.get(compID).stride;
+
+      const int cuWidth = cu.blocks[compID].width;
+      const int cuHeight = cu.blocks[compID].height;
+
+      const int bitDepth = cu.cs->sps->getBitDepth(toChannelType(compID));
+      const int precShift = std::max(0, bitDepth - 12);
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+      const int maxNumMinus1 = isBRcand ? (30 - 2 * std::min(bitDepth, 12) - 1) : (30 - 2 * std::min(bitDepth, 12));
+#else
+      const int maxNumMinus1 = 30 - 2 * std::min(bitDepth, 12);
+#endif
+      const int minDimBit = floorLog2(std::min(cuHeight, cuWidth));
+      const int minDim = 1 << minDimBit;
+      int       minStepBit = minDim > 8 ? 1 : 0;
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+      while (isBRcand ? (minDimBit > minStepBit + maxNumMinus1) : (((minDimBit - minStepBit) << 1) > maxNumMinus1))
+#else
+      while (((minDimBit - minStepBit) << 1) > maxNumMinus1) 
+#endif
+      { minStepBit++; } //make sure 2*log2(minDim/tmpStep) + 2*min(bitDepth,12) <= 30
+      const int numSteps = minDim >> minStepBit;
+      const int dimShift = minDimBit - minStepBit;
+
+      //----- get correlation data -----
+      int x = 0, y = 0, xx = 0, xy = 0;
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+      int cntShift = 0;
+      if (isBRcand)
+      {
+        Pel* refBottom = pred + (cuHeight - 1) * predStride;
+        Pel* recBottom = rec + (cuHeight - 1) * recStride;
+        for (int k = 0; k < numSteps; k++)
+        {
+          int idx = (k * cuWidth) >> dimShift;
+          int refVal = refBottom[idx];
+          int recVal = recBottom[idx];
+          x += refVal;
+          y += recVal;
+          xx += refVal * refVal;
+          xy += refVal * recVal;
+        }
+        cntShift = dimShift;
+
+        Pel* refRight = pred + cuWidth - 1;
+        Pel* recRight = rec + cuWidth - 1;
+        for (int k = 0; k < numSteps; k++)
+        {
+          int idx = (k * cuHeight) >> dimShift;
+          int refVal = refRight[idx * predStride];
+          int recVal = recRight[idx * recStride];
+          x += refVal;
+          y += recVal;
+          xx += refVal * refVal;
+          xy += refVal * recVal;
+        }
+        cntShift += (cntShift ? 1 : dimShift);
+      }
+      else
+#endif
+      {
+        for (int h = 0; h < numSteps; h++)
+        {
+          int vDim = ((h * cuHeight) >> dimShift);
+
+          for (int w = 0; w < numSteps; w++)
+          {
+            int hDim = ((w * cuWidth) >> dimShift);
+
+            int predVal = pred[vDim * predStride + hDim] >> precShift;
+            int recVal = rec[vDim * recStride + hDim] >> precShift;
+
+            x += predVal;
+            y += recVal;
+            xx += predVal * predVal;
+            xy += predVal * recVal;
+          }
+        }
+      }
+
+      int  shift = m_LICShift;
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+      int& scale = isBRcand ? cu.altLMBRParaUnit.scale[compID] : cu.altLMParaUnit.scale[compID];
+      int& offset = isBRcand ? cu.altLMBRParaUnit.offset[compID] : cu.altLMParaUnit.offset[compID];
+      if (!isBRcand)
+      {
+        cntShift = (dimShift << 1); 
+        CHECK(!cntShift, "cntShift == 0");
+      }
+#else
+      int& scale = cu.altLMParaUnit.scale[compID];
+      int& offset = cu.altLMParaUnit.offset[compID];
+      cntShift = (dimShift << 1); CHECK(!cntShift, "cntShift == 0");
+#endif
+      const int cropShift = std::max(0, bitDepth - precShift + cntShift - 15);
+      const int xzOffset = (xx >> m_LICRegShift);
+      const int sumX = (x << precShift);
+      const int sumY = (y << precShift);
+      const int sumXX = ((xx + xzOffset) >> (cropShift << 1)) << cntShift;
+      const int sumXY = ((xy + xzOffset) >> (cropShift << 1)) << cntShift;
+      const int sumXsumX = (x >> cropShift) * (x >> cropShift);
+      const int sumXsumY = (x >> cropShift) * (y >> cropShift);
+      int       a1 = sumXY - sumXsumY;
+      int       a2 = sumXX - sumXsumX;
+      int       scaleShiftA2 = getMSB(abs(a2)) - 6;
+      int       scaleShiftA1 = scaleShiftA2 - m_LICShiftDiff;
+      scaleShiftA2 = std::max(0, scaleShiftA2);
+      scaleShiftA1 = std::max(0, scaleShiftA1);
+      const int scaleShiftA = scaleShiftA2 + 15 - shift - scaleShiftA1;
+      a1 = a1 >> scaleShiftA1;
+      a2 = Clip3(0, 63, a2 >> scaleShiftA2);
+      scale = int((int64_t(a1) * int64_t(m_LICMultApprox[a2])) >> scaleShiftA);
+      scale = Clip3(0, 1 << (shift + 2), scale);
+      const int maxOffset = (1 << (bitDepth - 1)) - 1;
+      const int minOffset = -1 - maxOffset;
+      offset = (sumY - ((scale * sumX) >> shift) + ((1 << (cntShift)) >> 1)) >> cntShift;
+      offset = Clip3(minOffset, maxOffset, offset);
+    }
+  }
 #endif
 
 #if JVET_AA0096_MC_BOUNDARY_PADDING

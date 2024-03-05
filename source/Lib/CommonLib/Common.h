@@ -337,6 +337,9 @@ struct CCPModelCandidate
 #if JVET_AA0126_GLM
   int8_t  glmIdc = 0;
 #endif
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+  int ccInsideFilter = 0;
+#endif
 
   template<int NUM>
   inline bool isTheSameParams(const CCPModelCandidate& p) const
@@ -591,5 +594,95 @@ struct LutCCP
   // Postions for future extensions
 };
 #endif
+#if JVET_AG0058_EIP
+struct EipModelCandidate
+{
+  int64_t params[EIP_FILTER_TAP] = { 0 };
+  int     filterShape            = 0;
+  int     eipDimdMode            = PLANAR_IDX;
 
+  inline bool isTheSameParams(const EipModelCandidate& p) const
+  {
+    if (filterShape != p.filterShape) 
+    {
+      return false;
+    }
+    for (int i = 0; i < EIP_FILTER_TAP; ++i)
+    {
+      if (params[i] != p.params[i])
+      {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool operator==(const EipModelCandidate &cand) const 
+  { 
+    if (isTheSameParams(cand))
+    {
+      return true;
+    }
+    return false;
+  }
+};
+
+#if JVET_AG0058_EIP
+struct LutEIP
+{
+#if JVET_Z0118_GDR  
+  static_vector<EipModelCandidate, MAX_NUM_HEIP_CANDS> lutEip0;
+  static_vector<EipModelCandidate, MAX_NUM_HEIP_CANDS> lutEip1;
+#else
+  static_vector<CccmModel, MAX_NUM_HEIP_CANDS> lutEip;
+#endif
+  // Postions for future extensions
+};
+#endif
+#endif
+
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+struct DecoderDerivedCcpCandidate
+{
+  CCPModelCandidate ddccpCand;
+  int    cost;           // TM cost 
+  int    lmIndex;        // LM_CHROMA_IDX, MMLM_CHROMA_IDX, MDLM_L_IDX, MDLM_T_IDX, MMLM_L_IDX, MMLM_T_IDX
+  int    isCccm;         // 1: LM_CHROMA_IDX, MMLM_CHROMA_IDX; 2:MDLM_L_IDX, MMLM_L_IDX; 3: MDLM_T_IDX, MMLM_T_IDX
+  int    isGlcccm;       // 1: if glCccmFlag true
+  int    isInsideFilter; // 1: if LBCCP true
+  bool   isFusion;       // enable two CCP fusion
+};
+#endif
+
+#if JVET_AG0276_NLIC
+struct AltLMInterUnit
+{
+  int scale[MAX_NUM_COMPONENT];
+  int offset[MAX_NUM_COMPONENT];
+
+  void resetAltLinearModel()
+  {
+    for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
+    {
+      scale[comp] = 32;
+      offset[comp] = 0;
+    }
+  }
+
+  AltLMInterUnit()
+  {
+    resetAltLinearModel();
+  }
+
+  AltLMInterUnit &operator=(const AltLMInterUnit &other)
+  {
+    for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
+    {
+      scale[comp] = other.scale[comp];
+      offset[comp] = other.offset[comp];
+    }
+    return *this;
+  }
+};
+#endif
 #endif

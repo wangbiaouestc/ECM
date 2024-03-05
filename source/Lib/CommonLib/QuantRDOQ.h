@@ -117,30 +117,15 @@ private:
 
   void xRateDistOptQuantTS( TransformUnit &tu, const ComponentID &compID, const CCoeffBuf &coeffs, TCoeff &absSum, const QpParam &qp, const Ctx &ctx );
 
-  inline uint32_t xGetCodedLevelTSPred(double&            rd64CodedCost,
-    double&            rd64CodedCost0,
-    double&            rd64CodedCostSig,
-    Intermediate_Int    levelDouble,
-    int                 qBits,
-    double              errorScale,
-    uint32_t coeffLevels[],
-    double coeffLevelError[],
-    const BinFracBits* fracBitsSig,
-    const BinFracBits& fracBitsPar,
-    CoeffCodingContext& cctx,
-    const FracBitsAccess& fracBitsAccess,
-    const BinFracBits& fracBitsSign,
-    const BinFracBits& fracBitsGt1,
-    const uint8_t      sign,
-    int                rightPixel,
-    int                belowPixel,
-    uint16_t           ricePar,
-    bool               isLast,
-    bool               useLimitedPrefixLength,
-    const int          maxLog2TrDynamicRange
-    , int&               numUsedCtxBins
-  ) const;
 
+  inline uint32_t xGetCodedLevelTSPred(double &rd64CodedCost, double &rd64CodedCost0, double &rd64CodedCostSig,
+                                       Intermediate_Int levelDouble, int qBits, double errorScale,
+                                       uint32_t coeffLevels[], double coeffLevelError[], const BinFracBits *fracBitsSig,
+                                       const BinFracBits &fracBitsPar, CoeffCodingContext &cctx,
+                                       const FracBitsAccess &fracBitsAccess, const BinFracBits &fracBitsSign,
+                                       const BinFracBits &fracBitsGt1, const uint8_t sign, int rightPixel,
+                                       int belowPixel, uint16_t ricePar, bool isLast, bool useLimitedPrefixLength,
+                                       const int maxLog2TrDynamicRange, int &numUsedCtxBins) const;
   inline int xGetICRateTS   ( const uint32_t            absLevel,
                               const BinFracBits&        fracBitsPar,
                               const CoeffCodingContext& cctx,

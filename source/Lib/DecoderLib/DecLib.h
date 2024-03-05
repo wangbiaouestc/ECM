@@ -102,9 +102,6 @@ private:
 
 
   SEIMessages             m_SEIs; ///< List of SEI messages that have been received before the first slice and between slices, excluding prefix SEIs...
-#if EXTENSION_CABAC_TRAINING
-  uint64_t                m_binFileByteOffset;
-#endif
 
 #if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
   BilateralFilter         m_cBilateralFilter;
@@ -169,9 +166,6 @@ private:
 
   int                     m_decodedPictureHashSEIEnabled;  ///< Checksum(3)/CRC(2)/MD5(1)/disable(0) acting on decoded picture hash SEI message
   uint32_t                m_numberOfChecksumErrorsDetected;
-#if EXTENSION_CABAC_TRAINING
-  uint64_t& getBinFileByteOffset() { return m_binFileByteOffset; }
-#endif
 
   bool                    m_warningMessageSkipPicture;
 
@@ -245,6 +239,9 @@ public:
   bool  decode(InputNALUnit& nalu, int& iSkipFrame, int& iPOCLastDisplay, int iTargetOlsIdx);
   void  deletePicBuffer();
   void  executeLoopFilters();
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+  void  adaptiveClipToRealRange();
+#endif
 #if JVET_R0270
   void finishPicture(int &poc, PicList *&rpcListPic, MsgLevel msgl = INFO, bool associatedWithNewClvs = false);
 #else

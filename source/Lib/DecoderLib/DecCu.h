@@ -100,7 +100,11 @@ private:
   PelStorage        m_ciipBuffer;
 
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  MotionInfo        m_subPuMiBuf[SUB_BUFFER_SIZE][(MAX_CU_SIZE * MAX_CU_SIZE) >> (MIN_CU_LOG2 << 1)];
+#else
   MotionInfo        m_subPuMiBuf[SUB_TMVP_NUM][(MAX_CU_SIZE * MAX_CU_SIZE) >> (MIN_CU_LOG2 << 1)];
+#endif
 #else
   MotionInfo        m_subPuMiBuf[(MAX_CU_SIZE * MAX_CU_SIZE) >> (MIN_CU_LOG2 << 1)];
 #endif
@@ -125,6 +129,9 @@ private:
 #endif
 
   MergeCtx          m_geoMrgCtx;
+#if JVET_AG0164_AFFINE_GPM
+  AffineMergeCtx    m_geoAffMrgCtx;
+#endif
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   MergeCtx          m_geoTmMrgCtx[GEO_NUM_TM_MV_CAND];

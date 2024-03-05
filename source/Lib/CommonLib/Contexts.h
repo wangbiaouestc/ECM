@@ -72,6 +72,103 @@ enum BPMType
   BPM_NUM
 };
 
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+struct BinStoreElem
+{
+  uint8_t  bins;
+  uint8_t  count;
+  unsigned ctxId;
+  
+  BinStoreElem(unsigned b, unsigned c) : bins(b), count(1), ctxId(c) {}
+
+  unsigned bin(int i) const
+  {
+    return (bins >> i) & 1;
+  }
+  
+  void addBin(unsigned bin)
+  {
+    bins |= bin << count++;
+  }
+};
+
+typedef std::vector<BinStoreElem> BinStoreVector;
+
+class BinBuffer
+{
+public:
+  BinBuffer() : m_active(false), m_maxSize(0), m_numCtx(0), m_maxBinsPerCtx(0), m_buffer(nullptr) {}
+  ~BinBuffer() {}
+
+  void init(int size, int numCtx, int maxBinsPerCtx)
+  {
+    m_active           = false;
+    m_maxSize          = size;
+    m_numCtx           = numCtx;
+    m_maxBinsPerCtx    = maxBinsPerCtx;
+    m_indOfCtxInBuffer = std::vector<int16_t>(numCtx, -1);
+
+    if ( m_maxBinsPerCtx > 8 )
+    {
+      fprintf(stdout, "Chance type of BinStoreElem/bins to support over 8 bins per context\n");
+      exit(0);
+    }
+  }
+
+  void addBin( unsigned bin, unsigned ctxId )
+  {
+    if( m_active )
+    {
+      int bufferInd = m_indOfCtxInBuffer[ctxId];
+      
+      if( bufferInd >= 0 ) // Already active context type
+      {
+        BinStoreElem& store = (*m_buffer)[bufferInd];
+
+        if( store.count < m_maxBinsPerCtx ) // Room to add more bins
+        {
+          store.addBin( bin );
+        }
+      }
+      else if ( m_buffer->size() < m_maxSize ) // Room to add more context types
+      {
+        m_indOfCtxInBuffer[ctxId] = static_cast<int16_t>(m_buffer->size());
+        m_buffer->push_back( BinStoreElem( bin, ctxId ) );
+      }
+    }
+  }
+
+  void clear()           { m_buffer->clear(); std::fill(m_indOfCtxInBuffer.begin(), m_indOfCtxInBuffer.end(), -1); }
+  void setActive(bool b) { m_active = b; }
+  
+  const BinStoreVector* getBinStoreVector() const { return m_buffer; }
+  void                  setBinStoreVector(BinStoreVector *bb) { m_buffer = bb; if (bb) clear(); }
+
+private:
+  bool                 m_active;
+  std::size_t          m_maxSize;
+  int                  m_numCtx;
+  int                  m_maxBinsPerCtx;
+  std::vector<int16_t> m_indOfCtxInBuffer; // Only used in active CTU for convenience (8 bit enough)
+  BinStoreVector*      m_buffer;
+};
+
+class BinBufferer
+{
+public:
+  BinBufferer(): m_binBuffer () {}
+
+  void             setBinBufferActive ( bool b )             { m_binBuffer.setActive(b); }
+  void             setBinBuffer       ( BinStoreVector *bb ) { m_binBuffer.setBinStoreVector(bb); }
+  const BinStoreVector* getBinBuffer  ( )             const  { return m_binBuffer.getBinStoreVector(); }
+  void             initBufferer(int size, int numCtx, int maxBinsPerCtx) { m_binBuffer.init( size, numCtx, maxBinsPerCtx); }
+  virtual void     updateCtxs         ( BinStoreVector *bb ) = 0;
+
+protected:
+  BinBuffer m_binBuffer;
+};
+#endif
+
 class ProbModelTables
 {
 protected:
@@ -83,37 +180,6 @@ protected:
   static const uint8_t      m_RenormTable_32  [ 32];          // Std         MP   MPI
 };
 
-#if EXTENSION_CABAC_TRAINING
-class BinCollector
-{
-public:
-  void addBin(bool b)
-  {
-    int pos = 7 - (m_counter & 7);
-    if (pos == 7)
-    {
-      extractedBins.push_back(0);
-    }
-    extractedBins.back() |= (b ? 1 : 0) << pos;
-    m_counter++;
-  }
-
-  const std::vector<uint8_t> getExtractedBins() const { return extractedBins; }
-  uint64_t getNumExtractedBins() const { return m_counter; }
-
-  void resetCounters()
-  {
-    extractedBins.clear();
-    m_counter = 0;
-  }
-
-private:
-  std::vector<uint8_t> extractedBins;
-  uint64_t m_counter;
-};
-
-#endif
-
 class BinProbModelBase : public ProbModelTables
 {
 public:
@@ -121,9 +187,6 @@ public:
   ~BinProbModelBase() {}
   static uint32_t estFracBitsEP ()                    { return  (       1 << SCALE_BITS ); }
   static uint32_t estFracBitsEP ( unsigned numBins )  { return  ( numBins << SCALE_BITS ); }
-#if EXTENSION_CABAC_TRAINING
-  BinCollector m_ctxBinTrace;
-#endif
 };
 
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
@@ -158,6 +221,7 @@ public:
     int rate1 = m_rate & 15;
 
     auto ws = m_rateOffset[bin];
+
     int rateUsed0 = std::max( 2, rate0 + (ws >> 4) - ADJUSTMENT_RANGE );
     int rateUsed1 = std::max( 2, rate1 + (ws & 15) - ADJUSTMENT_RANGE );
 
@@ -176,6 +240,23 @@ public:
       m_state[1] += (0x7fffu >> rate1) & MASK_1;
     }
   }
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+  void updateShortWin(unsigned bin)
+  {
+    int rate0     = m_rate >> 4;
+    auto ws       = m_rateOffset[bin];
+    int rateUsed0 = std::max( 2, rate0 + (ws >> 4) - ADJUSTMENT_RANGE );
+
+    m_stateUsed[0] = m_state[0] - ((m_state[0] >> rateUsed0) & MASK_0);
+    m_state[0]    -= (m_state[0] >> rate0) & MASK_0;
+
+    if (bin)
+    {
+      m_stateUsed[0] += (0x7FFFU >> rateUsed0) & MASK_0;
+      m_state[0]     += (0x7fffu >> rate0) & MASK_0;
+    }
+  }
+#endif
 #else
   void update(unsigned bin)
   {
@@ -190,6 +271,19 @@ public:
       m_state[1] += (0x7fffu >> rate1) & MASK_1;
     }
   }
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+  void updateShortWin(unsigned bin)
+  {
+    int rate0 = m_rate >> 4;
+
+    m_state[0] -= (m_state[0] >> rate0) & MASK_0;
+    
+    if (bin)
+    {
+      m_state[0] += (0x7fffu >> rate0) & MASK_0;
+    }
+  }
+#endif
 #endif
   void setLog2WindowSize(uint8_t log2WindowSize)
   {
@@ -204,6 +298,9 @@ public:
   void     setWinSizes( uint8_t rate )          { m_rate = rate; }
   uint8_t  getWinSizes() const                  { return m_rate; }
   void     setAdaptRateOffset(uint8_t rateOffset, bool bin ) { m_rateOffset[bin] = rateOffset;}
+#if JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE
+  uint8_t  getAdaptRateOffset( bool bin ) const { return m_rateOffset[bin]; }
+#endif
 #endif
 
   void estFracBitsUpdate(unsigned bin, uint64_t &b)
@@ -211,6 +308,7 @@ public:
     b += estFracBits(bin);
     update(bin);
   }
+
   uint32_t        estFracBits(unsigned bin) const { return getFracBitsArray().intBits[bin]; }
   static uint32_t estFracBitsTrm(unsigned bin) { return (bin ? 0x3bfbb : 0x0010c); }
 #if EC_HIGH_PRECISION
@@ -368,8 +466,17 @@ public:
 #endif
   static const CtxSet   SkipFlag;
   static const CtxSet   MergeFlag;
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  static const CtxSet   MergeFlagOppositeLic;
+  static const CtxSet   TmMergeFlagOppositeLic;
+  static const CtxSet   AffineFlagOppositeLic;
+#endif
   static const CtxSet   RegularMergeFlag;
   static const CtxSet   MergeIdx;
+#if JVET_AG0164_AFFINE_GPM
+  static const CtxSet   GpmMergeIdx;
+  static const CtxSet   GpmAffMergeIdx;
+#endif
 #if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
   static const CtxSet   TmMergeIdx;
 #endif
@@ -407,6 +514,10 @@ public:
 #if JVET_AD0188_CCP_MERGE
   static const CtxSet   nonLocalCCP;
 #endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  static const CtxSet   decoderDerivedCCP;
+  static const CtxSet   ddNonLocalCCP;
+#endif
 #if JVET_Z0050_DIMD_CHROMA_FUSION
 #if ENABLE_DIMD
   static const CtxSet   DimdChromaMode;
@@ -426,6 +537,10 @@ public:
 #if JVET_AD0086_ENHANCED_INTRA_TMP
   static const CtxSet   TmpIdx;
   static const CtxSet   TmpFusion;
+#if JVET_AG0136_INTRA_TMP_LIC
+  static const CtxSet   TmpLic;
+  static const CtxSet   ItmpLicIndex;
+#endif
 #endif  
 #endif
 #if MMLM
@@ -442,6 +557,9 @@ public:
   static const CtxSet   MmvdStepMvpIdx;
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
   static const CtxSet   MmvdStepMvpIdxECM3;
+#endif
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  static const CtxSet   GeoBlendFlag;
 #endif
 #if JVET_W0097_GPM_MMVD_TM
   static const CtxSet   GeoMmvdFlag;
@@ -529,17 +647,43 @@ public:
 #if JVET_AE0102_LFNST_CTX
   static const CtxSet   SigFlagL[6];    // [ ChannelType + State ]
   static const CtxSet   ParFlagL[2];    // [ ChannelType ]
+#if JVET_AG0100_TRANSFORM_COEFFICIENT_CODING
+  static const CtxSet   GtxFlagL[8];    // [ ChannelType + x ]
+#else
   static const CtxSet   GtxFlagL[4];    // [ ChannelType + x ]
+#endif
 #endif
   static const CtxSet   SigFlag         [6];    // [ ChannelType + State ]
   static const CtxSet   ParFlag         [2];    // [ ChannelType ]
+#if JVET_AG0100_TRANSFORM_COEFFICIENT_CODING
+  static const CtxSet   GtxFlag[8];    // [ ChannelType + x ]
+#else
   static const CtxSet   GtxFlag         [4];    // [ ChannelType + x ]
+#endif
   static const CtxSet   TsSigCoeffGroup;
   static const CtxSet   TsSigFlag;
   static const CtxSet   TsParFlag;
   static const CtxSet   TsGtxFlag;
   static const CtxSet   TsLrg1Flag;
   static const CtxSet   TsResidualSign;
+#if JVET_AG0143_INTER_INTRA
+  static const CtxSet   SigCoeffGroupCtxSetSwitch[2];   // [ ChannelType ]
+  static const CtxSet   SigFlagCtxSetSwitch[6];         // [ ChannelType + State ]
+  static const CtxSet   ParFlagCtxSetSwitch[2];         // [ ChannelType ]
+#if JVET_AG0100_TRANSFORM_COEFFICIENT_CODING
+  static const CtxSet   GtxFlagCtxSetSwitch[8];    // [ ChannelType + x ]
+#else
+  static const CtxSet   GtxFlagCtxSetSwitch[4];    // [ ChannelType + x ]
+#endif
+  static const CtxSet   LastXCtxSetSwitch[2];           // [ ChannelType ]
+  static const CtxSet   LastYCtxSetSwitch[2];           // [ ChannelType ]
+  static const CtxSet   TsSigCoeffGroupCtxSetSwitch;
+  static const CtxSet   TsSigFlagCtxSetSwitch;
+  static const CtxSet   TsParFlagCtxSetSwitch;
+  static const CtxSet   TsGtxFlagCtxSetSwitch;
+  static const CtxSet   TsLrg1FlagCtxSetSwitch;
+  static const CtxSet   TsResidualSignCtxSetSwitch;
+#endif
   static const CtxSet   MVPIdx;
 #if JVET_X0083_BM_AMVP_MERGE_MODE
   static const CtxSet   amFlagState;
@@ -549,12 +693,18 @@ public:
 #if JVET_V0094_BILATERAL_FILTER
   static const CtxSet   BifCtrlFlags[];
 #endif
+#if JVET_AG0164_AFFINE_GPM
+  static const CtxSet   AffineGPMFlag;
+#endif
 #if JVET_W0066_CCSAO
   static const CtxSet   CcSaoControlIdc;
 #endif
   static const CtxSet   TransformSkipFlag;
   static const CtxSet   MTSIdx;
   static const CtxSet   LFNSTIdx;
+#if JVET_AG0061_INTER_LFNST_NSPT
+  static const CtxSet   InterLFNSTIdx;
+#endif
   static const CtxSet   PLTFlag;
   static const CtxSet   RotationFlag;
   static const CtxSet   RunTypeFlag;
@@ -588,7 +738,14 @@ public:
   static const CtxSet   AlfUseTemporalFilt;
   static const CtxSet   CcAlfFilterControlFlag;
   static const CtxSet   CiipFlag;
+#if JVET_AG0135_AFFINE_CIIP
+  static const CtxSet   CiipAffineFlag;
+#endif
   static const CtxSet   SmvdFlag;
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  static const CtxSet   amvpSbTmvpFlag;
+  static const CtxSet   amvpSbTmvpMvdIdx;
+#endif
   static const CtxSet   IBCFlag;
 #if JVET_AE0169_BIPREDICTIVE_IBC
   static const CtxSet   BiPredIbcFlag;
@@ -597,6 +754,9 @@ public:
   static const CtxSet   JointCbCrFlag;
 #if INTER_LIC
   static const CtxSet   LICFlag;
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+  static const CtxSet   LicDelta;
+#endif
 #endif
 #if SIGN_PREDICTION
   static const CtxSet   signPred[2];
@@ -628,6 +788,13 @@ public:
 #if JVET_AF0073_INTER_CCP_MERGE
   static const CtxSet   InterCcpMergeFlag;
 #endif
+#if JVET_AG0058_EIP
+  static const CtxSet   EipFlag;
+#endif
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+  static const CtxSet   CCPMergeFusionFlag;
+  static const CtxSet   CCPMergeFusionType;
+#endif
   static const unsigned NumberOfContexts;
 
   // combined sets for less complex copying
@@ -640,12 +807,9 @@ public:
 
 public:
   static const std::vector<uint8_t>&  getInitTable( unsigned initId );
-#if EXTENSION_CABAC_TRAINING
-  static std::vector<uint16_t> sm_InitTableNameIndexes;
-#endif
 private:
   static std::vector<std::vector<uint8_t> > sm_InitTables;
-  static CtxSet addCtxSet( std::initializer_list<std::initializer_list<uint8_t> > initSet2d );
+  static CtxSet addCtxSet( std::initializer_list<std::initializer_list<uint8_t> > initSet2d);
 };
 
 
@@ -666,10 +830,6 @@ public:
   CtxStore( bool dummy );
   CtxStore( const CtxStore<BinProbModel>& ctxStore );
 public:
-#if EXTENSION_CABAC_TRAINING
-  void copyFrom(const CtxStore<BinProbModel>& src) { CHECK(1, "CtxStore::copyFrom may not be called when EXTENSION_CABAC_TRAINING is enabled."); }
-  void copyFrom(const CtxStore<BinProbModel>& src, const CtxSet& ctxSet) { CHECK(1, "CtxStore::copyFrom may not be called when EXTENSION_CABAC_TRAINING is enabled."); }
-#else
   void copyFrom(const CtxStore<BinProbModel>& src)
   {
     checkInit();
@@ -682,7 +842,6 @@ public:
     std::copy_n(reinterpret_cast<const char*>(src.m_ctx + ctxSet.Offset), sizeof(BinProbModel) * ctxSet.Size,
       reinterpret_cast<char*>(m_ctx + ctxSet.Offset));
   }
-#endif
   void init(int qp, int initId);
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   void loadWinSizes( const std::vector<uint8_t>&   windows );
@@ -691,9 +850,32 @@ public:
   void saveWeights( std::vector<uint8_t>&         weights )  const;
   void loadPStates( const std::vector<std::pair<uint16_t, uint16_t>>&  probStates );
   void savePStates( std::vector<std::pair<uint16_t, uint16_t>>&        probStates )  const;
+#if JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE
+  void loadRateOffsets( const std::vector<uint8_t>& rateOffsets0, const std::vector<uint8_t>& rateOffsets1 );
+  void saveRateOffsets( std::vector<uint8_t>& rateOffsets0, std::vector<uint8_t>& rateOffsets1 ) const;
+#endif
 #else
   void loadPStates( const std::vector<uint16_t>&  probStates );
   void savePStates( std::vector<uint16_t>&        probStates )  const;
+#endif
+
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+  void updateCtxs(BinStoreVector *binStoreElemVector)
+  {
+    BinStoreVector& vector = *binStoreElemVector;
+    
+    int numCtxTypes = int( vector.size() );
+    
+    for ( int ctxType = 0; ctxType < numCtxTypes; ctxType++ )
+    {
+      const BinStoreElem& store = vector[ ctxType ];
+
+      for ( int i = 0; i < store.count; i++ )
+      {
+        m_ctxBuffer[ store.ctxId ].updateShortWin( store.bin(i) );
+      }
+    }
+  }
 #endif
 
   const BinProbModel& operator[]      ( unsigned  ctxId  )  const { return m_ctx[ctxId]; }
@@ -825,6 +1007,27 @@ public:
     default:        break;
     }
   }
+
+#if JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE
+  void  loadRateOffsets( const std::vector<uint8_t>& rateOffsets0, const std::vector<uint8_t>& rateOffsets1 )
+  {
+    switch( m_BPMType )
+    {
+    case BPM_Std:   m_ctxStore_Std.loadRateOffsets( rateOffsets0, rateOffsets1 );  break;
+    default:        break;
+    }
+  }
+
+  void  saveRateOffsets( std::vector<uint8_t>& rateOffsets0, std::vector<uint8_t>& rateOffsets1 ) const
+  {
+    switch( m_BPMType )
+    {
+    case BPM_Std:   m_ctxStore_Std.saveRateOffsets( rateOffsets0, rateOffsets1 );  break;
+    default:        break;
+    }
+}
+#endif
+
 #else
   void  loadPStates( const std::vector<uint16_t>& probStates )
   {
@@ -877,7 +1080,13 @@ public:
     default:        THROW("BPMType out of range");
     }
   }
-
+#if JVET_AG0196_CABAC_RETRAIN
+  // direct access to a model prm
+  int getRate(int ctxidx) const
+  {
+    return m_ctxStore_Std[ctxidx].getWinSizes();
+  }
+#endif
 private:
   BPMType                       m_BPMType;
   CtxStore<BinProbModel_Std>    m_ctxStore_Std;
@@ -927,6 +1136,9 @@ public:
       ctx.loadPStates( m_states );
       ctx.loadWeights( m_weights );
       ctx.loadWinSizes( m_rate );
+#if JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE
+      ctx.loadRateOffsets( m_rateOffset[0], m_rateOffset[1] );
+#endif
       return true;
     }
     return false;
@@ -936,6 +1148,9 @@ public:
     ctx.savePStates( m_states );
     ctx.saveWeights( m_weights );
     ctx.saveWinSizes( m_rate );
+#if JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE
+    ctx.saveRateOffsets( m_rateOffset[0], m_rateOffset[1] );
+#endif
     m_valid = true;
   }
 
@@ -944,6 +1159,9 @@ private:
   bool                 m_valid;
   std::vector<uint8_t> m_weights;
   std::vector<uint8_t> m_rate;
+#if JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE
+  std::vector<uint8_t> m_rateOffset[2];
+#endif
 };
 
 class CtxStateArray
@@ -977,13 +1195,21 @@ public:
     return false;
   }
 
+#if JVET_AG0196_CABAC_RETRAIN
+  inline void store( const Ctx &ctx, const SliceType sliceType )
+#else
   inline void store( const Ctx &ctx )
+#endif
   {
     if( !m_data.size() )
     {
       resize( 1 );
     }
     m_data[0].store( ctx );
+
+#if JVET_AG0196_CABAC_RETRAIN
+    m_sliceType = sliceType;
+#endif
   }
 
   inline size_t size() const
@@ -991,8 +1217,15 @@ public:
     return  m_data.size();
   }
 
+#if JVET_AG0196_CABAC_RETRAIN
+  SliceType getSliceType() const { return m_sliceType; }
+#endif
+
 private:
   std::vector<CtxStateBuf> m_data;
+#if JVET_AG0196_CABAC_RETRAIN
+  SliceType m_sliceType;
+#endif
 };
 
 class CtxStateStore
@@ -1026,11 +1259,19 @@ public:
         CHECK( m_stateBuf[t].size() > TEMP_CABAC_BUFFER_SIZE, "Wrong buffer size" );
       }
 
+#if JVET_AG0196_CABAC_RETRAIN
+      ctxStateArray->store( ctx, slice->getCabacInitSliceType() );
+#else
       ctxStateArray->store( ctx );
+#endif
     }
   }
 
+#if JVET_AG0196_CABAC_RETRAIN
+  bool loadCtx( Slice* slice, Ctx& ctx )
+#else
   bool loadCtx( const Slice* slice, Ctx& ctx )
+#endif
   {
     SliceType t = slice->getSliceType();
 
@@ -1041,6 +1282,9 @@ public:
       if( m_stateBuf[t].find( entry ) != m_stateBuf[t].end() )
       {
         const CtxStateArray& ctxStateArray = m_stateBuf[t][entry];
+#if JVET_AG0196_CABAC_RETRAIN
+        slice->setCabacInitSliceType( m_stateBuf[t][entry].getSliceType() );
+#endif
         return ctxStateArray.getIfValid( ctx );
       }      
     }
@@ -1060,7 +1304,12 @@ private:
 class CABACDataStore
 {
 public:
+
+#if JVET_AG0196_CABAC_RETRAIN
+  bool loadCtxStates( Slice* slice, Ctx& ctx ) { return m_ctxStateStore.loadCtx( slice, ctx ); }
+#else
   bool loadCtxStates( const Slice* slice, Ctx& ctx ) { return m_ctxStateStore.loadCtx( slice, ctx ); }
+#endif
   void storeCtxStates( const Slice* slice, const Ctx& ctx ) { m_ctxStateStore.storeCtx( slice, ctx ); }
 
   void updateBufferState( const Slice* slice )

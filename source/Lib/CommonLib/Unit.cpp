@@ -267,6 +267,10 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   affineType        = other.affineType;
   colorTransform = other.colorTransform;
   geoFlag           = other.geoFlag;
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  geoBlendFlag      = other.geoBlendFlag;
+  blendModel.copy( other.blendModel );
+#endif
   bdpcmMode         = other.bdpcmMode;
   bdpcmModeChroma   = other.bdpcmModeChroma;
   qp                = other.qp;
@@ -274,12 +278,19 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   rootCbf           = other.rootCbf;
   sbtInfo           = other.sbtInfo;
   mtsFlag           = other.mtsFlag;
+#if JVET_AG0061_INTER_LFNST_NSPT
+  lfnstFlag         = other.lfnstFlag;
+#endif
   lfnstIdx          = other.lfnstIdx;
   tileIdx           = other.tileIdx;
 #if JVET_AC0105_DIRECTIONAL_PLANAR
   plIdx = other.plIdx;
 #endif
 #if ENABLE_DIMD
+#if JVET_AG0146_DIMD_ITMP_IBC
+  isBvDimd = other.isBvDimd;
+  bvDimd = other.bvDimd;
+#endif
   dimd = other.dimd;
   dimdBlending = other.dimdBlending;
 #if JVET_AC0098_LOC_DEP_DIMD
@@ -324,9 +335,16 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #endif
 #if TMP_FAST_ENC
 #if JVET_AD0086_ENHANCED_INTRA_TMP
+#if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
+  tmpXdisp = other.tmpXdisp;
+  tmpYdisp = other.tmpYdisp;
+#endif
   tmpIdx        = other.tmpIdx;
   tmpFusionFlag = other.tmpFusionFlag;
   tmpFlmFlag    = other.tmpFlmFlag;
+#if JVET_AG0136_INTRA_TMP_LIC
+  tmpLicFlag    = other.tmpLicFlag;
+#endif
   tmpIsSubPel  = other.tmpIsSubPel;
   tmpSubPelIdx = other.tmpSubPelIdx;
 #endif
@@ -340,17 +358,35 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   timdModeSecondaryCheckWA = other.timdModeSecondaryCheckWA;
 #endif
   timdIsBlended     = other.timdIsBlended;
+#if JVET_AG0092_ENHANCED_TIMD_FUSION
+  timdModeNonAng    = other.timdModeNonAng;
+  for( int i = 0; i < TIMD_FUSION_NUM; i++ )
+  {
+    timdFusionWeight[i] = other.timdFusionWeight[i];
+    timdLocDep[i]       = other.timdLocDep[i];
+  }
+#else
   timdFusionWeight[0] = other.timdFusionWeight[0];
   timdFusionWeight[1] = other.timdFusionWeight[1];
+#endif
 #endif
 #if JVET_AB0155_SGPM
   timdHor      = other.timdHor;
   timdVer      = other.timdVer;
+#if JVET_AG0152_SGPM_ITMP_IBC
+  sgpmBv0       = other.sgpmBv0;
+  sgpmBv1       = other.sgpmBv1;
+#endif
   sgpm         = other.sgpm;
   sgpmIdx      = other.sgpmIdx;
   sgpmSplitDir = other.sgpmSplitDir;
   sgpmMode0    = other.sgpmMode0;
   sgpmMode1    = other.sgpmMode1;
+#endif
+#if JVET_AG0058_EIP
+  eipFlag = other.eipFlag;
+  eipMerge = other.eipMerge;
+  eipModel = other.eipModel;
 #endif
 #if ENABLE_OBMC
   obmcFlag          = other.obmcFlag;
@@ -373,6 +409,19 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST 
   intraTmpDimdMode = other.intraTmpDimdMode;
 #endif
+#if JVET_AG0061_INTER_LFNST_NSPT
+  dimdDerivedIntraDir = other.dimdDerivedIntraDir;
+#endif
+#endif
+#if JVET_AG0276_NLIC
+  altLMFlag         = other.altLMFlag;
+  altLMParaUnit     = other.altLMParaUnit;
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  altLMBRParaUnit   = other.altLMBRParaUnit;
+#endif
+#if ENABLE_OBMC
+  secAltLMParaUnit  = other.secAltLMParaUnit;
+#endif
 #endif
 #if INTER_LIC
   licFlag           = other.licFlag;
@@ -385,6 +434,9 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
       licOffset[i][comp] = other.licOffset[i][comp];
     }
   }
+#endif
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+  licDelta         = other.licDelta;
 #endif
 #endif
 #if JVET_AC0112_IBC_LIC
@@ -458,6 +510,9 @@ void CodingUnit::initData()
   affineType        = 0;
   colorTransform = false;
   geoFlag           = false;
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  geoBlendFlag      = false;
+#endif
   bdpcmMode         = 0;
   bdpcmModeChroma   = 0;
   qp                = 0;
@@ -465,12 +520,19 @@ void CodingUnit::initData()
   rootCbf           = true;
   sbtInfo           = 0;
   mtsFlag           = 0;
+#if JVET_AG0061_INTER_LFNST_NSPT
+  lfnstFlag         = 0;
+#endif
   lfnstIdx          = 0;
   tileIdx           = 0;
 #if JVET_AC0105_DIRECTIONAL_PLANAR
   plIdx = 0;
 #endif
 #if ENABLE_DIMD
+#if JVET_AG0146_DIMD_ITMP_IBC
+  isBvDimd  = 0;
+  bvDimd    = Mv(0, 0);
+#endif
   dimd = false;
   dimdBlending = false;
 #if JVET_AC0098_LOC_DEP_DIMD
@@ -515,11 +577,18 @@ void CodingUnit::initData()
 #endif
 #if TMP_FAST_ENC
 #if JVET_AD0086_ENHANCED_INTRA_TMP
+#if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
+  tmpXdisp = 0;
+  tmpYdisp = 0;
+#endif
   tmpIdx        = 0;
   tmpFusionFlag = false;
   tmpFlmFlag    = false;
   tmpIsSubPel  = 0;
   tmpSubPelIdx = -1;
+#if JVET_AG0136_INTRA_TMP_LIC
+  tmpLicFlag   = false;
+#endif
 #endif
 #endif
 #if JVET_W0123_TIMD_FUSION
@@ -534,8 +603,17 @@ void CodingUnit::initData()
   timdModeSecondary = -1;
 #endif
   timdIsBlended     = false;
+#if JVET_AG0092_ENHANCED_TIMD_FUSION
+  timdModeNonAng    = INVALID_TIMD_IDX;
+  for( int i = 0; i < TIMD_FUSION_NUM; i++ )
+  {
+    timdFusionWeight[i] = -1;
+    timdLocDep[i]       = 0;
+  }
+#else
   timdFusionWeight[0] = -1;
   timdFusionWeight[1] = -1;
+#endif
 #endif
 #if JVET_AB0155_SGPM
   timdHor      = -1;
@@ -545,6 +623,14 @@ void CodingUnit::initData()
   sgpmSplitDir = -1;
   sgpmMode0    = -1;
   sgpmMode1    = -1;
+#if JVET_AG0152_SGPM_ITMP_IBC
+  sgpmBv0      = Mv(0,0);
+  sgpmBv1      = Mv(0,0);
+#endif
+#endif
+#if JVET_AG0058_EIP
+  eipFlag = false;
+  eipMerge = false;
 #endif
 #if ENABLE_OBMC
   obmcFlag          = true;
@@ -566,6 +652,19 @@ void CodingUnit::initData()
 #if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST 
   intraTmpDimdMode = -1;
 #endif
+#if JVET_AG0061_INTER_LFNST_NSPT
+  dimdDerivedIntraDir = 0;
+#endif
+#endif
+#if JVET_AG0276_NLIC
+  altLMFlag = false;
+  altLMParaUnit.resetAltLinearModel();
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  altLMBRParaUnit.resetAltLinearModel();
+#endif
+#if ENABLE_OBMC
+  secAltLMParaUnit.resetAltLinearModel();
+#endif
 #endif
 #if INTER_LIC
   licFlag = false;
@@ -578,6 +677,9 @@ void CodingUnit::initData()
       licOffset[i][comp] = MAX_INT;
     }
   }
+#endif
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+  licDelta = 0;
 #endif
 #endif
 #if JVET_AC0112_IBC_LIC
@@ -835,6 +937,10 @@ void PredictionUnit::initData()
 #endif
   mipTransposedFlag = false;
   multiRefIdx = 0;
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  decoderDerivedCcpMode = 0;
+  ddNonLocalCCPFusion = 0;
+#endif
 #if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
   parseLumaMode = false;
   candId = -1;
@@ -849,12 +955,12 @@ void PredictionUnit::initData()
 #if JVET_AA0126_GLM
   glmIdc      = {};
 #endif
-#if JVET_AA0057_CCCM
+#if JVET_AA0057_CCCM || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   cccmFlag    = 0;
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   cccmNoSubFlag = 0;
 #endif
-#if JVET_AC0054_GLCCCM
+#if JVET_AC0054_GLCCCM || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   glCccmFlag = 0;
 #endif
 #if JVET_AD0202_CCCM_MDF
@@ -875,14 +981,23 @@ void PredictionUnit::initData()
   curCand = {};
   curCand.type = CCP_TYPE_NONE;
 #endif
-#if JVET_AD0120_LBCCP
+#if JVET_AD0120_LBCCP || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   ccInsideFilter = 0;
+#endif
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+  ccpMergeFusionFlag = 0;
+  ccpMergeFusionType = 0;
 #endif
   // inter data
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   colIdx = 0;
 #endif
   mergeFlag   = false;
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  mergeOppositeLic = false;
+  affineOppositeLic = false;
+  tmMergeFlagOppositeLic = false;
+#endif
   regularMergeFlag = false;
   mergeIdx    = MAX_UCHAR;
   geoSplitDir  = MAX_UCHAR;
@@ -955,6 +1070,10 @@ void PredictionUnit::initData()
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   reduceTplSize = false;
 #endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  amvpSbTmvpFlag = false;
+  amvpSbTmvpMvdIdx = -1;
+#endif
 #if JVET_AC0112_IBC_GPM
   ibcGpmFlag = false;
   ibcGpmSplitDir = MAX_UCHAR;
@@ -987,11 +1106,24 @@ void PredictionUnit::initData()
     for ( uint32_t j = 0; j < 3; j++ )
     {
       mvAffi[i][j].setZero();
+#if JVET_AG0164_AFFINE_GPM
+      gpmPartmvAffi[0][i][j].setZero();
+      gpmPartmvAffi[1][i][j].setZero();
+#endif
     }
   }
+#if JVET_AG0164_AFFINE_GPM
+  affineGPM[0] = affineGPM[1] = 0;
+  gpmPartRefIdx[0][0]  = gpmPartRefIdx[0][1]  = gpmPartRefIdx[1][0] = gpmPartRefIdx[1][1] = -1;
+  gpmPartAffType[0] = gpmPartAffType[1] = AFFINE_MODEL_NUM;
+#endif
+
   ciipFlag = false;
 #if CIIP_PDPC
   ciipPDPC = false;
+#endif
+#if JVET_AG0135_AFFINE_CIIP
+  ciipAffine = false;
 #endif
 #if JVET_AC0112_IBC_CIIP
   ibcCiipFlag = false;
@@ -1025,6 +1157,10 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
 #endif
   mipTransposedFlag = predData.mipTransposedFlag;
   multiRefIdx = predData.multiRefIdx;
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  decoderDerivedCcpMode = predData.decoderDerivedCcpMode;
+  ddNonLocalCCPFusion = predData.ddNonLocalCCPFusion;
+#endif
 #if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
   parseLumaMode = predData.parseLumaMode;
   candId = predData.candId;
@@ -1039,7 +1175,7 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
 #if JVET_AA0126_GLM
   glmIdc      = predData.glmIdc;
 #endif
-#if JVET_AA0057_CCCM
+#if JVET_AA0057_CCCM || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   cccmFlag    = predData.cccmFlag;
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   cccmNoSubFlag = predData.cccmNoSubFlag;
@@ -1064,8 +1200,12 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
   idxNonLocalCCP  = predData.idxNonLocalCCP;
   curCand = predData.curCand;
 #endif
-#if JVET_AD0120_LBCCP
+#if JVET_AD0120_LBCCP || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   ccInsideFilter = predData.ccInsideFilter;
+#endif
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+  ccpMergeFusionFlag = predData.ccpMergeFusionFlag;
+  ccpMergeFusionType = predData.ccpMergeFusionType;
 #endif
   return *this;
 }
@@ -1076,6 +1216,11 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
   colIdx = predData.colIdx;
 #endif
   mergeFlag   = predData.mergeFlag;
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  mergeOppositeLic = predData.mergeOppositeLic;
+  affineOppositeLic = predData.affineOppositeLic;
+  tmMergeFlagOppositeLic = predData.tmMergeFlagOppositeLic;
+#endif
   regularMergeFlag = predData.regularMergeFlag;
   mergeIdx    = predData.mergeIdx;
   geoSplitDir  = predData.geoSplitDir;
@@ -1148,6 +1293,10 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   reduceTplSize = predData.reduceTplSize;
 #endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  amvpSbTmvpFlag = predData.amvpSbTmvpFlag;
+  amvpSbTmvpMvdIdx = predData.amvpSbTmvpMvdIdx;
+#endif
 #if JVET_AC0112_IBC_GPM
   ibcGpmFlag = predData.ibcGpmFlag;
   ibcGpmSplitDir = predData.ibcGpmSplitDir;
@@ -1176,8 +1325,25 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
     for ( uint32_t j = 0; j < 3; j++ )
     {
       mvAffi[i][j] = predData.mvAffi[i][j];
+#if JVET_AG0164_AFFINE_GPM
+      gpmPartmvAffi[0][i][j] = predData.gpmPartmvAffi[0][i][j];
+      gpmPartmvAffi[1][i][j] = predData.gpmPartmvAffi[1][i][j];
+#endif
     }
   }
+#if JVET_AG0164_AFFINE_GPM
+  affineGPM[0] = predData.affineGPM[0];
+  affineGPM[1] = predData.affineGPM[1];
+
+  gpmPartRefIdx[0][0]  = predData.gpmPartRefIdx[0][0];
+  gpmPartRefIdx[0][1]  = predData.gpmPartRefIdx[0][1];
+  gpmPartRefIdx[1][0]  = predData.gpmPartRefIdx[1][0];
+  gpmPartRefIdx[1][1]  = predData.gpmPartRefIdx[1][1];
+
+  gpmPartAffType[0] = predData.gpmPartAffType[0];
+  gpmPartAffType[1] = predData.gpmPartAffType[1];
+#endif
+
 #if JVET_AD0140_MVD_PREDICTION
   mvdSuffixInfo = predData.mvdSuffixInfo;
 #endif
@@ -1191,6 +1357,9 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
   ciipFlag = predData.ciipFlag;
 #if CIIP_PDPC
   ciipPDPC = predData.ciipPDPC;
+#endif
+#if JVET_AG0135_AFFINE_CIIP
+  ciipAffine = predData.ciipAffine;
 #endif
 #if JVET_AC0112_IBC_CIIP
   ibcCiipFlag = predData.ibcCiipFlag;
@@ -1223,13 +1392,17 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 #endif
   mipTransposedFlag = other.mipTransposedFlag;
   multiRefIdx = other.multiRefIdx;
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  decoderDerivedCcpMode = other.decoderDerivedCcpMode;
+  ddNonLocalCCPFusion = other.ddNonLocalCCPFusion;
+#endif
 #if JVET_Z0050_CCLM_SLOPE
   cclmOffsets = other.cclmOffsets;
 #endif
 #if JVET_AA0126_GLM
   glmIdc      = other.glmIdc;
 #endif
-#if JVET_AA0057_CCCM
+#if JVET_AA0057_CCCM || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   cccmFlag    = other.cccmFlag;
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   cccmNoSubFlag = other.cccmNoSubFlag;
@@ -1255,10 +1428,19 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   curCand = other.curCand;
 #endif
 
-#if JVET_AD0120_LBCCP
+#if JVET_AD0120_LBCCP || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   ccInsideFilter = other.ccInsideFilter;
 #endif
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+  ccpMergeFusionFlag = other.ccpMergeFusionFlag;
+  ccpMergeFusionType = other.ccpMergeFusionType;
+#endif
   mergeFlag   = other.mergeFlag;
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  mergeOppositeLic = other.mergeOppositeLic;
+  affineOppositeLic = other.affineOppositeLic;
+  tmMergeFlagOppositeLic = other.tmMergeFlagOppositeLic;
+#endif
   regularMergeFlag = other.regularMergeFlag;
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   colIdx = other.colIdx;
@@ -1342,6 +1524,10 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   reduceTplSize = other.reduceTplSize;
 #endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  amvpSbTmvpFlag = other.amvpSbTmvpFlag;
+  amvpSbTmvpMvdIdx = other.amvpSbTmvpMvdIdx;
+#endif
 #if JVET_AC0112_IBC_GPM
   ibcGpmFlag = other.ibcGpmFlag;
   ibcGpmSplitDir = other.ibcGpmSplitDir;
@@ -1370,8 +1556,26 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
     for ( uint32_t j = 0; j < 3; j++ )
     {
       mvAffi[i][j] = other.mvAffi[i][j];
+#if JVET_AG0164_AFFINE_GPM
+      gpmPartmvAffi[0][i][j] = other.gpmPartmvAffi[0][i][j];
+      gpmPartmvAffi[1][i][j] = other.gpmPartmvAffi[1][i][j];
+#endif
     }
   }
+
+#if JVET_AG0164_AFFINE_GPM
+  affineGPM[0] = other.affineGPM[0];
+  affineGPM[1] = other.affineGPM[1];
+
+  gpmPartRefIdx[0][0] = other.gpmPartRefIdx[0][0];
+  gpmPartRefIdx[0][1] = other.gpmPartRefIdx[0][1];
+  gpmPartRefIdx[1][0] = other.gpmPartRefIdx[1][0];
+  gpmPartRefIdx[1][1] = other.gpmPartRefIdx[1][1];
+
+  gpmPartAffType[0] = other.gpmPartAffType[0];
+  gpmPartAffType[1] = other.gpmPartAffType[1];
+#endif
+
 #if JVET_AD0140_MVD_PREDICTION
   mvdSuffixInfo = other.mvdSuffixInfo;
 #endif
@@ -1386,6 +1590,9 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   ciipFlag = other.ciipFlag;
 #if CIIP_PDPC
   ciipPDPC = other.ciipPDPC;
+#endif
+#if JVET_AG0135_AFFINE_CIIP
+  ciipAffine = other.ciipAffine;
 #endif
 #if JVET_AC0112_IBC_CIIP
   ibcCiipFlag = other.ibcCiipFlag;
@@ -1421,9 +1628,54 @@ PredictionUnit& PredictionUnit::operator=( const MotionInfo& mi )
 }
 
 #if JVET_Z0139_HIST_AFF
+#if JVET_AG0164_AFFINE_GPM
+void PredictionUnit::getAffineMotionInfo(AffineMotionInfo affineMiOut[2], int refIdxOut[2], MvField baseMv[2]) const
+#else
 void PredictionUnit::getAffineMotionInfo(AffineMotionInfo affineMiOut[2], int refIdxOut[2]) const
+#endif
 {
+#if JVET_AG0164_AFFINE_GPM
+  baseMv[0] = MvField( Mv(), -1);
+  baseMv[1] = MvField( Mv(), -1);
 
+  if (cu->geoFlag)
+  {
+    CHECK( !affineGPM[0] && !affineGPM[1], "Not GPM-affine");
+    for (int list = 0; list < 2; list++)
+    {
+      refIdxOut[list] = NOT_VALID;
+      affineMiOut[list].oneSetAffineParametersPattern = 0;
+
+      for (int gpmPartIdx = 0; gpmPartIdx < 2; gpmPartIdx++)
+      {
+        if (affineGPM[gpmPartIdx])
+        {
+          CHECK(gpmPartAffType[gpmPartIdx] == AFFINE_MODEL_NUM, "Invalid affine type");
+
+          if (gpmPartRefIdx[gpmPartIdx][list] == -1)
+          {
+            continue;
+          }
+
+          refIdxOut[list] = gpmPartRefIdx[gpmPartIdx][list];
+
+          int affpara[4];
+          PU::deriveAffineParametersFromMVs(*this, gpmPartmvAffi[gpmPartIdx][list], affpara, gpmPartAffType[gpmPartIdx]);
+          PU::storeAffParas(affpara);
+
+          affineMiOut[list].oneSetAffineParameters[0] = (short)(affpara[0]);
+          affineMiOut[list].oneSetAffineParameters[1] = (short)(affpara[1]);
+          affineMiOut[list].oneSetAffineParameters[2] = (short)(affpara[2]);
+          affineMiOut[list].oneSetAffineParameters[3] = (short)(affpara[3]);
+
+          baseMv[list] = MvField(gpmPartmvAffi[gpmPartIdx][list][0], gpmPartRefIdx[gpmPartIdx][list]);
+          break;
+        }
+      }
+    }
+    return;
+  }
+#endif
   for (int list = 0; list < 2; list++)
   {
     RefPicList eRefList = (list == 0) ? REF_PIC_LIST_0 : REF_PIC_LIST_1;
@@ -1444,6 +1696,10 @@ void PredictionUnit::getAffineMotionInfo(AffineMotionInfo affineMiOut[2], int re
     affineMiOut[list].oneSetAffineParameters[1] = (short)(affpara[1]);
     affineMiOut[list].oneSetAffineParameters[2] = (short)(affpara[2]);
     affineMiOut[list].oneSetAffineParameters[3] = (short)(affpara[3]);
+
+#if JVET_AG0164_AFFINE_GPM
+    baseMv[list] = MvField(mvAffi[list][0], refIdxOut[list]);
+#endif
   }
 }
 #endif
@@ -1644,6 +1900,9 @@ void TransformUnit::initData()
   {
     cbf[i]           = 0;
     mtsIdx[i]        = MTS_DCT2_DCT2;
+#if JVET_AG0061_INTER_LFNST_NSPT
+    lfnstIdx[i]      = 0;
+#endif
   }
   depth              = 0;
   noResidual         = false;
@@ -1736,7 +1995,10 @@ TransformUnit& TransformUnit::operator=(const TransformUnit& other)
       if (m_runType[i]   && other.m_runType[i]   && m_runType[i]   != other.m_runType[i]  ) memcpy(m_runType[i],   other.m_runType[i],   sizeof(bool) * area);
     }
     cbf[i]           = other.cbf[i];
-    mtsIdx[i] = other.mtsIdx[i];
+    mtsIdx[i]        = other.mtsIdx[i];
+#if JVET_AG0061_INTER_LFNST_NSPT
+    lfnstIdx[i]      = other.lfnstIdx[i];
+#endif
   }
   depth              = other.depth;
   noResidual         = other.noResidual;
@@ -1781,6 +2043,9 @@ void TransformUnit::copyComponentFrom(const TransformUnit& other, const Componen
   cbf[i]           = other.cbf[i];
   depth            = other.depth;
   mtsIdx[i]        = other.mtsIdx[i];
+#if JVET_AG0061_INTER_LFNST_NSPT
+  lfnstIdx[i]      = other.lfnstIdx[i];
+#endif
   noResidual       = other.noResidual;
   jointCbCr        = isChroma( i ) ? other.jointCbCr : jointCbCr;
 #if JVET_AE0059_INTER_CCCM

@@ -120,7 +120,10 @@ CodingStructure::CodingStructure(CUCache& cuCache, PUCache& puCache, TUCache& tu
   m_ccpmIdxBuf = nullptr;
   m_ccpModelLUT.clear();
 #endif
-
+#if JVET_AG0058_EIP
+  m_eipIdxBuf = nullptr;
+  m_eipModelLUT.clear();
+#endif
 #if JVET_W0123_TIMD_FUSION
 #if JVET_Z0118_GDR
   m_ipmBuf0 = nullptr;
@@ -200,6 +203,14 @@ void CodingStructure::destroy()
   }
   m_ccpmIdxBuf = nullptr;
   m_ccpModelLUT.clear();
+#endif
+#if JVET_AG0058_EIP
+  if (m_eipIdxBuf)
+  {
+    delete [] m_eipIdxBuf;
+  }
+  m_eipIdxBuf = nullptr;
+  m_eipModelLUT.clear();
 #endif
 
 #if JVET_W0123_TIMD_FUSION
@@ -812,6 +823,31 @@ void CodingStructure::reconstructPicture(const CompArea &carea, std::vector<Pel>
 {  
   ComponentID compID = carea.compID;
   
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+  ClpRng clpRng = slice->clpRng(compID);
+  if (compID == COMPONENT_Y)
+  {
+    if (lmcsEnable)
+    {
+      clpRng.min = pLUT[slice->getLumaPelMin()];
+      clpRng.max = pLUT[slice->getLumaPelMax()];
+    }
+    else
+    {
+      if (slice->getSPS()->getUseLmcs() && slice->getLmcsEnabledFlag())
+      {
+        clpRng.min = pLUT[slice->getLumaPelMin()];
+        clpRng.max = pLUT[slice->getLumaPelMax()];
+      }
+      else
+      {
+        clpRng.min = slice->getLumaPelMin();
+        clpRng.max = slice->getLumaPelMax();
+      }
+    }
+  }
+#endif
+
   // 1. normal picture
   if (!isInGdrIntervalOrRecoveryPoc())  
   {
@@ -820,11 +856,19 @@ void CodingStructure::reconstructPicture(const CompArea &carea, std::vector<Pel>
     if (lmcsEnable)
     {
       picRecoBuff.rspSignal(getPredBuf(carea), pLUT);
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+      picRecoBuff.reconstruct(picRecoBuff, resiCS->getResiBuf(carea), clpRng);
+#else
       picRecoBuff.reconstruct(picRecoBuff, resiCS->getResiBuf(carea), slice->clpRng(compID));
+#endif
     }
     else
     {
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+      picRecoBuff.reconstruct(getPredBuf(carea), resiCS->getResiBuf(carea), clpRng);
+#else
       picRecoBuff.reconstruct(getPredBuf(carea), resiCS->getResiBuf(carea), slice->clpRng(compID));
+#endif
     }
 
     return;
@@ -836,11 +880,19 @@ void CodingStructure::reconstructPicture(const CompArea &carea, std::vector<Pel>
   if (lmcsEnable)
   {
     picRecoBuff0.rspSignal(getPredBuf(carea), pLUT);
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+    picRecoBuff0.reconstruct(picRecoBuff0, resiCS->getResiBuf(carea), clpRng);
+#else
     picRecoBuff0.reconstruct(picRecoBuff0, resiCS->getResiBuf(carea), slice->clpRng(compID));
+#endif
   }
   else
   {
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+    picRecoBuff0.reconstruct(getPredBuf(carea), resiCS->getResiBuf(carea), clpRng);
+#else
     picRecoBuff0.reconstruct(getPredBuf(carea), resiCS->getResiBuf(carea), slice->clpRng(compID));
+#endif
   }
 
   // 2.2. gdr interval clean picture
@@ -858,11 +910,19 @@ void CodingStructure::reconstructPicture(const CompArea &carea, std::vector<Pel>
     if (lmcsEnable)
     {
       picRecoBuff1.rspSignal(getPredBuf(overlappedArea), pLUT);
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+      picRecoBuff1.reconstruct(picRecoBuff1, resiCS->getResiBuf(overlappedArea), clpRng);
+#else
       picRecoBuff1.reconstruct(picRecoBuff1, resiCS->getResiBuf(overlappedArea), slice->clpRng(compID));
+#endif
     }
     else
     {
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+      picRecoBuff1.reconstruct(getPredBuf(overlappedArea), resiCS->getResiBuf(overlappedArea), clpRng);
+#else
       picRecoBuff1.reconstruct(getPredBuf(overlappedArea), resiCS->getResiBuf(overlappedArea), slice->clpRng(compID));
+#endif
     }
   }
 }
@@ -1846,7 +1906,10 @@ void CodingStructure::createInternals(const UnitArea& _unit, const bool isTopLay
   m_ccpmIdxBuf = new int[_lumaAreaScaled];
   m_ccpModelLUT.resize(0);
 #endif
-
+#if JVET_AG0058_EIP
+  m_eipIdxBuf = new int[_lumaAreaScaled];
+  m_eipModelLUT.resize(0);
+#endif
 #if JVET_W0123_TIMD_FUSION
 #if JVET_Z0118_GDR
   m_ipmBuf0 = new uint8_t[_lumaAreaScaled];
@@ -2335,6 +2398,9 @@ void CodingStructure::initSubStructure( CodingStructure& subStruct, const Channe
 #if JVET_AD0188_CCP_MERGE
   subStruct.ccpLut    = ccpLut;
 #endif
+#if JVET_AG0058_EIP
+  subStruct.eipLut = eipLut;
+#endif
   subStruct.prevPLT = prevPLT;
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   subStruct.treeType  = treeType;
@@ -2474,7 +2540,12 @@ void CodingStructure::useSubStructure( const CodingStructure& subStruct, const C
 #if JVET_AD0188_CCP_MERGE
   ccpLut = subStruct.ccpLut;
 #endif
-
+#if JVET_AG0058_EIP
+  if ((slice->isIntra() || (!slice->isIntra() && !subStruct.m_isTuEnc)) && chType != CHANNEL_TYPE_CHROMA)
+  {
+    eipLut = subStruct.eipLut;
+  }
+#endif
 #if JVET_W0123_TIMD_FUSION
   if (!subStruct.m_isTuEnc && chType != CHANNEL_TYPE_CHROMA)
   {
@@ -2632,6 +2703,15 @@ void CodingStructure::copyStructure( const CodingStructure& other, const Channel
   CCCPModelIdxBuf subIdxB = other.getCcpmIdxBuf();
   ownIdxB.copyFrom( subIdxB );
   m_ccpModelLUT = other.m_ccpModelLUT;
+#endif
+#if JVET_AG0058_EIP
+  eipLut = other.eipLut;
+#endif
+#if JVET_AG0058_EIP
+  EipModelIdxBuf ownEipIdxB = getEipIdxBuf();
+  CEipModelIdxBuf subEipIdxB = other.getEipIdxBuf();
+  ownEipIdxB.copyFrom(subEipIdxB);
+  m_eipModelLUT = other.m_eipModelLUT;
 #endif
 
 #if JVET_W0123_TIMD_FUSION
@@ -3015,6 +3095,48 @@ const int& CodingStructure::getCcpmIdxInfo( const Position& pos ) const
   const Position miPos = scaling.scale(pos - area.chromaPos());
 
   return *( m_ccpmIdxBuf + miPos.y * stride + miPos.x );
+}
+#endif
+
+#if JVET_AG0058_EIP
+EipModelIdxBuf CodingStructure::getEipIdxBuf( const Area& bufArea)
+{
+  const CompArea& lumaArea = area.Y();
+  CHECK( !lumaArea.contains( bufArea ), "Trying to access Eip model information outside of this coding structure");
+  const Area miArea   = g_miScaling.scale( bufArea );
+  const Area selfArea = g_miScaling.scale( lumaArea );
+  
+  return EipModelIdxBuf( m_eipIdxBuf + rsAddr( miArea.pos(), selfArea.pos(), selfArea.width ), selfArea.width, miArea.size() );
+}
+
+const CEipModelIdxBuf CodingStructure::getEipIdxBuf( const Area& bufArea ) const
+{
+  const CompArea& lumaArea = area.Y();
+  CHECK( !lumaArea.contains( bufArea ), "Trying to access Eip model information outside of this coding structure");
+  const Area miArea   = g_miScaling.scale( bufArea );
+  const Area selfArea = g_miScaling.scale( lumaArea );
+  
+  return EipModelIdxBuf( m_eipIdxBuf + rsAddr( miArea.pos(), selfArea.pos(), selfArea.width ), selfArea.width, miArea.size() );
+}
+
+int& CodingStructure::getEipIdxInfo( const Position& pos )
+{
+  CHECK( !area.Y().contains( pos ), "Trying to access Eip model information outside of this coding structure");
+
+  const unsigned stride = g_miScaling.scaleHor( area.lumaSize().width );
+  const Position miPos  = g_miScaling.scale( pos - area.lumaPos() );
+
+  return *( m_eipIdxBuf + miPos.y * stride + miPos.x );
+}
+
+const int& CodingStructure::getEipIdxInfo( const Position& pos ) const
+{
+  CHECK( !area.Y().contains( pos ), "Trying to access Eip model information outside of this coding structure");
+
+  const unsigned stride = g_miScaling.scaleHor( area.lumaSize().width );
+  const Position miPos  = g_miScaling.scale( pos - area.lumaPos() );
+
+  return *( m_eipIdxBuf + miPos.y * stride + miPos.x );
 }
 #endif
 

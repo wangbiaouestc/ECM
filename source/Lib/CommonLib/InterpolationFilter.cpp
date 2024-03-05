@@ -1438,6 +1438,10 @@ InterpolationFilter::InterpolationFilter()
 #if JVET_Y0065_GPM_INTRA
   m_weightedGeoBlkRounded = xWeightedGeoBlkRounded;
 #endif
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  m_weightedBlendBlk = xWeightedBlendBlk;
+  m_weightAffineBlk = xWeightAffineBlk;
+#endif
 #if JVET_AB0155_SGPM
   m_weightedSgpm = xWeightedSgpm;
   m_sadTM     = xSadTM;
@@ -2898,6 +2902,81 @@ void InterpolationFilter::xWeightedGeoBlkRounded(const PredictionUnit &pu, const
     weight += stepY;
   }
 }
+#endif
+
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+void InterpolationFilter::weightedBlendBlk( const PredictionUnit& pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1, WeightBuf& weightBuf, const int log2WeightBase, const bool roundOutputBD )
+{
+  m_weightedBlendBlk( pu, width, height, compIdx, predDst, predSrc0, predSrc1, weightBuf, log2WeightBase, roundOutputBD );
+}
+
+void InterpolationFilter::xWeightedBlendBlk( const PredictionUnit& pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1, WeightBuf& weightBuf, const int log2WeightBase, const bool roundOutputBD )
+{
+        Pel*    dst   = predDst.get(compIdx).buf;
+  const Pel*    src0  = predSrc0.get(compIdx).buf;
+  const Pel*    src1  = predSrc1.get(compIdx).buf;
+  int32_t strideDst   = predDst.get(compIdx).stride;
+  int32_t strideSrc0  = predSrc0.get(compIdx).stride;
+  int32_t strideSrc1  = predSrc1.get(compIdx).stride;
+
+//#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
+//  const char    log2WeightBase = 5;
+//#else
+//  const char    log2WeightBase = 3;
+//#endif
+  const ClpRng  clipRng = pu.cu->slice->clpRngs().comp[compIdx];
+  const int32_t clipbd = clipRng.bd;
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+  const int32_t shiftWeighted = (roundOutputBD ? IF_INTERNAL_FRAC_BITS(clipbd) : 0) + log2WeightBase;
+#else
+  const int32_t shiftWeighted = std::max<int>(2, (IF_INTERNAL_PREC - clipbd)) + log2WeightBase;
+#endif
+  const int32_t offsetWeighted = (1 << (shiftWeighted - 1)) + (roundOutputBD ? (IF_INTERNAL_OFFS << log2WeightBase) : 0 );
+  const uint32_t scaleX = getComponentScaleX(compIdx, pu.chromaFormat);
+  const uint32_t scaleY = getComponentScaleY(compIdx, pu.chromaFormat);
+
+  int16_t stepX = 1 << scaleX;
+  int16_t stepY = 1 << scaleY;
+  //int16_t* weight = nullptr;
+  int16_t* weight = weightBuf.buf;
+  int16_t one = 1 << log2WeightBase;
+  //int32_t strideWeight = weightBuf.stride;
+
+  for( int y = 0; y < height; y++ )
+  {
+    for( int x = 0; x < width; x++ )
+    {
+      dst[x] = ClipPel(rightShift(( (one - weight[x * stepX])*(src0[x]) + ( (weight[x * stepX]) * (src1[x])) + offsetWeighted), shiftWeighted), clipRng);
+    }
+    dst    += strideDst;
+    src0   += strideSrc0;
+    src1   += strideSrc1;
+    weight += weightBuf.stride * stepY;
+  }
+}
+
+void InterpolationFilter::weightAffineBlk(const PredictionUnit& pu, WeightBuf& bufWeight, const int log2WeightBase, AffineBlendingModel& blendModel)
+{
+  m_weightAffineBlk( pu, bufWeight, log2WeightBase, blendModel );
+}
+
+void InterpolationFilter::xWeightAffineBlk( const PredictionUnit& pu, WeightBuf& bufWeight, const int log2WeightBase, AffineBlendingModel& blendModel )
+{
+  const int width   = pu.lwidth();
+  const int height  = pu.lheight();
+
+  for (int y = 0; y < height; y++)
+  {
+    int16_t* weight = bufWeight.bufAt( 0, y );
+
+    for (int x = 0; x < width; x++)
+    {
+      int iWeight = blendModel.compute( x, y );
+      weight[x] = iWeight;
+    }
+  }
+}
+
 #endif
 
 /**
