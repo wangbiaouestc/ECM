@@ -3542,7 +3542,7 @@ void HLSWriter::codeSliceHeader         ( Slice* pcSlice )
   }
   else
   {
-    const Picture* const pColPic = pcSlice->getRefPic(RefPicList(1 - pcSlice->getColFromL0Flag()), pcSlice->getColRefIdx());
+    const Picture* const pColPic = pcSlice->getRefPic(RefPicList(1 - pcSlice->getColFromL0Flag()), pcSlice->getColRefIdx())->unscaledPic;
     ClpRng colLumaClpRng = pColPic->getLumaClpRng();
     int colLumaMin = colLumaClpRng.min;
     int colLumaMax = colLumaClpRng.max;
