@@ -30,6 +30,10 @@ struct DataFrame
   uint16_t p0, p1;
   int rate;
   int weight;
+#if JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE
+  int drate0;
+  int drate1;
+#endif
 };
 
 struct DataSequence
