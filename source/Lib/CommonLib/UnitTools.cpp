@@ -22951,7 +22951,7 @@ void PU::getAmvpSbTmvp(PredictionUnit &pu, MergeCtx& mrgCtx, const Mv mvShift, c
   const unsigned scale = 4 * std::max<int>(1, 4 * AMVP_DECIMATION_FACTOR / 4);
   const unsigned mask = ~(scale - 1);
   const RefPicList colRefList = RefPicList(pu.colIdx == 0 ? (slice.isInterB() ? 1 - slice.getColFromL0Flag() : 0) : (slice.isInterB() ? 1 - slice.getColFromL0Flag2nd() : 0));
-  const Picture *pColPic = slice.getRefPic(colRefList, pu.colIdx == 0 ? slice.getColRefIdx() : slice.getColRefIdx2nd());
+  const Picture *pColPic = slice.getRefPic(colRefList, pu.colIdx == 0 ? slice.getColRefIdx() : slice.getColRefIdx2nd())->unscaledPic;
 
   Position puPos = pu.lumaPos();
   Size puSize = pu.lumaSize();
