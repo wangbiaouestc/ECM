@@ -56,6 +56,10 @@ namespace CabacRetrain
 {
   extern std::vector<std::pair<uint16_t, uint16_t>>  vprobaInit;
   extern std::vector<int>                            vrate;
+#if JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE
+  extern std::vector<int>                            vdrate0;
+  extern std::vector<int>                            vdrate1;
+#endif
   extern std::vector<int>                            vweight;
   extern int                                         ctx;
   extern bool                                        report;
@@ -96,7 +100,11 @@ namespace CabacRetrain
       default: file << "? "; break;
       }
 
-      file << vprobaInit[ctxi].first << ' ' << vprobaInit[ctxi].second << ' ' << ( int ) vrate[ctxi] << ' ' << ( int ) vweight[ctxi] << ' ';
+      file << vprobaInit[ctxi].first << ' ' << vprobaInit[ctxi].second << ' ' << ( int ) vrate[ctxi] << ' ' << ( int ) vweight[ctxi] << ' '
+#if JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE
+           << ( int ) vdrate0[ctxi] << ' '<< ( int ) vdrate1[ctxi] << ' '
+#endif
+      ;
 
       for( auto b : vbins[ctxi] )
       {
@@ -133,6 +141,10 @@ namespace CabacRetrain
     files.resize( endctx - startctx );
     vbins.resize( endctx - startctx );
     vprobaInit.resize( endctx - startctx );
+#if JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE
+    vdrate0.resize( endctx - startctx );
+    vdrate1.resize( endctx - startctx );
+#endif
     vrate.resize( endctx - startctx );
     vweight.resize( endctx - startctx );
 
@@ -147,13 +159,18 @@ namespace CabacRetrain
         std::cerr << "[ERROR] ctx idx out or range ([0-" << ContextSetCfg::getInitTable( 0 ).size() << "[ )" << std::endl;
         exit( -1 );
       }
-      for( int k = 0; k < (3 * 3 + 2); ++k )
+#if JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE
+      constexpr int N=3*3+3*2;
+#else
+      constexpr int N=3*3+2;
+#endif
+      for( int k = 0; k < N; ++k )
       {
         file << ( int ) ContextSetCfg::getInitTable( k )[ctxi] << ' ';
       }
       file << "\n";
       file << "# SIZE " << filesize << '\n';
-      file << "# POC SLICETYPE QP SWITCHBP REPORT SLICEREPORT S0 S1 RATE WEIGHT BINS[]\n";
+      file << "# POC SLICETYPE QP SWITCHBP REPORT SLICEREPORT S0 S1 RATE WEIGHT DRATE0 DRATE1 BINS[]\n";
     }
   }
 }

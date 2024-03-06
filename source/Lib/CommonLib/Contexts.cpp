@@ -45,6 +45,10 @@
 namespace CabacRetrain
 {
   bool report=false;
+#if JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE
+  std::vector<int> vdrate0;
+  std::vector<int> vdrate1;
+#endif
   std::vector<int> vweight;
   std::vector<int> vrate;
   std::vector<std::pair<uint16_t,uint16_t>> vprobaInit;
@@ -816,6 +820,10 @@ void CtxStore<BinProbModel>::init( int qp, int initId )
 #if JVET_AG0196_CABAC_RETRAIN
     if (CabacRetrain::activate)
     {
+#if JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE
+      CabacRetrain::vdrate0[k]      = rateOffsetInitTable0[k];
+      CabacRetrain::vdrate1[k]      = rateOffsetInitTable1[k];
+#endif
       CabacRetrain::vrate[k]      = rateInitTable[k];
       CabacRetrain::vweight[k]    = weightInitTable[k];
       CabacRetrain::vprobaInit[k] = m_ctxBuffer[k].getState();

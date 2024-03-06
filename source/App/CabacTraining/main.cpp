@@ -159,13 +159,14 @@ int main( int argc, char **argv )
   if( !outfile.empty() )
   {
     ofstream file( outfile, ios::binary );
-    file << db.ctxidx << " A " << modelsgreedy[0].initId << ' ' << modelsgreedy[1].initId << ' '
-      << modelsgreedy[2].initId << ' ' << modelsgreedy[0].log2windowsize << ' ' << modelsgreedy[1].log2windowsize
-      << ' ' << modelsgreedy[2].log2windowsize << ' ' << modelsgreedy[0].adaptweight << ' '
-      << modelsgreedy[1].adaptweight << ' ' << modelsgreedy[2].adaptweight << ' ' << modelsgreedy[0].rateoffset[0]
-      << ' ' << modelsgreedy[0].rateoffset[1] 
+    file << db.ctxidx << " A "
+         << modelsgreedy[0].initId << ' '         << modelsgreedy[1].initId << ' '         << modelsgreedy[2].initId << ' '
+         << modelsgreedy[0].log2windowsize << ' ' << modelsgreedy[1].log2windowsize << ' ' << modelsgreedy[2].log2windowsize << ' '
+         << modelsgreedy[0].adaptweight << ' '    << modelsgreedy[1].adaptweight << ' '    << modelsgreedy[2].adaptweight << ' '
+         << modelsgreedy[0].rateoffset[0] << ' ' << modelsgreedy[0].rateoffset[1]
 #if JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE
-      << ' ' << modelsgreedy[1].rateoffset[0] << ' ' << modelsgreedy[1].rateoffset[1] << ' ' << modelsgreedy[2].rateoffset[0] << ' ' << modelsgreedy[2].rateoffset[1]
+         << ' ' << modelsgreedy[1].rateoffset[0] << ' ' << modelsgreedy[1].rateoffset[1]
+         << ' ' << modelsgreedy[2].rateoffset[0] << ' ' << modelsgreedy[2].rateoffset[1]
 #endif
       << std::endl;
   }
