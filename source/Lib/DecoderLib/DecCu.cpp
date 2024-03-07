@@ -4375,6 +4375,12 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
             else
             {
               PU::getInterMergeCandidates(pu, mrgCtx, 0, pu.mergeIdx);
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+              if (pu.mergeOppositeLic)
+              {
+                mrgCtx.licFlags[pu.mergeIdx] = !mrgCtx.licFlags[pu.mergeIdx];
+              }
+#endif
             }
 #else
             PU::getInterMergeCandidates(pu, mrgCtx, 0, pu.mergeIdx);

@@ -5239,13 +5239,13 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
           m_pcInterSearch->adjustAffineMergeCandidates(pu, affineBMMergeCtx);
         }
 #endif
-#if JVET_AG0276_LIC_FLAG_SIGNALING
-        if (hasOppositelicAff && pu.cs->sps->getUseAffMergeOppositeLic())
-        {
-          affineMergeCtxOppositeLic.numValidMergeCand = slice.getPicHeader()->getMaxNumAffineOppositeLicMergeCand();
-          affineMergeCtxOppositeLic.maxNumMergeCand = slice.getPicHeader()->getMaxNumAffineOppositeLicMergeCand();
-        }
+      }
 #endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+      if (hasOppositelicAff && pu.cs->sps->getUseAffMergeOppositeLic())
+      {
+        affineMergeCtxOppositeLic.numValidMergeCand = slice.getPicHeader()->getMaxNumAffineOppositeLicMergeCand();
+        affineMergeCtxOppositeLic.maxNumMergeCand = slice.getPicHeader()->getMaxNumAffineOppositeLicMergeCand();
       }
 #endif
 #if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS

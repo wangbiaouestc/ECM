@@ -13164,6 +13164,7 @@ int IntraPrediction::xCalTMPFusionNumber(const int maxNum, const int numIdx
   int offset       = maxNum * numIdx;
 #if JVET_AG0136_INTRA_TMP_LIC
   const static_vector<uint64_t, MTMP_NUM>& mtmpCostList = useMR ? m_mtmpCostListUseMR : m_mtmpCostList;
+  CHECK(offset >= mtmpCostList.size(), "Wrong offset for mtmpCostList");
   const int threshold = numIdx ? int(mtmpCostList[offset] * 1.2) : int(mtmpCostList[offset] * 2);
 #else
   int threshold    = numIdx ? int(m_mtmpCostList[offset] * 1.2) : int(m_mtmpCostList[offset] * 2);
