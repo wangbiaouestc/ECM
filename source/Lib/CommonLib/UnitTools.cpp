@@ -15329,6 +15329,7 @@ bool PU::checkTmEnableCondition(const SPS* sps, const PPS* pps, const Picture* r
 #if JVET_AG0164_AFFINE_GPM
 bool PU::checkRprRefExistingInGpm(const PredictionUnit& pu, const MergeCtx& geoMrgCtx0, uint8_t candIdx0, const MergeCtx& geoMrgCtx1, uint8_t candIdx1, const AffineMergeCtx& affMergeCtx)
 {
+#if !JVET_AF0190_RPR_TMP_REORDER_LIC
   if (pu.cs->sps->getRprEnabledFlag())
   {
     auto xCheckUseRprPerPart = [&pu](const MergeCtx& mrgCtx, const AffineMergeCtx& affCtx, uint8_t candIdx, uint8_t partIdx)
@@ -15375,7 +15376,7 @@ bool PU::checkRprRefExistingInGpm(const PredictionUnit& pu, const MergeCtx& geoM
     };
     return xCheckUseRprPerPart(geoMrgCtx0, affMergeCtx, candIdx0, 0) || xCheckUseRprPerPart(geoMrgCtx1, affMergeCtx,candIdx1,  1);
   }
-
+#endif
   return false;
 }
 #endif
