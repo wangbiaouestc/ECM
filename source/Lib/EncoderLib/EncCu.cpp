@@ -8444,7 +8444,11 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
   double geoTMFlagCost[2];
 #endif
 #if JVET_AA0058_GPM_ADAPTIVE_BLENDING
+#if TEST_3_4 
+  double geoBldFlagCost[TOTAL_GEO_BLENDING_NUM];
+#else
   double geoBldFlagCost[GEO_BLENDING_NUM];
+#endif
 #endif
 #if JVET_AG0164_AFFINE_GPM
   double geoAffMergeIdxCost[GEO_MAX_NUM_UNI_AFF_CANDS];
@@ -8500,12 +8504,14 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
     geoTMFlagCost[idx] = (double)fracBits * sqrtLambdaFracBits;
   }
 #endif
+#if !TEST_3_4
 #if JVET_AA0058_GPM_ADAPTIVE_BLENDING
   for (int idx = 0; idx < GEO_BLENDING_NUM; idx++)
   {
     uint64_t fracBits = m_CABACEstimator->geoBldFlagEst(ctxStart, idx);
     geoBldFlagCost[idx] = (double)fracBits * sqrtLambdaFracBits;
   }
+#endif
 #endif
 #if JVET_Y0065_GPM_INTRA
   bool bUseOnlyOneVector = (tempCS->slice->isInterP() || tempCS->sps->getMaxNumGeoCand() == 1);
@@ -8606,6 +8612,17 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
 #else
   PU::getGeoMergeCandidates(pu, mergeCtx, &m_mergeCand);
   maxNumMergeCandidates = min((int)maxNumMergeCandidates, mergeCtx.numValidMergeCand);
+#endif
+#if TEST_3_4
+  int blkSizeSmall = pu.lwidth() < pu.lheight() ? pu.lwidth() : pu.lheight();
+  int startIdx = (blkSizeSmall < GPM_BLENDING_SIZE_THRESHOLD) ? 0 : 1;
+  int endIdx = (blkSizeSmall < GPM_BLENDING_SIZE_THRESHOLD) ? GEO_BLENDING_NUM : TOTAL_GEO_BLENDING_NUM;
+  for (uint8_t idx = startIdx; idx < endIdx; idx++)
+  {
+    uint64_t fracBits = m_CABACEstimator->geoBldFlagEst(pu, ctxStart, idx);
+    geoBldFlagCost[idx] = (double)fracBits * sqrtLambdaFracBits;
+  }
+  m_CABACEstimator->getCtx() = ctxStart;
 #endif
 #if JVET_AG0164_AFFINE_GPM
   AffineMergeCtx affMergeCtx;
@@ -9373,7 +9390,14 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
     bool mmvdFlag1 = false;
 
 #if JVET_AA0058_GPM_ADAPTIVE_BLENDING
+#if TEST_3_4
+    int blkSizeSmall = pu.lwidth() < pu.lheight() ? pu.lwidth() : pu.lheight();
+    int startIdx = (blkSizeSmall < GPM_BLENDING_SIZE_THRESHOLD) ? 0 : 1;
+    int endIdx = (blkSizeSmall < GPM_BLENDING_SIZE_THRESHOLD) ? GEO_BLENDING_NUM : TOTAL_GEO_BLENDING_NUM;
+    for (uint8_t bldIdx = startIdx; bldIdx < endIdx; bldIdx++)
+#else
     for (uint8_t bldIdx = 0; bldIdx < GEO_BLENDING_NUM; bldIdx++)
+#endif
     {
       geoCombinations[candidateIdx * GEO_BLENDING_NUM + bldIdx] = m_acGeoWeightedBuffer[candidateIdx * GEO_BLENDING_NUM + bldIdx].getBuf(localUnitArea);
 #if JVET_Y0065_GPM_INTRA
@@ -11007,7 +11031,14 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
 #endif
 
 #if JVET_AA0058_GPM_ADAPTIVE_BLENDING
+#if TEST_3_4
+      int blkSizeSmall = pu.lwidth() < pu.lheight() ? pu.lwidth() : pu.lheight();
+      int startIdx = (blkSizeSmall < GPM_BLENDING_SIZE_THRESHOLD) ? 0 : 1;
+      int endIdx = (blkSizeSmall < GPM_BLENDING_SIZE_THRESHOLD) ? GEO_BLENDING_NUM : TOTAL_GEO_BLENDING_NUM;
+      for (uint8_t bldIdx = startIdx; bldIdx < endIdx; bldIdx++)
+#else
       for (uint8_t bldIdx = 0; bldIdx < GEO_BLENDING_NUM; bldIdx++)
+#endif
       {
         geoCombinations[candidateIdx * GEO_BLENDING_NUM + bldIdx] = m_acGeoWeightedBuffer[candidateIdx * GEO_BLENDING_NUM + bldIdx].getBuf(localUnitArea);
 

@@ -51,7 +51,7 @@
 #include <cassert>
 #include <cstdint>
 
-
+#define TEST_3_4                                          1
 
 #define BASE_ENCODER                                      1
 #define BASE_NORMATIVE                                    1
