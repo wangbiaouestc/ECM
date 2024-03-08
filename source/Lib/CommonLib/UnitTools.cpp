@@ -22964,6 +22964,7 @@ void PU::getAmvpSbTmvp(PredictionUnit &pu, MergeCtx& mrgCtx, const Mv mvShift, c
   centerPos.x = puPos.x + (puSize.width >> 1) + intMvShift.hor;
   centerPos.y = puPos.y + (puSize.height >> 1) + intMvShift.ver;
   clipColPos(centerPos.x, centerPos.y, pu);
+  scalePositionInRef(pu, *pu.cs->pps, colRefList, pu.colIdx == 0 ? slice.getColRefIdx() : slice.getColRefIdx2nd(), centerPos);
   centerPos = Position{ PosType(centerPos.x & mask), PosType(centerPos.y & mask) };
   const MotionInfo &mi = pColPic->cs->getMotionInfo(centerPos);
   Mv cColMv;
@@ -23068,6 +23069,7 @@ void PU::getAmvpSbTmvp(PredictionUnit &pu, MergeCtx& mrgCtx, const Mv mvShift, c
       {
         Position colPos{ x + xOff, y + yOff };
         clipColPos(colPos.x, colPos.y, pu);
+        scalePositionInRef(pu, *pu.cs->pps, colRefList, pu.colIdx == 0 ? slice.getColRefIdx() : slice.getColRefIdx2nd(), colPos);
         colPos = Position{ PosType(colPos.x & mask), PosType(colPos.y & mask) };
         int bufIdx = (colPos.x >> ATMVP_SUB_BLOCK_SIZE) - bufTL.x + ((colPos.y >> ATMVP_SUB_BLOCK_SIZE) - bufTL.y) * AMVP_SBTMVP_BUF_STRIDE;
         MotionInfo mi;
@@ -23116,6 +23118,7 @@ void PU::getAmvpSbTmvp(PredictionUnit &pu, MergeCtx& mrgCtx, const Mv mvShift, c
       {
         Position colPos{ x + xOff, y + yOff };
         clipColPos(colPos.x, colPos.y, pu);
+        scalePositionInRef(pu, *pu.cs->pps, colRefList, pu.colIdx == 0 ? slice.getColRefIdx() : slice.getColRefIdx2nd(), colPos);
         colPos = Position{ PosType(colPos.x & mask), PosType(colPos.y & mask) };
         const MotionInfo &colMi = pColPic->cs->getMotionInfo(colPos);
 
@@ -23819,7 +23822,11 @@ void PU::spanIpmInfoSgpm(PredictionUnit &pu)
 #endif
 
 #if RPR_ENABLE
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+void PU::scalePositionInRef(PredictionUnit& pu, const PPS& pps, RefPicList refList, int refIdx, Position& PosY)
+#else
 void scalePositionInRef( PredictionUnit& pu, const PPS& pps, RefPicList refList, int refIdx, Position& PosY )
+#endif
 {
   const Picture* refPic = pu.cu->slice->getRefPic( refList, refIdx )->unscaledPic;
   const bool scaled = refPic->isRefScaled( &pps );
@@ -26325,7 +26332,11 @@ void CU::saveProCcpInfoInter(CodingUnit &cu, TransformUnit &tu)
       clipColPos(posY.x, posY.y, pu);
 #endif
 #if RPR_ENABLE
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+      PU::scalePositionInRef(pu, *pu.cs->pps, refList, refIdx, posY);
+#else
       scalePositionInRef( pu, *pu.cs->pps, refList, refIdx, posY );
+#endif
 #endif
       posY.x = (posY.x & mask);
       posY.y = (posY.y & mask);
@@ -26369,7 +26380,11 @@ void CU::saveProCcpInfoInter(CodingUnit &cu, TransformUnit &tu)
     clipColPos(posY0.x, posY0.y, pu);
 #endif
 #if RPR_ENABLE
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+    PU::scalePositionInRef(pu, *pu.cs->pps, REF_PIC_LIST_0, tempMi.refIdx[0], posY0);
+#else
     scalePositionInRef( pu, *pu.cs->pps, REF_PIC_LIST_0, tempMi.refIdx[0], posY0 );
+#endif
 #endif
     posY0.x = (posY0.x & mask);
     posY0.y = (posY0.y & mask);
@@ -26396,7 +26411,11 @@ void CU::saveProCcpInfoInter(CodingUnit &cu, TransformUnit &tu)
     clipColPos(posY1.x, posY1.y, pu);
 #endif
 #if RPR_ENABLE
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+    PU::scalePositionInRef(pu, *pu.cs->pps, REF_PIC_LIST_1, tempMi.refIdx[1], posY1);
+#else
     scalePositionInRef( pu, *pu.cs->pps, REF_PIC_LIST_1, tempMi.refIdx[1], posY1 );
+#endif
 #endif
     posY1.x = (posY1.x & mask);
     posY1.y = (posY1.y & mask);
