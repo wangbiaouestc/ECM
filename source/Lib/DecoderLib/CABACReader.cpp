@@ -37,10 +37,6 @@
 
 #include "CABACReader.h"
 
-#if EXTENSION_CABAC_TRAINING
-#include <fstream>
-#endif
-
 #include "CommonLib/CodingStructure.h"
 #include "CommonLib/TrQuant.h"
 #include "CommonLib/UnitTools.h"
@@ -5156,6 +5152,13 @@ void CABACReader::merge_data( PredictionUnit& pu )
         affBmFlag(pu);
       }
 #endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+      pu.affineOppositeLic = false;
+      if (PU::hasOppositeLICFlag(pu) && !pu.afMmvdFlag && !pu.affBMMergeFlag && pu.cs->sps->getUseAffMergeOppositeLic())
+      {
+        pu.affineOppositeLic = m_BinDecoder.decodeBin(Ctx::AffineFlagOppositeLic(0));
+      }
+#endif
       merge_idx(pu);
       cu.firstPU->regularMergeFlag = false;
       return;
@@ -5334,6 +5337,21 @@ void CABACReader::merge_data( PredictionUnit& pu )
   }
   else
   {
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+    pu.mergeOppositeLic = false;
+    pu.tmMergeFlagOppositeLic = false;
+    if (pu.regularMergeFlag && PU::hasOppositeLICFlag(pu) && !pu.bmMergeFlag)
+    {
+      if (pu.tmMergeFlag && pu.cs->sps->getUseTMMergeOppositeLic())
+      {
+        pu.tmMergeFlagOppositeLic = m_BinDecoder.decodeBin(Ctx::TmMergeFlagOppositeLic(0));
+      }
+      else if (pu.cs->sps->getUseMergeOppositeLic())
+      {
+        pu.mergeOppositeLic = m_BinDecoder.decodeBin(Ctx::MergeFlagOppositeLic(0));
+      }
+    }
+#endif
     merge_idx(pu);
   }
 }
@@ -5359,6 +5377,12 @@ void CABACReader::merge_idx( PredictionUnit& pu )
     }
 #endif
     int numCandminus1 = int( pu.cs->picHeader->getMaxNumAffineMergeCand() ) - 1;
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+    if (pu.affineOppositeLic)
+    {
+      numCandminus1 = int(pu.cs->picHeader->getMaxNumAffineOppositeLicMergeCand()) - 1;
+    }
+#endif
     pu.mergeIdx = 0;
     if ( numCandminus1 > 0 )
     {
@@ -5658,6 +5682,16 @@ void CABACReader::merge_idx( PredictionUnit& pu )
   else if (pu.bmMergeFlag)
   {
     numCandminus1 = int(pu.cs->sps->getMaxNumBMMergeCand()) - 1;
+  }
+#endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  if (pu.mergeOppositeLic)
+  {
+    numCandminus1 = int(pu.cs->sps->getMaxNumOppositeLicMergeCand()) - 1;
+  }
+  else if (pu.tmMergeFlagOppositeLic)
+  {
+    numCandminus1 = int(pu.cs->sps->getMaxNumTMOppositeLicMergeCand()) - 1;
   }
 #endif
   if( numCandminus1 > 0 )
@@ -9596,8 +9630,24 @@ void CABACReader::cu_lic_flag( CodingUnit& cu )
   if( CU::isLICFlagPresent( cu ) )
   {
     RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE( STATS__CABAC_BITS__LIC_FLAG, cu.lumaSize() );
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+    unsigned ctxId = DeriveCtx::CtxLicFlag( cu );
+    cu.licFlag = m_BinDecoder.decodeBin( Ctx::LICFlag( ctxId ) );
+#else
     cu.licFlag = m_BinDecoder.decodeBin( Ctx::LICFlag( 0 ) );
+#endif
     DTRACE( g_trace_ctx, D_SYNTAX, "cu_lic_flag() lic_flag=%d\n", cu.licFlag ? 1 : 0 );
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+    if (cu.licFlag && CU::isLicSlopeAllowed(cu) && cu.firstPU->interDir != 3)
+    {
+      int delta = m_BinDecoder.decodeBin(Ctx::LicDelta(0)) ? 1 : 0;
+      if (delta)
+      {
+        delta *= m_BinDecoder.decodeBin(Ctx::LicDelta(1)) ? -1 : +1;
+      }
+      cu.licDelta = delta;
+    }
+#endif
   }
 }
 #endif
@@ -9901,373 +9951,3 @@ void CABACReader::interCcpMerge(TransformUnit& tu)
 }
 #endif
 
-#if EXTENSION_CABAC_TRAINING
-// The strings in array "ctxNames" must be in the same order as the calls of "ContextSetCfg::addCtxSet" in Contexts.cpp
-const char* ctxNames[] =
-{
-  "SplitFlag",
-  "SplitQtFlag",
-  "SplitHvFlag",
-  "Split12Flag",
-#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
-  "ModeConsFlag",
-#endif
-  "SkipFlag",
-  "MergeFlag",
-  "RegularMergeFlag",
-  "MergeIdx",
-#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
-  "TmMergeIdx",
-#endif
-#if JVET_Y0065_GPM_INTRA
-  "GPMIntraFlag",
-#endif
-  "MmvdFlag",
-  "MmvdMergeIdx",
-  "MmvdStepMvpIdx",
-#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-  "MmvdStepMvpIdxECM3",
-#endif
-#if JVET_W0097_GPM_MMVD_TM
-  "GeoMmvdFlag",
-  "GeoMmvdStepMvpIdx",
-#endif
-#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
-  "GeoBldFlag",
-#endif
-#if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
-  "GeoSubModeIdx",
-#endif
-#if AFFINE_MMVD
-  "AfMmvdFlag",
-  "AfMmvdIdx",
-  "AfMmvdOffsetStep",
-#if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
-  "AfMmvdOffsetStepECM3",
-#endif
-#endif
-#if JVET_AA0061_IBC_MBVD
-  "IbcMbvdFlag",
-  "IbcMbvdMergeIdx",
-  "IbcMbvdStepMvpIdx",
-#endif
-#if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
-  "TMMergeFlag",
-#endif
-#if TM_MRG
-#if JVET_X0141_CIIP_TIMD_TM
-  "CiipTMMergeFlag",
-#endif
-#endif
-  "PredMode",
-  "MultiRefLineIdx",
-  "IntraLumaMpmFlag",
-#if SECONDARY_MPM
-  "IntraLumaSecondMpmFlag",
-  "IntraLumaMPMIdx",
-#if JVET_AD0085_MPM_SORTING
-  "IntraLumaSecondMpmIdx",
-#endif
-#endif
-  "IntraLumaPlanarFlag",
-  "CclmModeFlag",
-  "CclmModeIdx",
-  "IntraChromaPredMode",
-#if JVET_Z0050_DIMD_CHROMA_FUSION
-#if ENABLE_DIMD
-  "DimdChromaMode",
-#endif
-  "ChromaFusionMode",
-#endif
-#if JVET_AC0071_DBV
-  "DbvChromaMode",
-#endif
-  "MipFlag",
-#if JVET_V0130_INTRA_TMP
-  "TmpFlag",
-#endif
-#if JVET_AD0086_ENHANCED_INTRA_TMP
-  "TmpIdx",
-  "TmpFusion",
-#endif
-#if MMLM
-  "MMLMFlag",
-#endif
-  "DeltaQP",
-  "InterDir",
-  "RefPic",
-#if JVET_Z0054_BLK_REF_PIC_REORDER
-  "RefPicLC",
-#endif
-  "SubblockMergeFlag",
-#if JVET_X0049_ADAPT_DMVR
-  "BMMergeFlag",
-#endif
-#if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
-  "affBMFlag",
-#endif
-#if JVET_AA0070_RRIBC
-  "rribcFlipType",
-#endif
-#if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
-  "bvOneZeroComp",
-#endif
-  "AffineFlag",
-  "AffineType",
-  "AffMergeIdx",
-#if INTER_LIC
-  "LICFlag",
-#endif
-  "BcwIdx",
-  "Mvd",
-#if JVET_Z0131_IBC_BVD_BINARIZATION
-  "Bvd",
-#endif
-#if JVET_AD0140_MVD_PREDICTION
-  "MvsdIdxMVDMSB",
-#endif
-#if JVET_AC0104_IBC_BVD_PREDICTION
-  "MvsdIdxBVDMSB",
-#endif
-#if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
-  "MvsdIdx",
-#endif
-#if JVET_AD0140_MVD_PREDICTION && JVET_AC0104_IBC_BVD_PREDICTION
-  "MvsdIdxIBC",
-#endif
-#if MULTI_HYP_PRED
-  "MultiHypothesisFlag",
-#endif
-  "MHRefPic",
-  "MHWeight",
-  "BDPCMMode",
-  "QtRootCbf",
-  "ACTFlag",
-  "QtCbf[0]",
-  "QtCbf[1]",
-  "QtCbf[2]",
-  "SigCoeffGroup[0]",
-  "SigCoeffGroup[1]",
-#if JVET_AE0102_LFNST_CTX
-  "SigFlagL[0]",
-  "SigFlagL[1]",
-  "SigFlagL[2]",
-  "SigFlagL[3]",
-  "SigFlagL[4]",
-  "SigFlagL[5]",
-  "ParFlagL[0]",
-  "ParFlagL[1]",
-  "GtxFlagL[0]",
-  "GtxFlagL[1]",
-  "GtxFlagL[2]",
-  "GtxFlagL[3]",
-#endif
-  "SigFlag[0]",
-  "SigFlag[1]",
-  "SigFlag[2]",
-  "SigFlag[3]",
-  "SigFlag[4]",
-  "SigFlag[5]",
-  "ParFlag[0]",
-  "ParFlag[1]",
-  "GtxFlag[0]",
-  "GtxFlag[1]",
-  "GtxFlag[2]",
-  "GtxFlag[3]",
-  "LastX[0]",
-  "LastX[1]",
-  "LastY[0]",
-  "LastY[1]",
-  "MVPIdx",
-#if JVET_X0083_BM_AMVP_MERGE_MODE
-  "amFlagState",
-#endif
-  "SmvdFlag",
-  "SaoMergeFlag",
-  "SaoTypeIdx",
-#if JVET_V0094_BILATERAL_FILTER
-  "BifCtrlFlags[0]",
-#if JVET_X0071_CHROMA_BILATERAL_FILTER
-  "BifCtrlFlags[1]",
-  "BifCtrlFlags[2]",
-#endif
-#endif
-#if JVET_W0066_CCSAO
-  "CcSaoControlIdc",
-#endif
-  "LFNSTIdx",
-  "PLTFlag",
-  "RotationFlag",
-  "RunTypeFlag",
-  "IdxRunModel",
-  "CopyRunModel",
-  "TransformSkipFlag",
-  "MTSIdx",
-  "ISPMode",
-  "SbtFlag",
-  "SbtQuadFlag",
-  "SbtHorFlag",
-  "SbtPosFlag",
-  "ChromaQpAdjFlag",
-#if ENABLE_DIMD
-  "DimdFlag",
-#endif
-#if JVET_W0123_TIMD_FUSION
-  "TimdFlag",
-#endif
-#if JVET_AB0155_SGPM
-  "SgpmFlag",
-#endif
-#if ENABLE_OBMC 
-  "ObmcFlag",
-#endif
-  "ChromaQpAdjIdc",
-  "ImvFlag",
-#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
-  "ImvFlagIBC",
-#endif
-  "ctbAlfFlag",
-  "ctbAlfAlternative",
-  "AlfUseTemporalFilt",
-  "CcAlfFilterControlFlag",
-  "CiipFlag",
-  "IBCFlag",
-#if JVET_AE0169_BIPREDICTIVE_IBC
-  "BiPredIbcFlag",
-#endif
-#if JVET_AC0112_IBC_CIIP
-  "IbcCiipFlag",
-  "IbcCiipIntraIdx",
-#endif
-#if JVET_AC0112_IBC_GPM
-  "IbcGpmFlag",
-  "IbcGpmIntraFlag",
-  "IbcGpmSplitDirSetFlag",
-  "IbcGpmBldIdx",
-#endif
-#if JVET_AC0112_IBC_LIC
-  "IbcLicFlag",
-#endif
-#if JVET_AE0078_IBC_LIC_EXTENSION
-  "IbcLicIndex",
-#endif
-  "JointCbCrFlag",
-  "TsSigCoeffGroup",
-  "TsSigFlag",
-  "TsParFlag",
-  "TsGtxFlag",
-  "TsLrg1Flag",
-  "TsResidualSign",
-#if SIGN_PREDICTION
-  "signPred[0]",
-  "signPred[1]",
-#endif
-#if JVET_Z0050_CCLM_SLOPE
-  "CclmDeltaFlags",
-#endif
-#if JVET_AA0126_GLM
-  "GlmFlags",
-#endif
-#if JVET_AA0057_CCCM
-  "CccmFlag",
-#if JVET_AD0202_CCCM_MDF
-  "CccmMpfFlag",
-#endif
-#if JVET_AE0100_BVGCCCM
-  "BvgCccmFlag",
-#endif
-#endif
-#if JVET_AD0120_LBCCP
-  "CcInsideFilterFlag",
-#endif
-#if JVET_AC0119_LM_CHROMA_FUSION
-  "ChromaFusionType",
-  "ChromaFusionCclm",
-#endif
-#if JVET_AB0157_TMRL
-  "TmrlDerive",
-#endif
-#if JVET_AD0188_CCP_MERGE
-  "nonLocalCCP",
-#endif
-#if JVET_AE0059_INTER_CCCM
-  "InterCccmFlag",
-#endif
-#if JVET_AF0073_INTER_CCP_MERGE
-  "InterCcpMergeFlag",
-#endif
-#if JVET_AG0058_EIP
-  "EipFlag",
-#endif
-};
-
-void CABACReader::traceStoredCabacBits(Slice* pcSlice, uint64_t& binFileByteOffset)
-{
-  std::ofstream out("CabacBits_data.xml", std::ios::app);
-  std::ofstream out2("CabacBits_data.bin", std::ios::app | std::ios::binary);
-
-  out << "    <frame>" << std::endl;
-  out << "        <POC>" << pcSlice->getPOC() << "</POC>" << std::endl;
-
-  out << "        <slice_type>";
-  if (pcSlice->getSliceType() == I_SLICE)
-  {
-    out << "I_SLICE";
-  }
-  else if (pcSlice->getSliceType() == B_SLICE)
-  {
-    out << "B_SLICE";
-  }
-  else
-  {
-    out << "P_SLICE";
-  }
-  out << "</slice_type>" << std::endl;
-  out << "        <QP>" << pcSlice->getSliceQp() << "</QP>" << std::endl;
-
-  int initType = 0;
-
-  if (pcSlice->getSliceType() != I_SLICE)
-  {
-    bool cabac_init_flag = pcSlice->getPPS()->getCabacInitPresentFlag() && pcSlice->getCabacInitFlag();
-    if (pcSlice->getSliceType() == P_SLICE)
-    {
-      initType = cabac_init_flag ? 2 : 1;
-    }
-    else
-    {
-      initType = cabac_init_flag ? 1 : 2;
-    }
-  }
-
-  out << "        <initType>" << initType << "</initType>" << std::endl;
-
-  CtxStore<BinProbModel_Std>& binProbModels = static_cast<CtxStore<BinProbModel_Std>&>(m_BinDecoder);
-  int prevNameIdx = 0;
-  int ctxCount = 0;
-  for (int x = 0; x < ContextSetCfg::NumberOfContexts; ++x, ++ctxCount)
-  {
-    BinCollector& tr = binProbModels[x].m_ctxBinTrace;
-    int currNameIdx = ContextSetCfg::sm_InitTableNameIndexes[x];
-    if (currNameIdx != prevNameIdx)
-    {
-      prevNameIdx = currNameIdx;
-      ctxCount = 0;
-    }
-    std::string name = ctxNames[currNameIdx];
-
-    out << "        <BinProbModel name=\"" << name << "\" index=\"" << ctxCount << "\"";
-    out << " >" << std::endl;
-    out << "            <binstream len=\"" << tr.getNumExtractedBins() << "\"";
-    if (tr.getNumExtractedBins() != 0)
-    {
-      out << " pos=\"" << binFileByteOffset << "\"";
-    }
-    out << " />" << std::endl;
-    out2.write((char*)tr.getExtractedBins().data(), tr.getExtractedBins().size());
-    binFileByteOffset += tr.getExtractedBins().size();
-    out << "        </BinProbModel>" << std::endl;
-  }
-  out << "    </frame>" << std::endl;
-}
-#endif

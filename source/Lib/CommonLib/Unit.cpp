@@ -413,6 +413,16 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   dimdDerivedIntraDir = other.dimdDerivedIntraDir;
 #endif
 #endif
+#if JVET_AG0276_NLIC
+  altLMFlag         = other.altLMFlag;
+  altLMParaUnit     = other.altLMParaUnit;
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  altLMBRParaUnit   = other.altLMBRParaUnit;
+#endif
+#if ENABLE_OBMC
+  secAltLMParaUnit  = other.secAltLMParaUnit;
+#endif
+#endif
 #if INTER_LIC
   licFlag           = other.licFlag;
 #if JVET_AD0213_LIC_IMP
@@ -424,6 +434,9 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
       licOffset[i][comp] = other.licOffset[i][comp];
     }
   }
+#endif
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+  licDelta         = other.licDelta;
 #endif
 #endif
 #if JVET_AC0112_IBC_LIC
@@ -643,6 +656,16 @@ void CodingUnit::initData()
   dimdDerivedIntraDir = 0;
 #endif
 #endif
+#if JVET_AG0276_NLIC
+  altLMFlag = false;
+  altLMParaUnit.resetAltLinearModel();
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  altLMBRParaUnit.resetAltLinearModel();
+#endif
+#if ENABLE_OBMC
+  secAltLMParaUnit.resetAltLinearModel();
+#endif
+#endif
 #if INTER_LIC
   licFlag = false;
 #if JVET_AD0213_LIC_IMP
@@ -654,6 +677,9 @@ void CodingUnit::initData()
       licOffset[i][comp] = MAX_INT;
     }
   }
+#endif
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+  licDelta = 0;
 #endif
 #endif
 #if JVET_AC0112_IBC_LIC
@@ -967,6 +993,11 @@ void PredictionUnit::initData()
   colIdx = 0;
 #endif
   mergeFlag   = false;
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  mergeOppositeLic = false;
+  affineOppositeLic = false;
+  tmMergeFlagOppositeLic = false;
+#endif
   regularMergeFlag = false;
   mergeIdx    = MAX_UCHAR;
   geoSplitDir  = MAX_UCHAR;
@@ -1185,6 +1216,11 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
   colIdx = predData.colIdx;
 #endif
   mergeFlag   = predData.mergeFlag;
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  mergeOppositeLic = predData.mergeOppositeLic;
+  affineOppositeLic = predData.affineOppositeLic;
+  tmMergeFlagOppositeLic = predData.tmMergeFlagOppositeLic;
+#endif
   regularMergeFlag = predData.regularMergeFlag;
   mergeIdx    = predData.mergeIdx;
   geoSplitDir  = predData.geoSplitDir;
@@ -1400,6 +1436,11 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   ccpMergeFusionType = other.ccpMergeFusionType;
 #endif
   mergeFlag   = other.mergeFlag;
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  mergeOppositeLic = other.mergeOppositeLic;
+  affineOppositeLic = other.affineOppositeLic;
+  tmMergeFlagOppositeLic = other.tmMergeFlagOppositeLic;
+#endif
   regularMergeFlag = other.regularMergeFlag;
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   colIdx = other.colIdx;

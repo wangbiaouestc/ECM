@@ -1898,7 +1898,7 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
   int targetMin = 64, targetMax = 940;
   if (cs.slice->getSliceType() != I_SLICE)
   {
-    const Picture* const pColPic = pcPic->cs->slice->getRefPic(RefPicList(1 - pcPic->cs->slice->getColFromL0Flag()), pcPic->cs->slice->getColRefIdx());
+    const Picture* const pColPic = pcPic->cs->slice->getRefPic(RefPicList(1 - pcPic->cs->slice->getColFromL0Flag()), pcPic->cs->slice->getColRefIdx())->unscaledPic;
     ClpRng colLumaClpRng = pColPic->getLumaClpRng();
     targetMin = colLumaClpRng.min;
     targetMax = colLumaClpRng.max;

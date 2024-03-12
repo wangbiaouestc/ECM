@@ -199,6 +199,15 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
                 pcEncPic->cs->pps   = pcEncPic->slices.back()->getPPS();
                 pcEncPic->cs->sps   = pcEncPic->slices.back()->getSPS();
                 pcEncPic->cs->slice = pcEncPic->slices.back();
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+                pcEncPic->cs->slice->setLumaPelMin(pic->cs->slice->getLumaPelMin());
+                pcEncPic->cs->slice->setLumaPelMax(pic->cs->slice->getLumaPelMax());
+                pcEncPic->cs->slice->setAdaptiveClipQuant(pic->cs->slice->getAdaptiveClipQuant());
+                pcEncPic->lumaClpRng.min = pic->cs->slice->getLumaPelMin();
+                pcEncPic->lumaClpRng.max = pic->cs->slice->getLumaPelMax();
+                pcEncPic->lumaClpRngforQuant.min = pic->cs->slice->getLumaPelMin();
+                pcEncPic->lumaClpRngforQuant.max = pic->cs->slice->getLumaPelMax();
+#endif
 
                 if( debugCTU >= 0 && poc == debugPOC )
                 {
@@ -295,6 +304,9 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
                 }
 
                 pcDecLib->executeLoopFilters();
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+                pcDecLib->adaptiveClipToRealRange();
+#endif
 #if JVET_V0094_BILATERAL_FILTER
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
                 if ( pic->cs->sps->getSAOEnabledFlag() || pic->cs->pps->getUseBIF() || pic->cs->pps->getUseChromaBIF())
@@ -331,6 +343,9 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
           if (!bRet)
           {
             pcDecLib->executeLoopFilters();
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+            pcDecLib->adaptiveClipToRealRange();
+#endif
           }
 
           pcDecLib->finishPicture( poc, pcListPic, DETAILS );
@@ -491,9 +506,6 @@ DecLib::DecLib()
   , m_parameterSetManager()
   , m_apcSlicePilot(NULL)
   , m_SEIs()
-#if EXTENSION_CABAC_TRAINING
-  , m_binFileByteOffset(0)
-#endif
   , m_cIntraPred()
   , m_cInterPred()
   , m_cTrQuant()
@@ -3349,10 +3361,6 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
 
   //  Decode a picture
   m_cSliceDecoder.decompressSlice( pcSlice, &( nalu.getBitstream() ), ( m_pcPic->poc == getDebugPOC() ? getDebugCTU() : -1 ) );
-#if EXTENSION_CABAC_TRAINING
-  CABACReader&   cabacReader = *(m_CABACDecoder.getCABACReader(0));
-  cabacReader.traceStoredCabacBits(pcSlice, getBinFileByteOffset());
-#endif
 
   m_bFirstSliceInPicture = false;
   m_uiSliceSegmentIdx++;

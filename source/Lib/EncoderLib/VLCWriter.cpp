@@ -1380,6 +1380,12 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #endif
 #if INTER_LIC
   WRITE_FLAG(pcSPS->getLicEnabledFlag() ? 1 : 0, "sps_lic_enabled_flag");
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+  if (pcSPS->getLicEnabledFlag())
+  {
+    WRITE_FLAG(pcSPS->getLicSlopeAdjustEnabledFlag() ? 1 : 0, "sps_lic_slope_adjust_enabled_flag");
+  }
+#endif
 #endif
 
   WRITE_FLAG( pcSPS->getWrapAroundEnabledFlag() ? 1 : 0,                              "sps_ref_wraparound_enabled_flag" );
@@ -1485,6 +1491,10 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
   {
     WRITE_FLAG(pcSPS->getFpelMmvdEnabledFlag() ? 1 : 0,                               "sps_mmvd_fullpel_only_flag");
   }
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  WRITE_FLAG(pcSPS->getUseMergeOppositeLic() ? 1 : 0,                                 "sps_oppositelic_merge_enabled_flag");
+  WRITE_FLAG(pcSPS->getUseTMMergeOppositeLic() ? 1 : 0,                               "sps_TM_oppositelic_merge_enabled_flag");
+#endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
   if (pcSPS->getTMToolsEnableFlag())
@@ -1492,6 +1502,12 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
   WRITE_FLAG(pcSPS->getUseMvdPred() ? 1 : 0,                                          "sps_mvd_pred_enabled_flag");
 #endif
   WRITE_UVLC(MRG_MAX_NUM_CANDS - pcSPS->getMaxNumMergeCand(), "six_minus_max_num_merge_cand");
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  if (pcSPS->getUseMergeOppositeLic())
+  {
+    WRITE_UVLC(REG_MRG_MAX_NUM_CANDS_OPPOSITELIC - pcSPS->getMaxNumOppositeLicMergeCand(), "five_minus_max_num_oppositelic_merge_cand");
+  }
+#endif
   WRITE_FLAG( pcSPS->getUseSBT() ? 1 : 0,                                                      "sps_sbt_enabled_flag");
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   WRITE_FLAG( pcSPS->getUseDMVDMode() ? 1 : 0,                                                 "sps_dmvd_enabled_flag" );
@@ -1516,12 +1532,38 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
   WRITE_UVLC(BM_MRG_MAX_NUM_CANDS - pcSPS->getMaxNumBMMergeCand(), "six_minus_max_num_bm_merge_cand");
 #endif
   WRITE_FLAG( pcSPS->getUseAffine() ? 1 : 0,                                                   "sps_affine_enabled_flag" );
+#if JVET_AG0276_NLIC
+  if (pcSPS->getUseAML()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+    && pcSPS->getTMToolsEnableFlag()
+#endif
+    )
+  {
+    WRITE_FLAG(pcSPS->getUseAltLM() ? 1 : 0, "sps_alt_lm_enabled_flag");
+    if (pcSPS->getUseAffine())
+    {
+      WRITE_FLAG(pcSPS->getUseAffAltLM() ? 1 : 0, "sps_affine_alt_lm_enabled_flag");
+    }
+  }
+#endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  if (pcSPS->getUseAffine())
+  {
+    WRITE_FLAG(pcSPS->getUseAffMergeOppositeLic() ? 1 : 0, "sps_affine_oppositelic_merge_enabled_flag");
+  }
+#endif
   if ( pcSPS->getUseAffine() )
   {
     WRITE_UVLC(AFFINE_MRG_MAX_NUM_CANDS - pcSPS->getMaxNumAffineMergeCand(), "five_minus_max_num_subblock_merge_cand");
     WRITE_FLAG( pcSPS->getUseAffineType() ? 1 : 0,                                             "sps_affine_type_flag" );
 #if AFFINE_MMVD
     WRITE_FLAG( pcSPS->getUseAffineMmvdMode() ? 1 : 0,                                         "sps_affine_mmvd_enabled_flag" );
+#endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+    if (pcSPS->getUseAffMergeOppositeLic())
+    {
+      WRITE_UVLC(AFF_MRG_MAX_NUM_CANDS_OPPOSITELIC - pcSPS->getMaxNumAffineOppositeLicMergeCand(), "eight_minus_max_num_oppositelic_subblock_merge_cand");
+    }
 #endif
     if (pcSPS->getAMVREnabledFlag())
     {
@@ -1541,6 +1583,12 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
     {
 #endif
       WRITE_FLAG(pcSPS->getUseAffineTM() ? 1 : 0,                                              "sps_tm_affine_flag");
+#if JVET_AG0276_NLIC
+      if (pcSPS->getUseAffineTM() && pcSPS->getUseAffAltLM())
+      {
+        WRITE_FLAG(pcSPS->getUseAffAltLMTM() ? 1 : 0,                                          "sps_affine_alt_lm_tm_flag");
+      }
+#endif
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
     }
 #endif
@@ -1645,6 +1693,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if JVET_AF0073_INTER_CCP_MERGE
   WRITE_FLAG( pcSPS->getUseInterCcpMerge() ? 1 : 0,                                    "sps_inter_ccp_merge");
 #endif
+#if JVET_AG0058_EIP
+  WRITE_FLAG(pcSPS->getUseEip() ? 1 : 0, "sps_eip_enabled_flag");
+#endif
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
   if (pcSPS->getTMnoninterToolsEnableFlag())
   {
@@ -1674,9 +1725,6 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #endif
 #if JVET_AD0082_TMRL_CONFIG
   WRITE_FLAG(pcSPS->getUseTmrl() ? 1 : 0, "sps_tmrl_enabled_flag");
-#endif
-#if JVET_AG0058_EIP
-  WRITE_FLAG(pcSPS->getUseEip() ? 1 : 0, "sps_eip_enabled_flag");
 #endif
 #if JVET_AD0085_MPM_SORTING
   WRITE_FLAG(pcSPS->getUseMpmSorting() ? 1 : 0, "sps_mpm_sorting_enabled_flag");
@@ -2680,10 +2728,16 @@ void HLSWriter::codePictureHeader( PicHeader* picHeader, bool writeRbspTrailingB
     if ( sps->getUseAffine() )
     {
       picHeader->setMaxNumAffineMergeCand(sps->getMaxNumAffineMergeCand());
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+      picHeader->setMaxNumAffineOppositeLicMergeCand(sps->getMaxNumAffineOppositeLicMergeCand());
+#endif
     }
     else
     {
       picHeader->setMaxNumAffineMergeCand(sps->getSbTMVPEnabledFlag() && picHeader->getEnableTMVPFlag());
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+      picHeader->setMaxNumAffineOppositeLicMergeCand(0);
+#endif
     }
 
   // full-pel MMVD flag
@@ -3488,7 +3542,7 @@ void HLSWriter::codeSliceHeader         ( Slice* pcSlice )
   }
   else
   {
-    const Picture* const pColPic = pcSlice->getRefPic(RefPicList(1 - pcSlice->getColFromL0Flag()), pcSlice->getColRefIdx());
+    const Picture* const pColPic = pcSlice->getRefPic(RefPicList(1 - pcSlice->getColFromL0Flag()), pcSlice->getColRefIdx())->unscaledPic;
     ClpRng colLumaClpRng = pColPic->getLumaClpRng();
     int colLumaMin = colLumaClpRng.min;
     int colLumaMax = colLumaClpRng.max;

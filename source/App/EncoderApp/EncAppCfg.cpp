@@ -1036,6 +1036,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("AffineType",                                      m_AffineType,                                      true,  "Enable affine type prediction (0:off, 1:on)  [default: on]" )
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
   ("AffineTM",                                        m_useAffineTM,                                     true, "Enable TM-based subblock motion refinement (0:off, 1:on)  [default: on]")
+#if JVET_AG0276_NLIC
+  ("AffAltLMTM",                                      m_useAffAltLMTM,                                   true, "Enable TM-based subblock motion refinement for affine AltLM")
+#endif
 #endif
 #if AFFINE_MMVD
   ("AffineMMVD",                                      m_AffineMmvdMode,                                  true, "Affine MMVD mode (0:off, 1:on)  [default: on]" )
@@ -1077,6 +1080,15 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("BIO",                                             m_BIO,                                            false, "Enable bi-directional optical flow")
 #if JVET_W0090_ARMC_TM
   ("AML",                                             m_AML,                                             true, "Enable adaptive merge list")
+#if JVET_AG0276_NLIC
+  ("AltLM",                                           m_altLM,                                           true, "Enable altLM")
+  ("AffAltLM",                                        m_affAltLM,                                        true, "Enable affine altLM")
+#endif
+#endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  ("MergeOppositeLic",                                m_mergeOppositeLic,                                true, "Enable opposite LIC flag for merge")
+  ("MergeTMOppositeLic",                              m_mergeTMOppositeLic,                              true, "Enable opposite LIC flag for TM merge")
+  ("MergeAffOppositeLic",                             m_mergeAffOppositeLic,                             true, "Enable opposite LIC flag for Affine merge")
 #endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   ("ArmcRefinedMotion",                               m_armcRefinedMotion,                               true, "Enable adaptive re-ordering of merge candidates with refined motion")
@@ -1555,6 +1567,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #else
   ("MaxNumMergeCand",                                 m_maxNumMergeCand,                                   5u, "Maximum number of merge candidates")
 #endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  ("MaxNumOppositeLicMergeCand",                      m_maxNumOppositeLicMergeCand,                       (uint32_t)(REG_MRG_MAX_NUM_CANDS_OPPOSITELIC), "Maximum number of merge candidates with opposite LIC flag")
+#endif
 #if JVET_X0049_ADAPT_DMVR
   ("MaxNumBMMergeCand",                               m_maxNumBMMergeCand,                                 4u, "Maximum number of BM merge candidates")
 #endif
@@ -1562,6 +1577,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("MaxNumAffineMergeCand",                           m_maxNumAffineMergeCand, (uint32_t)AFFINE_MRG_MAX_NUM_CANDS, "Maximum number of affine merge candidates")
 #else
   ("MaxNumAffineMergeCand",                           m_maxNumAffineMergeCand,                             5u, "Maximum number of affine merge candidates")
+#endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  ("MaxNumAffineOppositeLicMergeCand",                m_maxNumAffineOppositeLicMergeCand,                  (uint32_t)(AFF_MRG_MAX_NUM_CANDS_OPPOSITELIC), "Maximum number of affine merge candidates with opposite LIC flag")
 #endif
 #if NON_ADJACENT_MRG_CAND
   ("MaxNumGeoCand",                                   m_maxNumGeoCand,                                     10u, "Maximum number of geometric partitioning mode candidates")
@@ -1826,6 +1844,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if INTER_LIC
   ("LIC",                                             m_lic,                                     true, "Local illumination compensation [LIC] (0:disabled, 1:enabled)  [default: 1]")
   ("FastPicLevelLIC",                                 m_fastPicLevelLIC,                         true, "Fast picture level LIC decision (0:disabled, 1:enabled)  [default: 1]")
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+  ("LicSlopeAdjust",                                  m_licSlopeAdjust,                          true, "LIC with slope adjustment (0:disabled, 1:enabled)  [default: 1]")
+#endif
 #endif
   ( "ScalingRatioHor",                                m_scalingRatioHor,                          1.0, "Scaling ratio in hor direction" )
   ( "ScalingRatioVer",                                m_scalingRatioVer,                          1.0, "Scaling ratio in ver direction" )
@@ -4002,6 +4023,9 @@ bool EncAppCfg::xCheckParameter()
   xConfirmPara(m_maxNumAffineMergeCand < (m_sbTmvpEnableFlag ? 1 : 0),
                "MaxNumAffineMergeCand must be greater than 0 when SbTMVP is enabled");
   xConfirmPara( m_maxNumAffineMergeCand > AFFINE_MRG_MAX_NUM_CANDS, "MaxNumAffineMergeCand must be no more than AFFINE_MRG_MAX_NUM_CANDS." );
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  xConfirmPara(m_maxNumAffineOppositeLicMergeCand > AFF_MRG_MAX_NUM_CANDS_OPPOSITELIC, "MaxNumAffineOppositeLicMergeCand must be no more than AFF_MRG_MAX_NUM_CANDS_OPPOLIC.");
+#endif
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
   if (!m_tmNoninterToolsEnableFlag)
   {
@@ -4089,9 +4113,15 @@ bool EncAppCfg::xCheckParameter()
 #if AFFINE_MMVD
     xConfirmPara(m_AffineMmvdMode, "Affine MMVD can't be enabled if Affine is disabled.");
 #endif
+#if JVET_AG0135_AFFINE_CIIP
+    xConfirmPara( m_useCiipAffine, "Affine CIIP can't be enabled if Affine is disabled." );
+#endif
     m_maxNumAffineMergeCand = m_sbTmvpEnableFlag ? 1 : 0;
     if (m_PROF) msg(WARNING, "PROF is forcefully disabled when Affine is off \n");
     m_PROF = false;
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+    m_maxNumAffineOppositeLicMergeCand = 0;
+#endif
   }
 #if MULTI_PASS_DMVR
   if (m_DMVR && m_DMVDMode)
@@ -4198,6 +4228,24 @@ bool EncAppCfg::xCheckParameter()
       m_mvdPred = false;
     }
 #endif
+  }
+#endif
+#if JVET_AG0276_NLIC
+  if (!m_AML)
+  {
+    msg(WARNING, "AltLM is forcefully disabled since ARMC is set off\n");
+    m_altLM = false;
+    m_affAltLM = false;
+  }
+  if (!m_affAltLM)
+  {
+    msg(WARNING, "Affine AltLM TM is disabled since affine AltLM is set off\n");
+    m_useAffAltLMTM = false;
+  }
+  if (!m_useAffineTM)
+  {
+    msg(WARNING, "Affine AltLM TM is disabled since TM-based affine TM is set off\n");
+    m_useAffAltLMTM = false;
   }
 #endif
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_W0097_GPM_MMVD_TM && TM_MRG
@@ -5816,6 +5864,9 @@ void EncAppCfg::xPrintParameter()
   if( m_lic )
   {
     msg( VERBOSE, "FastPicLevelLIC:%d ", m_fastPicLevelLIC );
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+    msg( VERBOSE, "LicSlopeAdust:%d ", m_licSlopeAdjust );
+#endif
   }
 #endif
 #if JVET_AE0059_INTER_CCCM

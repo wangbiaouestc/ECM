@@ -548,6 +548,9 @@ void IntraPrediction::init(ChromaFormat chromaFormatIDC, const unsigned bitDepth
   for( auto &buffer : m_tempBuffer )
   {
     buffer.create( chromaFormatIDC, Area( 0, 0, MAX_CU_SIZE, MAX_CU_SIZE ) );
+#if JVET_AG0092_ENHANCED_TIMD_FUSION
+    memset(buffer.getBuf(COMPONENT_Y).buf, 0, MAX_CU_SIZE * MAX_CU_SIZE * sizeof(Pel));
+#endif
   }
 #if ENABLE_DIMD && INTRA_TRANS_ENC_OPT
   m_dimdBlending = dimdBlending;
@@ -1714,9 +1717,9 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
       Pel *pelDst = piPred.buf;
       int strideDst = piPred.stride;
 #if JVET_W0123_TIMD_FUSION && JVET_AG0092_ENHANCED_TIMD_FUSION
-      xLocationdepBlending(pelDst, strideDst, pelVer, strideVer, pelHor, strideHor, pelNonLocDep,strideNonLocDep, width, height,mode, weightVer, weightHor, weightNonLocDep);
+      xLocationdepBlending(pelDst, strideDst, pelVer, strideVer, pelHor, strideHor, pelNonLocDep, strideNonLocDep, width, height,mode, weightVer, weightHor, weightNonLocDep);
 #else
-      xDimdLocationdepBlending(pelDst, strideDst, pelVer, strideVer, pelHor, strideHor, pelNonLocDep,strideNonLocDep, width, height,mode, weightVer, weightHor, weightNonLocDep);
+      xDimdLocationdepBlending(pelDst, strideDst, pelVer, strideVer, pelHor, strideHor, pelNonLocDep, strideNonLocDep, width, height,mode, weightVer, weightHor, weightNonLocDep);
 #endif
     }
 #else
@@ -1957,6 +1960,7 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
       case (PLANAR_IDX): xPredIntraPlanar(srcBuf3rd, nonAngBuffer); break;
 #endif
       case(DC_IDX):     xPredIntraDc(srcBuf3rd, nonAngBuffer, channelType, false); break;
+        default: CHECK( true, "Wrong timdModeNonAng" ); break;
       }
 #if JVET_X0148_TIMD_PDPC
 #if CIIP_PDPC
@@ -2053,7 +2057,7 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
 #else
     Pel *pelPred = piPred.buf;
     Pel *pelPredFusion = predFusion.buf;
-    Pel *pelPredNonAng = nonAngBuffer.buf;
+    Pel *pelPredNonAng = pu.cu->timdFusionWeight[2] > 0 ? nonAngBuffer.buf : nullptr;
 #if JVET_AG0092_ENHANCED_TIMD_FUSION
     PelBuf predAngNonLocDep = m_tempBuffer[4].getBuf( localUnitArea.Y() );
     PelBuf predAngVer       = m_tempBuffer[2].getBuf( localUnitArea.Y() );
@@ -7680,6 +7684,9 @@ int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area
       {
         uiSecondaryCost = uiBestCost;
         iSecondaryMode  = iBestMode;
+#if JVET_AC0094_REF_SAMPLES_OPT
+        bSecondaryModeCheckWA = bBestModeCheckWA;
+#endif
       }
 #endif
       if (uiSecondaryCost < uiBestCost || (uiSecondaryCost - uiBestCost < uiBestCost))
@@ -12315,7 +12322,7 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
       Mv mergeCand = m_bvBasedMergeCandidates[mergeCandIdx];
       if (mergeCand.getHor() >= mvXMin && mergeCand.getHor() <= mvXMax && mergeCand.getVer() >= mvYMin && mergeCand.getVer() <= mvYMax) // merge candidate is inside itmp region
       {
-        bvRegionIdList[mergeCandIdx] = checkIdx;
+        bvRegionIdList[mergeCandIdx] = regionId;
       }
     }
 #endif
@@ -13157,6 +13164,7 @@ int IntraPrediction::xCalTMPFusionNumber(const int maxNum, const int numIdx
   int offset       = maxNum * numIdx;
 #if JVET_AG0136_INTRA_TMP_LIC
   const static_vector<uint64_t, MTMP_NUM>& mtmpCostList = useMR ? m_mtmpCostListUseMR : m_mtmpCostList;
+  CHECK(offset >= mtmpCostList.size(), "Wrong offset for mtmpCostList");
   const int threshold = numIdx ? int(mtmpCostList[offset] * 1.2) : int(mtmpCostList[offset] * 2);
 #else
   int threshold    = numIdx ? int(m_mtmpCostList[offset] * 1.2) : int(m_mtmpCostList[offset] * 2);
@@ -23095,8 +23103,8 @@ void IntraPrediction::getNeiEipCands(const PredictionUnit& pu, static_vector<Eip
   if (!slice.isIntra() && compId == COMPONENT_Y)
   {
     const Picture* const pColPic = slice.getRefPic(RefPicList(slice.isInterB() ? 1 - slice.getColFromL0Flag() : 0), slice.getColRefIdx()); 
-
-    if(pColPic)
+    bool isRefScaled = pColPic->isRefScaled(slice.getPPS());
+    if(pColPic && !isRefScaled)
     {
       const PreCalcValues& pcv = *cs.pcv;
       bool c0Avail;
@@ -23268,8 +23276,9 @@ void IntraPrediction::getNeiEipCands(const PredictionUnit& pu, static_vector<Eip
   if (!slice.isIntra() && compId == COMPONENT_Y)
   {
     const Picture* const pColPic = slice.getRefPic(RefPicList(slice.isInterB() ? 1 - slice.getColFromL0Flag() : 0), slice.getColRefIdx()); 
+    bool isRefScaled = pColPic->isRefScaled(slice.getPPS());
 
-    if(pColPic)
+    if (pColPic && !isRefScaled)
     {
       const PreCalcValues& pcv = *cs.pcv;
 

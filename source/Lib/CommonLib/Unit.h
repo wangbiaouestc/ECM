@@ -431,11 +431,24 @@ struct CodingUnit : public UnitArea
   int            intraTmpDimdMode;
 #endif
 #endif
+#if JVET_AG0276_NLIC
+  bool           altLMFlag;
+  AltLMInterUnit altLMParaUnit;
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  AltLMInterUnit altLMBRParaUnit;
+#endif
+#if ENABLE_OBMC
+  AltLMInterUnit secAltLMParaUnit;
+#endif
+#endif
 #if INTER_LIC
   bool           licFlag;
 #if JVET_AD0213_LIC_IMP
   int            licScale[2][3];
   int            licOffset[2][3];
+#endif
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+  int            licDelta;
 #endif
 #endif
 #if JVET_AC0112_IBC_LIC
@@ -657,6 +670,11 @@ struct InterPredictionData
 #endif
 #if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
   bool        tmMergeFlag;
+#endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  bool        tmMergeFlagOppositeLic;
+  bool        mergeOppositeLic;
+  bool        affineOppositeLic;
 #endif
 #if JVET_X0049_ADAPT_DMVR
   uint8_t     bmMergeFlag;

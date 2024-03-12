@@ -13,8 +13,13 @@ inline void initDefaultParameters( const ModelParameters &prms, const DataFrame 
   cabac.setState( { slice.p0,slice.p1 } );
   cabac.setWinSizes( slice.rate );
   cabac.setAdaptRateWeight( slice.weight );
+#if JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE
+  cabac.setAdaptRateOffset( slice.drate0, 0 );
+  cabac.setAdaptRateOffset( slice.drate1, 1 );
+#else
   cabac.setAdaptRateOffset( prms.rateoffset[0], 0 );
   cabac.setAdaptRateOffset( prms.rateoffset[1], 1 );
+#endif
 }
 
 inline std::pair<uint16_t, uint16_t> coding2ProbaInit( int initId, int qp )
@@ -40,6 +45,10 @@ inline void initNewParameters( const ModelParameters &prms, const DataFrame &sli
 
   cabac.setLog2WindowSize( prms.log2windowsize );
   cabac.setAdaptRateWeight( prms.adaptweight );
+#if JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE
+  cabac.setAdaptRateOffset( prms.rateoffset[0], 0 );
+  cabac.setAdaptRateOffset( prms.rateoffset[1], 1 );
+#endif
 }
 
 inline uint64_t cost1Frame( const DataFrame &slice, BinProbModel_Std &cabac )
