@@ -1970,6 +1970,9 @@ void DecCu::xReconInter(CodingUnit &cu)
               cu.licOffset[list][comp] = 0;
             }
             else
+#if LIC_INHERIT_PARA
+            if (!cu.licInheritPara)
+#endif
             {
               m_pcInterPred->setLicParam(list, comp, cu.licScale[list][comp], cu.licOffset[list][comp]);
             }
@@ -2234,8 +2237,15 @@ void DecCu::xReconInter(CodingUnit &cu)
     }
     else
     {
+#if LIC_INHERIT_PARA
+      cu.secAltLMParaUnit.resetAltLinearModel();
+#else
       cu.secAltLMParaUnit = cu.altLMParaUnit;
+#endif
     }
+#if LIC_INHERIT_PARA
+    cu.altLMParaUnit.resetAltLinearModel();
+#endif
     if (CU::isSecLicParaNeeded(cu) && CU::isAllowSecLicPara(cu))
     {
       UnitArea localUnitArea(cu.chromaFormat, Area(0, 0, cu.lumaSize().width, cu.lumaSize().height));
@@ -2773,6 +2783,14 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
 #endif
 #if INTER_LIC
             m_geoTmMrgCtx0.licFlags[pu.geoMergeIdx0] = false;
+#if LIC_INHERIT_PARA
+#if LIC_INHERIT_PARA
+            m_geoTmMrgCtx0.copyLICParamFromCtx(pu.geoMergeIdx0, m_geoMrgCtx, pu.geoMergeIdx0);
+            m_geoTmMrgCtx0.licFlags[pu.geoMergeIdx0] = m_geoTmMrgCtx0.licInheritPara[pu.geoMergeIdx0];
+#else
+            m_geoTmMrgCtx0.setDefaultLICParamToCtx(pu.geoMergeIdx0);
+#endif
+#endif
 #endif
 #if MULTI_HYP_PRED
             m_geoTmMrgCtx0.addHypNeighbours[pu.geoMergeIdx0] = m_geoMrgCtx.addHypNeighbours[pu.geoMergeIdx0];
@@ -2831,6 +2849,14 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
 #endif
 #if INTER_LIC
             m_geoTmMrgCtx1.licFlags[pu.geoMergeIdx1] = false;
+#if LIC_INHERIT_PARA
+#if LIC_INHERIT_PARA
+            m_geoTmMrgCtx1.copyLICParamFromCtx(pu.geoMergeIdx1, m_geoMrgCtx, pu.geoMergeIdx1);
+            m_geoTmMrgCtx1.licFlags[pu.geoMergeIdx1] = m_geoTmMrgCtx1.licInheritPara[pu.geoMergeIdx1];
+#else
+            m_geoTmMrgCtx1.setDefaultLICParamToCtx(pu.geoMergeIdx1);
+#endif
+#endif
 #endif
 #if MULTI_HYP_PRED
             m_geoTmMrgCtx1.addHypNeighbours[pu.geoMergeIdx1] = m_geoMrgCtx.addHypNeighbours[pu.geoMergeIdx1];
@@ -3043,6 +3069,9 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
 #endif
 #if INTER_LIC                                                   
                   affineMergeCtx.licFlags[cnt] = !affineRMVFCtxOppositeLic.licFlags[i];
+#if LIC_INHERIT_PARA
+                  affineMergeCtx.licInheritPara[cnt] = false;
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
                   affineMergeCtx.obmcFlags[cnt] = affineRMVFCtxOppositeLic.obmcFlags[i];
@@ -3081,6 +3110,9 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
 #endif
 #if INTER_LIC
             pu.cu->licFlag = affineMergeCtx.licFlags[pu.mergeIdx];
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+            affineMergeCtx.setLICParamToPu(pu, pu.mergeIdx, pu.cu->licFlag);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
             pu.cu->obmcFlag = affineMergeCtx.obmcFlags[pu.mergeIdx];
@@ -3319,6 +3351,9 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
 #endif
 #if INTER_LIC
           pu.cu->licFlag = affineMergeCtx.licFlags[pu.mergeIdx];
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+          affineMergeCtx.setLICParamToPu(pu, pu.mergeIdx, pu.cu->licFlag);
+#endif
 #endif
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
           pu.colIdx = affineMergeCtx.colIdx[pu.mergeIdx];
@@ -3824,6 +3859,9 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                       pu.cu->bcwIdx = mrgCtx.bcwIdx[candIdx];
 #if JVET_AD0213_LIC_IMP
                       pu.cu->licFlag = mrgCtx.licFlags[candIdx];
+#if LIC_INHERIT_PARA
+                      mrgCtx.setLICParamToPu(pu, candIdx, mrgCtx.licInheritPara[candIdx]);
+#endif
 #endif
                       pu.mv[0] = mrgCtx.mvFieldNeighbours[candIdx << 1].mv;
                       pu.mv[1] = mrgCtx.mvFieldNeighbours[(candIdx << 1) + 1].mv;
@@ -3907,6 +3945,9 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                       pu.cu->bcwIdx = mrgCtx.bcwIdx[candIdx];
 #if JVET_AD0213_LIC_IMP
                       pu.cu->licFlag = mrgCtx.licFlags[candIdx];
+#if LIC_INHERIT_PARA
+                      mrgCtx.setLICParamToPu(pu, candIdx, mrgCtx.licInheritPara[candIdx]);
+#endif
 #endif
                       pu.mv[0] = mrgCtx.mvFieldNeighbours[candIdx << 1].mv;
                       pu.mv[1] = mrgCtx.mvFieldNeighbours[(candIdx << 1) + 1].mv;
@@ -4028,6 +4069,9 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                   for (int i = 0; i < mrgCtx.numValidMergeCand; i++)
                   {
                     mrgCtx.licFlags[i] = !mrgCtx.licFlags[i];
+#if LIC_INHERIT_PARA
+                    mrgCtx.licInheritPara[i] = false;
+#endif
                   }
                 }
 #endif
@@ -4058,6 +4102,9 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                     for (int i = 0; i < mrgCtx.numValidMergeCand; i++)
                     {
                       mrgCtx.licFlags[i] = !mrgCtx.licFlags[i];
+#if LIC_INHERIT_PARA
+                      mrgCtx.licInheritPara[i] = false;
+#endif
                     }
                   }
 #endif
@@ -4103,6 +4150,9 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
 #endif
 #if INTER_LIC
                     mrgCtx.licFlags[ui] = false;
+#if LIC_INHERIT_PARA
+                    mrgCtx.setDefaultLICParamToCtx(ui);
+#endif
 #endif
                     mrgCtx.interDirNeighbours[ui] = 0;
                     mrgCtx.mvFieldNeighbours[(ui << 1)].refIdx = NOT_VALID;
@@ -4170,10 +4220,13 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                   for (int i = 0; i < mrgCtx.numValidMergeCand; i++)
                   {
                     mrgCtx.licFlags[i] = !mrgCtx.licFlags[i];
+#if LIC_INHERIT_PARA
+                    mrgCtx.licInheritPara[i] = false;
+#endif
                   }
                 }
 #endif
-#if JVET_AG0276_NLIC
+#if JVET_AG0276_NLIC || LIC_INHERIT_PARA_ARMC_STAGE
                 if (pu.tmMergeFlag || pu.ciipFlag)
                 {
 #endif
@@ -4198,19 +4251,55 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
 #endif
                     AltLMMergeCtx altLMMrgCtx;
                     PU::getAltMergeCandidates(pu, altLMMrgCtx);
-                    m_pcInterPred->adjustMergeCandidates(pu, mrgCtx, altLMMrgCtx, pu.cs->sps->getMaxNumMergeCand());
+#if LIC_INHERIT_PARA_ARMC_STAGE
+                    AltLMMergeCtx mrgCtxInherited;
+                    PU::getAltMergeCandidates(pu, mrgCtxInherited, true);
+#endif
+                    m_pcInterPred->adjustMergeCandidates(pu, mrgCtx
+#if LIC_INHERIT_PARA_ARMC_STAGE
+                                                       , &altLMMrgCtx
+                                                       , &mrgCtxInherited
+#else
+                                                       , altLMMrgCtx
+#endif
+                                                       , pu.cs->sps->getMaxNumMergeCand());
 #if JVET_AG0276_LIC_FLAG_SIGNALING
                   }
                   else
                   {
                     AltLMMergeCtx altLMBRMrgCtx;
                     PU::getAltBRMergeCandidates(pu, altLMBRMrgCtx);
-                    m_pcInterPred->adjustMergeCandidates(pu, mrgCtx, altLMBRMrgCtx, pu.cs->sps->getMaxNumMergeCand());
+                    m_pcInterPred->adjustMergeCandidates(pu, mrgCtx
+#if LIC_INHERIT_PARA_ARMC_STAGE
+                                                       , &altLMBRMrgCtx
+                                                       , nullptr
+#else
+                                                       , altLMBRMrgCtx
+#endif
+                                                       , pu.cs->sps->getMaxNumMergeCand());
                   }
 #endif
                   }
                   else
                   {
+#if LIC_INHERIT_PARA_ARMC_STAGE
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+                    if (!PU::isOppositeLIC(pu))
+#else
+                    if(true)
+#endif
+                    {
+                      AltLMMergeCtx mrgCtxInherited;
+                      PU::getAltMergeCandidates(pu, mrgCtxInherited, true);
+                      m_pcInterPred->adjustMergeCandidates(pu, mrgCtx, nullptr, &mrgCtxInherited,
+#if TM_MRG
+                                                           pu.tmMergeFlag ? pu.cs->sps->getMaxNumTMMergeCand() : 
+#endif
+                                                           pu.cs->sps->getMaxNumMergeCand());
+                    }
+                    else
+                    {
+#endif
 #if JVET_Z0102_NO_ARMC_FOR_ZERO_CAND
                     m_pcInterPred->adjustMergeCandidates(pu, mrgCtx, 
 #if TM_MRG
@@ -4220,7 +4309,18 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
 #else
                     m_pcInterPred->adjustMergeCandidatesInOneCandidateGroup(pu, mrgCtx, pu.mergeIdx + 1, pu.mergeIdx);
 #endif
+#if LIC_INHERIT_PARA_ARMC_STAGE
+                    }
+#endif
                   }
+                }
+#elif LIC_INHERIT_PARA_ARMC_STAGE
+                }
+                else
+                {
+                  AltLMMergeCtx mrgCtxInherited;
+                  PU::getAltMergeCandidates(pu, mrgCtxInherited, true);
+                  m_pcInterPred->adjustMergeCandidates(pu, mrgCtx, nullptr, &mrgCtxInherited, pu.cs->sps->getMaxNumMergeCand());
                 }
 #endif
 #if JVET_AB0079_TM_BCW_MRG
@@ -4268,6 +4368,9 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                   for (int i = 0; i < mrgCtx.numValidMergeCand; i++)
                   {
                     mrgCtx.licFlags[i] = !mrgCtx.licFlags[i];
+#if LIC_INHERIT_PARA
+                    mrgCtx.licInheritPara[i] = false;
+#endif
                   }
                 }
 #endif
@@ -4292,6 +4395,9 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
 #endif
 #if INTER_LIC
                   mrgCtx.licFlags[ui] = false;
+#if LIC_INHERIT_PARA
+                  mrgCtx.setDefaultLICParamToCtx(ui);
+#endif
 #endif
                   mrgCtx.interDirNeighbours[ui] = 0;
                   mrgCtx.mvFieldNeighbours[(ui << 1)].refIdx = NOT_VALID;
@@ -4359,6 +4465,9 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                   for (int i = 0; i < mrgCtx.numValidMergeCand; i++)
                   {
                     mrgCtx.licFlags[i] = !mrgCtx.licFlags[i];
+#if LIC_INHERIT_PARA
+                    mrgCtx.licInheritPara[i] = false;
+#endif
                   }
                 }
 #endif

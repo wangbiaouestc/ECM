@@ -425,6 +425,9 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #endif
 #if INTER_LIC
   licFlag           = other.licFlag;
+#if LIC_INHERIT_PARA
+  licInheritPara    = other.licInheritPara;
+#endif
 #if JVET_AD0213_LIC_IMP
   for (int i = 0; i < 2; i++)
   {
@@ -668,6 +671,9 @@ void CodingUnit::initData()
 #endif
 #if INTER_LIC
   licFlag = false;
+#if LIC_INHERIT_PARA
+  licInheritPara = false;
+#endif
 #if JVET_AD0213_LIC_IMP
   for (int i = 0; i < 2; i++)
   {

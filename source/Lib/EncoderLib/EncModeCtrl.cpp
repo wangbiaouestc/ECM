@@ -2512,7 +2512,11 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
         }
         else
         {
+#if LIC_INHERIT_PARA
+          cuECtx.bestCU->secAltLMParaUnit.resetAltLinearModel();
+#else
           cuECtx.bestCU->secAltLMParaUnit = cuECtx.bestCU->altLMParaUnit;
+#endif
         }
         cuECtx.bestCU->altLMParaUnit.resetAltLinearModel();
 #if JVET_AG0276_LIC_FLAG_SIGNALING

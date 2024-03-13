@@ -51,6 +51,14 @@
 #include <cassert>
 #include <cstdint>
 
+#define EE2_TEST_3_5                                      1 // 1 for Test-3.5a 
+                                                            // 2 for Test 3.5b
+                                                            // 3 for Test 3.5c
+#if EE2_TEST_3_5
+#define LIC_INHERIT_PARA                                  1
+#define LIC_INHERIT_PARA_SWAP_STAGE                       ((EE2_TEST_3_5) == 2 && (LIC_INHERIT_PARA))
+#define LIC_INHERIT_PARA_ARMC_STAGE                       ((EE2_TEST_3_5) == 3 && (LIC_INHERIT_PARA))
+#endif
 
 
 #define BASE_ENCODER                                      1

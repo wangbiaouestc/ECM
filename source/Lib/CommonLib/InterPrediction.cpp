@@ -1674,10 +1674,40 @@ void InterPrediction::xPredInterUni(const PredictionUnit &pu, const RefPicList &
       CHECK( bioApplied, "BIO is not allowed with affine" );
       m_iRefListIdx = eRefPicList;
       bool genChromaMv = (!luma && chroma && compID == COMPONENT_Cb);
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+      if (pu.cu->licInheritPara)
+      {
+        CHECK(!pu.cu->licFlag, "LIC flag should be true");
+        pu.cu->licFlag = false;
+      }
+#endif
 #if JVET_Z0136_OOB
       xPredAffineBlk(compID, pu, pu.cu->slice->getRefPic(eRefPicList, iRefIdx)->unscaledPic, mv, pcYuvPred, bi, pu.cu->slice->clpRng(compID), eRefPicList, genChromaMv, pu.cu->slice->getScalingRatio(eRefPicList, iRefIdx));
 #else
       xPredAffineBlk(compID, pu, pu.cu->slice->getRefPic(eRefPicList, iRefIdx)->unscaledPic, mv, pcYuvPred, bi, pu.cu->slice->clpRng(compID), genChromaMv, pu.cu->slice->getScalingRatio(eRefPicList, iRefIdx));
+#endif
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+      if (pu.cu->licInheritPara)
+      {
+        const ClpRng& clpRng = pu.cu->slice->clpRng(compID);
+        bool nonTrivialModel = pu.cu->licFlag && (pu.cu->licScale[m_iRefListIdx][compID] != 32 || pu.cu->licOffset[m_iRefListIdx][compID] != 0);
+        if (nonTrivialModel && !pu.cs->sps->getRprEnabledFlag() && !m_isAddHypMC)
+        {
+          if (bi)
+          {
+            const int biShift = IF_INTERNAL_PREC - clpRng.bd;
+            const Pel biOffset = -IF_INTERNAL_OFFS;
+            pcYuvPred.bufs[compID].toLast(clpRng);
+            pcYuvPred.bufs[compID].linearTransform(pu.cu->licScale[m_iRefListIdx][compID], m_LICShift, pu.cu->licOffset[m_iRefListIdx][compID], true, clpRng);
+            pcYuvPred.bufs[compID].linearTransform(1, -biShift, biOffset, false, clpRng);
+          }
+          else
+          {
+            pcYuvPred.bufs[compID].linearTransform(pu.cu->licScale[m_iRefListIdx][compID], m_LICShift, pu.cu->licOffset[m_iRefListIdx][compID], true, clpRng);
+          }
+        }
+        pu.cu->licFlag = true;
+      }
 #endif
     }
     else
@@ -2048,9 +2078,11 @@ void InterPrediction::xPredInterBiBDMVR(PredictionUnit &pu, PelUnitBuf &pcYuvPre
   {
 #if INTER_LIC
 #if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
-    if (pu.cu->affine || pu.cu->licFlag
+    if (pu.cu->affine || 
+                         pu.cu->licFlag
 #else
-    if (pu.cu->affine || m_subPuMC || pu.cu->licFlag
+    if (pu.cu->affine || m_subPuMC || 
+                                      pu.cu->licFlag
 #endif
 #if ENABLE_OBMC
       || pu.cu->isobmcMC
@@ -2659,9 +2691,11 @@ void InterPrediction::xPredInterBiBDMVR2(PredictionUnit &pu, PelUnitBuf &pcYuvPr
   {
 #if INTER_LIC
 #if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
-    if (pu.cu->affine || pu.cu->licFlag
+    if (pu.cu->affine || 
+                         pu.cu->licFlag
 #else
-    if (pu.cu->affine || m_subPuMC || pu.cu->licFlag
+    if (pu.cu->affine || m_subPuMC || 
+                                       pu.cu->licFlag
 #endif
 #if ENABLE_OBMC
         || pu.cu->isobmcMC
@@ -3918,6 +3952,14 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
 #endif
 
   const bool isResamplingPossible = pu.cs->sps->getRprEnabledFlag();
+#if LIC_INHERIT_PARA
+  const unsigned origWidth = dstPic.bufs[compID].width;
+  const unsigned origHeight = dstPic.bufs[compID].height;
+  int  backupWidth = dstPic.bufs[compID].width;
+  int  backupHeight = dstPic.bufs[compID].height;
+  Pel *backupDstBufPtr = dstPic.bufs[compID].buf;
+  int  backupDstBufStride = dstPic.bufs[compID].stride;
+#endif
 
   if( isResamplingPossible && !isIBC && xPredInterBlkRPR( scalingRatio, *pu.cs->pps, CompArea( compID, chFmt, pu.blocks[compID], Size( dstPic.bufs[compID].width, dstPic.bufs[compID].height ) ), refPic, mv, dstPic.bufs[compID].buf, dstPic.bufs[compID].stride, bi, wrapRef, clpRng, 0, useAltHpelIf ) )
   {
@@ -4003,11 +4045,17 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
       height = dmvrHeight;
     }
     // backup data
+#if LIC_INHERIT_PARA
+    backupWidth = width;
+    backupHeight = height;
+    backupDstBufPtr = dstBuf.buf;
+    backupDstBufStride = dstBuf.stride;
+#else
     int  backupWidth        = width;
     int  backupHeight       = height;
     Pel *backupDstBufPtr    = dstBuf.buf;
     int  backupDstBufStride = dstBuf.stride;
-
+#endif
     if (bioApplied && compID == COMPONENT_Y)
     {
 #if MULTI_PASS_DMVR || SAMPLE_BASED_BDOF
@@ -4274,6 +4322,49 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
 #endif
 #endif
 
+#if LIC_INHERIT_PARA
+  if (pu.cu->geoFlag)
+  {
+    bool nonTrivialModel = pu.cu->licFlag && (pu.cu->licScale[m_iRefListIdx][compID] != 32 || pu.cu->licOffset[m_iRefListIdx][compID] != 0);
+    if (nonTrivialModel && !pu.cs->sps->getRprEnabledFlag() && !m_isAddHypMC)
+    {
+      if (bi)
+      {
+        const int biShift = IF_INTERNAL_PREC - clpRng.bd;
+        const Pel biOffset = -IF_INTERNAL_OFFS;
+        if (bioApplied && compID == COMPONENT_Y)
+        {
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+          dstBuf.stride = origWidth + ((BIO_EXTEND_SIZE + 1) << 1);
+          dstBuf.buf = m_filteredBlockTmp[2 + m_iRefListIdx][compID];
+          dstBuf.buf += 2 * (dstBuf.stride + 1);
+#else
+          dstBuf.stride = backupWidth;
+          dstBuf.buf = m_filteredBlockTmp[2 + m_iRefListIdx][compID];
+#endif
+          dstBuf.width = backupWidth;
+          dstBuf.height = backupHeight;
+        }
+
+        dstBuf.toLast(clpRng);
+        dstBuf.linearTransform(pu.cu->licScale[m_iRefListIdx][compID], m_LICShift, pu.cu->licOffset[m_iRefListIdx][compID], true, clpRng);
+        dstBuf.linearTransform(1, -biShift, biOffset, false, clpRng);
+        if (bioApplied && compID == COMPONENT_Y)
+        {
+          dstBuf.buf = backupDstBufPtr;
+          dstBuf.stride = backupDstBufStride;
+          dstBuf.width = origWidth;
+          dstBuf.height = origHeight;
+        }
+      }
+      else
+      {
+        dstBuf.linearTransform(pu.cu->licScale[m_iRefListIdx][compID], m_LICShift, pu.cu->licOffset[m_iRefListIdx][compID], true, clpRng);
+      }
+    }
+    return;
+  }
+#endif
 #if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
 #if JVET_AD0213_LIC_IMP
   Slice* slice = pu.cu->slice;
@@ -4286,6 +4377,28 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
     if( pu.cu->licFlag && !pu.ciipFlag )
 #endif
     {
+#if LIC_INHERIT_PARA
+      if (pu.cu->licInheritPara && !pu.cs->sps->getRprEnabledFlag()
+        && !pu.ciipFlag
+        && !m_isAddHypMC
+        )
+      {
+        //CHECK(pu.ciipFlag, "pu.ciipFlag && pu.cu->licInheritPara");
+        if (bi)
+        {
+          const int biShift = IF_INTERNAL_PREC - clpRng.bd;
+          const Pel biOffset = -IF_INTERNAL_OFFS;
+          dstBuf.toLast(clpRng);
+          dstBuf.linearTransform(pu.cu->licScale[m_iRefListIdx][compID], m_LICShift, pu.cu->licOffset[m_iRefListIdx][compID], true, clpRng);
+          dstBuf.linearTransform(1, -biShift, biOffset, false, clpRng);
+        }
+        else
+        {
+          dstBuf.linearTransform(pu.cu->licScale[m_iRefListIdx][compID], m_LICShift, pu.cu->licOffset[m_iRefListIdx][compID], true, clpRng);
+        }
+        return;
+      }
+#endif
       CHECK( pu.cu->geoFlag, "Geometric mode is not used with LIC" );
       CHECK( CU::isIBC( *pu.cu ), "IBC mode is not used with LIC" );
 #if !JVET_AD0213_LIC_IMP
@@ -6895,7 +7008,23 @@ void InterPrediction::xWeightedAverage(
 #endif
       return;
     }
-    if (bioApplied)
+
+#if LIC_INHERIT_PARA
+    if (bioApplied && (pu.cu->geoFlag && chromaOnly))
+    {
+#if JVET_AG0276_LIC_BDOF_BDMVR
+      m_bdofMvRefined = (pu.cu->licFlag == false);
+#else
+      m_bdofMvRefined = true;
+#endif
+    }
+#endif
+
+    if (bioApplied
+#if LIC_INHERIT_PARA
+      && !(pu.cu->geoFlag && chromaOnly)
+#endif
+    )
     {
 #if !JVET_Z0136_OOB
       const int  src0Stride = pu.lwidth() + 2 * BIO_EXTEND_SIZE + 2;
@@ -8047,11 +8176,26 @@ void InterPrediction::subBlockOBMC(PredictionUnit  &pu, PelUnitBuf* pDst)
         subPu.cu->bcwIdx = neighPu->cu->bcwIdx;
         for (int refList = 0; refList < 2; refList++)
         {
+#if LIC_INHERIT_PARA
+          if(neighPu->interDir & (refList + 1))
+          {
+#endif
           for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
           {
             subPu.cu->licScale[refList][comp] = neighPu->cu->licScale[refList][comp];
             subPu.cu->licOffset[refList][comp] = neighPu->cu->licOffset[refList][comp];
           }
+#if LIC_INHERIT_PARA
+          }
+          else
+          {
+            for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
+            {
+              subPu.cu->licScale[refList][comp] = 32;
+              subPu.cu->licOffset[refList][comp] = 0;
+            }
+          }
+#endif
         }
 #endif
 #if JVET_AG0276_NLIC
@@ -8101,11 +8245,26 @@ void InterPrediction::subBlockOBMC(PredictionUnit  &pu, PelUnitBuf* pDst)
         subPu.cu->BcwIdx = neighPu->cu->BcwIdx;
         for (int refList = 0; refList < 2; refList++)
         {
+#if LIC_INHERIT_PARA
+          if (neighPu->interDir & (refList + 1))
+          {
+#endif
           for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
           {
             subPu.cu->licScale[refList][comp] = neighPu->cu->licScale[refList][comp];
             subPu.cu->licOffset[refList][comp] = neighPu->cu->licOffset[refList][comp];
           }
+#if LIC_INHERIT_PARA
+          }
+          else
+          {
+            for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
+            {
+              subPu.cu->licScale[refList][comp] = 32;
+              subPu.cu->licOffset[refList][comp] = 0;
+            }
+          }
+#endif
         }
 #endif
         xSubBlockMotionCompensation(subPu, cTmp1);
@@ -8166,11 +8325,26 @@ void InterPrediction::subBlockOBMC(PredictionUnit  &pu, PelUnitBuf* pDst)
   subPu.cu->licFlag = licFlag;
   for (int refList = 0; refList < 2; refList++)
   {
+#if LIC_INHERIT_PARA
+    if (pu.interDir & (refList + 1))
+    {
+#endif
     for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
     {
       subPu.cu->licScale[refList][comp] = licScale[refList][comp];
       subPu.cu->licOffset[refList][comp] = licOffset[refList][comp];
     }
+#if LIC_INHERIT_PARA
+    }
+    else
+    {
+      for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
+      {
+        subPu.cu->licScale[refList][comp] = 32;
+        subPu.cu->licOffset[refList][comp] = 0;
+      }
+    }
+#endif
   }
   subPu.cu->bcwIdx = bcwIdx;
 #endif
@@ -8946,6 +9120,10 @@ bool InterPrediction::getGeoBlendCand( const CodingUnit& cu, MergeCtx& geoMrgCtx
   maxNumMergeCandidates = std::min((int)maxNumMergeCandidates, geoMrgCtx.numValidMergeCand);
   Slice* slice = cu.cs->slice;
   MvField mvFieldA[2], mvFieldB[2];
+#if LIC_INHERIT_PARA
+  int     scaleA[2], offsetA[2];
+  int     scaleB[2], offsetB[2];
+#endif
   int numGeoBlendInfoCand = 0;
   geoMrgCtx.setGeoMrgDuplicate( *cu.firstPU );
   bool* mrgDuplicated = geoMrgCtx.mrgDuplicated;
@@ -8962,7 +9140,14 @@ bool InterPrediction::getGeoBlendCand( const CodingUnit& cu, MergeCtx& geoMrgCtx
     }
 
     MvField mvFieldTmp[2];
-    int dir = geoMrgCtx.getDir( slice, mergeCand, mvFieldTmp );
+#if LIC_INHERIT_PARA
+    int     scaleTmp[2], offsetTmp[2];
+#endif
+    int dir = geoMrgCtx.getDir( slice, mergeCand, mvFieldTmp
+#if LIC_INHERIT_PARA
+                              , scaleTmp, offsetTmp
+#endif
+    );
     if (dir == 0 || dir == 2)
     {
       listMergeCand0.push_back(mergeCand);
@@ -8990,8 +9175,16 @@ bool InterPrediction::getGeoBlendCand( const CodingUnit& cu, MergeCtx& geoMrgCtx
     uint8_t mergeCand0 = pairMergeCand.first;
     uint8_t mergeCand1 = pairMergeCand.second;
 
-    int dir0 = geoMrgCtx.getDir( slice, mergeCand0, mvFieldA );
-    int dir1 = geoMrgCtx.getDir( slice, mergeCand1, mvFieldB );
+    int dir0 = geoMrgCtx.getDir( slice, mergeCand0, mvFieldA 
+#if LIC_INHERIT_PARA
+                               , scaleA, offsetA
+#endif
+    );
+    int dir1 = geoMrgCtx.getDir( slice, mergeCand1, mvFieldB 
+#if LIC_INHERIT_PARA
+                               , scaleB, offsetB
+#endif
+    );
 
     if ( dir0 < 0 || dir0 == 1 ) 
     { // should contain at least ref-list-0
@@ -9009,7 +9202,11 @@ bool InterPrediction::getGeoBlendCand( const CodingUnit& cu, MergeCtx& geoMrgCtx
     for (int i = 0; i < numGeoBlendInfoCand && !bSame; i++)
     {
       GeoBlendInfo& tgeoBI = geoBlendInfo[i];
+#if LIC_INHERIT_PARA
+      bSame = tgeoBI.isSame(mvFieldA, mvFieldB, scaleA, scaleB, offsetA, offsetB) || tgeoBI.isSame(mvFieldB, mvFieldA, scaleB, scaleA, offsetB, offsetA);
+#else
       bSame = tgeoBI.isSame( mvFieldA, mvFieldB ) || tgeoBI.isSame( mvFieldB, mvFieldA );
+#endif
     }
     if (bSame)
     {
@@ -9018,7 +9215,13 @@ bool InterPrediction::getGeoBlendCand( const CodingUnit& cu, MergeCtx& geoMrgCtx
 
     m_tplBuffers.set( mergeCand0, mergeCand1, cu.lumaSize() );
 
-    Distortion uiCostTmp = deriveBcwBlendingBiDir( *cu.firstPU, mvFieldA, mvFieldB );  // template distortion cost
+    Distortion uiCostTmp = deriveBcwBlendingBiDir( *cu.firstPU, mvFieldA, mvFieldB 
+#if LIC_INHERIT_PARA
+                                                 , geoMrgCtx.licFlags[mergeCand0], geoMrgCtx.licFlags[mergeCand1]
+                                                 , scaleA, scaleB
+                                                 , offsetA, offsetB
+#endif
+    );  // template distortion cost
 
     if ( uiCostTmp < MAX_UINT64 )
     {
@@ -9031,6 +9234,16 @@ bool InterPrediction::getGeoBlendCand( const CodingUnit& cu, MergeCtx& geoMrgCtx
       geoBI.mvFieldA[1] = mvFieldA[1];
       geoBI.mvFieldB[0] = mvFieldB[0];
       geoBI.mvFieldB[1] = mvFieldB[1];
+#if LIC_INHERIT_PARA
+      geoBI.scaleA [0]  = scaleA [0];
+      geoBI.scaleA [1]  = scaleA [1];
+      geoBI.offsetA[0]  = offsetA[0];
+      geoBI.offsetA[1]  = offsetA[1];
+      geoBI.scaleB [0]  = scaleB [0];
+      geoBI.scaleB [1]  = scaleB [1];
+      geoBI.offsetB[0]  = offsetB[0];
+      geoBI.offsetB[1]  = offsetB[1];
+#endif
       geoBI.dir[0]      = dir0;
       geoBI.dir[1]      = dir1;
 
@@ -9082,6 +9295,10 @@ void InterPrediction::motionCompensationGeoBlend( CodingUnit& cu, MergeCtx& geoM
   const int mergeIdx = cu.firstPU->geoMergeIdx0;
 
   GeoBlendInfo  geoBI;
+#if LIC_INHERIT_PARA
+  cu.licFlag = false;
+  geoMrgCtx.setLICParamToPu(*cu.firstPU, NOT_VALID, false);
+#endif
   bool  bFoundGeoBlendCand = getGeoBlendCand( cu, geoMrgCtx, mergeIdx, geoBI );
   if ( !bFoundGeoBlendCand ) 
   {
@@ -11850,6 +12067,9 @@ void  InterPrediction::sortInterMergeMMVDCandidates(PredictionUnit &pu, MergeCtx
 #endif
 #if INTER_LIC
     pu.cu->licFlag = mrgCtx.licFlags[fPosBaseIdx];
+#if LIC_INHERIT_PARA
+    mrgCtx.setLICParamToPu(pu, fPosBaseIdx, mrgCtx.licInheritPara[fPosBaseIdx]);
+#endif
 #endif
     pu.cu->bcwIdx = (mrgCtx.interDirNeighbours[fPosBaseIdx] == 3) ? mrgCtx.bcwIdx[fPosBaseIdx] : BCW_DEFAULT;
     pu.refIdx[REF_PIC_LIST_0] = refList0;
@@ -12356,6 +12576,9 @@ void  InterPrediction::sortAffineMergeCandidates(PredictionUnit pu, AffineMergeC
 #endif
 #if JVET_AD0213_LIC_IMP
     pu.cu->licFlag = affMrgCtx.licFlags[pu.mergeIdx];
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+    affMrgCtx.setLICParamToPu(pu, pu.mergeIdx, pu.cu->licFlag);
+#endif
 #endif
     //Store
     posList0 = 0;
@@ -13056,7 +13279,13 @@ Distortion InterPrediction::deriveBcwBlending( PredictionUnit& pu, bool bUniDir[
   return uiCost;
 }
 
-Distortion InterPrediction::deriveBcwBlendingBiDir( PredictionUnit& pu, MvField mvfldA[2], MvField mvfldB[2] )
+Distortion InterPrediction::deriveBcwBlendingBiDir( PredictionUnit& pu, MvField mvfldA[2], MvField mvfldB[2] 
+#if LIC_INHERIT_PARA
+                                                  , bool isLicA, bool isLicB
+                                                  , int scaleA[2], int scaleB[2]
+                                                  , int offsetA[2], int offsetB[2]
+#endif
+)
 {
   if ( pu.ciipFlag || !pu.cs->sps->getUseAML() )
   {
@@ -13099,6 +13328,12 @@ Distortion InterPrediction::deriveBcwBlendingBiDir( PredictionUnit& pu, MvField 
   MvField mvFieldStore[2];
   mvFieldStore[0].setMvField( pu.mv[0], pu.refIdx[0] );
   mvFieldStore[1].setMvField( pu.mv[1], pu.refIdx[1] );
+#if LIC_INHERIT_PARA
+  bool licFlagStore = pu.cu->licFlag;
+  bool inheritStore = pu.cu->licInheritPara;
+  int scaleStore [2] = { pu.cu->licScale [0][COMPONENT_Y] , pu.cu->licScale [1][COMPONENT_Y] };
+  int offsetStore[2] = { pu.cu->licOffset[0][COMPONENT_Y] , pu.cu->licOffset[1][COMPONENT_Y] };
+#endif
 
   bool  bUniDirTab[2] = { true, true };
 
@@ -13108,6 +13343,26 @@ Distortion InterPrediction::deriveBcwBlendingBiDir( PredictionUnit& pu, MvField 
     int refIdx[2];
     refIdx[0] = mvField[0].refIdx;
     refIdx[1] = mvField[1].refIdx;
+#if LIC_INHERIT_PARA
+    if (iPart)
+    {
+      pu.cu->licFlag = isLicB;
+      pu.cu->licInheritPara = isLicB;
+      pu.cu->licScale [0][COMPONENT_Y] = scaleB [0];
+      pu.cu->licScale [1][COMPONENT_Y] = scaleB [1];
+      pu.cu->licOffset[0][COMPONENT_Y] = offsetB[0];
+      pu.cu->licOffset[1][COMPONENT_Y] = offsetB[1];
+    }
+    else
+    {
+      pu.cu->licFlag = isLicA;
+      pu.cu->licInheritPara = isLicA;
+      pu.cu->licScale [0][COMPONENT_Y] = scaleA [0];
+      pu.cu->licScale [1][COMPONENT_Y] = scaleA [1];
+      pu.cu->licOffset[0][COMPONENT_Y] = offsetA[0];
+      pu.cu->licOffset[1][COMPONENT_Y] = offsetA[1];
+    }
+#endif
 
   #if JVET_Z0067_RPR_ENABLE
     bool bRefIsRescaled = false;
@@ -13220,6 +13475,14 @@ Distortion InterPrediction::deriveBcwBlendingBiDir( PredictionUnit& pu, MvField 
   pu.mv[1]      = mvFieldStore[1].mv;
   pu.refIdx[0]  = mvFieldStore[0].refIdx;
   pu.refIdx[1]  = mvFieldStore[1].refIdx;
+#if LIC_INHERIT_PARA
+  pu.cu->licFlag = licFlagStore;
+  pu.cu->licInheritPara = inheritStore;
+  pu.cu->licScale [0][COMPONENT_Y] = scaleStore [0];
+  pu.cu->licScale [1][COMPONENT_Y] = scaleStore [1];
+  pu.cu->licOffset[0][COMPONENT_Y] = offsetStore[0];
+  pu.cu->licOffset[1][COMPONENT_Y] = offsetStore[1];
+#endif
 
   return uiCost;
 }
@@ -13471,7 +13734,9 @@ void InterPrediction::adjustMergeCandidatesBcwIdx(PredictionUnit& pu, MergeCtx& 
 #if JVET_AF0128_LIC_MERGE_TM
 void InterPrediction::adjustMergeCandidatesLicFlag(PredictionUnit& pu, MergeCtx& mrgCtx, const int mergeIdx)
 {
-  if (pu.cu->geoFlag || !pu.cs->sps->getTMToolsEnableFlag() || !pu.cs->slice->getUseLIC())
+  if (
+    pu.cu->geoFlag || 
+    !pu.cs->sps->getTMToolsEnableFlag() || !pu.cs->slice->getUseLIC())
   {
     return;
   }
@@ -13523,6 +13788,17 @@ void InterPrediction::adjustMergeCandidatesLicFlag(PredictionUnit& pu, MergeCtx&
     mrgCtx.setMergeInfo(pu, uiMergeCand);
     origLICFlag = pu.cu->licFlag;
     pu.cu->licFlag = false;
+#if LIC_INHERIT_PARA_SWAP_STAGE
+    bool checkLicInheritPara = origLICFlag && 256 > pu.cs->slice->getSPS()->getCTUSize();
+    if (checkLicInheritPara && (nWidth > 256 || nHeight > 256))
+    {
+      checkLicInheritPara = false;
+    }
+#endif
+#if LIC_INHERIT_PARA
+    CHECK(pu.cu->licInheritPara, "licInheritPara is initially true ");
+    pu.cu->licInheritPara = false; // Set false for getBlkAMLRefTemplate to get non-LIC MC results
+#endif
 #if JVET_Z0067_RPR_ENABLE
     bool bRefIsRescaled = false;
     for (uint32_t refList = 0; refList < NUM_REF_PIC_LIST_01; refList++)
@@ -13541,6 +13817,10 @@ void InterPrediction::adjustMergeCandidatesLicFlag(PredictionUnit& pu, MergeCtx&
 
     uiBestCost = MAX_UINT64;
     uiCost = 0;
+#if LIC_INHERIT_PARA_SWAP_STAGE
+    Distortion licInheritParaCost = checkLicInheritPara ? 0 : MAX_UINT64;
+    bool bestLicInheritPara = false;
+#endif
 
     for (int idx = 0; idx < 2; idx++)
     {
@@ -13552,18 +13832,35 @@ void InterPrediction::adjustMergeCandidatesLicFlag(PredictionUnit& pu, MergeCtx&
       if (m_bAMLTemplateAvailabe[0])
       {
         m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
-
         uiCost += cDistParam.distFunc(cDistParam);
+#if LIC_INHERIT_PARA_SWAP_STAGE
+        if (checkLicInheritPara && licFlag)
+        {
+          cDistParam.useMR = false;
+          pcBufPredRefTop.Y().linearTransform(pu.cu->licScale[pu.interDir - 1][COMPONENT_Y], m_LICShift, pu.cu->licOffset[pu.interDir - 1][COMPONENT_Y], true, pu.cu->slice->clpRng(COMPONENT_Y));
+          licInheritParaCost += cDistParam.distFunc(cDistParam);
+          cDistParam.useMR = licFlag;
+        }
+#endif
       }
 
       if (m_bAMLTemplateAvailabe[1])
       {
         m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
-
         uiCost += cDistParam.distFunc(cDistParam);
+#if LIC_INHERIT_PARA_SWAP_STAGE
+        if (checkLicInheritPara && licFlag)
+        {
+          cDistParam.useMR = false;
+          pcBufPredRefLeft.Y().linearTransform(pu.cu->licScale[pu.interDir - 1][COMPONENT_Y], m_LICShift, pu.cu->licOffset[pu.interDir - 1][COMPONENT_Y], true, pu.cu->slice->clpRng(COMPONENT_Y));
+          licInheritParaCost += cDistParam.distFunc(cDistParam);
+          cDistParam.useMR = licFlag;
+        }
+#endif
       }
 
-      if (origLICFlag == licFlag)
+      if (origLICFlag == licFlag
+      )
       {
         if (pu.cu->slice->getCheckLDB())
         {
@@ -13580,9 +13877,25 @@ void InterPrediction::adjustMergeCandidatesLicFlag(PredictionUnit& pu, MergeCtx&
         uiBestCost = uiCost;
         bestLICFlag = licFlag;
       }
+#if LIC_INHERIT_PARA_SWAP_STAGE
+      if (checkLicInheritPara && licInheritParaCost < uiBestCost)
+      {
+        bestLICFlag = true;
+        bestLicInheritPara = true;
+      }
+#endif
     } //for (int licFlag = 0; licFlag < 2; licFlag++)
     pu.cu->licFlag = bestLICFlag;
     mrgCtx.licFlags[uiMergeCand] = bestLICFlag;
+#if LIC_INHERIT_PARA_SWAP_STAGE
+    mrgCtx.licInheritPara[uiMergeCand] = bestLicInheritPara;
+#endif
+#if LIC_INHERIT_PARA
+    if (!bestLICFlag)
+    {
+      mrgCtx.setDefaultLICParamToCtx(uiMergeCand);
+    }
+#endif
   } // for (uint32_t uiMergeCand = 0; uiMergeCand < mrgCtx.numValidMergeCand; uiMergeCand++)
   pu.mergeIdx = mergeIdx;
 }
@@ -13744,6 +14057,9 @@ void InterPrediction::adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMer
 #endif
 #if INTER_LIC
       pairMergeCand.licFlags[cnt] = mvpMergeCandCtx.licFlags[rdCandList[0]];
+#if LIC_INHERIT_PARA
+      pairMergeCand.setDefaultLICParamToCtx(cnt);
+#endif
 #endif
       pairMergeCand.bcwIdx[cnt] = mvpMergeCandCtx.bcwIdx[rdCandList[0]];
       pairMergeCand.useAltHpelIf[cnt] = mvpMergeCandCtx.useAltHpelIf[rdCandList[0]];
@@ -13803,6 +14119,9 @@ void InterPrediction::adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMer
       if (averageUsed && !(((pu.cu->slice->getPOC() - pu.cu->slice->getRefPOC(REF_PIC_LIST_0, 0)) == 1) && pu.cu->slice->getPicHeader()->getMvdL1ZeroFlag()))
       {
         pairMergeCand.licFlags[cnt] = false;
+#if LIC_INHERIT_PARA
+        pairMergeCand.setDefaultLICParamToCtx(cnt);
+#endif
       }
 #endif
 
@@ -13812,6 +14131,9 @@ void InterPrediction::adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMer
         if (interDir == 3)
         {
           pairMergeCand.licFlags[cnt] = false;
+#if LIC_INHERIT_PARA
+          pairMergeCand.setDefaultLICParamToCtx(cnt);
+#endif
         }
 #endif
         uint32_t mvdSimilarityThresh = 1;
@@ -13979,17 +14301,32 @@ void InterPrediction::adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMer
 }
 #endif
 
-#if JVET_AG0276_NLIC
-void InterPrediction::adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMergeCandCtx, AltLMMergeCtx& altLMMrgCtx, int numRetrievedMergeCand)
+#if JVET_AG0276_NLIC || LIC_INHERIT_PARA_ARMC_STAGE
+void InterPrediction::adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMergeCandCtx
+#if LIC_INHERIT_PARA_ARMC_STAGE
+                                          , AltLMMergeCtx* pMrgCtxAlt
+                                          , AltLMMergeCtx* pMrgCtxInherit
+#else
+                                          , AltLMMergeCtx& altLMMrgCtx
+#endif
+                                          , int numRetrievedMergeCand)
 {
   MergeCtx altLMMergeCand;
   altLMMergeCand.numValidMergeCand = 0;
   altLMMergeCand.numCandToTestEnc = 0;
+#if LIC_INHERIT_PARA_ARMC_STAGE
+  if(pMrgCtxAlt != nullptr)
+  {
+    AltLMMergeCtx& altLMMrgCtx = *pMrgCtxAlt;
+#endif
   for (uint32_t mrgIdx = 0; mrgIdx < altLMMrgCtx.numValidMergeCand; mrgIdx++)
   {
     altLMMergeCand.altLMFlag[altLMMergeCand.numValidMergeCand] = true;
     altLMMergeCand.altLMParaNeighbours[altLMMergeCand.numValidMergeCand] = altLMMrgCtx.altLMParaNeighbours[mrgIdx];
     altLMMergeCand.licFlags[altLMMergeCand.numValidMergeCand] = false;
+#if LIC_INHERIT_PARA
+    altLMMergeCand.setDefaultLICParamToCtx(altLMMergeCand.numValidMergeCand);
+#endif
     altLMMergeCand.interDirNeighbours[altLMMergeCand.numValidMergeCand] = altLMMrgCtx.interDirNeighbours[mrgIdx];
     altLMMergeCand.mvFieldNeighbours[(altLMMergeCand.numValidMergeCand << 1) + 0] = altLMMrgCtx.mvFieldNeighbours[(mrgIdx << 1) + 0];
     altLMMergeCand.mvFieldNeighbours[(altLMMergeCand.numValidMergeCand << 1) + 1] = altLMMrgCtx.mvFieldNeighbours[(mrgIdx << 1) + 1];
@@ -14001,14 +14338,51 @@ void InterPrediction::adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMer
     altLMMergeCand.numValidMergeCand++;
     altLMMergeCand.numCandToTestEnc++;
   }
+#if LIC_INHERIT_PARA_ARMC_STAGE
+  }
+#endif
+#if LIC_INHERIT_PARA_ARMC_STAGE
+  MergeCtx inheritedMrgCand;
+  inheritedMrgCand.numValidMergeCand = 0;
+  inheritedMrgCand.numCandToTestEnc = 0;
+  if (pMrgCtxInherit != nullptr)
+  {
+    AltLMMergeCtx& altLMMrgCtx = *pMrgCtxInherit;
+    for (uint32_t mrgIdx = 0; mrgIdx < altLMMrgCtx.numValidMergeCand; mrgIdx++)
+    {
+      inheritedMrgCand.altLMFlag[inheritedMrgCand.numValidMergeCand] = false;
+      inheritedMrgCand.altLMParaNeighbours[inheritedMrgCand.numValidMergeCand].resetAltLinearModel();
+      inheritedMrgCand.licFlags[inheritedMrgCand.numValidMergeCand] = altLMMrgCtx.licFlags[mrgIdx];
+      inheritedMrgCand.copyLICParamFromCtx(inheritedMrgCand.numValidMergeCand, altLMMrgCtx, mrgIdx);
 
-  if (mvpMergeCandCtx.numValidMergeCand + altLMMergeCand.numValidMergeCand <= 1)
+      inheritedMrgCand.interDirNeighbours[inheritedMrgCand.numValidMergeCand] = altLMMrgCtx.interDirNeighbours[mrgIdx];
+      inheritedMrgCand.mvFieldNeighbours[(inheritedMrgCand.numValidMergeCand << 1) + 0] = altLMMrgCtx.mvFieldNeighbours[(mrgIdx << 1) + 0];
+      inheritedMrgCand.mvFieldNeighbours[(inheritedMrgCand.numValidMergeCand << 1) + 1] = altLMMrgCtx.mvFieldNeighbours[(mrgIdx << 1) + 1];
+      inheritedMrgCand.useAltHpelIf[inheritedMrgCand.numValidMergeCand] = altLMMrgCtx.useAltHpelIf[mrgIdx];
+      inheritedMrgCand.bcwIdx[inheritedMrgCand.numValidMergeCand] = altLMMrgCtx.bcwIdx[mrgIdx];
+      inheritedMrgCand.addHypNeighbours[inheritedMrgCand.numValidMergeCand].clear();
+      inheritedMrgCand.candCost[inheritedMrgCand.numValidMergeCand] = MAX_UINT64;
+
+      inheritedMrgCand.numValidMergeCand++;
+      inheritedMrgCand.numCandToTestEnc++;
+    }
+  }
+#endif
+
+  if (mvpMergeCandCtx.numValidMergeCand + altLMMergeCand.numValidMergeCand 
+#if LIC_INHERIT_PARA_ARMC_STAGE
+   + inheritedMrgCand.numValidMergeCand
+#endif
+    <= 1)
   {
     for (uint32_t mrgIdx = 0; mrgIdx < altLMMergeCand.numValidMergeCand; mrgIdx++)
     {
       mvpMergeCandCtx.altLMFlag[mvpMergeCandCtx.numValidMergeCand] = altLMMergeCand.altLMFlag[mrgIdx];
       mvpMergeCandCtx.altLMParaNeighbours[mvpMergeCandCtx.numValidMergeCand] = altLMMergeCand.altLMParaNeighbours[mrgIdx];
       mvpMergeCandCtx.licFlags[mvpMergeCandCtx.numValidMergeCand] = altLMMergeCand.licFlags[mrgIdx];
+#if LIC_INHERIT_PARA
+      mvpMergeCandCtx.setDefaultLICParamToCtx(mvpMergeCandCtx.numValidMergeCand);
+#endif
       mvpMergeCandCtx.interDirNeighbours[mvpMergeCandCtx.numValidMergeCand] = altLMMergeCand.interDirNeighbours[mrgIdx];
       mvpMergeCandCtx.mvFieldNeighbours[(mvpMergeCandCtx.numValidMergeCand << 1) + 0] = altLMMergeCand.mvFieldNeighbours[(mrgIdx << 1) + 0];
       mvpMergeCandCtx.mvFieldNeighbours[(mvpMergeCandCtx.numValidMergeCand << 1) + 1] = altLMMergeCand.mvFieldNeighbours[(mrgIdx << 1) + 1];
@@ -14018,23 +14392,58 @@ void InterPrediction::adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMer
       mvpMergeCandCtx.candCost[mvpMergeCandCtx.numValidMergeCand] = altLMMergeCand.candCost[mrgIdx];
       mvpMergeCandCtx.numValidMergeCand++;
     }
+#if LIC_INHERIT_PARA_ARMC_STAGE
+    for (uint32_t mrgIdx = 0; mrgIdx < inheritedMrgCand.numValidMergeCand; mrgIdx++)
+    {
+      mvpMergeCandCtx.altLMFlag[mvpMergeCandCtx.numValidMergeCand] = inheritedMrgCand.altLMFlag[mrgIdx];
+      mvpMergeCandCtx.altLMParaNeighbours[mvpMergeCandCtx.numValidMergeCand] = inheritedMrgCand.altLMParaNeighbours[mrgIdx];
+      mvpMergeCandCtx.licFlags[mvpMergeCandCtx.numValidMergeCand] = inheritedMrgCand.licFlags[mrgIdx];
+      mvpMergeCandCtx.copyLICParamFromCtx(mvpMergeCandCtx.numValidMergeCand, inheritedMrgCand, mrgIdx);
+
+      mvpMergeCandCtx.interDirNeighbours[mvpMergeCandCtx.numValidMergeCand] = inheritedMrgCand.interDirNeighbours[mrgIdx];
+      mvpMergeCandCtx.mvFieldNeighbours[(mvpMergeCandCtx.numValidMergeCand << 1) + 0] = inheritedMrgCand.mvFieldNeighbours[(mrgIdx << 1) + 0];
+      mvpMergeCandCtx.mvFieldNeighbours[(mvpMergeCandCtx.numValidMergeCand << 1) + 1] = inheritedMrgCand.mvFieldNeighbours[(mrgIdx << 1) + 1];
+      mvpMergeCandCtx.useAltHpelIf[mvpMergeCandCtx.numValidMergeCand] = inheritedMrgCand.useAltHpelIf[mrgIdx];
+      mvpMergeCandCtx.bcwIdx[mvpMergeCandCtx.numValidMergeCand] = inheritedMrgCand.bcwIdx[mrgIdx];
+      mvpMergeCandCtx.addHypNeighbours[mvpMergeCandCtx.numValidMergeCand] = inheritedMrgCand.addHypNeighbours[mrgIdx];
+      mvpMergeCandCtx.candCost[mvpMergeCandCtx.numValidMergeCand] = inheritedMrgCand.candCost[mrgIdx];
+      mvpMergeCandCtx.numValidMergeCand++;
+    }
+#endif
     return;
   }
 
   int numCandInCategory = MAX_INT;
 
+#if LIC_INHERIT_PARA_ARMC_STAGE
+  const int maxBufferSize = NUM_MERGE_CANDS
+                          + MRG_MAX_NUM_CANDS
+                          + ALT_MRG_MAX_NUM_CANDS
+                          + LIC_INHERIT_ALT_MRG_MAX_NUM_CANDS
+    ;
+  uint32_t   rdCandList  [maxBufferSize];
+  uint32_t   candCategory[maxBufferSize];
+  Distortion candCostList[maxBufferSize];
+#else
   uint32_t   rdCandList[NUM_MERGE_CANDS + MRG_MAX_NUM_CANDS + ALT_MRG_MAX_NUM_CANDS];
   uint32_t   candCategory[NUM_MERGE_CANDS + MRG_MAX_NUM_CANDS + ALT_MRG_MAX_NUM_CANDS];
   Distortion candCostList[NUM_MERGE_CANDS + MRG_MAX_NUM_CANDS + ALT_MRG_MAX_NUM_CANDS];
+#endif
 
+#if LIC_INHERIT_PARA_ARMC_STAGE
+  for (uint32_t j = 0; j < maxBufferSize; j++)
+#else
   for (uint32_t j = 0; j < NUM_MERGE_CANDS + MRG_MAX_NUM_CANDS + ALT_MRG_MAX_NUM_CANDS; j++)
+#endif
   {
     rdCandList[j] = MAX_UINT;
     candCategory[j] = MAX_UINT;
     candCostList[j] = MAX_UINT64;
   }
 
+#if !LIC_INHERIT_PARA_ARMC_STAGE
   Distortion uiCost;
+#endif
 
   DistParam cDistParam;
   cDistParam.applyWeight = false;
@@ -14047,9 +14456,18 @@ void InterPrediction::adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMer
   PelUnitBuf pcBufPredCurTop = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[0][0], nWidth, AML_MERGE_TEMPLATE_SIZE)));
   PelUnitBuf pcBufPredCurLeft = (PelUnitBuf(pu.chromaFormat, PelBuf(m_acYuvCurAMLTemplate[1][0], AML_MERGE_TEMPLATE_SIZE, nHeight)));
 
+#if LIC_INHERIT_PARA_ARMC_STAGE
+  auto reordering = [&](MergeCtx& mvpMergeCandCtx, int groupId, int cumulativeNumValidMergeCand)
+  {
+    Distortion uiCost;
+#endif
   for (uint32_t uiMergeCand = 0; uiMergeCand < mvpMergeCandCtx.numValidMergeCand; uiMergeCand++)
   {
-    if (mvpMergeCandCtx.numCandToTestEnc != mvpMergeCandCtx.numValidMergeCand)
+    if (
+#if LIC_INHERIT_PARA_ARMC_STAGE
+        groupId == 0 &&
+#endif
+        mvpMergeCandCtx.numCandToTestEnc != mvpMergeCandCtx.numValidMergeCand)
     {
       if (uiMergeCand >= mvpMergeCandCtx.numCandToTestEnc)
       {
@@ -14111,9 +14529,20 @@ void InterPrediction::adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMer
       uiCost = mvpMergeCandCtx.candCost[uiMergeCand];
     }
 
-    updateCandList(uiMergeCand, 0, uiCost, mvpMergeCandCtx.numValidMergeCand, rdCandList, candCategory, candCostList);
+    updateCandList(uiMergeCand
+#if LIC_INHERIT_PARA_ARMC_STAGE
+                 , groupId, uiCost, cumulativeNumValidMergeCand
+#else
+                 , 0, uiCost, mvpMergeCandCtx.numValidMergeCand
+#endif
+                 , rdCandList, candCategory, candCostList);
   }
   pu.mergeIdx = origMergeIdx;
+#if LIC_INHERIT_PARA_ARMC_STAGE
+  };
+
+  reordering(mvpMergeCandCtx, 0, mvpMergeCandCtx.numValidMergeCand);
+#endif
 
   MergeCtx pairMergeCand;
   pairMergeCand.numValidMergeCand = 0;
@@ -14142,6 +14571,9 @@ void InterPrediction::adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMer
 #endif
 #if INTER_LIC
       pairMergeCand.licFlags[cnt] = mvpMergeCandCtx.licFlags[rdCandList[0]];
+#if LIC_INHERIT_PARA
+      pairMergeCand.setDefaultLICParamToCtx(cnt);
+#endif
 #endif
       pairMergeCand.bcwIdx[cnt] = mvpMergeCandCtx.bcwIdx[rdCandList[0]];
       pairMergeCand.useAltHpelIf[cnt] = mvpMergeCandCtx.useAltHpelIf[rdCandList[0]];
@@ -14201,6 +14633,9 @@ void InterPrediction::adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMer
       if (averageUsed && !(((pu.cu->slice->getPOC() - pu.cu->slice->getRefPOC(REF_PIC_LIST_0, 0)) == 1) && pu.cu->slice->getPicHeader()->getMvdL1ZeroFlag()))
       {
         pairMergeCand.licFlags[cnt] = false;
+#if LIC_INHERIT_PARA
+        pairMergeCand.setDefaultLICParamToCtx(cnt);
+#endif
       }
 #endif
 
@@ -14210,6 +14645,9 @@ void InterPrediction::adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMer
         if (interDir == 3)
         {
           pairMergeCand.licFlags[cnt] = false;
+#if LIC_INHERIT_PARA
+          pairMergeCand.setDefaultLICParamToCtx(cnt);
+#endif
         }
 #endif
         uint32_t mvdSimilarityThresh = 1;
@@ -14244,6 +14682,9 @@ void InterPrediction::adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMer
 
     if (pairAdded)
     {
+#if LIC_INHERIT_PARA_ARMC_STAGE
+      reordering(pairMergeCand, 1, mvpMergeCandCtx.numValidMergeCand + pairMergeCand.numValidMergeCand);
+#else
       for (uint32_t uiMergeCand = 0; uiMergeCand < pairMergeCand.numValidMergeCand; uiMergeCand++)
       {
         if (pairMergeCand.candCost[uiMergeCand] == MAX_UINT64)
@@ -14281,10 +14722,14 @@ void InterPrediction::adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMer
         updateCandList(uiMergeCand, 1, uiCost, (mvpMergeCandCtx.numValidMergeCand + pairMergeCand.numValidMergeCand), rdCandList, candCategory, candCostList);
       }
       pu.mergeIdx = origMergeIdx;
+#endif
     }
 
     if (altLMMergeCand.numValidMergeCand)
     {
+#if LIC_INHERIT_PARA_ARMC_STAGE
+      reordering(altLMMergeCand, 2, mvpMergeCandCtx.numValidMergeCand + pairMergeCand.numValidMergeCand + altLMMergeCand.numValidMergeCand);
+#else
       for (uint32_t uiMergeCand = 0; uiMergeCand < altLMMergeCand.numValidMergeCand; uiMergeCand++)
       {
         if (altLMMergeCand.candCost[uiMergeCand] == MAX_UINT64)
@@ -14322,14 +14767,33 @@ void InterPrediction::adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMer
         updateCandList(uiMergeCand, 2, uiCost, (mvpMergeCandCtx.numValidMergeCand + pairMergeCand.numValidMergeCand + altLMMergeCand.numValidMergeCand), rdCandList, candCategory, candCostList);
       }
       pu.mergeIdx = origMergeIdx;
+#endif
     }
+#if LIC_INHERIT_PARA_ARMC_STAGE
+    if (inheritedMrgCand.numValidMergeCand)
+    {
+      reordering(inheritedMrgCand, 3, mvpMergeCandCtx.numValidMergeCand + pairMergeCand.numValidMergeCand + altLMMergeCand.numValidMergeCand + inheritedMrgCand.numValidMergeCand);
+    }
+#endif
 
     Distortion cost = pu.cs->slice->getCostForARMC();
+#if LIC_INHERIT_PARA_ARMC_STAGE
+    uint32_t   candToBeRemoved = maxBufferSize;
+#else
     uint32_t   candToBeRemoved = NUM_MERGE_CANDS + MRG_MAX_NUM_CANDS + ALT_MRG_MAX_NUM_CANDS;
+#endif
     Distortion min = MAX_UINT64;
 
-    numCandInCategory = std::min(numRetrievedMergeCand, mvpMergeCandCtx.numValidMergeCand + pairMergeCand.numValidMergeCand + altLMMergeCand.numValidMergeCand);
-    for (int sizeCandList = mvpMergeCandCtx.numCandToTestEnc + pairMergeCand.numValidMergeCand + altLMMergeCand.numValidMergeCand; sizeCandList > 1; sizeCandList--)
+    numCandInCategory = std::min(numRetrievedMergeCand, mvpMergeCandCtx.numValidMergeCand + pairMergeCand.numValidMergeCand + altLMMergeCand.numValidMergeCand
+#if LIC_INHERIT_PARA_ARMC_STAGE
+                                                                                          + inheritedMrgCand.numValidMergeCand
+#endif
+    );
+    for (int sizeCandList = mvpMergeCandCtx.numCandToTestEnc + pairMergeCand.numValidMergeCand + altLMMergeCand.numValidMergeCand
+#if LIC_INHERIT_PARA_ARMC_STAGE
+                          + inheritedMrgCand.numValidMergeCand
+#endif
+         ; sizeCandList > 1; sizeCandList--)
     {
       min = MAX_UINT64;
       for (uint32_t uiMergeCand = 0; uiMergeCand < sizeCandList - 1; ++uiMergeCand)
@@ -14381,6 +14845,9 @@ void InterPrediction::adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMer
   {
     if (altLMMergeCand.numValidMergeCand)
     {
+#if LIC_INHERIT_PARA_ARMC_STAGE
+      reordering(altLMMergeCand, 2, mvpMergeCandCtx.numValidMergeCand + altLMMergeCand.numValidMergeCand);
+#else
       for (uint32_t uiMergeCand = 0; uiMergeCand < altLMMergeCand.numValidMergeCand; uiMergeCand++)
       {
         if (altLMMergeCand.candCost[uiMergeCand] == MAX_UINT64)
@@ -14418,11 +14885,28 @@ void InterPrediction::adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMer
         updateCandList(uiMergeCand, 2, uiCost, (mvpMergeCandCtx.numValidMergeCand + altLMMergeCand.numValidMergeCand), rdCandList, candCategory, candCostList);
       }
       pu.mergeIdx = origMergeIdx;
+#endif
     }
-    numCandInCategory = std::min(numRetrievedMergeCand, mvpMergeCandCtx.numValidMergeCand + altLMMergeCand.numValidMergeCand);
+#if LIC_INHERIT_PARA_ARMC_STAGE
+    if (inheritedMrgCand.numValidMergeCand)
+    {
+      reordering(inheritedMrgCand, 3, mvpMergeCandCtx.numValidMergeCand + altLMMergeCand.numValidMergeCand + inheritedMrgCand.numValidMergeCand);
+    }
+#endif
+    numCandInCategory = std::min(numRetrievedMergeCand, mvpMergeCandCtx.numValidMergeCand + altLMMergeCand.numValidMergeCand
+#if LIC_INHERIT_PARA_ARMC_STAGE
+                                                                                          + inheritedMrgCand.numValidMergeCand
+#endif
+    );
   }
 
+#if LIC_INHERIT_PARA_ARMC_STAGE
+  int numGroups = 4;
+  const MergeCtx* mrgCtx2toN[] = { &pairMergeCand, &altLMMergeCand, &inheritedMrgCand};
+  updateCandInMultiCandidateGroups(rdCandList, candCategory, numCandInCategory, mvpMergeCandCtx, mrgCtx2toN, numGroups);
+#else
   updateCandInThreeCandidateGroups(mvpMergeCandCtx, pairMergeCand, altLMMergeCand, rdCandList, candCategory, numCandInCategory);
+#endif
 
   for (int idx = 0; idx < numCandInCategory; idx++)
   {
@@ -14456,6 +14940,44 @@ void InterPrediction::updateCandList(uint32_t uiCand, uint32_t uiCandGrp, Distor
   }
 }
 
+#if LIC_INHERIT_PARA_ARMC_STAGE
+void InterPrediction::updateCandInMultiCandidateGroups(uint32_t* rdCandList, uint32_t* rdCandGrpList, int numCandInCategory, MergeCtx& mrgCtx, const MergeCtx** mrgCtx2toN, int N)
+{
+  std::vector<const MergeCtx*> mrgList;
+  mrgList.reserve(N);
+
+  MergeCtx mrgCtxTmp = mrgCtx;
+  mrgList.push_back(&mrgCtxTmp);
+  for (int i = 0; i < N - 1; ++i)
+  {
+    mrgList.push_back(mrgCtx2toN[i]);
+  }
+
+  //update
+  for (uint32_t uiMergeCand = 0; uiMergeCand < numCandInCategory; uiMergeCand++)
+  {
+    const MergeCtx& srcMrgCtx = *mrgList[rdCandGrpList[uiMergeCand]];
+    const uint32_t  srcMrgIdx = rdCandList[uiMergeCand];
+
+    mrgCtx.bcwIdx[uiMergeCand] = srcMrgCtx.bcwIdx[srcMrgIdx];
+    mrgCtx.interDirNeighbours[uiMergeCand] = srcMrgCtx.interDirNeighbours[srcMrgIdx];
+    mrgCtx.mvFieldNeighbours[(uiMergeCand << 1)] = srcMrgCtx.mvFieldNeighbours[srcMrgIdx << 1];
+    mrgCtx.mvFieldNeighbours[(uiMergeCand << 1) + 1] = srcMrgCtx.mvFieldNeighbours[(srcMrgIdx << 1) + 1];
+    mrgCtx.useAltHpelIf[uiMergeCand] = srcMrgCtx.useAltHpelIf[srcMrgIdx];
+    mrgCtx.altLMFlag[uiMergeCand] = srcMrgCtx.altLMFlag[srcMrgIdx];
+    mrgCtx.altLMParaNeighbours[uiMergeCand] = srcMrgCtx.altLMParaNeighbours[srcMrgIdx];
+#if INTER_LIC
+    mrgCtx.licFlags[uiMergeCand] = srcMrgCtx.licFlags[srcMrgIdx];
+#if LIC_INHERIT_PARA
+    mrgCtx.copyLICParamFromCtx(uiMergeCand, srcMrgCtx, srcMrgIdx);
+#endif
+#endif
+#if MULTI_HYP_PRED
+    mrgCtx.addHypNeighbours[uiMergeCand] = srcMrgCtx.addHypNeighbours[srcMrgIdx];
+#endif
+  }
+}
+#else
 void InterPrediction::updateCandInThreeCandidateGroups(MergeCtx& mrgCtx, MergeCtx mrgCtx2, MergeCtx mrgCtx3, uint32_t* rdCandList, uint32_t* rdCandGrpList, int numCandInCategory)
 {
   MergeCtx mrgCtxTmp;
@@ -14470,6 +14992,9 @@ void InterPrediction::updateCandInThreeCandidateGroups(MergeCtx& mrgCtx, MergeCt
     mrgCtxTmp.altLMParaNeighbours[uiMergeCand] = mrgCtx.altLMParaNeighbours[uiMergeCand];
 #if INTER_LIC 
     mrgCtxTmp.licFlags[uiMergeCand] = mrgCtx.licFlags[uiMergeCand];
+#if LIC_INHERIT_PARA
+    mrgCtxTmp.copyLICParamFromCtx(uiMergeCand, mrgCtx, uiMergeCand);
+#endif
 #endif
 #if MULTI_HYP_PRED
     mrgCtxTmp.addHypNeighbours[uiMergeCand] = mrgCtx.addHypNeighbours[uiMergeCand];
@@ -14489,6 +15014,9 @@ void InterPrediction::updateCandInThreeCandidateGroups(MergeCtx& mrgCtx, MergeCt
       mrgCtx.altLMParaNeighbours[uiMergeCand] = mrgCtx3.altLMParaNeighbours[rdCandList[uiMergeCand]];
 #if INTER_LIC
       mrgCtx.licFlags[uiMergeCand] = mrgCtx3.licFlags[rdCandList[uiMergeCand]];
+#if LIC_INHERIT_PARA
+      mrgCtx.copyLICParamFromCtx(uiMergeCand, mrgCtx3, rdCandList[uiMergeCand]);
+#endif
 #endif
 #if MULTI_HYP_PRED
       mrgCtx.addHypNeighbours[uiMergeCand] = mrgCtx3.addHypNeighbours[rdCandList[uiMergeCand]];
@@ -14505,6 +15033,9 @@ void InterPrediction::updateCandInThreeCandidateGroups(MergeCtx& mrgCtx, MergeCt
       mrgCtx.altLMParaNeighbours[uiMergeCand] = mrgCtx2.altLMParaNeighbours[rdCandList[uiMergeCand]];
 #if INTER_LIC
       mrgCtx.licFlags[uiMergeCand] = mrgCtx2.licFlags[rdCandList[uiMergeCand]];
+#if LIC_INHERIT_PARA
+      mrgCtx.copyLICParamFromCtx(uiMergeCand, mrgCtx2, rdCandList[uiMergeCand]);
+#endif
 #endif
 #if MULTI_HYP_PRED
       mrgCtx.addHypNeighbours[uiMergeCand] = mrgCtx2.addHypNeighbours[rdCandList[uiMergeCand]];
@@ -14523,6 +15054,9 @@ void InterPrediction::updateCandInThreeCandidateGroups(MergeCtx& mrgCtx, MergeCt
 #endif
 #if INTER_LIC
       mrgCtx.licFlags[uiMergeCand] = mrgCtxTmp.licFlags[rdCandList[uiMergeCand]];
+#if LIC_INHERIT_PARA
+      mrgCtx.copyLICParamFromCtx(uiMergeCand, mrgCtxTmp, rdCandList[uiMergeCand]);
+#endif
 #endif
 #if MULTI_HYP_PRED
       mrgCtx.addHypNeighbours[uiMergeCand] = mrgCtxTmp.addHypNeighbours[rdCandList[uiMergeCand]];
@@ -14530,6 +15064,7 @@ void InterPrediction::updateCandInThreeCandidateGroups(MergeCtx& mrgCtx, MergeCt
     }
   }
 }
+#endif
 #endif
 
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
@@ -14549,6 +15084,9 @@ void  InterPrediction::updateCandInTwoCandidateGroups(MergeCtx& mrgCtx, uint32_t
 #endif
 #if INTER_LIC 
     mrgCtxTmp.licFlags[uiMergeCand] = mrgCtx.licFlags[uiMergeCand];
+#if LIC_INHERIT_PARA
+    mrgCtxTmp.copyLICParamFromCtx(uiMergeCand, mrgCtx, uiMergeCand);
+#endif
 #endif
 #if MULTI_HYP_PRED
     mrgCtxTmp.addHypNeighbours[uiMergeCand] = mrgCtx.addHypNeighbours[uiMergeCand];
@@ -14562,7 +15100,7 @@ void  InterPrediction::updateCandInTwoCandidateGroups(MergeCtx& mrgCtx, uint32_t
     {
       mrgCtx.bcwIdx[uiMergeCand] = mrgCtx2.bcwIdx[rdCandList[uiMergeCand] - mrgCtx.numValidMergeCand];
       mrgCtx.interDirNeighbours[uiMergeCand] = mrgCtx2.interDirNeighbours[rdCandList[uiMergeCand] - mrgCtx.numValidMergeCand];
-      mrgCtx.mvFieldNeighbours[(uiMergeCand << 1)] = mrgCtx2.mvFieldNeighbours[((rdCandList[uiMergeCand] -mrgCtx.numValidMergeCand) << 1)];
+      mrgCtx.mvFieldNeighbours[(uiMergeCand << 1)] = mrgCtx2.mvFieldNeighbours[((rdCandList[uiMergeCand] - mrgCtx.numValidMergeCand) << 1)];
       mrgCtx.mvFieldNeighbours[(uiMergeCand << 1) + 1] = mrgCtx2.mvFieldNeighbours[((rdCandList[uiMergeCand] - mrgCtx.numValidMergeCand) << 1) + 1];
       mrgCtx.useAltHpelIf[uiMergeCand] = mrgCtx2.useAltHpelIf[rdCandList[uiMergeCand] - mrgCtx.numValidMergeCand];
 #if JVET_AG0276_NLIC
@@ -14571,6 +15109,9 @@ void  InterPrediction::updateCandInTwoCandidateGroups(MergeCtx& mrgCtx, uint32_t
 #endif
 #if INTER_LIC
       mrgCtx.licFlags[uiMergeCand] = mrgCtx2.licFlags[rdCandList[uiMergeCand] - mrgCtx.numValidMergeCand];
+#if LIC_INHERIT_PARA
+      mrgCtx.copyLICParamFromCtx(uiMergeCand, mrgCtx2, rdCandList[uiMergeCand] - mrgCtx.numValidMergeCand);
+#endif
 #endif
 #if MULTI_HYP_PRED
       mrgCtx.addHypNeighbours[uiMergeCand] = mrgCtx2.addHypNeighbours[rdCandList[uiMergeCand] - mrgCtx.numValidMergeCand];
@@ -14590,6 +15131,9 @@ void  InterPrediction::updateCandInTwoCandidateGroups(MergeCtx& mrgCtx, uint32_t
 #endif
 #if INTER_LIC
       mrgCtx.licFlags[uiMergeCand] = mrgCtxTmp.licFlags[rdCandList[uiMergeCand]];
+#if LIC_INHERIT_PARA
+      mrgCtx.copyLICParamFromCtx(uiMergeCand, mrgCtxTmp, rdCandList[uiMergeCand]);
+#endif
 #endif
 #if MULTI_HYP_PRED
       mrgCtx.addHypNeighbours[uiMergeCand] = mrgCtxTmp.addHypNeighbours[rdCandList[uiMergeCand]];
@@ -14615,6 +15159,9 @@ void  InterPrediction::updateCandInOneCandidateGroup(MergeCtx& mrgCtx, uint32_t*
 #endif
 #if INTER_LIC 
     mrgCtxTmp.licFlags[uiMergeCand] = mrgCtx.licFlags[uiMergeCand];
+#if LIC_INHERIT_PARA
+    mrgCtxTmp.copyLICParamFromCtx(uiMergeCand, mrgCtx, uiMergeCand);
+#endif
 #endif
 #if MULTI_HYP_PRED
     mrgCtxTmp.addHypNeighbours[uiMergeCand] = mrgCtx.addHypNeighbours[uiMergeCand];
@@ -14634,6 +15181,9 @@ void  InterPrediction::updateCandInOneCandidateGroup(MergeCtx& mrgCtx, uint32_t*
 #endif
 #if INTER_LIC
     mrgCtx.licFlags[uiMergeCand] = mrgCtxTmp.licFlags[rdCandList[uiMergeCand]];
+#if LIC_INHERIT_PARA
+    mrgCtx.copyLICParamFromCtx(uiMergeCand, mrgCtxTmp, rdCandList[uiMergeCand]);
+#endif
 #endif
 #if MULTI_HYP_PRED
     mrgCtx.addHypNeighbours[uiMergeCand] = mrgCtxTmp.addHypNeighbours[rdCandList[uiMergeCand]];
@@ -14704,25 +15254,25 @@ void  InterPrediction::adjustInterMergeCandidates(PredictionUnit &pu, MergeCtx& 
       const RefPicList eRefPicList = refList ? REF_PIC_LIST_1 : REF_PIC_LIST_0;
       bRefIsRescaled |= (pu.refIdx[refList] >= 0) ? pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList])->isRefScaled(pu.cs->pps) : false;
     }
-    if ( !bRefIsRescaled )
+    if (!bRefIsRescaled)
 #endif
     {
 #endif
-    getBlkAMLRefTemplate(pu, pcBufPredRefTop, pcBufPredRefLeft);
+      getBlkAMLRefTemplate(pu, pcBufPredRefTop, pcBufPredRefLeft);
 
-    if (m_bAMLTemplateAvailabe[0])
-    {
-      m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+      if (m_bAMLTemplateAvailabe[0])
+      {
+        m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
 
-      uiCost += cDistParam.distFunc(cDistParam);
-    }
+        uiCost += cDistParam.distFunc(cDistParam);
+      }
 
-    if (m_bAMLTemplateAvailabe[1])
-    {
-      m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+      if (m_bAMLTemplateAvailabe[1])
+      {
+        m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
 
-      uiCost += cDistParam.distFunc(cDistParam);
-    }
+        uiCost += cDistParam.distFunc(cDistParam);
+      }
 #if JVET_Y0128_NON_CTC
     }
 #endif
@@ -14780,11 +15330,11 @@ void InterPrediction::adjustMergeCandidatesInOneCandidateGroup(PredictionUnit &p
 #if TM_MRG
     if ((
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
-          pu.cs->sps->getUseTMMrgMode() &&
+      pu.cs->sps->getUseTMMrgMode() &&
 #endif
-    	  pu.tmMergeFlag) || (mvpMergeCandCtx.numCandToTestEnc != mvpMergeCandCtx.numValidMergeCand && uiMergeCand > mvpMergeCandCtx.numCandToTestEnc ))
+      pu.tmMergeFlag) || (mvpMergeCandCtx.numCandToTestEnc != mvpMergeCandCtx.numValidMergeCand && uiMergeCand > mvpMergeCandCtx.numCandToTestEnc))
 #else
-    if ((mvpMergeCandCtx.numCandToTestEnc != mvpMergeCandCtx.numValidMergeCand && uiMergeCand > mvpMergeCandCtx.numCandToTestEnc ))
+    if ((mvpMergeCandCtx.numCandToTestEnc != mvpMergeCandCtx.numValidMergeCand && uiMergeCand > mvpMergeCandCtx.numCandToTestEnc))
 #endif
     {
       uiCost = mvpMergeCandCtx.candCost[uiMergeCand];
@@ -14814,17 +15364,17 @@ void InterPrediction::adjustMergeCandidatesInOneCandidateGroup(PredictionUnit &p
       {
 #endif
 
-      getBlkAMLRefTemplate(pu, pcBufPredRefTop, pcBufPredRefLeft);
-      if (m_bAMLTemplateAvailabe[0])
-      {
-        m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
-        uiCost += cDistParam.distFunc(cDistParam);
-      }
-      if (m_bAMLTemplateAvailabe[1])
-      {
-        m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
-        uiCost += cDistParam.distFunc(cDistParam);
-      }
+        getBlkAMLRefTemplate(pu, pcBufPredRefTop, pcBufPredRefLeft);
+        if (m_bAMLTemplateAvailabe[0])
+        {
+          m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+          uiCost += cDistParam.distFunc(cDistParam);
+        }
+        if (m_bAMLTemplateAvailabe[1])
+        {
+          m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+          uiCost += cDistParam.distFunc(cDistParam);
+        }
 #if JVET_Z0067_RPR_ENABLE
       }
 #endif
@@ -14837,7 +15387,7 @@ void InterPrediction::adjustMergeCandidatesInOneCandidateGroup(PredictionUnit &p
   updateCandInOneCandidateGroup(mvpMergeCandCtx, rdCandList, applyBDMVR, mvBufBDMVR, mvBufBDMVRTmp, subRefineList, subRefineListTmp, numCandInCategory);
 }
 
-void  InterPrediction::updateCandInOneCandidateGroup(MergeCtx& mrgCtx, uint32_t* rdCandList, bool* applyBDMVR, Mv** mvBufBDMVR, Mv** mvBufBDMVRTmp, bool subRefineList[][2], bool subRefineListTmp[][2],int numCandInCategory)
+void  InterPrediction::updateCandInOneCandidateGroup(MergeCtx& mrgCtx, uint32_t* rdCandList, bool* applyBDMVR, Mv** mvBufBDMVR, Mv** mvBufBDMVRTmp, bool subRefineList[][2], bool subRefineListTmp[][2], int numCandInCategory)
 {
   bool applyBDMVRTmp[10];
   MergeCtx mrgCtxTmp;
@@ -14854,6 +15404,9 @@ void  InterPrediction::updateCandInOneCandidateGroup(MergeCtx& mrgCtx, uint32_t*
 #endif
 #if INTER_LIC
     mrgCtxTmp.licFlags[uiMergeCand] = mrgCtx.licFlags[uiMergeCand];
+#if LIC_INHERIT_PARA
+    mrgCtxTmp.copyLICParamFromCtx(uiMergeCand, mrgCtx, uiMergeCand);
+#endif
 #endif
 #if MULTI_HYP_PRED
     mrgCtxTmp.addHypNeighbours[uiMergeCand] = mrgCtx.addHypNeighbours[uiMergeCand];
@@ -14877,6 +15430,9 @@ void  InterPrediction::updateCandInOneCandidateGroup(MergeCtx& mrgCtx, uint32_t*
 #endif
 #if INTER_LIC
     mrgCtx.licFlags[uiMergeCand] = mrgCtxTmp.licFlags[rdCandList[uiMergeCand]];
+#if LIC_INHERIT_PARA
+    mrgCtx.copyLICParamFromCtx(uiMergeCand, mrgCtxTmp, rdCandList[uiMergeCand]);
+#endif
 #endif
 #if MULTI_HYP_PRED
     mrgCtx.addHypNeighbours[uiMergeCand] = mrgCtxTmp.addHypNeighbours[rdCandList[uiMergeCand]];
@@ -15061,6 +15617,9 @@ void  InterPrediction::updateCandInfo(MergeCtx& mrgCtx, uint32_t(*RdCandList)[MR
 #endif
 #if INTER_LIC
     mrgCtxTmp.licFlags[ui] = false;
+#if LIC_INHERIT_PARA
+    mrgCtxTmp.setDefaultLICParamToCtx(ui);
+#endif
 #endif
 #if MULTI_HYP_PRED
     mrgCtxTmp.addHypNeighbours[ui].clear();
@@ -15085,6 +15644,9 @@ void  InterPrediction::updateCandInfo(MergeCtx& mrgCtx, uint32_t(*RdCandList)[MR
 #endif
 #if INTER_LIC 
     mrgCtxTmp.licFlags[uiMergeCand] = mrgCtx.licFlags[uiMergeCand];
+#if LIC_INHERIT_PARA
+    mrgCtxTmp.copyLICParamFromCtx(uiMergeCand, mrgCtx, uiMergeCand);
+#endif
 #endif
 #if MULTI_HYP_PRED
     mrgCtxTmp.addHypNeighbours[uiMergeCand] = mrgCtx.addHypNeighbours[uiMergeCand];
@@ -15113,6 +15675,9 @@ void  InterPrediction::updateCandInfo(MergeCtx& mrgCtx, uint32_t(*RdCandList)[MR
 #endif
 #if INTER_LIC
     mrgCtx.licFlags          [uiMergeCand]            = mrgCtxTmp.licFlags          [srcCand];
+#if LIC_INHERIT_PARA
+    mrgCtx.copyLICParamFromCtx(uiMergeCand, mrgCtxTmp, srcCand);
+#endif
 #endif
 #if MULTI_HYP_PRED
     mrgCtx.addHypNeighbours  [uiMergeCand]            = mrgCtxTmp.addHypNeighbours  [srcCand];
@@ -15129,6 +15694,9 @@ void  InterPrediction::updateCandInfo(MergeCtx& mrgCtx, uint32_t(*RdCandList)[MR
 #endif
 #if INTER_LIC
     mrgCtx.licFlags[uiMergeCand] = mrgCtxTmp.licFlags[RdCandList[uiMergeCand / ADAPTIVE_SUB_GROUP_SIZE][uiMergeCand%ADAPTIVE_SUB_GROUP_SIZE]];
+#if LIC_INHERIT_PARA
+    mrgCtx.copyLICParamFromCtx(uiMergeCand, mrgCtxTmp, RdCandList[uiMergeCand / ADAPTIVE_SUB_GROUP_SIZE][uiMergeCand%ADAPTIVE_SUB_GROUP_SIZE]);
+#endif
 #endif
 #if MULTI_HYP_PRED
     mrgCtx.addHypNeighbours[uiMergeCand] = mrgCtxTmp.addHypNeighbours[RdCandList[uiMergeCand / ADAPTIVE_SUB_GROUP_SIZE][uiMergeCand%ADAPTIVE_SUB_GROUP_SIZE]];
@@ -15372,6 +15940,13 @@ void InterPrediction::getBlkAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBuf
   const int lumaShift = 2 + MV_FRACTIONAL_BITS_DIFF;
   const int horShift  = (lumaShift + ::getComponentScaleX(COMPONENT_Y, pu.chromaFormat));
   const int verShift  = (lumaShift + ::getComponentScaleY(COMPONENT_Y, pu.chromaFormat));
+#if LIC_INHERIT_PARA
+  if (pu.cu->licInheritPara)
+  {
+    CHECK(!pu.cu->licFlag, "");
+    pu.cu->licFlag = false;
+  }
+#endif
 
 #if JVET_AA0093_ENHANCED_MMVD_EXTENSION
   if (!bLoadSave && xCheckIdenticalMotion(pu))
@@ -15379,6 +15954,9 @@ void InterPrediction::getBlkAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBuf
     if (xCheckIdenticalMotion(pu))
 #endif
     {
+#if LIC_INHERIT_PARA
+      m_iRefListIdx = 0;
+#endif
       mvCurr = pu.mv[0];
       /*const int horIntMv = (mvCurr.getHor() + ((1 << horShift) >> 1)) >> horShift;
         const int verIntMv = (mvCurr.getVer() + ((1 << verShift) >> 1)) >> verShift;
@@ -15467,6 +16045,20 @@ void InterPrediction::getBlkAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBuf
         }
 #endif
       }
+#if LIC_INHERIT_PARA
+      if (pu.cu->licInheritPara)
+      {
+        const ClpRng& clpRng = pu.cu->slice->clpRng(COMPONENT_Y);
+        if (m_bAMLTemplateAvailabe[0])
+        {
+          pcBufPredRefTop.Y().linearTransform(pu.cu->licScale[REF_PIC_LIST_0][0], m_LICShift, pu.cu->licOffset[REF_PIC_LIST_0][0], true, clpRng);
+        }
+        if (m_bAMLTemplateAvailabe[1])
+        {
+          pcBufPredRefLeft.Y().linearTransform(pu.cu->licScale[REF_PIC_LIST_0][0], m_LICShift, pu.cu->licOffset[REF_PIC_LIST_0][0], true, clpRng);
+        }
+      }
+#endif
     }
     else
     {
@@ -15533,6 +16125,15 @@ void InterPrediction::getBlkAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBuf
                           pu.cu->slice->clpRng( COMPONENT_Y ), false, false, SCALE_1X, 0, 0, false, NULL, 0, true );
 #endif
 #endif
+#if LIC_INHERIT_PARA
+            if (pu.cu->licInheritPara)
+            {
+              const ClpRng& clpRng = pu.cu->slice->clpRng(COMPONENT_Y);
+              pcMbBuf.Y().toLast(clpRng);
+              pcMbBuf.Y().linearTransform(pu.cu->licScale[refList][0], m_LICShift, pu.cu->licOffset[refList][0], true, clpRng);
+              pcMbBuf.Y().linearTransform(1, -biShift, biOffset, false, clpRng);
+            }
+#endif
           }
           else
           {
@@ -15554,6 +16155,13 @@ void InterPrediction::getBlkAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBuf
             xPredInterBlk( COMPONENT_Y, pu, pu.cu->slice->getRefPic( eRefPicList, pu.refIdx[refList] ), mvTop, pcMbBuf,
                           false, pu.cu->slice->clpRng( COMPONENT_Y ), false, false, SCALE_1X, 0, 0, false, NULL, 0, true );
 #endif
+#endif
+#if LIC_INHERIT_PARA
+            if (pu.cu->licInheritPara)
+            {
+              const ClpRng& clpRng = pu.cu->slice->clpRng(COMPONENT_Y);
+              pcMbBuf.Y().linearTransform(pu.cu->licScale[refList][0], m_LICShift, pu.cu->licOffset[refList][0], true, clpRng);
+            }
 #endif
           }
 #if JVET_AG0276_NLIC
@@ -15598,6 +16206,15 @@ void InterPrediction::getBlkAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBuf
                           true, pu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0, false, NULL, 0, true);
 #endif
 #endif
+#if LIC_INHERIT_PARA
+            if (pu.cu->licInheritPara)
+            {
+              const ClpRng& clpRng = pu.cu->slice->clpRng(COMPONENT_Y);
+              pcMbBuf.Y().toLast(clpRng);
+              pcMbBuf.Y().linearTransform(pu.cu->licScale[refList][0], m_LICShift, pu.cu->licOffset[refList][0], true, clpRng);
+              pcMbBuf.Y().linearTransform(1, -biShift, biOffset, false, clpRng);
+            }
+#endif
           }
           else
           {
@@ -15619,6 +16236,13 @@ void InterPrediction::getBlkAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBuf
             xPredInterBlk( COMPONENT_Y, pu, pu.cu->slice->getRefPic( eRefPicList, pu.refIdx[refList] ), mvLeft, pcMbBuf,
                           false, pu.cu->slice->clpRng( COMPONENT_Y ), false, false, SCALE_1X, 0, 0, false, NULL, 0, true );
 #endif
+#endif
+#if LIC_INHERIT_PARA
+            if (pu.cu->licInheritPara)
+            {
+              const ClpRng& clpRng = pu.cu->slice->clpRng(COMPONENT_Y);
+              pcMbBuf.Y().linearTransform(pu.cu->licScale[refList][0], m_LICShift, pu.cu->licOffset[refList][0], true, clpRng);
+            }
 #endif
           }
 #if JVET_AG0276_NLIC
@@ -15750,6 +16374,12 @@ void InterPrediction::getBlkAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBuf
       }
 #endif
     }
+#if LIC_INHERIT_PARA
+    if (pu.cu->licInheritPara)
+    {
+      pu.cu->licFlag = true;
+    }
+#endif
 }
 #if JVET_AD0213_LIC_IMP
 void InterPrediction::getBlkAMLRefTemplateAlt(PredictionUnit &pu, PelUnitBuf &pcBufPredRefTop, PelUnitBuf &pcBufPredRefLeft, int8_t posList0, int8_t posList1, bool load0, bool load1)
@@ -15762,6 +16392,13 @@ void InterPrediction::getBlkAMLRefTemplateAlt(PredictionUnit &pu, PelUnitBuf &pc
   const int verShift = (lumaShift + ::getComponentScaleY(COMPONENT_Y, pu.chromaFormat));
 
   CHECK(pu.refIdx[REF_PIC_LIST_0] < 0 || pu.refIdx[REF_PIC_LIST_1] < 0, "the function only deals with MMVD bi-pred reordering");
+#if LIC_INHERIT_PARA
+  if (pu.cu->licInheritPara)
+  {
+    CHECK(!pu.cu->licFlag, "");
+    pu.cu->licFlag = false;
+  }
+#endif
 
   PelUnitBuf pcBufPredRefLeftTranspose = PelUnitBuf(pu.chromaFormat, PelBuf(pcBufPredRefLeft.Y().buf, pcBufPredRefLeft.Y().height, pcBufPredRefLeft.Y().width));
 
@@ -15806,6 +16443,15 @@ void InterPrediction::getBlkAMLRefTemplateAlt(PredictionUnit &pu, PelUnitBuf &pc
 #else
       xPredInterBlk(COMPONENT_Y, pu, pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList]), mvTop, pcMbBuf, true, pu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0, false, NULL, 0, true, true, mvCurr);
 #endif
+#if LIC_INHERIT_PARA
+      if (pu.cu->licInheritPara)
+      {
+        const ClpRng& clpRng = pu.cu->slice->clpRng(COMPONENT_Y);
+        pcMbBuf.Y().toLast(clpRng);
+        pcMbBuf.Y().linearTransform(pu.cu->licScale[refList][0], m_LICShift, pu.cu->licOffset[refList][0], true, clpRng);
+        pcMbBuf.Y().linearTransform(1, -biShift, biOffset, false, clpRng);
+      }
+#endif
 #if JVET_AG0276_NLIC
       if (m_bAMLTemplateAvailabe[1])
       {
@@ -15838,6 +16484,15 @@ void InterPrediction::getBlkAMLRefTemplateAlt(PredictionUnit &pu, PelUnitBuf &pc
       }
 #else
       xPredInterBlk(COMPONENT_Y, pu, pu.cu->slice->getRefPic(eRefPicList, pu.refIdx[refList]), mvLeft, pcMbBuf, true, pu.cu->slice->clpRng(COMPONENT_Y), false, false, SCALE_1X, 0, 0, false, NULL, 0, true, true, mvCurr);
+#endif
+#if LIC_INHERIT_PARA
+      if (pu.cu->licInheritPara)
+      {
+        const ClpRng& clpRng = pu.cu->slice->clpRng(COMPONENT_Y);
+        pcMbBuf.Y().toLast(clpRng);
+        pcMbBuf.Y().linearTransform(pu.cu->licScale[refList][0], m_LICShift, pu.cu->licOffset[refList][0], true, clpRng);
+        pcMbBuf.Y().linearTransform(1, -biShift, biOffset, false, clpRng);
+      }
 #endif
 #if JVET_AG0276_NLIC
       m_skipDoLic = false;
@@ -15882,6 +16537,12 @@ void InterPrediction::getBlkAMLRefTemplateAlt(PredictionUnit &pu, PelUnitBuf &pc
     }
 #endif
   }
+#if LIC_INHERIT_PARA
+  if (pu.cu->licInheritPara)
+  {
+    pu.cu->licFlag = true;
+  }
+#endif
 }
 #endif
 #endif
@@ -15969,6 +16630,9 @@ void  InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMer
 #endif
 #if INTER_LIC
     pu.cu->licFlag = affMrgCtx.licFlags[uiMergeCand];
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+    affMrgCtx.setLICParamToPu(pu, uiMergeCand, pu.cu->licFlag);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
     pu.cu->obmcFlag = affMrgCtx.obmcFlags[uiMergeCand];
@@ -16178,6 +16842,9 @@ void  InterPrediction::updateAffineCandInfo(PredictionUnit &pu, AffineMergeCtx& 
 #endif
 #if INTER_LIC
     affMrgCtxTmp.licFlags[i] = false;
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+    affMrgCtxTmp.setDefaultLICParamToCtx(i);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
     affMrgCtxTmp.obmcFlags[i] = true;
@@ -16209,6 +16876,9 @@ void  InterPrediction::updateAffineCandInfo(PredictionUnit &pu, AffineMergeCtx& 
 #endif
 #if INTER_LIC                                                   
     affMrgCtxTmp.licFlags[uiMergeCand] = affMrgCtx.licFlags[uiMergeCand];
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+    affMrgCtxTmp.copyLICParamFromCtx(uiMergeCand, affMrgCtx, uiMergeCand);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
     affMrgCtxTmp.obmcFlags[uiMergeCand] = affMrgCtx.obmcFlags[uiMergeCand];
@@ -16249,6 +16919,9 @@ void  InterPrediction::updateAffineCandInfo(PredictionUnit &pu, AffineMergeCtx& 
 #endif
 #if INTER_LIC 
     affMrgCtx.licFlags[uiMergeCand] = affMrgCtxTmp.licFlags[srcCand];
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+    affMrgCtx.copyLICParamFromCtx(uiMergeCand, affMrgCtxTmp, srcCand);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
     affMrgCtx.obmcFlags[uiMergeCand] = affMrgCtxTmp.obmcFlags[srcCand];
@@ -16272,6 +16945,9 @@ void  InterPrediction::updateAffineCandInfo(PredictionUnit &pu, AffineMergeCtx& 
 #endif
 #if INTER_LIC 
     affMrgCtx.licFlags[uiMergeCand] = affMrgCtxTmp.licFlags[RdCandList[uiMergeCand / ADAPTIVE_AFFINE_SUB_GROUP_SIZE][uiMergeCand%ADAPTIVE_AFFINE_SUB_GROUP_SIZE]];
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+    affMrgCtx.copyLICParamFromCtx(uiMergeCand, affMrgCtxTmp, RdCandList[uiMergeCand / ADAPTIVE_AFFINE_SUB_GROUP_SIZE][uiMergeCand%ADAPTIVE_AFFINE_SUB_GROUP_SIZE]);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
     affMrgCtx.obmcFlags[uiMergeCand] = affMrgCtxTmp.obmcFlags[RdCandList[uiMergeCand / ADAPTIVE_AFFINE_SUB_GROUP_SIZE][uiMergeCand % ADAPTIVE_AFFINE_SUB_GROUP_SIZE]];
@@ -16408,6 +17084,9 @@ void InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMerg
 #endif
 #if INTER_LIC
       pu.cu->licFlag = affMrgCtx.licFlags[uiMergeCand];
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+      affMrgCtx.setLICParamToPu(pu, uiMergeCand, pu.cu->licFlag);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
       pu.cu->obmcFlag = affMrgCtx.obmcFlags[uiMergeCand];
@@ -16529,6 +17208,9 @@ void InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMerg
         pu.cu->altLMParaUnit = altLMRMVFCand.altLMParaNeighbours[uiMergeCand];
 #if INTER_LIC
         pu.cu->licFlag = altLMRMVFCand.licFlags[uiMergeCand];
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+        altLMRMVFCand.setLICParamToPu(pu, uiMergeCand, pu.cu->licFlag);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
         pu.cu->obmcFlag = altLMRMVFCand.obmcFlags[uiMergeCand];
@@ -16631,6 +17313,9 @@ void InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMerg
         pu.cu->altLMParaUnit = altLMAffMergeCand.altLMParaNeighbours[uiMergeCand];
 #if INTER_LIC
         pu.cu->licFlag = altLMAffMergeCand.licFlags[uiMergeCand];
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+        altLMAffMergeCand.setLICParamToPu(pu, uiMergeCand, pu.cu->licFlag);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
         pu.cu->obmcFlag = altLMAffMergeCand.obmcFlags[uiMergeCand];
@@ -16797,6 +17482,9 @@ void InterPrediction::updateAffineCandInThreeGrp(PredictionUnit &pu, AffineMerge
     affMrgCtxTmp.altLMParaNeighbours[uiMergeCand] = affMrgCtx.altLMParaNeighbours[uiMergeCand];
 #if INTER_LIC                                                   
     affMrgCtxTmp.licFlags[uiMergeCand] = affMrgCtx.licFlags[uiMergeCand];
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+    affMrgCtxTmp.copyLICParamFromCtx(uiMergeCand, affMrgCtx, uiMergeCand);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
     affMrgCtxTmp.obmcFlags[uiMergeCand] = affMrgCtx.obmcFlags[uiMergeCand];
@@ -16823,6 +17511,9 @@ void InterPrediction::updateAffineCandInThreeGrp(PredictionUnit &pu, AffineMerge
       affMrgCtx.altLMParaNeighbours[uiMergeCand] = affMrgCtxTmp.altLMParaNeighbours[rdCandList[uiMergeCand]];
 #if INTER_LIC 
       affMrgCtx.licFlags[uiMergeCand] = affMrgCtxTmp.licFlags[rdCandList[uiMergeCand]];
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+      affMrgCtx.copyLICParamFromCtx(uiMergeCand, affMrgCtxTmp, rdCandList[uiMergeCand]);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
       affMrgCtx.obmcFlags[uiMergeCand] = affMrgCtxTmp.obmcFlags[rdCandList[uiMergeCand]];
@@ -16846,6 +17537,9 @@ void InterPrediction::updateAffineCandInThreeGrp(PredictionUnit &pu, AffineMerge
       affMrgCtx.altLMParaNeighbours[uiMergeCand] = altLMAffMrgCtx1.altLMParaNeighbours[rdCandList[uiMergeCand]];
 #if INTER_LIC 
       affMrgCtx.licFlags[uiMergeCand] = altLMAffMrgCtx1.licFlags[rdCandList[uiMergeCand]];
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+      affMrgCtx.copyLICParamFromCtx(uiMergeCand, altLMAffMrgCtx1, rdCandList[uiMergeCand]);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
       affMrgCtx.obmcFlags[uiMergeCand] = altLMAffMrgCtx1.obmcFlags[rdCandList[uiMergeCand]];
@@ -16869,6 +17563,9 @@ void InterPrediction::updateAffineCandInThreeGrp(PredictionUnit &pu, AffineMerge
       affMrgCtx.altLMParaNeighbours[uiMergeCand] = altLMAffMrgCtx.altLMParaNeighbours[rdCandList[uiMergeCand]];
 #if INTER_LIC 
       affMrgCtx.licFlags[uiMergeCand] = altLMAffMrgCtx.licFlags[rdCandList[uiMergeCand]];
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+      affMrgCtx.copyLICParamFromCtx(uiMergeCand, altLMAffMrgCtx, rdCandList[uiMergeCand]);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
       affMrgCtx.obmcFlags[uiMergeCand] = altLMAffMrgCtx.obmcFlags[rdCandList[uiMergeCand]];
@@ -17187,6 +17884,19 @@ void InterPrediction::getAffAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBuf
   int LICshift[2] = { 0 };
   int scale[2]    = { 0 };
   int offset[2]   = { 0 };
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+  if (pu.cu->licInheritPara)
+  {
+    CHECK(!pu.cu->licFlag, "LIC flag must be set when inherited LIC mode is used");
+    pu.cu->licFlag = false;
+    LICshift[0] = m_LICShift;
+    scale   [0] = pu.cu->licScale [0][0];
+    offset  [0] = pu.cu->licOffset[0][0];
+    LICshift[1] = m_LICShift;
+    scale   [1] = pu.cu->licScale [1][0];
+    offset  [1] = pu.cu->licOffset[1][0];
+  }
+#endif
 #endif
   const int bitDepth = pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA);
 #if JVET_AA0093_ENHANCED_MMVD_EXTENSION
@@ -17195,6 +17905,9 @@ void InterPrediction::getAffAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBuf
     if (xCheckIdenticalMotion(pu))
 #endif
     {
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+      m_iRefListIdx = 0;
+#endif
       Pel *            refLeftTemplate  = m_acYuvRefAMLTemplate[1][0];
       Pel *            refAboveTemplate = m_acYuvRefAMLTemplate[0][0];
       int              numTemplate[2]   = { 0, 0 };   // 0:Above, 1:Left
@@ -17221,12 +17934,23 @@ void InterPrediction::getAffAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBuf
       }
 #endif
 #if INTER_LIC
-      if (pu.cu->licFlag)
+      if (pu.cu->licFlag
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+        || pu.cu->licInheritPara
+#endif
+        )
       {
         Pel *recLeftTemplate  = m_acYuvCurAMLTemplate[1][0];
         Pel *recAboveTemplate = m_acYuvCurAMLTemplate[0][0];
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+        if (pu.cu->licFlag)
+        {
+#endif
         xGetLICParamGeneral(*pu.cu, COMPONENT_Y, numTemplate, refLeftTemplate, refAboveTemplate, recLeftTemplate,
                             recAboveTemplate, LICshift[0], scale[0], offset[0]);
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+        }
+#endif
         if (m_bAMLTemplateAvailabe[0])
         {
           PelBuf &      dstBuf = pcBufPredRefTop.bufs[0];
@@ -17411,6 +18135,12 @@ void InterPrediction::getAffAMLRefTemplate(PredictionUnit &pu, PelUnitBuf &pcBuf
         }
       }
 #endif
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+      if (pu.cu->licInheritPara)
+      {
+        pu.cu->licFlag = true;
+      }
+#endif
       if (m_bAMLTemplateAvailabe[0])
       {
         PelUnitBuf srcPred[2];
@@ -17568,6 +18298,19 @@ void InterPrediction::getAffAMLRefTemplateAlt(PredictionUnit &pu, PelUnitBuf &pc
   int licShift[2] = { 0 };
   int scale[2] = { 0 };
   int offset[2] = { 0 };
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+  if (pu.cu->licInheritPara)
+  {
+    CHECK(!pu.cu->licFlag, "LCI flag must be set when inherited LIC mode is used");
+    pu.cu->licFlag = false;
+    licShift[0] = m_LICShift;
+    scale[0] = pu.cu->licScale[0][0];
+    offset[0] = pu.cu->licOffset[0][0];
+    licShift[1] = m_LICShift;
+    scale[1] = pu.cu->licScale[1][0];
+    offset[1] = pu.cu->licOffset[1][0];
+  }
+#endif
   const int bitDepth = pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA);
   const ClpRng &clpRng = pu.cu->cs->slice->clpRng(COMPONENT_Y);
   const int biShift = IF_INTERNAL_PREC - bitDepth;
@@ -17610,12 +18353,23 @@ void InterPrediction::getAffAMLRefTemplateAlt(PredictionUnit &pu, PelUnitBuf &pc
 #endif
     );
 #if INTER_LIC
-    if (pu.cu->licFlag)
+    if (pu.cu->licFlag
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+      || pu.cu->licInheritPara
+#endif
+      )
     {
       Pel *recLeftTemplate = m_acYuvCurAMLTemplate[1][0];
       Pel *recAboveTemplate = m_acYuvCurAMLTemplate[0][0];
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+      if (pu.cu->licFlag)
+      {
+#endif
       xGetLICParamGeneral(*pu.cu, COMPONENT_Y, numTemplate, refLeftTemplate, refAboveTemplate, recLeftTemplate,
         recAboveTemplate, licShift[refList], scale[refList], offset[refList]);
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+      }
+#endif
       if (m_bAMLTemplateAvailabe[0])
       {
         srcAbovePred.bufs[0].linearTransform(scale[refList], licShift[refList], offset[refList], true, clpRng);
@@ -17635,6 +18389,12 @@ void InterPrediction::getAffAMLRefTemplateAlt(PredictionUnit &pu, PelUnitBuf &pc
       srcLeftPred.bufs[0].linearTransform(1, -biShift, biOffset, false, clpRngDummy);
     }
   }
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+  if (pu.cu->licInheritPara)
+  {
+    pu.cu->licFlag = true;
+  }
+#endif
   if (m_bAMLTemplateAvailabe[0])
   {
     PelUnitBuf srcPred[2];
@@ -17774,6 +18534,9 @@ void  InterPrediction::updateIBCCandInfo(PredictionUnit &pu, MergeCtx& mrgCtx, u
 #endif
 #if INTER_LIC
     mrgCtxTmp.licFlags[ui] = false;
+#if LIC_INHERIT_PARA
+    mrgCtxTmp.setDefaultLICParamToCtx(ui);
+#endif
 #endif
 #if JVET_AC0112_IBC_LIC
     mrgCtxTmp.ibcLicFlags[ui] = false;
@@ -17990,6 +18753,9 @@ void  InterPrediction::adjustAffineMergeCandidatesOneGroup(PredictionUnit &pu, A
 #endif
 #if INTER_LIC
     pu.cu->licFlag = affMrgCtx.licFlags[uiMergeCand];
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+    affMrgCtx.setLICParamToPu(pu, uiMergeCand, pu.cu->licFlag);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
     pu.cu->obmcFlag = affMrgCtx.obmcFlags[uiMergeCand];
@@ -18095,6 +18861,9 @@ void  InterPrediction::updateAffineCandInfo2(PredictionUnit &pu, AffineMergeCtx&
 #endif
 #if INTER_LIC                                                   
     affMrgCtxTmp.licFlags[uiMergeCand] = affMrgCtx.licFlags[uiMergeCand];
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+    affMrgCtxTmp.copyLICParamFromCtx(uiMergeCand, affMrgCtx, uiMergeCand);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
     affMrgCtxTmp.obmcFlags[uiMergeCand] = affMrgCtx.obmcFlags[uiMergeCand];
@@ -18118,6 +18887,9 @@ void  InterPrediction::updateAffineCandInfo2(PredictionUnit &pu, AffineMergeCtx&
 #endif
 #if INTER_LIC 
     affMrgCtx.licFlags[uiMergeCand] = affMrgCtxTmp.licFlags[rdCandList[uiMergeCand / listsize][uiMergeCand%listsize]];
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+    affMrgCtx.copyLICParamFromCtx(uiMergeCand, affMrgCtxTmp, rdCandList[uiMergeCand / listsize][uiMergeCand%listsize]);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
     affMrgCtx.obmcFlags[uiMergeCand] = affMrgCtxTmp.obmcFlags[rdCandList[uiMergeCand / listsize][uiMergeCand % listsize]];
@@ -18144,6 +18916,9 @@ void  InterPrediction::updateIBCCandInfo( PredictionUnit &pu, MergeCtx& mrgCtx, 
 #endif
 #if INTER_LIC
     mrgCtxTmp.licFlags[ui] = false;
+#if LIC_INHERIT_PARA
+    mrgCtxTmp.setDefaultLICParamToCtx(ui);
+#endif
 #endif
 #if JVET_AC0112_IBC_LIC
     mrgCtxTmp.ibcLicFlags[ui] = false;
@@ -18341,11 +19116,26 @@ int InterPrediction::selectOBMCmode(PredictionUnit &pu, PredictionUnit &subblock
     subblockPu.cu->bcwIdx = tmpPu->cu->bcwIdx;
     for (int refList = 0; refList < 2; refList++)
     {
+#if LIC_INHERIT_PARA
+      if (tmpPu->interDir & (refList + 1))
+      {
+#endif
       for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
       {
         subblockPu.cu->licScale[refList][comp] = tmpPu->cu->licScale[refList][comp];
         subblockPu.cu->licOffset[refList][comp] = tmpPu->cu->licOffset[refList][comp];
       }
+#if LIC_INHERIT_PARA
+      }
+      else
+      {
+        for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
+        {
+          subblockPu.cu->licScale[refList][comp] = 32;
+          subblockPu.cu->licOffset[refList][comp] = 0;
+        }
+      }
+#endif
     }
 #endif
     getBlkOBMCRefTemplate(subblockPu, pcBufPredRefTop1, isAbove, neigMi);
@@ -18427,11 +19217,26 @@ int InterPrediction::selectOBMCmode(PredictionUnit &pu, PredictionUnit &subblock
     subblockPu.cu->bcwIdx = tmpPu->cu->bcwIdx;
     for (int refList = 0; refList < 2; refList++)
     {
+#if LIC_INHERIT_PARA
+      if (tmpPu->interDir & (refList + 1))
+      {
+#endif
       for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
       {
         subblockPu.cu->licScale[refList][comp] = tmpPu->cu->licScale[refList][comp];
         subblockPu.cu->licOffset[refList][comp] = tmpPu->cu->licOffset[refList][comp];
       }
+#if LIC_INHERIT_PARA
+      }
+      else
+      {
+        for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
+        {
+          subblockPu.cu->licScale[refList][comp] = 32;
+          subblockPu.cu->licOffset[refList][comp] = 0;
+        }
+      }
+#endif
     }
 #endif
     getBlkOBMCRefTemplate(subblockPu, pcBufPredRefLeft1, isAbove, neigMi);
@@ -20147,9 +20952,19 @@ void InterPrediction::xLicCompAdj(const PredictionUnit& pu, PelUnitBuf& pcYuvPre
   }
   else if (pu.cu->licFlag && !(pu.ciipFlag && !(((slice.getPOC() - slice.getRefPOC(REF_PIC_LIST_0, 0)) == 1) && slice.getCheckLDC())) && pu.refIdx[0] >= 0 && pu.refIdx[1] >= 0)
   {
+#if LIC_INHERIT_PARA
+    bool useInheritedMode = pu.cu->licInheritPara;
+#if LIC_INHERIT_PARA
+    useInheritedMode |= pu.cu->geoFlag;
+#endif
+#endif
+
 #if !JVET_AF0190_RPR_TMP_REORDER_LIC
     if (!pu.cs->sps->getRprEnabledFlag())
     {
+#endif
+#if LIC_INHERIT_PARA
+      if(!useInheritedMode)
 #endif
       for (uint32_t licIdx = 0; licIdx < NUM_LIC_ITERATION; licIdx++)
       {
@@ -20213,6 +21028,9 @@ void InterPrediction::xLicCompAdj(const PredictionUnit& pu, PelUnitBuf& pcYuvPre
           const ClpRng& clpRng = pu.cu->slice->clpRng(ComponentID(compID));
           const int biShift = IF_INTERNAL_PREC - clpRng.bd;
           curSrcPred.bufs[compID].toLast(clpRng);
+#if LIC_INHERIT_PARA
+          if (!useInheritedMode)
+#endif
           curSrcPred.bufs[compID].linearTransform(m_scale[refList][compID], m_shift[refList][compID], m_offset[refList][compID], true, clpRng);
           curSrcPred.bufs[compID].linearTransform(1, -biShift, biOffset, false, clpRng);
         }
@@ -20225,6 +21043,16 @@ void InterPrediction::xLicCompAdj(const PredictionUnit& pu, PelUnitBuf& pcYuvPre
 #if JVET_AG0276_LIC_BDOF_BDMVR
 void InterPrediction::xLicCompAdjBdof(const PredictionUnit& pu, PelUnitBuf& pcYuvPred, const bool lumaOnly, const bool chromaOnly)
 {
+#if LIC_INHERIT_PARA
+  bool useInheritedMode = pu.cu->licInheritPara;
+#if LIC_INHERIT_PARA
+  useInheritedMode |= pu.cu->geoFlag;
+#endif
+#endif
+
+#if LIC_INHERIT_PARA
+  if (!useInheritedMode)
+#endif
   for (uint32_t licIdx = 0; licIdx < NUM_LIC_ITERATION; licIdx++)
   {
     int licRefList = (licIdx % 2);
@@ -20291,6 +21119,9 @@ void InterPrediction::xLicCompAdjBdof(const PredictionUnit& pu, PelUnitBuf& pcYu
       const ClpRng& clpRng = pu.cu->slice->clpRng(ComponentID(compID));
       const int biShift = IF_INTERNAL_PREC - clpRng.bd;
       curSrcPred.bufs[compID].toLast(clpRng);
+#if LIC_INHERIT_PARA
+      if (!useInheritedMode)
+#endif
       curSrcPred.bufs[compID].linearTransform(m_scale[refList][compID], m_shift[refList][compID], m_offset[refList][compID], true, clpRng);
       curSrcPred.bufs[compID].linearTransform(1, -biShift, biOffset, false, clpRng);
       if (compID == COMPONENT_Y)
@@ -21501,7 +22332,14 @@ void InterPrediction::deriveTemplateLIC(TplMatchingCtrl& tplCtrl, RefPicList eRe
   const CodingUnit&     cu = tplCtrl.m_cu;
   const PredictionUnit& pu = tplCtrl.m_pu;
   Mv                    mv = tplCtrl.getFinalMv();
+#if LIC_INHERIT_PARA
+  bool licParamExists = pu.cu->geoFlag;
+#endif
 
+#if LIC_INHERIT_PARA
+  if (!licParamExists)
+  {
+#endif
   m_numTemplate[COMPONENT_Y][0] = m_numTemplate[COMPONENT_Y][1] = 0;
   clipMv(mv, pu.lumaPos(), pu.lumaSize(), *pu.cs->sps, *pu.cs->pps);
 #if JVET_AF0190_RPR_TMP_REORDER_LIC
@@ -21510,7 +22348,22 @@ void InterPrediction::deriveTemplateLIC(TplMatchingCtrl& tplCtrl, RefPicList eRe
   xGetSublkTemplate(cu, COMPONENT_Y, tplCtrl.m_refPic, mv, pu.blocks[COMPONENT_Y].width, pu.blocks[COMPONENT_Y].height, 0, 0, m_numTemplate[COMPONENT_Y], refLeftTemplate, refAboveTemplate, recLeftTemplate, recAboveTemplate);
   m_fillLicTpl[COMPONENT_Y] = true;
   xGetLICParamGeneral(*pu.cu, COMPONENT_Y, m_numTemplate[COMPONENT_Y], refLeftTemplate, refAboveTemplate, recLeftTemplate, recAboveTemplate, m_shift[eRefList][COMPONENT_Y], m_scale[eRefList][COMPONENT_Y], m_offset[eRefList][COMPONENT_Y]);
+#if LIC_INHERIT_PARA
+  }
+#endif
 
+#if LIC_INHERIT_PARA
+  if (licParamExists && m_scale[eRefList][COMPONENT_Y] != 0) // When scale!=0, current template has been modified by TplMatchingCtrl::inverseCurTemplateLIC, and thus cannot be used to compute LIC error if curTpl is not going to be re-filled
+  {
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+    tplCtrl.m_minCost = (tplCtrl.m_minCost * abs(m_scale[eRefList][COMPONENT_Y]) + ((Distortion)1 << (m_shift[eRefList][COMPONENT_Y] - 1))) >> m_shift[eRefList][COMPONENT_Y];
+#else
+    CHECK(m_scale[eRefList][COMPONENT_Y] < 0, "Invalid scale of LIC");
+    tplCtrl.m_minCost = (tplCtrl.m_minCost * m_scale[eRefList][COMPONENT_Y] + ((Distortion)1 << (m_shift[eRefList][COMPONENT_Y] - 1))) >> m_shift[eRefList][COMPONENT_Y];
+#endif
+    return;
+  }
+#endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   tplCtrl.m_minCost = tplCtrl.xGetTempMatchLICError<tplSize>(mv, m_shift[eRefList][COMPONENT_Y], m_scale[eRefList][COMPONENT_Y], m_offset[eRefList][COMPONENT_Y]);
 #else
@@ -21552,9 +22405,27 @@ Distortion InterPrediction::deriveTMMv(const PredictionUnit& pu, bool fillCurTpl
   {
     return std::numeric_limits<Distortion>::max();
   }
+#if LIC_INHERIT_PARA
+  bool licParamExists = pu.cu->licFlag && pu.cu->geoFlag;
+  if (licParamExists)
+  {
+    m_scale [eRefList][COMPONENT_Y] = pu.cu->licScale [eRefList][COMPONENT_Y];
+    m_offset[eRefList][COMPONENT_Y] = pu.cu->licOffset[eRefList][COMPONENT_Y];
+    m_shift [eRefList][COMPONENT_Y] = m_LICShift;
+  }
+#endif
 
   if (otherMvf == nullptr) // uni prediction
   {
+#if LIC_INHERIT_PARA // remove LIC model
+    if (!licParamExists || (licParamExists && m_scale[eRefList][COMPONENT_Y] != 0))
+    {
+      if (licParamExists)
+      {
+        pu.cu->licFlag = false;
+        tplCtrl.inverseCurTemplateLIC(m_shift[eRefList][COMPONENT_Y], m_scale[eRefList][COMPONENT_Y], m_offset[eRefList][COMPONENT_Y]);
+      }
+#endif
 #if TM_MRG && JVET_AA0093_REFINED_MOTION_FOR_ARMC
     if (pu.reduceTplSize && pu.tmMergeFlag
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
@@ -21570,6 +22441,12 @@ Distortion InterPrediction::deriveTMMv(const PredictionUnit& pu, bool fillCurTpl
     tplCtrl.deriveMvUni<TM_TPL_SIZE>();
 #if TM_MRG && JVET_AA0093_REFINED_MOTION_FOR_ARMC
     }
+#endif
+#if LIC_INHERIT_PARA
+    }
+#endif
+#if LIC_INHERIT_PARA // recover LIC flag
+    pu.cu->licFlag = licParamExists ? true : pu.cu->licFlag;
 #endif
     mv = tplCtrl.getFinalMv();
 #if JVET_AD0213_LIC_IMP
@@ -21619,7 +22496,19 @@ Distortion InterPrediction::deriveTMMv(const PredictionUnit& pu, bool fillCurTpl
       else
 #endif
       tplCtrl.removeHighFreq<1>(otherRefPic, otherMvf->mv, getBcwWeight(cu.bcwIdx, eRefList));
+#if LIC_INHERIT_PARA // remove LIC model (tpl=1)
+      if (!licParamExists || (licParamExists && m_scale[eRefList][COMPONENT_Y] != 0))
+      {
+        if (licParamExists)
+        {
+          pu.cu->licFlag = false;
+          tplCtrl.inverseCurTemplateLIC(m_shift[eRefList][COMPONENT_Y], m_scale[eRefList][COMPONENT_Y], m_offset[eRefList][COMPONENT_Y]);
+        }
+#endif
       tplCtrl.deriveMvUni<1>();
+#if LIC_INHERIT_PARA
+      }
+#endif
     }
     else
     {
@@ -21632,9 +22521,24 @@ Distortion InterPrediction::deriveTMMv(const PredictionUnit& pu, bool fillCurTpl
       else
 #endif
     tplCtrl.removeHighFreq<TM_TPL_SIZE>(otherRefPic, otherMvf->mv, getBcwWeight(cu.bcwIdx, eRefList));
+#if LIC_INHERIT_PARA // remove LIC model (tpl=4)
+    if (!licParamExists || (licParamExists && m_scale[eRefList][COMPONENT_Y] != 0))
+    {
+      if (licParamExists)
+      {
+        pu.cu->licFlag = false;
+        tplCtrl.inverseCurTemplateLIC(m_shift[eRefList][COMPONENT_Y], m_scale[eRefList][COMPONENT_Y], m_offset[eRefList][COMPONENT_Y]);
+      }
+#endif
     tplCtrl.deriveMvUni<TM_TPL_SIZE>();
+#if LIC_INHERIT_PARA
+    }
+#endif
 #if TM_MRG && JVET_AA0093_REFINED_MOTION_FOR_ARMC
     }
+#endif
+#if LIC_INHERIT_PARA // recover LIC flag
+    pu.cu->licFlag = licParamExists ? true : pu.cu->licFlag;
 #endif
     mv = tplCtrl.getFinalMv();
 #if JVET_AD0213_LIC_IMP
@@ -22153,6 +23057,28 @@ void TplMatchingCtrl::removeHighFreqLIC(const Picture& otherRefPic, const Mv& ot
 {
   xRemoveHighFreqLIC<tplSize, true>(otherRefPic, otherRefMv, curRefBcwWeight, shift, scale, offset);
   xRemoveHighFreqLIC<tplSize, false>(otherRefPic, otherRefMv, curRefBcwWeight, shift, scale, offset);
+}
+#endif
+
+#if LIC_INHERIT_PARA // Function: inverseCurTemplateLIC
+void TplMatchingCtrl::inverseCurTemplateLIC(int shift, int scale, int offset)
+{
+  CHECK(scale == 0, "Scale cannot be zero");
+
+  //    cur - scale * pred / 32 - offset  =>  [ ( 32 * N/scale ) * cur / N + ( 32 * N/scale ) * (-offset) / N ] - pred = invScale * cur / N + invOffset - pred
+  const int invShift  = 16;
+        int invScale  = ((1 << (shift + invShift)) + (scale > 0 ? (scale >> 1) : -(scale >> 1))) / scale;
+        int invOffset = ((-offset * invScale) + (1 << (invShift - 1))) >> invShift;
+
+  for (int isLeftTpl = 0; isLeftTpl <= 1; ++isLeftTpl)
+  {
+    PelBuf& curTplBuf = isLeftTpl == 0 ? m_curTplAbove : m_curTplLeft;
+    if (curTplBuf.buf != nullptr)
+    {
+      const ClpRng& clpRng = m_cu.cs->slice->clpRng(COMPONENT_Y);
+      curTplBuf.linearTransform(invScale, invShift, invOffset, false, clpRng);
+    }
+  }
 }
 #endif
 
@@ -24124,7 +25050,6 @@ void InterPrediction::bmAffineIntSearch(const PredictionUnit &pu, Mv(&mvOffset)[
     for (int list = 0; list < 2; list++)
     {
       mvInitial[list] = it->m_mv[list];
-
       xBDMVRFillBlkPredPelBuffer(subPu, *m_bmRefPic[list], mvInitial[list] - mvPreInterOffset, predBuf[list], pu.cs->slice->clpRng(COMPONENT_Y)); //bi-linear interpolation
     }
     Distortion currSubBlkCost;
@@ -27583,6 +28508,9 @@ void InterPrediction::xAddHypMC(PredictionUnit& pu, PelUnitBuf& predBuf, PelUnit
 #endif
 #if INTER_LIC
   auto savedLICFlag = pu.cu->licFlag;
+#if LIC_INHERIT_PARA
+  auto savedLICInheritePara = pu.cu->licInheritPara;
+#endif
 #endif
   MultiHypVec savedHypVec = pu.addHypData;
   pu.addHypData.clear();
@@ -27623,6 +28551,9 @@ void InterPrediction::xAddHypMC(PredictionUnit& pu, PelUnitBuf& predBuf, PelUnit
 #endif
 #if INTER_LIC
     fakePredData.cu->licFlag = mhData.licFlag;
+#if LIC_INHERIT_PARA
+    fakePredData.cu->licInheritPara = false;
+#endif
 #if JVET_AD0213_LIC_IMP
     m_isAddHypMC = true;
 #endif
@@ -27644,6 +28575,9 @@ void InterPrediction::xAddHypMC(PredictionUnit& pu, PelUnitBuf& predBuf, PelUnit
 #endif
 #if INTER_LIC
   pu.cu->licFlag = savedLICFlag;
+#if LIC_INHERIT_PARA
+  pu.cu->licInheritPara = savedLICInheritePara;
+#endif
 #endif
   pu.cu->imv = savedIMV;
   pu.cu->affine = savedAffine;
@@ -27826,6 +28760,9 @@ void InterPrediction::getAmvpMergeModeMergeList(PredictionUnit& pu, MvField* mvF
                 bmMergeCtx.useAltHpelIf[mergeIdx] = false;
                 bmMergeCtx.addHypNeighbours[mergeIdx].clear();
                 bmMergeCtx.candCost[mergeIdx] = MAX_UINT64;
+#if LIC_INHERIT_PARA
+                bmMergeCtx.setDefaultLICParamToCtx(mergeIdx);
+#endif
               }
               PredictionUnit tmpPU = pu;
               adjustMergeCandidatesInOneCandidateGroup(tmpPU, bmMergeCtx, bmMergeCtx.numValidMergeCand);
@@ -27835,6 +28772,9 @@ void InterPrediction::getAmvpMergeModeMergeList(PredictionUnit& pu, MvField* mvF
 #endif
 
         pu.cu->licFlag = bmMergeCtx.licFlags[0];
+#if LIC_INHERIT_PARA
+        bmMergeCtx.setLICParamToPu(pu, 0, bmMergeCtx.licInheritPara[0]);
+#endif
         if (bmMergeCtx.licFlags[0])
         {
           pu.mv[refListAmvp] = amvpLicInfo.mvCand[bestMvpIdxToTest];
@@ -27872,6 +28812,9 @@ void InterPrediction::getAmvpMergeModeMergeList(PredictionUnit& pu, MvField* mvF
         else
         {
           pu.cu->licFlag = bmMergeCtx.licFlags[1];
+#if LIC_INHERIT_PARA
+          bmMergeCtx.setLICParamToPu(pu, 1, bmMergeCtx.licInheritPara[1]);
+#endif
           if (bmMergeCtx.licFlags[1])
           {
             pu.mv[refListAmvp] = amvpLicInfo.mvCand[bestMvpIdxToTest];
