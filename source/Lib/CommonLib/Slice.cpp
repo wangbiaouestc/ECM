@@ -3724,6 +3724,7 @@ SPS::SPS()
 #endif
 #if JVET_AG0136_INTRA_TMP_LIC
   , m_itmpLicExtension        ( false )
+  , m_itmpLicMode             ( false )
 #endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
  , m_DMVDMode                 ( false )
