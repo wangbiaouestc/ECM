@@ -4362,6 +4362,12 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
         dstBuf.linearTransform(pu.cu->licScale[m_iRefListIdx][compID], m_LICShift, pu.cu->licOffset[m_iRefListIdx][compID], true, clpRng);
       }
     }
+    if (!m_isAddHypMC)
+    {
+      m_scale [m_iRefListIdx][compID] = pu.cu->licScale[m_iRefListIdx][compID];
+      m_offset[m_iRefListIdx][compID] = pu.cu->licOffset[m_iRefListIdx][compID];
+      m_shift [m_iRefListIdx][compID] = m_LICShift;
+    }
     return;
   }
 #endif
@@ -4396,6 +4402,9 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
         {
           dstBuf.linearTransform(pu.cu->licScale[m_iRefListIdx][compID], m_LICShift, pu.cu->licOffset[m_iRefListIdx][compID], true, clpRng);
         }
+        m_scale [m_iRefListIdx][compID] = pu.cu->licScale[m_iRefListIdx][compID];
+        m_offset[m_iRefListIdx][compID] = pu.cu->licOffset[m_iRefListIdx][compID];
+        m_shift [m_iRefListIdx][compID] = m_LICShift;
         return;
       }
 #endif
@@ -12830,7 +12839,11 @@ void  InterPrediction::sortAffineMergeCandidates(PredictionUnit pu, AffineMergeC
     pu.mergeType = affMrgCtx.mergeType[pu.mergeIdx];
 #if INTER_LIC
     pu.cu->licFlag = affMrgCtx.licFlags[pu.mergeIdx];
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+    affMrgCtx.setLICParamToPu(pu, pu.mergeIdx, pu.cu->licFlag);
+#else
     pu.cu->licFlag = false;
+#endif
 #endif
     pu.interDir = affMrgCtx.interDirNeighbours[pu.mergeIdx];
     pu.cu->affineType = affMrgCtx.affineType[pu.mergeIdx];
@@ -13789,8 +13802,8 @@ void InterPrediction::adjustMergeCandidatesLicFlag(PredictionUnit& pu, MergeCtx&
     origLICFlag = pu.cu->licFlag;
     pu.cu->licFlag = false;
 #if LIC_INHERIT_PARA_SWAP_STAGE
-    bool checkLicInheritPara = origLICFlag && 256 > pu.cs->slice->getSPS()->getCTUSize();
-    if (checkLicInheritPara && (nWidth > 256 || nHeight > 256))
+    bool checkLicInheritPara = origLICFlag && LIC_INHERIT_PARA_SWAP_STAGE_MAX_SIZE > pu.cs->slice->getSPS()->getCTUSize();
+    if (checkLicInheritPara && (nWidth > LIC_INHERIT_PARA_SWAP_STAGE_MAX_SIZE || nHeight > LIC_INHERIT_PARA_SWAP_STAGE_MAX_SIZE))
     {
       checkLicInheritPara = false;
     }
@@ -20953,10 +20966,7 @@ void InterPrediction::xLicCompAdj(const PredictionUnit& pu, PelUnitBuf& pcYuvPre
   else if (pu.cu->licFlag && !(pu.ciipFlag && !(((slice.getPOC() - slice.getRefPOC(REF_PIC_LIST_0, 0)) == 1) && slice.getCheckLDC())) && pu.refIdx[0] >= 0 && pu.refIdx[1] >= 0)
   {
 #if LIC_INHERIT_PARA
-    bool useInheritedMode = pu.cu->licInheritPara;
-#if LIC_INHERIT_PARA
-    useInheritedMode |= pu.cu->geoFlag;
-#endif
+    bool useInheritedMode = pu.cu->licInheritPara || pu.cu->geoFlag;
 #endif
 
 #if !JVET_AF0190_RPR_TMP_REORDER_LIC
@@ -20964,7 +20974,20 @@ void InterPrediction::xLicCompAdj(const PredictionUnit& pu, PelUnitBuf& pcYuvPre
     {
 #endif
 #if LIC_INHERIT_PARA
-      if(!useInheritedMode)
+      if(useInheritedMode)
+      {
+        for (uint32_t refList = 0; refList < 2; refList++)
+        {
+          for (int compID = 0; compID < MAX_NUM_COMPONENT; compID++)
+          {
+            m_scale [refList][compID] = pu.cu->licScale[refList][compID];
+            m_offset[refList][compID] = pu.cu->licOffset[refList][compID];
+            m_shift [refList][compID] = m_LICShift;
+          }
+        }
+      }
+      else
+      {
 #endif
       for (uint32_t licIdx = 0; licIdx < NUM_LIC_ITERATION; licIdx++)
       {
@@ -21008,6 +21031,9 @@ void InterPrediction::xLicCompAdj(const PredictionUnit& pu, PelUnitBuf& pcYuvPre
           }
         }
       }
+#if LIC_INHERIT_PARA
+      }
+#endif
 
       const Pel biOffset = -IF_INTERNAL_OFFS;
       for (int refList = 0; refList < NUM_REF_PIC_LIST_01; refList++)
@@ -21025,14 +21051,21 @@ void InterPrediction::xLicCompAdj(const PredictionUnit& pu, PelUnitBuf& pcYuvPre
             continue;
           }
 
+#if LIC_INHERIT_PARA && BUGFIX_LIC_INHERIT_PARA
+          if (!useInheritedMode) // Note: for LIC inheritance mode, linearTransform has been done at the end of xPredInterBlk and thus it can be bypassed here. However, linearTransform is not performed at xPredInterBlk when LIC-BDOF condition is true, and has to be performed at xLicCompAdjBdof
+          {
+#endif
           const ClpRng& clpRng = pu.cu->slice->clpRng(ComponentID(compID));
           const int biShift = IF_INTERNAL_PREC - clpRng.bd;
           curSrcPred.bufs[compID].toLast(clpRng);
-#if LIC_INHERIT_PARA
+#if LIC_INHERIT_PARA && !BUGFIX_LIC_INHERIT_PARA
           if (!useInheritedMode)
 #endif
           curSrcPred.bufs[compID].linearTransform(m_scale[refList][compID], m_shift[refList][compID], m_offset[refList][compID], true, clpRng);
           curSrcPred.bufs[compID].linearTransform(1, -biShift, biOffset, false, clpRng);
+#if LIC_INHERIT_PARA && BUGFIX_LIC_INHERIT_PARA
+          }
+#endif
         }
       }
 #if !JVET_AF0190_RPR_TMP_REORDER_LIC
@@ -21044,14 +21077,24 @@ void InterPrediction::xLicCompAdj(const PredictionUnit& pu, PelUnitBuf& pcYuvPre
 void InterPrediction::xLicCompAdjBdof(const PredictionUnit& pu, PelUnitBuf& pcYuvPred, const bool lumaOnly, const bool chromaOnly)
 {
 #if LIC_INHERIT_PARA
-  bool useInheritedMode = pu.cu->licInheritPara;
-#if LIC_INHERIT_PARA
-  useInheritedMode |= pu.cu->geoFlag;
-#endif
+  bool useInheritedMode = pu.cu->licInheritPara || pu.cu->geoFlag;
 #endif
 
 #if LIC_INHERIT_PARA
-  if (!useInheritedMode)
+  if (useInheritedMode)
+  {
+    for (uint32_t refList = 0; refList < 2; refList++)
+    {
+      for (int compID = 0; compID < MAX_NUM_COMPONENT; compID++)
+      {
+        m_scale [refList][compID] = pu.cu->licScale[refList][compID];
+        m_offset[refList][compID] = pu.cu->licOffset[refList][compID];
+        m_shift [refList][compID] = m_LICShift;
+      }
+    }
+  }
+  else
+  {
 #endif
   for (uint32_t licIdx = 0; licIdx < NUM_LIC_ITERATION; licIdx++)
   {
@@ -21093,6 +21136,9 @@ void InterPrediction::xLicCompAdjBdof(const PredictionUnit& pu, PelUnitBuf& pcYu
       }
     }
   }
+#if LIC_INHERIT_PARA
+  }
+#endif
 
   const Pel biOffset = -IF_INTERNAL_OFFS;
   for (int refList = 0; refList < NUM_REF_PIC_LIST_01; refList++)
@@ -21119,7 +21165,7 @@ void InterPrediction::xLicCompAdjBdof(const PredictionUnit& pu, PelUnitBuf& pcYu
       const ClpRng& clpRng = pu.cu->slice->clpRng(ComponentID(compID));
       const int biShift = IF_INTERNAL_PREC - clpRng.bd;
       curSrcPred.bufs[compID].toLast(clpRng);
-#if LIC_INHERIT_PARA
+#if LIC_INHERIT_PARA && !BUGFIX_LIC_INHERIT_PARA
       if (!useInheritedMode)
 #endif
       curSrcPred.bufs[compID].linearTransform(m_scale[refList][compID], m_shift[refList][compID], m_offset[refList][compID], true, clpRng);

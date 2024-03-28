@@ -2554,12 +2554,19 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
 #if INTER_LIC
               bool orgLicFlag = bestCU->licFlag;
               bestCU->licFlag = false;
+#if LIC_INHERIT_PARA
+              bool orgLicInheritedFlag = bestCU->licInheritPara;
+              bestCU->licInheritPara = false;
+#endif
 #endif
               bool orgCiipFlag = bestCU->firstPU->ciipFlag;
               bestCU->firstPU->ciipFlag = false;
               m_pcInterSearch->xPredWoRefinement(*bestCU->firstPU, predBeforeMCAdjBuffer);
 #if INTER_LIC
               bestCU->licFlag = orgLicFlag;
+#if LIC_INHERIT_PARA
+              bestCU->licInheritPara = orgLicInheritedFlag;
+#endif
 #endif
               bestCU->firstPU->ciipFlag = orgCiipFlag;
             }

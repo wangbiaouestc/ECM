@@ -679,8 +679,13 @@ void CodingUnit::initData()
   {
     for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
     {
+#if LIC_INHERIT_PARA
+      licScale[i][comp] = 32;
+      licOffset[i][comp] = 0;
+#else
       licScale[i][comp] = MAX_INT;
       licOffset[i][comp] = MAX_INT;
+#endif
     }
   }
 #endif

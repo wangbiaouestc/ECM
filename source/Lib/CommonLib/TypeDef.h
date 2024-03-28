@@ -58,6 +58,7 @@
 #define LIC_INHERIT_PARA                                  1
 #define LIC_INHERIT_PARA_SWAP_STAGE                       ((EE2_TEST_3_5) == 2 && (LIC_INHERIT_PARA))
 #define LIC_INHERIT_PARA_ARMC_STAGE                       ((EE2_TEST_3_5) == 3 && (LIC_INHERIT_PARA))
+#define BUGFIX_LIC_INHERIT_PARA                           1
 #endif
 
 

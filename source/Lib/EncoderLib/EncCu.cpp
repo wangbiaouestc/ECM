@@ -5764,6 +5764,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
 #if INTER_LIC
             cu.licFlag = affineMergeCtxOppositeLic.licFlags[uiAffMergeCand];
+#if LIC_INHERIT_PARA
+            affineMergeCtxOppositeLic.setLICParamToPu(pu, NOT_VALID, false);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
             cu.obmcFlag = affineMergeCtxOppositeLic.obmcFlags[uiAffMergeCand];
@@ -6021,6 +6024,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
 #if INTER_LIC
             cu.licFlag = affineMergeCtxOppositeLic.licFlags[uiAffMergeCand];
+#if LIC_INHERIT_PARA
+            affineMergeCtxOppositeLic.setLICParamToPu(pu, NOT_VALID, false);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
             cu.obmcFlag = affineMergeCtxOppositeLic.obmcFlags[uiAffMergeCand];
@@ -7246,6 +7252,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
 #if INTER_LIC
             cu.licFlag = affineMergeCtx.licFlags[uiMergeCand];
+#if LIC_INHERIT_PARA
+            affineMergeCtx.setLICParamToPu(pu, NOT_VALID, false);
+#endif
 #endif
 #if JVET_AG0276_NLIC
             cu.altLMFlag = affineMergeCtx.altLMFlag[uiMergeCand];
@@ -7418,6 +7427,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
         pu.mergeType      = affineMergeCtx.mergeType         [pu.mergeIdx];
 #if INTER_LIC
         pu.cu->licFlag    = affineMergeCtx.licFlags          [pu.mergeIdx];
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+        affineMergeCtx.setLICParamToPu(pu, pu.mergeIdx, pu.cu->licFlag);
+#endif
 #endif
         pu.interDir       = affineMergeCtx.interDirNeighbours[pu.mergeIdx];
         pu.cu->affineType = affineMergeCtx.affineType        [pu.mergeIdx];
@@ -7576,6 +7588,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
 #if INTER_LIC
         cu.licFlag = affineMergeCtxOppositeLic.licFlags[uiMergeCand];
+#if LIC_INHERIT_PARA
+        affineMergeCtxOppositeLic.setLICParamToPu(pu, NOT_VALID, false);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
         cu.obmcFlag = affineMergeCtxOppositeLic.obmcFlags[uiMergeCand];
@@ -15654,6 +15669,9 @@ void EncCu::xCheckRDCostAffineMerge2Nx2N( CodingStructure *&tempCS, CodingStruct
         cu.bcwIdx = affineMergeCtx.bcwIdx[uiMergeCand];
 #if INTER_LIC
         cu.licFlag = affineMergeCtx.licFlags[uiMergeCand];
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+        affineMergeCtx.setLICParamToPu(pu, uiMergeCand, cu.licFlag);
+#endif
 #endif
 
         pu.mergeType = affineMergeCtx.mergeType[uiMergeCand];
@@ -15777,6 +15795,9 @@ void EncCu::xCheckRDCostAffineMerge2Nx2N( CodingStructure *&tempCS, CodingStruct
       cu.bcwIdx = affineMergeCtx.bcwIdx[uiMergeCand];
 #if INTER_LIC
       cu.licFlag = affineMergeCtx.licFlags[uiMergeCand];
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+      affineMergeCtx.setLICParamToPu(pu, uiMergeCand, cu.licFlag);
+#endif
 #endif
 
       pu.mergeType = affineMergeCtx.mergeType[uiMergeCand];
@@ -16011,6 +16032,9 @@ void EncCu::xCheckRDCostAffineMmvd2Nx2N(CodingStructure *&tempCS, CodingStructur
             pu.cu->affineType = affineMergeCtx.affineType        [pu.mergeIdx];
 #if INTER_LIC
             pu.cu->licFlag    = affineMergeCtx.licFlags          [pu.mergeIdx];
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+            affineMergeCtx.setLICParamToPu(pu, pu.mergeIdx, pu.cu->licFlag);
+#endif
 #endif
             pu.cu->bcwIdx     = affineMergeCtx.bcwIdx            [pu.mergeIdx];
             pu.mmvdMergeFlag  = false;
@@ -16123,6 +16147,9 @@ void EncCu::xCheckRDCostAffineMmvd2Nx2N(CodingStructure *&tempCS, CodingStructur
         pu.mergeType      = affineMergeCtx.mergeType         [pu.mergeIdx];
 #if INTER_LIC
         pu.cu->licFlag    = affineMergeCtx.licFlags          [pu.mergeIdx];
+#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+        affineMergeCtx.setLICParamToPu(pu, pu.mergeIdx, pu.cu->licFlag);
+#endif
 #endif
         pu.interDir       = affineMergeCtx.interDirNeighbours[pu.mergeIdx];
         pu.cu->affineType = affineMergeCtx.affineType        [pu.mergeIdx];
@@ -22925,6 +22952,9 @@ void EncCu::xCheckSATDCostBMMerge(CodingStructure*& tempCS,
       pu.cu->bcwIdx = mrgCtx.bcwIdx[candIdx];
 #if JVET_AD0213_LIC_IMP
       pu.cu->licFlag = false;
+#if LIC_INHERIT_PARA
+      cu.licInheritPara = false;
+#endif
 #endif
       pu.mv[REF_PIC_LIST_0] = mrgCtx.mvFieldNeighbours[(candIdx << 1)].mv;
       pu.mv[REF_PIC_LIST_1] = mrgCtx.mvFieldNeighbours[(candIdx << 1) + 1].mv;
@@ -23131,6 +23161,9 @@ void EncCu::xCheckSATDCostBMMerge(CodingStructure*& tempCS,
 #endif
 #if MULTI_PASS_DMVR
   pu.bdmvrRefine = false;
+#endif
+#if LIC_INHERIT_PARA
+  cu.licInheritPara = false;
 #endif
 }
 #endif

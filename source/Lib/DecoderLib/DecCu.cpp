@@ -1996,12 +1996,19 @@ void DecCu::xReconInter(CodingUnit &cu)
 #if INTER_LIC
             bool orgLicFlag = cu.licFlag;
             cu.licFlag = false;
+#if LIC_INHERIT_PARA
+            bool orgLicInheritedFlag = cu.licInheritPara;
+            cu.licInheritPara = false;
+#endif
 #endif
             bool orgCiipFlag = cu.firstPU->ciipFlag;
             cu.firstPU->ciipFlag = false;
             m_pcInterPred->xPredWoRefinement(*cu.firstPU, predBeforeMCAdjBuffer);
 #if INTER_LIC
             cu.licFlag = orgLicFlag;
+#if LIC_INHERIT_PARA
+            cu.licInheritPara = orgLicInheritedFlag;
+#endif
 #endif
             cu.firstPU->ciipFlag = orgCiipFlag;
           }

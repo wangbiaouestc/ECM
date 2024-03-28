@@ -7916,6 +7916,9 @@ void InterSearch::predInterSearchAdditionalHypothesis(PredictionUnit& pu, const 
 #endif
 #if INTER_LIC
   auto savedLICFlag = pu.cu->licFlag;
+#if LIC_INHERIT_PARA
+  auto savedLICInheritePara = pu.cu->licInheritPara;
+#endif
 #endif
   tempMHPredData.isMrg = true;
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
@@ -7978,6 +7981,9 @@ void InterSearch::predInterSearchAdditionalHypothesis(PredictionUnit& pu, const 
         fakePredData.cu->altLMFlag = m_geoMrgCtx.altLMFlag[i];
         fakePredData.cu->altLMParaUnit = m_geoMrgCtx.altLMParaNeighbours[i];
 #endif
+#if LIC_INHERIT_PARA
+        fakePredData.cu->licInheritPara = false;
+#endif
         fakePredData.mvRefine = true;
         if (savedLICFlag)
         {
@@ -7992,6 +7998,9 @@ void InterSearch::predInterSearchAdditionalHypothesis(PredictionUnit& pu, const 
 #if JVET_AG0276_NLIC
         fakePredData.cu->altLMFlag = savedAltLMFlag;
         fakePredData.cu->altLMParaUnit = savedAltLMParaUnit;
+#endif
+#if LIC_INHERIT_PARA
+        fakePredData.cu->licInheritPara = savedLICInheritePara;
 #endif
         fakePredData.cu->imv = savedIMV;
         fakePredData.cu->affine = savedAffine;
@@ -8166,6 +8175,9 @@ void InterSearch::predInterSearchAdditionalHypothesis(PredictionUnit& pu, const 
 #endif
 #if INTER_LIC
         pu.cu->licFlag = tempMHPredData.licFlag;
+#if LIC_INHERIT_PARA
+        pu.cu->licInheritPara = false;
+#endif
 #endif
         xMotionEstimation(pu, tempOrigBuf, eRefPicList, cMvPred, iRefIdxPred, cMv, tempMHPredData.mvpIdx, uiBits, uiCostTemp, amvpInfo, false, g_addHypWeight[tempMHPredData.weightIdx]);
         xCheckBestMVP(eRefPicList, cMv, cMvPred, tempMHPredData.mvpIdx, amvpInfo, uiBits, uiCostTemp, pu.cu->imv);
@@ -8175,6 +8187,9 @@ void InterSearch::predInterSearchAdditionalHypothesis(PredictionUnit& pu, const 
 #endif
 #if INTER_LIC
         pu.cu->licFlag = savedLICFlag;
+#if LIC_INHERIT_PARA
+        pu.cu->licInheritPara = savedLICInheritePara;
+#endif
 #endif
         tempMHPredData.mv = cMv;
         tempMHPredData.mv.mvCliptoStorageBitDepth();
