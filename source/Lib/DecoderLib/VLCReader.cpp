@@ -2411,7 +2411,7 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_AG0276_LIC_FLAG_SIGNALING
   if (pcSPS->getUseMergeOppositeLic())
   {
-    READ_UVLC(uiCode, "five_max_num_oppolic_merge_cand");
+    READ_UVLC(uiCode, "five_minus_max_num_oppositelic_merge_cand");
     pcSPS->setMaxNumOppositeLicMergeCand(REG_MRG_MAX_NUM_CANDS_OPPOSITELIC - uiCode);
   }
 #endif

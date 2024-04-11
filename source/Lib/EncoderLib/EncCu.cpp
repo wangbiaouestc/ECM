@@ -3864,6 +3864,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #if JVET_AG0276_LIC_FLAG_SIGNALING
   MergeCtx tmMrgCtxOppositeLic;
   tmMrgCtxOppositeLic.numValidMergeCand = 0;
+#if JVET_X0049_ADAPT_DMVR || JVET_Z0102_NO_ARMC_FOR_ZERO_CAND
+  tmMrgCtxOppositeLic.numCandToTestEnc = 0;
+#endif
 #endif
 #if JVET_X0141_CIIP_TIMD_TM
   MergeCtx ciipTmMrgCtx;
@@ -5223,7 +5226,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #else
         m_pcInterSearch->adjustAffineMergeCandidates(pu, affineMergeCtx);
 #if JVET_AG0276_LIC_FLAG_SIGNALING
-        if (hasOppolicAff && pu.cs->sps->getUseAffMergeOppositeLic())
+        if (hasOppositelicAff && pu.cs->sps->getUseAffMergeOppositeLic())
         {
           m_pcInterSearch->adjustAffineMergeCandidates(pu, affineMergeCtxOppositeLic);
         }
@@ -5883,7 +5886,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #if JVET_AG0276_NLIC
             if ((validNumOppositeLic + cntOppositeLic) < affineMergeCtxOppositeLic.maxNumMergeCand && !affineMergeCtxOppositeLic.altLMFlag[uiAffMergeCand])
 #else
-            if ((validNumOppoLic + cntOppoLic) < affineMergeCtxOppoLic.maxNumMergeCand)
+            if ((validNumOppositeLic + cntOppositeLic) < affineMergeCtxOppositeLic.maxNumMergeCand)
 #endif
             {
               index = validNumOppositeLic + cntOppositeLic;
