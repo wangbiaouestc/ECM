@@ -4199,7 +4199,7 @@ void CABACReader::amvpSbTmvpFlag(PredictionUnit& pu)
     pu.cu->smvdMode = 0;
     g_picAmvpSbTmvpEnabledArea += pu.lwidth() * pu.lheight();
   }
-  DTRACE(g_trace_ctx, D_SYNTAX, "amvpSbTmvpFlag() amvpSbTmvpFlag=%d interDir:%d colIdx:%d pos=(%d,%d) size=%dx%d\n", pu.amvpSbTmvpFlag ? 1 : 0, pu.interDir, pu.colIdx ? 1 : 0, pu.lumaPos().x, pu.lumaPos().y, pu.lumaSize().width, pu.lumaSize().height);
+  DTRACE(g_trace_ctx, D_SYNTAX, "amvpSbTmvpFlag() amvpSbTmvpFlag=%d colIdx:%d pos=(%d,%d) size=%dx%d\n", pu.amvpSbTmvpFlag ? 1 : 0, pu.colIdx ? 1 : 0, pu.lumaPos().x, pu.lumaPos().y, pu.lumaSize().width, pu.lumaSize().height);
 }
 
 void CABACReader::amvpSbTmvpMvdCoding(PredictionUnit &pu, Mv &rMvd)
@@ -4208,7 +4208,7 @@ void CABACReader::amvpSbTmvpMvdCoding(PredictionUnit &pu, Mv &rMvd)
   {
     pu.amvpSbTmvpMvdIdx = -1;
     rMvd.setZero();
-    DTRACE(g_trace_ctx, D_SYNTAX, "amvpSbTmvpMvdCoding() pos=(%d,%d) size=(%d,%d) amvpSbTmvpMvdIdx:%d mvd(%d, %d)\n", pu.lx(), pu.ly(), pu.lwidth(), pu.lheight(), -1, rMvd.getHor(), rMvd.getVer());
+    DTRACE(g_trace_ctx, D_SYNTAX, "amvpSbTmvpMvdCoding() pos=(%d,%d) size=(%d,%d) amvpSbTmvpMvdIdx:%d\n", pu.lx(), pu.ly(), pu.lwidth(), pu.lheight(), -1);
   }
   else
   {
