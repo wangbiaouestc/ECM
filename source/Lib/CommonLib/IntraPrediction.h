@@ -274,6 +274,10 @@ protected:
   int        numSamplesBuf[NUM_EIP_BASE_RECOTYPE];
 #endif
 private:
+#if JVET_AG0136_INTRA_TMP_LIC
+  Pel arrayTemp[TMP_FUSION_NUM][(MAX_CU_SIZE + TMP_TEMPLATE_SIZE) * (MAX_CU_SIZE + TMP_TEMPLATE_SIZE)];
+#endif
+
 #if !MERGE_ENC_OPT
   Pel* m_yuvExt2[MAX_NUM_COMPONENT][4];
   int  m_yuvExtSize2;

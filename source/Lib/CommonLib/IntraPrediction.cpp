@@ -13400,7 +13400,6 @@ void IntraPrediction::xTMPFusionCalcParams(CodingUnit *cu, CompArea area, CccmMo
       ptrOffsetsFusionUseMR[i] = ClipPel(rightShift(ptrLicInd[1] * refPointTemplate[i][refPosY * picStride + refPosX], ptrLicInd[0]) + ptrLicInd[2], cu->cs->slice->clpRng(COMPONENT_Y));
     }
   }
-  Pel arrayTemp[TMP_FUSION_NUM][(MAX_CU_SIZE + TMP_TEMPLATE_SIZE) * (MAX_CU_SIZE + TMP_TEMPLATE_SIZE)];
   if (useMR)
   {
     for (int i = 0; i < foundCandiNum; i++)
@@ -13879,7 +13878,6 @@ void IntraPrediction::xTMPFusionApplyModel(PelBuf &piPred, unsigned int uiBlkWid
   memset( samples, 0, sizeof( Pel ) * TMP_FUSION_PARAMS);
 
 #if JVET_AG0136_INTRA_TMP_LIC
-  Pel arrayTemp[TMP_FUSION_NUM][MAX_CU_SIZE * MAX_CU_SIZE];
   if (useMR)
   {
     const Pel* const ptrOffsetsFusionUseMR = m_memOffsetsFusionUseMR[cu->tmpIdx - 3];
@@ -14328,7 +14326,6 @@ bool IntraPrediction::generateTMPrediction(Pel *piPred, unsigned int uiStride, i
 #endif
     Pel *refTarget[TMP_FUSION_NUM];
 #if JVET_AG0136_INTRA_TMP_LIC
-    Pel arrayTemp[TMP_FUSION_NUM][MAX_CU_SIZE * MAX_CU_SIZE];
     if (useMR)
     {
       for (int i = 0; i < tmpFusionNum; i++)
