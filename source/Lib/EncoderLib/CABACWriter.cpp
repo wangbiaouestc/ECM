@@ -3588,7 +3588,7 @@ void CABACWriter::amvpSbTmvpFlag(const PredictionUnit& pu)
   
   m_BinEncoder.encodeBin(pu.amvpSbTmvpFlag ? 1 : 0, Ctx::amvpSbTmvpFlag(0));
   
-  DTRACE(g_trace_ctx, D_SYNTAX, "amvpSbTmvpFlag() amvpSbTmvpFlag=%d interDir:%d colIdx:%d pos=(%d,%d) size=%dx%d\n", pu.amvpSbTmvpFlag ? 1 : 0, pu.interDir, pu.colIdx ? 1 : 0, pu.lumaPos().x, pu.lumaPos().y, pu.lumaSize().width, pu.lumaSize().height);
+  DTRACE(g_trace_ctx, D_SYNTAX, "amvpSbTmvpFlag() amvpSbTmvpFlag=%d colIdx:%d pos=(%d,%d) size=%dx%d\n", pu.amvpSbTmvpFlag ? 1 : 0, pu.colIdx ? 1 : 0, pu.lumaPos().x, pu.lumaPos().y, pu.lumaSize().width, pu.lumaSize().height);
   if (pu.amvpSbTmvpFlag)
   {
     if (pu.cs->slice->getAmvpSbTmvpNumColPic() > 1)
