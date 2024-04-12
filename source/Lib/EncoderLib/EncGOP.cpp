@@ -3855,6 +3855,7 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
         if (minPoc > 4)
         {
           pcSlice->setAmvpSbTmvpEnabledFlag(false);
+          pcSlice->setAmvpSbTmvpAmvrEnabledFlag(false);
         }
         else
         {
