@@ -51,6 +51,7 @@
 #include <cassert>
 #include <cstdint>
 
+#define TEST_3_4                                          1
 #define EE2_TEST_3_5                                      1 // 1 for Test-3.5a 
                                                             // 2 for Test 3.5b
                                                             // 3 for Test 3.5c

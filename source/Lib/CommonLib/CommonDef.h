@@ -1437,7 +1437,9 @@ static const int TOTAL_GEO_BLENDING_NUM =                           6; // GPM 0~
 #define GET_SGPM_BLD_IDX(a, b)                                                                                           \
   (std::min(a, b) <= 4 ? 1 : std::min(a, b) <= 8 ? 2 : std::min(a, b) <= 16 ? 3 : std::min(a, b) <= 32 ? 4 : 5)
 #endif
-
+#if TEST_3_4
+static const int GPM_BLENDING_SIZE_THRESHOLD = 32;
+#endif
 #if ENABLE_OBMC
 static const unsigned int defaultWeight[2][4] = { {27, 16, 6, 0}, {27, 0, 0, 0} };
 #endif

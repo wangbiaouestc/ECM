@@ -468,6 +468,25 @@ const CtxSet ContextSetCfg::GeoMmvdStepMvpIdx = ContextSetCfg::addCtxSet({
 
 const CtxSet ContextSetCfg::GeoBldFlag = ContextSetCfg::addCtxSet({
 // ctx 67 to 70
+#if TEST_3_4
+// ctx 67 to 70
+ { 58, 22, 52, 21, 58, 22, 52, 21 },
+ { 60, 51, 59, 44, 60, 51, 59, 44,},
+ { 0, 0, 0, 0, 0, 0, 0, 0,},
+ { 1, 1, 1, 1, 1, 1, 1, 1,},
+ { 1, 1, 1, 1, 1, 1, 1, 1, },
+ { 1, 1, 0, 1, 1, 1, 0, 1,},
+ { 11, DWE, DWE, 11, 11, DWE, DWE, 11,},
+ { 11, DWE, 11, 11, 11, DWE, 11, 11,},
+ { 11, DWE, 4, 11, 11, DWE, 4, 11,},
+ { 132, 116, 116, 117, 132, 116, 116, 117,},
+ { DWO, 117, 132, 118, DWO, 117, 132, 118,},
+ { 118, 117, 117, 117, 118, 117, 117, 117,},
+ { 122, 118, 125, 122, 122, 118, 125, 122,},
+ { DWO, 116, 117, 117, DWO, 116, 117, 117,},
+ { 120, 117, 150, DWO, 120, 117, 150, DWO,},
+#else
+// ctx 67 to 70
  { 58, 22, 52, 21, },
  { 60, 51, 59, 44, },
  { 0, 0, 0, 0, },
@@ -483,6 +502,7 @@ const CtxSet ContextSetCfg::GeoBldFlag = ContextSetCfg::addCtxSet({
  { 122, 118, 125, 122, },
  { DWO, 116, 117, 117, },
  { 120, 117, 150, DWO, },
+#endif
 });
 
 const CtxSet ContextSetCfg::GeoSubModeIdx = ContextSetCfg::addCtxSet({
