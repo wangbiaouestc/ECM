@@ -314,9 +314,9 @@ enum CCPType
 
 struct CCPModelCandidate
 {
-  int64_t params[2][NUM_CCP_PARAMS] = { 0 };
+  int64_t params[2][NUM_CCP_PARAMS] = { { 0 } };
 #if MMLM
-  int64_t params2[2][NUM_CCP_PARAMS] = { 0 };
+  int64_t params2[2][NUM_CCP_PARAMS] = { { 0 } };
   int     shift2[2] = { 0 };
   int     yThres = 0;
 #endif

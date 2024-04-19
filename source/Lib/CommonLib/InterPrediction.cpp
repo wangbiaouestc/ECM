@@ -910,7 +910,6 @@ void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, cons
 #if JVET_AG0061_INTER_LFNST_NSPT
 int InterPrediction::deriveInterDimdMode(const CodingUnit cu, CPelBuf predBuf)
 {
-  int        sigcnt  = 0;
   const Pel *pPred   = predBuf.buf;
   const int  iStride = predBuf.stride;
   int        height  = predBuf.height;
@@ -919,7 +918,7 @@ int InterPrediction::deriveInterDimdMode(const CodingUnit cu, CPelBuf predBuf)
   int piHistogramClean[NUM_LUMA_MODE] = { 0 };
 
   pPred = pPred + iStride + 1;
-  sigcnt += buildHistogram(pPred, iStride, height - 2, width - 2, piHistogramClean, 0, width - 2, height - 2);
+  buildHistogram(pPred, iStride, height - 2, width - 2, piHistogramClean, 0, width - 2, height - 2);
 
   int firstAmp = 0, curAmp = 0;
   int firstMode = 0, curMode = 0;
@@ -34712,7 +34711,7 @@ std::vector<Mv> InterPrediction::deriveMVDFromMVSDIdxAffineSI(PredictionUnit& pu
     CandCheckEnv checkEnv(cMvdDerived, cMvPred, pu, picWidth, picHeight, lcuWidth, tplCtrl, aMvCostVec);
     int idxOffset = 0;
     //typedef void (CandCheckEnv::* RangeCheckFxn)(bool , bool , int , int , int );
-    auto checkRange = [&step, &checkEnv, &idxOffset, iHorRange, iVerRange](int idxRight, int rangeLen)
+    auto checkRange = [&step, &checkEnv, &idxOffset](int idxRight, int rangeLen)
     {
       switch (step)
       {

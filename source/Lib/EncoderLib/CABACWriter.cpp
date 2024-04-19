@@ -6653,30 +6653,24 @@ unsigned CABACWriter::xWriteMvdPrefix( unsigned uiSymbol, int param )
   numBins++;
 
   unsigned temp = 0;
-  unsigned bitCount = 0;
   for (int i = numBins - 1; i >= 0; i--)
   {
     temp = bins >> i;
     m_BinEncoder.encodeBinEP(temp);
     bins -= (temp << i);
-    bitCount++;
   }
   return numBins - 1; // less by 1 as compared to what xReadBvdContextPrefix() returns
 }
 
 void CABACWriter::xWriteMvdContextSuffix(unsigned uiSymbol, int param, int paramUpdated, int numSkipMSB )
 {
-  unsigned bins    = 0;
   unsigned numBins = 0;
   while (uiSymbol >= (unsigned) (1 << param))
   {
-    bins <<= 1;
-    bins++;
     numBins++;
     uiSymbol -= 1 << param;
     param++;
   }
-  bins <<= 1;
   numBins++;
   paramUpdated++;
 
@@ -6907,17 +6901,13 @@ unsigned CABACWriter::xWriteBvdContextPrefix(unsigned uiSymbol, unsigned ctxT, i
 }
 void CABACWriter::xWriteBvdContextSuffix(unsigned uiSymbol, int param, int paramUpdated, int numSkipMSB )
 {
-  unsigned bins    = 0;
   unsigned numBins = 0;
   while (uiSymbol >= (unsigned) (1 << param))
   {
-    bins <<= 1;
-    bins++;
     numBins++;
     uiSymbol -= 1 << param;
     param++;
   }
-  bins <<= 1;
   numBins++;
   paramUpdated++;
 
