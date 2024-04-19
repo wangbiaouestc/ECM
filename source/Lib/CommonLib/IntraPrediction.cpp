@@ -8272,7 +8272,6 @@ void IntraPrediction::ibcCiipBlending(Pel *pDst, int strideDst, const Pel *pSrc0
 #if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
 int IntraPrediction::deriveDimdIntraTmpModePred(const CodingUnit cu, CPelBuf predBuf)
 {
-  int sigcnt = 0;
   const Pel* pPred = predBuf.buf;
   const int iStride = predBuf.stride;
   int height = predBuf.height;
@@ -8281,7 +8280,7 @@ int IntraPrediction::deriveDimdIntraTmpModePred(const CodingUnit cu, CPelBuf pre
   int piHistogramClean[NUM_LUMA_MODE] = { 0 };
 
   pPred = pPred + iStride + 1;
-  sigcnt += buildHistogram(pPred, iStride, height - 2, width - 2, piHistogramClean, 0, width - 2, height - 2);
+  buildHistogram(pPred, iStride, height - 2, width - 2, piHistogramClean, 0, width - 2, height - 2);
 
   int firstAmp = 0, curAmp = 0;
   int firstMode = 0, curMode = 0;
@@ -15275,7 +15274,7 @@ void IntraPrediction::xGlmApplyModelOffset(const PredictionUnit &pu, const Compo
 
 void IntraPrediction::xCccmApplyModelOffset(const PredictionUnit &pu, const ComponentID compId,
                                             CccmModel& cccmModel, int modelId, int modelThr,
-                                            PelBuf &piPred, int lumaOffset, int chromaOffset[], int type, int refSizeX, int refSizeY)
+                                            PelBuf &piPred, int lumaOffset, int chromaOffset[2], int type, int refSizeX, int refSizeY)
 {
   const ClpRng &clpRng(pu.cu->cs->slice->clpRng(compId));
   Pel* samples = m_samples;

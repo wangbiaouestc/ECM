@@ -7006,7 +7006,6 @@ void CABACReader::mvd_coding( Mv &rMvd, MvdSuffixInfo* const pSi
 
 unsigned CABACReader::xReadMvdPrefix( int param )
 {
-  unsigned symbol = 0;
   unsigned bit    = 1;
   unsigned uiIdx  = 0;
 
@@ -7014,7 +7013,6 @@ unsigned CABACReader::xReadMvdPrefix( int param )
   {
     bit = m_BinDecoder.decodeBinEP();
     uiIdx++;
-    symbol += bit << param++;
   }
 
   --uiIdx;
@@ -7226,7 +7224,6 @@ void CABACReader::mvd_coding( Mv &rMvd
 #if JVET_AC0104_IBC_BVD_PREDICTION
 unsigned CABACReader::xReadBvdContextPrefix(unsigned ctxT, int offset, int param )
 {
-  unsigned symbol = 0;
   unsigned bit    = 1;
   unsigned uiIdx = 0;
 
@@ -7242,7 +7239,6 @@ unsigned CABACReader::xReadBvdContextPrefix(unsigned ctxT, int offset, int param
     }
 
     uiIdx++;
-    symbol += bit << param++;
   }
 
   --uiIdx;

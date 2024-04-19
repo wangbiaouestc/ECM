@@ -40,7 +40,6 @@ static std::array<ModelParameters, 3> readModelParameters( std::istream &in )
 
 static DataDb addDataFrame( istream &in, DataDb &db )
 {
-  int64_t tot = 0;
   char c = ( char ) in.peek();
 
   while( in&&c == 'c' )
@@ -139,7 +138,6 @@ static DataDb addDataFrame( istream &in, DataDb &db )
         std::string s;
         in >> s;
         d.bins.resize( s.size() );
-        tot += s.size();
         for( int k = 0; k < ( int ) s.size(); ++k )
         {
           d.bins[k] = (s[k] == '1');

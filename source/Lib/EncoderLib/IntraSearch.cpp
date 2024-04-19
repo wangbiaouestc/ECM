@@ -4045,7 +4045,7 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
       }
 
 #if MMLM
-      bool isCccmModeEnabledInRdo[2][MMLM_T_IDX + 1] = { false };
+      bool isCccmModeEnabledInRdo[2][MMLM_T_IDX + 1] = { { false } };
 #if !JVET_AD0202_CCCM_MDF
       isCccmModeEnabledInRdo[0][satdCccmModeList[0][0]] = true;
 #endif
@@ -4060,7 +4060,7 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
 #endif
 #endif
 #if JVET_AD0202_CCCM_MDF 
-      bool isCccmWithMulDownSamplingEnabledInRdo[MMLM_T_IDX + 1][CCCM_NUM_PRED_FILTER] = { false };
+      bool isCccmWithMulDownSamplingEnabledInRdo[MMLM_T_IDX + 1][CCCM_NUM_PRED_FILTER] = { { false } };
       isCccmWithMulDownSamplingEnabledInRdo[satdCccmModeList[0][0]][satdCccmFilterIndex[0]] = true;
       for (int i = 1; i < 7; i++)
 #else
@@ -10810,7 +10810,7 @@ bool IntraSearch::xRecurIntraCodingACTQT(CodingStructure &cs, Partitioner &parti
       piReco.reconstruct(piPred, piResi, cs.slice->clpRng(compID));
 
       if (m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled() || (m_pcEncCfg->getLmcs()
-        & slice.getLmcsEnabledFlag() && (m_pcReshape->getCTUFlag() || (isChroma(compID) && m_pcEncCfg->getReshapeIntraCMD()))))
+        && slice.getLmcsEnabledFlag() && (m_pcReshape->getCTUFlag() || (isChroma(compID) && m_pcEncCfg->getReshapeIntraCMD()))))
       {
         const CPelBuf orgLuma = csFull->getOrgBuf(csFull->area.blocks[COMPONENT_Y]);
         if (compID == COMPONENT_Y && !(m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled()))
@@ -10924,7 +10924,7 @@ bool IntraSearch::xRecurIntraCodingACTQT(CodingStructure &cs, Partitioner &parti
 #endif
             piReco.reconstruct(piPred, piResi, cs.slice->clpRng(compID));
             if (m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled()
-                || (m_pcEncCfg->getLmcs() & slice.getLmcsEnabledFlag()
+                || (m_pcEncCfg->getLmcs() && slice.getLmcsEnabledFlag()
                     && (m_pcReshape->getCTUFlag() || (isChroma(compID) && m_pcEncCfg->getReshapeIntraCMD()))))
             {
               const CPelBuf orgLuma = csFull->getOrgBuf(csFull->area.blocks[COMPONENT_Y]);
