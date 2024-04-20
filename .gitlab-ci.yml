@@ -11,8 +11,8 @@ stages:
          - master
          - merge_requests
       variables:
-         - $CI_PROJECT_URL == 'https://vcgit.hhi.fraunhofer.de/jvet/VVCSoftware_VTM'
-         - $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'master'
+         - $CI_PROJECT_URL == 'https://vcgit.hhi.fraunhofer.de/ecm/ECM'
+         - $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'VTM11_ANC'
 
 .build_template_linux:
    extends: .build_template
@@ -27,25 +27,32 @@ build_macos:
    tags:
       - macos
 
-build_ubuntu1604:
+build_macos_arm:
+   extends: .build_template
+   tags:
+      - macos-arm
+
+build_ubuntu2004:
    extends: .build_template_linux
    tags:
-      - ubuntu1604
+      - ubuntu2004
 
-build_ubuntu1804:
+build_ubuntu2204:
    extends: .build_template_linux
    tags:
-      - ubuntu1804
+      - ubuntu2204
 
-build_ubuntu1804-gcc8:
-   extends: .build_template_linux
+build_ubuntu2204-gcc12:
+   extends: .build_template
    script:
       - make realclean
-      - make all toolset=gcc-8
+      - make all toolset=gcc-12
       - make realclean
-      - make linuxbuild enable-tracing=true toolset=gcc-8
+      - make release high-bitdepth=true toolset=gcc-12
+      - make realclean
+      - make linuxbuild enable-tracing=true toolset=gcc-12
    tags:
-      - ubuntu1804-gcc8
+      - ubuntu2204-gcc12
 
 build_vc191x:
    extends: .build_template
