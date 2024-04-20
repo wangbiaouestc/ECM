@@ -124,6 +124,9 @@ extern const uint32_t   g_uiGroupIdx[];
 extern const uint32_t   g_uiGroupIdx[ MAX_TB_SIZEY ];
 #endif
 extern const uint32_t   g_uiMinInGroup[ LAST_SIGNIFICANT_GROUPS ];
+#if JVET_AG0100_TRANSFORM_COEFFICIENT_CODING
+extern const uint32_t g_auiGoRiceParsCoeffGTN[GTN_MAXSUM];
+#endif
 extern const uint32_t   g_auiGoRiceParsCoeff     [ 32 ];
 inline uint32_t g_auiGoRicePosCoeff0(int st, uint32_t ricePar)
 {
@@ -184,6 +187,9 @@ extern TMatrixCoeff g_trCoreDCT2P256[256][256];
 extern TMatrixCoeff g_trCoreDCT8P256[256][256];
 extern TMatrixCoeff g_trCoreDST7P256[256][256];
 #endif
+#if JVET_AG0067_DMVR_EXTENSIONS
+extern int g_bdofWeight[1600];
+#endif
 #if JVET_W0103_INTRA_MTS
 extern TMatrixCoeff g_aiTr2[NUM_TRANS_TYPE][2][2];
 extern TMatrixCoeff g_aiTr4[NUM_TRANS_TYPE][4][4];
@@ -234,6 +240,12 @@ extern const     int8_t   g_nspt4x16[ 35 ][ 3 ][ 24 ][ 64 ];
 extern const     int8_t   g_nspt16x4[ 35 ][ 3 ][ 24 ][ 64 ];
 extern const     int8_t   g_nspt8x16[ 35 ][ 3 ][ 40 ][ 128 ];
 extern const     int8_t   g_nspt16x8[ 35 ][ 3 ][ 40 ][ 128 ];
+#if JVET_AE0086_LARGE_NSPT
+extern const     int8_t   g_nspt4x32[ 35 ][ 3 ][ 20 ][ 128 ];
+extern const     int8_t   g_nspt32x4[ 35 ][ 3 ][ 20 ][ 128 ];
+extern const     int8_t   g_nspt8x32[ 35 ][ 3 ][ 24 ][ 256 ];
+extern const     int8_t   g_nspt32x8[ 35 ][ 3 ][ 24 ][ 256 ];
+#endif
 #endif
 
 // ====================================================================================================================
@@ -395,9 +407,17 @@ extern const int8_t g_ccSaoCandPosX[MAX_NUM_LUMA_COMP][MAX_CCSAO_CAND_POS_Y];
 extern const int8_t g_ccSaoCandPosY[MAX_NUM_LUMA_COMP][MAX_CCSAO_CAND_POS_Y];
 #endif
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+extern const int8_t g_ccSaoEdgePosX[MAX_CCSAO_EDGE_DIR][2];
+extern const int8_t g_ccSaoEdgePosY[MAX_CCSAO_EDGE_DIR][2];
+extern const short  g_ccSaoEdgeThr [MAX_CCSAO_EDGE_IDC][MAX_CCSAO_EDGE_THR];
+extern const int8_t g_ccSaoEdgeNum [MAX_CCSAO_EDGE_IDC][2];
+extern const int8_t g_ccSaoBandTab [MAX_CCSAO_BAND_IDC][2];
+#else
 extern const int8_t g_ccSaoEdgeTypeX[CCSAO_EDGE_TYPE][2];
 extern const int8_t g_ccSaoEdgeTypeY[CCSAO_EDGE_TYPE][2];
 extern const short  g_ccSaoQuanValue[CCSAO_QUAN_NUM];
+#endif
 #endif
 #if JVET_V0130_INTRA_TMP
 extern unsigned int g_uiDepth2Width[5];
@@ -415,6 +435,23 @@ extern const int8_t g_glmPattern[NUM_GLM_PATTERN][6];
 extern const int8_t g_ibcGpmFirstSetSplitDirToIdx[GEO_NUM_PARTITION_MODE];
 extern const int8_t g_ibcGpmFirstSetSplitDir[IBC_GPM_MAX_SPLIT_DIR_FIRST_SET_NUM];
 extern const int8_t g_ibcGpmSecondSetSplitDir[GEO_NUM_PARTITION_MODE];
+#endif
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+extern int g_ibcMbvdCandOffsets[IBC_MBVD_AD_STEP_NUM];
+extern int g_ibcMbvdStepCandIdxList[IBC_MBVD_AD_NUM >> IBC_MBVD_LOG2_START_STEP];
+extern int g_ibcMbvdNeiOffsets[IBC_MBVD_NEI_NUM * 2];
+#endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+extern const int8_t g_amvpSbTmvp_mvd_dir[2][8];
+extern const int8_t g_amvpSbTmvp_mvd_offset[6];
+extern uint32_t g_picAmvpSbTmvpEnabledArea;
+#endif
+#if JVET_AG0058_EIP
+extern const Position g_eipFilter[NUM_EIP_SHAPE][EIP_FILTER_TAP];
+extern const EIPInfo  g_eipInfoLut[4][4][9];
+#endif
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+extern const int g_licSlopeDeltaSet[LIC_SLOPE_MAX_NUM_DELTA + 1];
 #endif
 #endif  //__TCOMROM__
 

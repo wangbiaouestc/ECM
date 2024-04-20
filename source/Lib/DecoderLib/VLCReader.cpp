@@ -560,7 +560,7 @@ void HLSyntaxReader::parsePPS( PPS* pcPPS )
     {
       pcPPS->setSingleSlicePerSubPicFlag(0);
     }
-    if (pcPPS->getRectSliceFlag() & !(pcPPS->getSingleSlicePerSubPicFlag()))
+    if (pcPPS->getRectSliceFlag() && !(pcPPS->getSingleSlicePerSubPicFlag()))
     {
       int32_t tileIdx = 0;
 
@@ -1130,6 +1130,10 @@ void HLSyntaxReader::parseAlfAps( APS* aps )
           param.lumaClassifierIdx[altIdx] = 2;
         }
       }
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+      READ_CODE(2, code, "alf_luma_bits");
+      param.coeffBits[altIdx] = code + 6;
+#endif
 #else
       READ_FLAG(code, "alf_luma_classifier");
       param.lumaClassifierIdx[altIdx] = code;
@@ -2123,6 +2127,16 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   READ_FLAG( uiCode, "sps_ccsao_enabled_flag" );                    pcSPS->setCCSAOEnabledFlag ( uiCode ? true : false );
 #endif
   READ_FLAG( uiCode, "sps_alf_enabled_flag" );                      pcSPS->setALFEnabledFlag ( uiCode ? true : false );
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  if( pcSPS->getALFEnabledFlag() )
+  {
+    READ_FLAG( uiCode, "sps_alf_precision_flag" );                  pcSPS->setAlfPrecisionFlag( uiCode ? true : false );
+  }
+  else
+  {
+    pcSPS->setAlfPrecisionFlag( false );
+  }
+#endif
   if (pcSPS->getALFEnabledFlag() && pcSPS->getChromaFormatIdc() != CHROMA_400)
   {
     READ_FLAG( uiCode, "sps_ccalf_enabled_flag" );                      pcSPS->setCCALFEnabledFlag ( uiCode ? true : false );
@@ -2218,8 +2232,17 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
   READ_FLAG( uiCode, "sps_tm_tools_enabled_flag" );                 pcSPS->setTMToolsEnableFlag( uiCode );
 #endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  READ_FLAG( uiCode, "sps_tmNoninterToolsEnableFlag_enabled_flag" ); pcSPS->setTMnoninterToolsEnableFlag( uiCode );
+#endif
 #if INTER_LIC
   READ_FLAG( uiCode, "sps_lic_enabled_flag" );                      pcSPS->setLicEnabledFlag( uiCode );
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+  if (pcSPS->getLicEnabledFlag())
+  {
+    READ_FLAG( uiCode, "sps_lic_slope_adjust_enabled_flag" ); pcSPS->setLicSlopeAdjustEnabledFlag( uiCode );
+  }
+#endif
 #endif
 
   READ_FLAG(uiCode, "sps_ref_wraparound_enabled_flag");                  pcSPS->setWrapAroundEnabledFlag( uiCode ? true : false );
@@ -2248,8 +2271,12 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 
 #if JVET_W0090_ARMC_TM
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  if(pcSPS->getTMToolsEnableFlag() || pcSPS->getTMnoninterToolsEnableFlag())
+#else
   pcSPS->setUseAML(false);
   if(pcSPS->getTMToolsEnableFlag())
+#endif
   {
 #endif
   READ_FLAG( uiCode, "sps_aml_enabled_flag");                        pcSPS->setUseAML ( uiCode != 0 );
@@ -2262,7 +2289,11 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #endif
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
   pcSPS->setUseTmvpNmvpReordering(false);
-  if (pcSPS->getUseAML())
+  if (pcSPS->getUseAML()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+      && pcSPS->getTMToolsEnableFlag()
+#endif
+    )
   {
     READ_FLAG( uiCode, "sps_aml_tmvp_nmvp_enabled_flag");            pcSPS->setUseTmvpNmvpReordering ( uiCode != 0 );
   }
@@ -2271,7 +2302,11 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
   pcSPS->setUseArmcRefinedMotion (false);
 #endif
-  if (pcSPS->getUseAML())
+  if (pcSPS->getUseAML()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+      && pcSPS->getTMToolsEnableFlag()
+#endif
+    )
   {
     READ_FLAG( uiCode, "sps_ArmcRefinedMotion_enabled_flag");        pcSPS->setUseArmcRefinedMotion ( uiCode != 0 );
   }
@@ -2280,7 +2315,11 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
   pcSPS->setNumLambda(0);
 #endif
-  if (pcSPS->getUseAML())
+  if (pcSPS->getUseAML()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+      && pcSPS->getTMToolsEnableFlag()
+#endif
+    )
   {
     READ_UVLC(uiCode, "num_Lambda");
     pcSPS->setNumLambda(uiCode);
@@ -2352,6 +2391,12 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   {
     pcSPS->setFpelMmvdEnabledFlag( false );
   }
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  pcSPS->setUseMergeOppositeLic( false );
+  pcSPS->setUseTMMergeOppositeLic( false );
+  READ_FLAG(uiCode, "sps_oppositelic_merge_enabled_flag");                     pcSPS->setUseMergeOppositeLic(uiCode != 0);
+  READ_FLAG(uiCode, "sps_TM_oppositelic_merge_enabled_flag");                     pcSPS->setUseTMMergeOppositeLic(uiCode != 0);
+#endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
   uiCode = 0;
@@ -2363,6 +2408,13 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   READ_UVLC(uiCode, "six_minus_max_num_merge_cand");
   CHECK(MRG_MAX_NUM_CANDS <= uiCode, "Incorrrect max number of merge candidates!");
   pcSPS->setMaxNumMergeCand(MRG_MAX_NUM_CANDS - uiCode);
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  if (pcSPS->getUseMergeOppositeLic())
+  {
+    READ_UVLC(uiCode, "five_minus_max_num_oppositelic_merge_cand");
+    pcSPS->setMaxNumOppositeLicMergeCand(REG_MRG_MAX_NUM_CANDS_OPPOSITELIC - uiCode);
+  }
+#endif
   READ_FLAG(uiCode, "sps_sbt_enabled_flag");                        pcSPS->setUseSBT                 ( uiCode != 0 );
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   READ_FLAG( uiCode,    "sps_dmvd_enabled_flag" );                      pcSPS->setUseDMVDMode( uiCode != 0 );
@@ -2398,6 +2450,29 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   pcSPS->setMaxNumBMMergeCand(BM_MRG_MAX_NUM_CANDS - uiCode);
 #endif
   READ_FLAG( uiCode,    "sps_affine_enabled_flag" );                            pcSPS->setUseAffine              ( uiCode != 0 );
+#if JVET_AG0276_NLIC
+  pcSPS->setUseAltLM(false);
+  pcSPS->setUseAffAltLM(false);
+  if (pcSPS->getUseAML()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+    && pcSPS->getTMToolsEnableFlag()
+#endif
+    )
+  {
+    READ_FLAG( uiCode, "sps_alt_lm_enabled_flag" );                     pcSPS->setUseAltLM( uiCode != 0 );
+    if (pcSPS->getUseAffine())
+    {
+      READ_FLAG( uiCode, "sps_affine_alt_lm_enabled_flag" );            pcSPS->setUseAffAltLM( uiCode != 0 );
+    }
+  }
+#endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  pcSPS->setUseAffMergeOppositeLic(false);
+  if (pcSPS->getUseAffine())
+  {
+    READ_FLAG(uiCode, "sps_affine_oppolic_merge_enabled_flag");            pcSPS->setUseAffMergeOppositeLic(uiCode != 0);
+  }
+#endif
   if ( pcSPS->getUseAffine() )
   {
     READ_UVLC(uiCode, "five_minus_max_num_subblock_merge_cand");
@@ -2416,6 +2491,13 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if AFFINE_MMVD
     READ_FLAG( uiCode, "sps_affine_mmvd_enabled_flag" );                pcSPS->setUseAffineMmvdMode      ( uiCode != 0 );
 #endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+    if (pcSPS->getUseAffMergeOppositeLic())
+    {
+      READ_UVLC(uiCode, "eight_minus_max_num_aff_oppolic_merge_cand");
+      pcSPS->setMaxNumAffineOppositeLicMergeCand(AFF_MRG_MAX_NUM_CANDS_OPPOSITELIC - uiCode);
+    }
+#endif
     if( pcSPS->getAMVREnabledFlag())
     {
       READ_FLAG( uiCode, "sps_affine_amvr_enabled_flag" );            pcSPS->setAffineAmvrEnabledFlag  ( uiCode != 0 );
@@ -2430,6 +2512,30 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
     }
 #if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
     READ_FLAG(uiCode, "sps_affine_nontranslation_parameter_refinement");       pcSPS->setUseAffineParaRefinement(uiCode != 0);
+#endif
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+    if (pcSPS->getTMToolsEnableFlag())
+    {
+#endif
+    READ_FLAG(uiCode, "sps_tm_affine_flag");       pcSPS->setUseAffineTM(uiCode != 0);
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+    }
+    else
+    {
+      pcSPS->setUseAffineTM( false );
+    }
+#endif
+#if JVET_AG0276_NLIC
+    if (pcSPS->getUseAffineTM() && pcSPS->getUseAffAltLM())
+    {
+      READ_FLAG(uiCode, "sps_affine_alt_lm_tm_flag");                pcSPS->setUseAffAltLMTM(uiCode != 0);
+    }
+    else
+    {
+      pcSPS->setUseAffAltLMTM(false);
+    }
+#endif
 #endif
   }
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
@@ -2456,12 +2562,26 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
     pcSPS->setUseCiipTmMrg(false);
   }
 #endif
+#if JVET_AG0135_AFFINE_CIIP
+  if (pcSPS->getUseCiip() && pcSPS->getUseAffine())
+  {
+    READ_FLAG(uiCode, "sps_ciip_affine_flag");  pcSPS->setUseCiipAffine(uiCode != 0);
+  }
+  else
+  {
+    pcSPS->setUseCiipAffine(false);
+  }
+#endif
   if (pcSPS->getMaxNumMergeCand() >= 2)
   {
     READ_FLAG(uiCode, "sps_gpm_enabled_flag");
     pcSPS->setUseGeo(uiCode != 0);
     if (pcSPS->getUseGeo())
     {
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+      READ_FLAG(uiCode, "sps_gpm_blend_flag");
+      pcSPS->setUseGeoBlend(uiCode != 0);
+#endif
       if (pcSPS->getMaxNumMergeCand() >= 3)
       {
         READ_UVLC(uiCode, "max_num_merge_cand_minus_max_num_gpm_cand");
@@ -2473,6 +2593,15 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
       {
         pcSPS->setMaxNumGeoCand(2);
       }
+
+#if JVET_AG0164_AFFINE_GPM
+      if (pcSPS->getUseAffine() && pcSPS->getMaxNumGeoCand() != 0 && pcSPS->getMaxNumAffineMergeCand() >= 3)
+      {
+        READ_UVLC(uiCode, "max_num_aff_merge_cand_minus_max_num_gpm_aff_cand");
+        pcSPS->setMaxNumGpmAffCand((uint32_t)(pcSPS->getMaxNumAffineMergeCand() - uiCode));
+      }
+#endif
+
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_W0097_GPM_MMVD_TM && TM_MRG
       pcSPS->setUseGPMTMMode( false );
       if (pcSPS->getTMToolsEnableFlag())
@@ -2518,6 +2647,19 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if ENABLE_DIMD
   READ_FLAG(uiCode, "sps_dimd_enabled_flag");                           pcSPS->setUseDimd(uiCode != 0);
 #endif
+#if JVET_AE0059_INTER_CCCM
+  READ_FLAG(uiCode, "sps_inter_cccm");                              pcSPS->setUseInterCccm( uiCode != 0 );
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  READ_FLAG(uiCode, "sps_inter_ccp_merge");                         pcSPS->setUseInterCcpMerge( uiCode != 0 );
+#endif
+#if JVET_AG0058_EIP
+  READ_FLAG(uiCode, "sps_eip_enabled_flag");                        pcSPS->setUseEip(uiCode != 0);
+#endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  if (pcSPS->getTMnoninterToolsEnableFlag())
+  {
+#endif
 #if JVET_V0130_INTRA_TMP
   READ_FLAG(uiCode, "sps_intraTMP_enabled_flag");                   pcSPS->setUseIntraTMP( uiCode != 0 );
   if(pcSPS->getUseIntraTMP())
@@ -2553,8 +2695,26 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   READ_UVLC(uiCode, "sps_cccm_cand");                               pcSPS->setUseCccm(uiCode);
 #endif
+#if JVET_AE0100_BVGCCCM
+  READ_FLAG(uiCode, "sps_bvg_cccm");                                pcSPS->setUseBvgCccm(uiCode != 0);
+#endif
 #if JVET_AD0188_CCP_MERGE
   READ_UVLC(uiCode, "sps_ccp_merge");                               pcSPS->setUseCcpMerge(uiCode);
+#endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  READ_UVLC(uiCode, "sps_ddccp_fusion");                            pcSPS->setUseDdCcpFusion(uiCode);
+#endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  }
+  else
+  {
+#if JVET_AC0147_CCCM_NO_SUBSAMPLING
+    READ_UVLC(uiCode, "sps_cccm_cand");                             pcSPS->setUseCccm(uiCode);
+#endif
+#if JVET_AE0100_BVGCCCM
+    READ_FLAG(uiCode, "sps_bvg_cccm");                                pcSPS->setUseBvgCccm(uiCode != 0);
+#endif
+  }
 #endif
   if( pcSPS->getChromaFormatIdc() != CHROMA_400)
   {
@@ -2613,12 +2773,18 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
     }
     READ_FLAG(uiCode, "sps_ibc_enabled_flag_inter_slice");                                    pcSPS->setIBCFlagInterSlice(uiCode);
     READ_FLAG( uiCode, "sps_ibc_merge_enabled_flag" );                                        pcSPS->setUseIbcMerge( uiCode );
+#if !JVET_AE0169_BIPREDICTIVE_IBC
     if( pcSPS->getUseIbcMerge() )
     {
+#endif
 #endif
     READ_UVLC(uiCode, "six_minus_max_num_ibc_merge_cand");
     CHECK(IBC_MRG_MAX_NUM_CANDS <= uiCode, "Incorrrect max number of IBC merge candidates!");
     pcSPS->setMaxNumIBCMergeCand(IBC_MRG_MAX_NUM_CANDS - uiCode);
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS&&JVET_AE0169_BIPREDICTIVE_IBC
+    if( pcSPS->getUseIbcMerge() )
+    {
+#endif
 #if JVET_AA0061_IBC_MBVD
     READ_FLAG( uiCode, "sps_ibc_mbvd_enabled_flag" );                   pcSPS->setUseIbcMbvd             ( uiCode != 0 );
 #endif
@@ -2629,29 +2795,61 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
     }
     else
     {
+#if !JVET_AE0169_BIPREDICTIVE_IBC
 #if JVET_Z0075_IBC_HMVP_ENLARGE
       pcSPS->setMaxNumIBCMergeCand( IBC_MRG_MAX_NUM_CANDS );
 #else
       pcSPS->setMaxNumIBCMergeCand( 0 );
 #endif
+#endif
       pcSPS->setUseIbcGpm( 0 );
       pcSPS->setUseIbcMbvd( 0 );
     }
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+    if (pcSPS->getUseIbcMbvd())
+    {
+      READ_FLAG(uiCode, "sps_ibc_mbvd_adaptive_search_flag");           pcSPS->setUseIbcMbvdAdSearch(uiCode);
+    }
+#endif
     READ_FLAG(uiCode, "sps_rribc_enabled_flag");                   pcSPS->setUseRRIbc(uiCode != 0);
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+    if (pcSPS->getTMnoninterToolsEnableFlag())
+    {
+      READ_FLAG(uiCode, "sps_tmibc_enabled_flag");                 pcSPS->setUseTMIbc(uiCode != 0);
+    }
+#else
     READ_FLAG(uiCode, "sps_tmibc_enabled_flag");                   pcSPS->setUseTMIbc(uiCode != 0);
 #endif
-
+#endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  if (pcSPS->getTMnoninterToolsEnableFlag())
+  {
+#endif
 #if JVET_AC0104_IBC_BVD_PREDICTION
     READ_FLAG( uiCode, "sps_ibc_bvd_pred_enabled_flag" );               pcSPS->setUseBvdPred             ( uiCode != 0 );
 #endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
     READ_FLAG( uiCode, "sps_ibc_bvp_cluster_enabled_flag" );            pcSPS->setUseBvpCluster          ( uiCode != 0 );
 #endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  }
+#endif
+
 #if JVET_AC0112_IBC_CIIP
     READ_FLAG(uiCode, "sps_ibc_ciip_enabled_flag");                     pcSPS->setUseIbcCiip(uiCode != 0);
 #endif
 #if JVET_AC0112_IBC_LIC
     READ_FLAG( uiCode, "sps_ibc_lic_enabled_flag" );                    pcSPS->setUseIbcLic              ( uiCode != 0 );
+#endif
+#if JVET_AE0159_FIBC
+    READ_FLAG( uiCode, "sps_ibc_filter_enabled_flag" );                 pcSPS->setUseIbcFilter           ( uiCode != 0 );
+#endif
+#if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
+    READ_FLAG( uiCode, "sps_ibc_non_adjacent_spatial_candidates_enabled_flag");    pcSPS->setUseIbcNonAdjCand(uiCode != 0);
+#endif
+#if JVET_AG0136_INTRA_TMP_LIC
+    READ_FLAG( uiCode, "sps_itmp_lic_extension_flag" );                    pcSPS->setItmpLicExtension ( uiCode != 0 );
+    READ_FLAG( uiCode, "sps_itmp_lic_mode_flag" );                              pcSPS->setItmpLicMode ( uiCode != 0 );
 #endif
   }
   else
@@ -3365,8 +3563,13 @@ void HLSyntaxReader::parsePictureHeader( PicHeader* picHeader, ParameterSetManag
       if (uiCode)
       {
 #if ALF_IMPROVEMENT
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+        READ_FLAG(uiCode, "ph_alf_fixed_filter_set_idx_luma");
+        picHeader->setAlfFixedFilterSetIdx(COMPONENT_Y, uiCode);
+#else
         READ_FLAG(uiCode, "ph_alf_fixed_filter_set_idx");
         picHeader->setAlfFixedFilterSetIdx(uiCode);
+#endif
 #endif
         READ_CODE(3, uiCode, "ph_num_alf_aps_ids_luma");
         int numAps = uiCode;
@@ -3384,6 +3587,18 @@ void HLSyntaxReader::parsePictureHeader( PicHeader* picHeader, ParameterSetManag
         {
           READ_CODE(1, uiCode, "ph_alf_cb_enabled_flag");   alfCbEnabledFlag = uiCode;
           READ_CODE(1, uiCode, "ph_alf_cr_enabled_flag");   alfCrEnabledFlag = uiCode;
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+          if( alfCbEnabledFlag )
+          {
+            READ_FLAG(uiCode, "ph_alf_fixed_filter_set_idx_cb");
+            picHeader->setAlfFixedFilterSetIdx(COMPONENT_Cb, uiCode);
+          }
+          if( alfCrEnabledFlag )
+          {
+            READ_FLAG(uiCode, "ph_alf_fixed_filter_set_idx_cr");
+            picHeader->setAlfFixedFilterSetIdx(COMPONENT_Cr, uiCode);
+          }
+#endif
         }
         else
         {
@@ -3941,10 +4156,16 @@ void HLSyntaxReader::parsePictureHeader( PicHeader* picHeader, ParameterSetManag
     if ( sps->getUseAffine() )
     {
       picHeader->setMaxNumAffineMergeCand(sps->getMaxNumAffineMergeCand());
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+      picHeader->setMaxNumAffineOppositeLicMergeCand(sps->getMaxNumAffineOppositeLicMergeCand());
+#endif
     }
     else
     {
       picHeader->setMaxNumAffineMergeCand(sps->getSbTMVPEnabledFlag() && picHeader->getEnableTMVPFlag());
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+      picHeader->setMaxNumAffineOppositeLicMergeCand(0);
+#endif
     }
 
   // full-pel MMVD flag
@@ -4525,9 +4746,14 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
 
     if (uiCode)
     {
-#if ALF_IMPROVEMENT 
+#if ALF_IMPROVEMENT
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+      READ_FLAG(uiCode, "slice_alf_fixed_filter_set_idx_luma");
+      pcSlice->setTileGroupAlfFixedFilterSetIdx(COMPONENT_Y, uiCode);
+#else
       READ_FLAG(uiCode, "slice_alf_fixed_filter_set_idx");
       pcSlice->setTileGroupAlfFixedFilterSetIdx(uiCode);
+#endif
 #endif
       READ_CODE(3, uiCode, "slice_num_alf_aps_ids_luma");
       int numAps = uiCode;
@@ -4548,6 +4774,18 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
       {
         READ_CODE(1, uiCode, "slice_alf_cb_enabled_flag");   alfCbEnabledFlag = uiCode;
         READ_CODE(1, uiCode, "slice_alf_cr_enabled_flag");   alfCrEnabledFlag = uiCode;
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+        if (alfCbEnabledFlag)
+        {
+          READ_FLAG(uiCode, "slice_alf_fixed_filter_set_idx_cb");
+          pcSlice->setTileGroupAlfFixedFilterSetIdx(COMPONENT_Cb, uiCode);
+        }
+        if (alfCrEnabledFlag)
+        {
+          READ_FLAG(uiCode, "slice_alf_fixed_filter_set_idx_cr");
+          pcSlice->setTileGroupAlfFixedFilterSetIdx(COMPONENT_Cr, uiCode);
+        }
+#endif
       }
       else
       {
@@ -5025,6 +5263,20 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
       pcSlice->setUseIBC(sps->getIBCFlagInterSlice());
     }
 #endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  if (pcSlice->getUseIBC())
+#else
+  if (pcSlice->getSPS()->getIBCFlag())
+#endif
+  {
+    READ_FLAG(uiCode, "bi_prediction_ibc_flag"); pcSlice->setBiPredictionIBCFlag(uiCode != 0);
+  }
+  else
+  {
+    pcSlice->setBiPredictionIBCFlag(false);
+  }
+#endif
 
     int qpDelta = 0;
     if (pps->getQpDeltaInfoInPhFlag())
@@ -5231,7 +5483,11 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
 
   }
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
-  if (!pcSlice->isIntra() && sps->getUseAML())
+  if (!pcSlice->isIntra() && sps->getUseAML()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+      && sps->getTMToolsEnableFlag()
+#endif
+    )
   {
     int index = sps->getQPOffsetsIdx(pcSlice->getSliceQp() - (pps->getPicInitQPMinus26() + 26));
     bool lambdaCanBePredicted = false;
@@ -5243,9 +5499,9 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
     if (!lambdaCanBePredicted)
     {
 #if JVET_AB0082
-      READ_CODE(10, uiCode, "lambda");
+      READ_CODE(10, uiCode, "Lambda");
 #else
-      READ_CODE(9, uiCode, "lambda");
+      READ_CODE(9, uiCode, "Lambda");
 #endif
       pcSlice->setCostForARMC((uint32_t)uiCode);
     }
@@ -5280,6 +5536,53 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
       READ_CODE(8,ignore_,"slice_segment_header_extension_data_byte");
     }
   }
+
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+  READ_FLAG(uiCode, "adaptive_clip_quant"); pcSlice->setAdaptiveClipQuant(uiCode ? true : false);
+  int clipDeltaShift = 0;
+  if (pcSlice->getAdaptiveClipQuant())
+  {
+    clipDeltaShift = ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_1;
+  }
+  else
+  {
+    clipDeltaShift = ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_0;
+  }
+  if (pcSlice->getSliceType() == I_SLICE)
+  {
+    READ_SVLC(iCode, "clip_luma_pel_max");
+    int deltaMax = iCode;
+    if (deltaMax > 0)
+    {
+      deltaMax = (deltaMax << clipDeltaShift);
+    }
+    else if (deltaMax < 0)
+    {
+      deltaMax = -((-deltaMax) << clipDeltaShift);
+    }
+    READ_SVLC(iCode, "clip_luma_pel_min");
+    int deltaMin = iCode;
+    if (deltaMin > 0)
+    {
+      deltaMin = (deltaMin << clipDeltaShift);
+    }
+    else if (deltaMin < 0)
+    {
+      deltaMin = -((-deltaMin) << clipDeltaShift);
+    }
+    pcSlice->setLumaPelMax(std::min(deltaMax + 940, (1 << sps->getBitDepth(toChannelType(COMPONENT_Y))) - 1));
+    pcSlice->setLumaPelMin(std::max(0, deltaMin + 64));
+  }
+  else
+  {
+    READ_SVLC(iCode, "clip_luma_pel_max");
+    int deltaMax = iCode;
+    READ_SVLC(iCode, "clip_luma_pel_min");
+    int deltaMin = iCode;
+    pcSlice->setLumaPelMax(deltaMax);
+    pcSlice->setLumaPelMin(deltaMin);
+  }
+#endif
 
   std::vector<uint32_t> entryPointOffset;
 
@@ -5533,6 +5836,9 @@ void HLSyntaxReader::parseConstraintInfo(ConstraintInfo *cinfo)
 #endif
 #if JVET_AD0082_TMRL_CONFIG
     READ_FLAG(symbol, "gci_no_tmrl_constraint_flag");                    cinfo->setNoTmrlConstraintFlag(symbol > 0 ? true : false);
+#endif
+#if JVET_AG0058_EIP
+    READ_FLAG(symbol, "gci_no_eip_constraint_flag");                     cinfo->setNoTmrlConstraintFlag(symbol > 0 ? true : false);
 #endif
     /* inter */
     READ_FLAG(symbol, "gci_no_ref_pic_resampling_constraint_flag");      cinfo->setNoRprConstraintFlag(symbol > 0 ? true : false);
@@ -6395,9 +6701,9 @@ void HLSyntaxReader::parseCcSao( Slice* pcSlice, PicHeader* picHeader, const SPS
   uint32_t  uiCode;
   if (sps->getCCSAOEnabledFlag())
   {
-    READ_FLAG(uiCode, "slice_ccsao_y_enabled_flag" ); pcSlice->setCcSaoEnabledFlag(COMPONENT_Y,  uiCode); ccSaoParam.enabled[COMPONENT_Y ] = uiCode;
-    READ_FLAG(uiCode, "slice_ccsao_cb_enabled_flag"); pcSlice->setCcSaoEnabledFlag(COMPONENT_Cb, uiCode); ccSaoParam.enabled[COMPONENT_Cb] = uiCode;
-    READ_FLAG(uiCode, "slice_ccsao_cr_enabled_flag"); pcSlice->setCcSaoEnabledFlag(COMPONENT_Cr, uiCode); ccSaoParam.enabled[COMPONENT_Cr] = uiCode;
+    READ_FLAG(uiCode, "ccsao_y_enabled_flag" ); pcSlice->setCcSaoEnabledFlag(COMPONENT_Y,  uiCode); ccSaoParam.enabled[COMPONENT_Y ] = uiCode;
+    READ_FLAG(uiCode, "ccsao_cb_enabled_flag"); pcSlice->setCcSaoEnabledFlag(COMPONENT_Cb, uiCode); ccSaoParam.enabled[COMPONENT_Cb] = uiCode;
+    READ_FLAG(uiCode, "ccsao_cr_enabled_flag"); pcSlice->setCcSaoEnabledFlag(COMPONENT_Cr, uiCode); ccSaoParam.enabled[COMPONENT_Cr] = uiCode;
   }
   else
   {
@@ -6406,16 +6712,57 @@ void HLSyntaxReader::parseCcSao( Slice* pcSlice, PicHeader* picHeader, const SPS
     ccSaoParam.enabled[COMPONENT_Cr] = false;
   }
 
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+  if (ccSaoParam.enabled[COMPONENT_Y] || ccSaoParam.enabled[COMPONENT_Cb] || ccSaoParam.enabled[COMPONENT_Cr])
+  {
+    READ_FLAG(uiCode, "ccsao_ext_chroma_flag"); 
+    ccSaoParam.extChroma[COMPONENT_Y] = ccSaoParam.extChroma[COMPONENT_Cb] = ccSaoParam.extChroma[COMPONENT_Cr] = uiCode;
+  }
+#endif
+
   for (int compIdx = 0; compIdx < MAX_NUM_COMPONENT; compIdx++)
   {
     if (ccSaoParam.enabled[compIdx])
     {
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+      if (!pcSlice->isIntra())
+      {
+        READ_FLAG(uiCode, "ccsao_reuse_prv_flag"); ccSaoParam.reusePrv[compIdx] = uiCode;
+      }
+      else
+      {
+        ccSaoParam.reusePrv[compIdx] = false;
+      }
+
+      if (ccSaoParam.reusePrv[compIdx])
+      {
+        READ_CODE(MAX_CCSAO_PRV_NUM_BITS, uiCode, "ccsao_reuse_prv_id"); ccSaoParam.reusePrvId[compIdx] = uiCode;
+        continue;
+      }
+#endif
+
       READ_UVLC(uiCode, "ccsao_set_num"); ccSaoParam.setNum[compIdx] = uiCode + 1;
       
       for (int setIdx = 0; setIdx < ccSaoParam.setNum[compIdx]; setIdx++)
       {
         ccSaoParam.setEnabled[compIdx][setIdx] = true;
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+        READ_FLAG(uiCode, "ccsao_set_type"); ccSaoParam.setType[compIdx][setIdx] = uiCode;
+        if (ccSaoParam.setType[compIdx][setIdx] == CCSAO_SET_TYPE_EDGE)
+        {
+          if (ccSaoParam.extChroma[compIdx])
+          {
+            READ_CODE(MAX_CCSAO_EDGE_CMP_BITS, uiCode, "ccsao_edge_cmp"); ccSaoParam.candPos[compIdx][setIdx][COMPONENT_Cb] = uiCode;
+          }
+          READ_CODE(MAX_CCSAO_EDGE_IDC_BITS, uiCode, "ccsao_edge_idc"); ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cr] = uiCode;
+          READ_CODE(MAX_CCSAO_EDGE_DIR_BITS, uiCode, "ccsao_edge_dir"); ccSaoParam.candPos[compIdx][setIdx][COMPONENT_Y ] = uiCode;
+          READ_CODE(MAX_CCSAO_EDGE_THR_BITS, uiCode, "ccsao_edge_thr"); ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cb] = uiCode;
+          READ_CODE(MAX_CCSAO_BAND_IDC_BITS, uiCode, "ccsao_band_idc"); ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y ] = uiCode;
+        }
+        else
+        {
+#else
         READ_FLAG(uiCode, "ccsao_setType");
         ccSaoParam.setType[compIdx][setIdx] = uiCode;
         if (ccSaoParam.setType[compIdx][setIdx])
@@ -6432,23 +6779,24 @@ void HLSyntaxReader::parseCcSao( Slice* pcSlice, PicHeader* picHeader, const SPS
         {
           /* Band offset */
 #endif
-          READ_CODE(MAX_CCSAO_CAND_POS_Y_BITS, uiCode, "ccsao_cand_pos_y");
-          ccSaoParam.candPos[compIdx][setIdx][COMPONENT_Y] = uiCode;
-          READ_CODE(MAX_CCSAO_BAND_NUM_Y_BITS, uiCode, "ccsao_band_num_y");
-          ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y] = uiCode + 1;
-          READ_CODE(MAX_CCSAO_BAND_NUM_U_BITS, uiCode, "ccsao_band_num_u");
-          ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cb] = uiCode + 1;
-          READ_CODE(MAX_CCSAO_BAND_NUM_V_BITS, uiCode, "ccsao_band_num_v");
-          ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cr] = uiCode + 1;
+#endif
+          READ_CODE(MAX_CCSAO_CAND_POS_Y_BITS, uiCode, "ccsao_cand_pos_y"); ccSaoParam.candPos[compIdx][setIdx][COMPONENT_Y ] = uiCode;
+          READ_CODE(MAX_CCSAO_BAND_NUM_Y_BITS, uiCode, "ccsao_band_num_y"); ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y ] = uiCode + 1;
+          READ_CODE(MAX_CCSAO_BAND_NUM_U_BITS, uiCode, "ccsao_band_num_u"); ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cb] = uiCode + 1;
+          READ_CODE(MAX_CCSAO_BAND_NUM_V_BITS, uiCode, "ccsao_band_num_v"); ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cr] = uiCode + 1;
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
         }
 #endif
         short *offset   = ccSaoParam.offset [compIdx][setIdx];
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+        int    classNum = SampleAdaptiveOffset::getCcSaoClassNum(compIdx, setIdx, ccSaoParam);
+#else
         int    classNum = ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y ]
                         * ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cb]
                         * ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cr];
+#endif
 
-#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER && !JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
         if (ccSaoParam.setType[compIdx][setIdx])
         {
           if (ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y] <= CCSAO_EDGE_COMPARE_VALUE + CCSAO_EDGE_COMPARE_VALUE)
@@ -6486,6 +6834,60 @@ void HLSyntaxReader::parseCcSao( Slice* pcSlice, PicHeader* picHeader, const SPS
       }
     }
   }
+
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+  // Should be before CcSaoControlIdc to assign setNum
+#if JVET_Z0118_GDR
+  if( pcSlice->isIDRorBLA() || pcSlice->getPendingRasInit() || pcSlice->isInterGDR() )
+#else
+  if( pcSlice->isIDRorBLA() || pcSlice->getPendingRasInit() )
+#endif
+  {
+    g_ccSaoPrvParam[COMPONENT_Y ].clear();
+    g_ccSaoPrvParam[COMPONENT_Cb].clear();
+    g_ccSaoPrvParam[COMPONENT_Cr].clear();
+  }
+
+  // loadCcSaoPrvParam
+  for (int compIdx = 0; compIdx < MAX_NUM_COMPONENT; compIdx++)
+  {
+    if (ccSaoParam.enabled[compIdx] && ccSaoParam.reusePrv[compIdx])
+    {
+      int prvId = ccSaoParam.reusePrvId[compIdx];
+
+      CcSaoPrvParam prvParam = g_ccSaoPrvParam[compIdx][prvId];
+      ccSaoParam.setNum[compIdx] = prvParam.setNum;
+      std::memcpy( ccSaoParam.setEnabled[compIdx], prvParam.setEnabled, sizeof( ccSaoParam.setEnabled[compIdx] ) );
+      std::memcpy( ccSaoParam.setType   [compIdx], prvParam.setType,    sizeof( ccSaoParam.setType   [compIdx] ) );
+      std::memcpy( ccSaoParam.candPos   [compIdx], prvParam.candPos,    sizeof( ccSaoParam.candPos   [compIdx] ) );
+      std::memcpy( ccSaoParam.bandNum   [compIdx], prvParam.bandNum,    sizeof( ccSaoParam.bandNum   [compIdx] ) );
+      std::memcpy( ccSaoParam.offset    [compIdx], prvParam.offset,     sizeof( ccSaoParam.offset    [compIdx] ) );
+    }
+  }
+
+  // setup/saveCcSaoPrvParam
+  for (int compIdx = 0; compIdx < MAX_NUM_COMPONENT; compIdx++)
+  {
+    if (ccSaoParam.enabled[compIdx] && !ccSaoParam.reusePrv[compIdx])
+    {
+      if (g_ccSaoPrvParam[compIdx].size() == MAX_CCSAO_PRV_NUM)
+      {
+        g_ccSaoPrvParam[compIdx].pop_back();
+      }
+
+      CcSaoPrvParam prvParam;
+      prvParam.temporalId = pcSlice->getTLayer();
+      prvParam.setNum     = ccSaoParam.setNum[compIdx];
+      std::memcpy( prvParam.setEnabled, ccSaoParam.setEnabled[compIdx], sizeof( prvParam.setEnabled ) );
+      std::memcpy( prvParam.setType,    ccSaoParam.setType   [compIdx], sizeof( prvParam.setType    ) );
+      std::memcpy( prvParam.candPos,    ccSaoParam.candPos   [compIdx], sizeof( prvParam.candPos    ) );
+      std::memcpy( prvParam.bandNum,    ccSaoParam.bandNum   [compIdx], sizeof( prvParam.bandNum    ) );
+      std::memcpy( prvParam.offset,     ccSaoParam.offset    [compIdx], sizeof( prvParam.offset     ) );
+      
+      g_ccSaoPrvParam[compIdx].insert(g_ccSaoPrvParam[compIdx].begin(), prvParam);
+    }
+  }
+#endif
 }
 #endif
 

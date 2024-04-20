@@ -77,33 +77,6 @@ static void printMacroSettings()
   }
 }
 
-#if JVET_Z0150_MEMORY_USAGE_PRINT
-#ifdef __linux
-#include <cstdlib>
-#include <cstdio>
-#include <cstring>
-
-int getProcStatusValue(const char* key)
-{
-  FILE* file = fopen("/proc/self/status", "r");
-  int result = -1;
-  char line[128];
-
-  int len = strlen(key);
-  while (fgets(line, 128, file) != nullptr)
-  {
-    if (strncmp(line, key, len) == 0)
-    {
-      result = atoi(line+len);
-      break;
-    }
-  }
-  fclose(file);
-  return result;
-}
-#endif
-#endif
-
 // ====================================================================================================================
 // Main function
 // ====================================================================================================================

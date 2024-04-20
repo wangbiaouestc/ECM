@@ -72,6 +72,9 @@ struct PelBufferOps
   void ( *addAvg4 )       ( const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, int width, int height,            int shift, int offset, const ClpRng& clpRng );
   void ( *addAvg8 )       ( const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, int width, int height,            int shift, int offset, const ClpRng& clpRng );
 #endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  void ( *avg )        (const Pel* src1, int src1Stride, const Pel* src2, int src2Stride, Pel *dst, int dstStride, int width, int height);
+#endif
 #if JVET_AD0213_LIC_IMP
   void(*toLast2)       (Pel* src, int srcStride, int width, int height, int shiftNum, int offset, const ClpRng& clpRng);
   void(*toLast4)       (Pel* src, int srcStride, int width, int height, int shiftNum, int offset, const ClpRng& clpRng);
@@ -86,8 +89,21 @@ struct PelBufferOps
   void(*bioGradFilter) (Pel* pSrc, int srcStride, int width, int height, int gradStride, Pel* gradX, Pel* gradY, const int bitDepth);
   void(*calcBIOPar)    (const Pel* srcY0Temp, const Pel* srcY1Temp, const Pel* gradX0, const Pel* gradX1, const Pel* gradY0, const Pel* gradY1, int* dotProductTemp1, int* dotProductTemp2, int* dotProductTemp3, int* dotProductTemp5, int* dotProductTemp6, const int src0Stride, const int src1Stride, const int gradStride, const int widthG, const int heightG, const int bitDepth);
 #if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
-  void(*calcBIOParameterHighPrecision)   (const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0, Pel* gradX1, Pel* gradY0, Pel* gradY1, int width, int height, const int src0Stride, const int src1Stride, const int widthG, const int bitDepth, int32_t* s1, int32_t* s2, int32_t* s3, int32_t* s5, int32_t* s6, Pel* dI);
-  void(*calcBIOParamSum4HighPrecision)   (int32_t* s1, int32_t* s2, int32_t* s3, int32_t* s5, int32_t* s6, int width, int height, const int widthG, int32_t* sumS1, int32_t* sumS2, int32_t* sumS3, int32_t* sumS5, int32_t* sumS6);
+  void(*calcBIOParameterHighPrecision)   (const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0, Pel* gradX1, Pel* gradY0, Pel* gradY1, int width, int height, const int src0Stride, const int src1Stride, const int widthG, const int bitDepth, int32_t* s1, int32_t* s2, int32_t* s3, int32_t* s5, int32_t* s6, Pel* dI
+#if JVET_AG0067_DMVR_EXTENSIONS
+                                          ,Pel* gX, Pel* gY
+#endif
+                                          );
+  void(*calcBIOParamSum4HighPrecision)   (int32_t* s1, int32_t* s2, int32_t* s3, int32_t* s5, int32_t* s6, int width, int height, const int widthG, int32_t* sumS1, int32_t* sumS2, int32_t* sumS3, int32_t* sumS5, int32_t* sumS6
+#if JVET_AG0067_DMVR_EXTENSIONS
+                                          ,Pel* dI ,Pel* gX, Pel* gY, bool isGPM, bool isSub
+#endif
+                                          );
+#endif
+#if JVET_AG0067_DMVR_EXTENSIONS
+  void(*calcBIOParamSum4HighPrecision4)   (int32_t* s1, int32_t* s2, int32_t* s3, int32_t* s5, int32_t* s6, int width, int height, const int widthG, int32_t* sumS1, int32_t* sumS2, int32_t* sumS3, int32_t* sumS5, int32_t* sumS6, Pel* dI, Pel* gX, Pel* gY, bool isGPM, bool isSub);
+  void(*calcBIOParamSum4HighPrecision8)   (int32_t* s1, int32_t* s2, int32_t* s3, int32_t* s5, int32_t* s6, int width, int height, const int widthG, int32_t* sumS1, int32_t* sumS2, int32_t* sumS3, int32_t* sumS5, int32_t* sumS6, Pel* dI  ,Pel* gX, Pel* gY, bool isGPM, bool isSub);
+  void(*calcBIOParamSum4HighPrecision16)   (int32_t* s1, int32_t* s2, int32_t* s3, int32_t* s5, int32_t* s6, int width, int height, const int widthG, int32_t* sumS1, int32_t* sumS2, int32_t* sumS3, int32_t* sumS5, int32_t* sumS6, Pel* dI   ,Pel* gX, Pel* gY, bool isGPM, bool isSub);
 #endif
 #if MULTI_PASS_DMVR || SAMPLE_BASED_BDOF
   void(*calcBIOParameter)   (const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0, Pel* gradX1, Pel* gradY0, Pel* gradY1, int width, int height, const int src0Stride, const int src1Stride, const int widthG, const int bitDepth, Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGyGx, Pel* dI);
@@ -157,6 +173,9 @@ void copyBufferCore(Pel *src, int srcStride, Pel *Dst, int dstStride, int width,
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM
 int64_t getSumOfDifferenceCore(const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height, int rowSubShift, int bitDepth);
 #endif
+#if JVET_AG0067_DMVR_EXTENSIONS
+int getMean(int sum, int div);
+#endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
 void getAbsoluteDifferencePerSampleCore(Pel* dst, int dstStride, const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, int width, int height);
 template <uint8_t maskType> // 0: No mask, 1: Use mask, 2: Use binary mask that contains only 0's and 1's, 3: Inverse the input binary mask before use
@@ -207,6 +226,9 @@ struct AreaBuf : public Size
 #else
   void addAvg               ( const AreaBuf<const T> &other1, const AreaBuf<const T> &other2, const ClpRng& clpRng );
 #endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  void avg                  (const AreaBuf<const T> &other1, const AreaBuf<const T> &other2);
+#endif
   void removeHighFreq       ( const AreaBuf<T>& other, const bool bClip, const ClpRng& clpRng);
   void updateHistogram      ( std::vector<int32_t>& hist ) const;
 #if INTER_LIC
@@ -216,6 +238,9 @@ struct AreaBuf : public Size
   T    meanDiff             ( const AreaBuf<const T> &other ) const;
   void subtract             ( const T val );
   void subtract             ( const AreaBuf<const T> &buffer1, const AreaBuf<const T> &buffer2 );
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  void linearTransforms     ( const int scale, const int shift, const int offset, const int scale2, const int shift2, const int offset2, const int yThres, bool bClip, const ClpRng& clpRng );
+#endif
   void linearTransform      ( const int scale, const int shift, const int offset, bool bClip, const ClpRng& clpRng );
 
   void transposedFrom       ( const AreaBuf<const T> &other );
@@ -259,6 +284,10 @@ struct AreaBuf : public Size
 typedef AreaBuf<      Pel>  PelBuf;
 typedef AreaBuf<const Pel> CPelBuf;
 
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+typedef AreaBuf<      int16_t> WeightBuf;
+#endif
+
 #if JVET_Y0141_SIGN_PRED_IMPROVE
 typedef AreaBuf<      unsigned> IdxBuf;
 typedef AreaBuf<const unsigned> CIdxBuf;
@@ -274,6 +303,14 @@ typedef AreaBuf<      uint8_t> IpmBuf;
 typedef AreaBuf<const uint8_t> CIpmBuf;
 #endif
 
+#if JVET_AE0043_CCP_MERGE_TEMPORAL
+typedef AreaBuf<      int>   CCPModelIdxBuf;
+typedef AreaBuf<const int>  CCCPModelIdxBuf;
+#endif
+#if JVET_AG0058_EIP
+typedef AreaBuf<      int>   EipModelIdxBuf;
+typedef AreaBuf<const int>  CEipModelIdxBuf;
+#endif
 typedef AreaBuf<      TCoeff>  PLTescapeBuf;
 typedef AreaBuf<const TCoeff> CPLTescapeBuf;
 

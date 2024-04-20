@@ -27,6 +27,11 @@ build_macos:
    tags:
       - macos
 
+build_macos_arm:
+   extends: .build_template
+   tags:
+      - macos-arm
+
 build_ubuntu2004:
    extends: .build_template_linux
    tags:
@@ -36,6 +41,16 @@ build_ubuntu2204:
    extends: .build_template_linux
    tags:
       - ubuntu2204
+
+build_ubuntu2204-gcc12:
+   extends: .build_template
+   script:
+      - make realclean
+      - make all toolset=gcc-12
+      - make realclean
+      - make linuxbuild enable-tracing=true toolset=gcc-12
+   tags:
+      - ubuntu2204-gcc12
 
 build_vc191x:
    extends: .build_template

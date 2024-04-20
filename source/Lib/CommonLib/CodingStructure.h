@@ -114,6 +114,9 @@ public:
 
   void destroy();
   void releaseIntermediateData();
+  bool m_isTopLayer;
+  void destroyTemporaryCsData();
+  void createTemporaryCsData(const bool isPLTused);
 #if JVET_Z0118_GDR
   bool isCuCrossIRA(int begX) const;
   bool isCuCrossVB(int endX) const;
@@ -159,7 +162,6 @@ public:
   void destroyTMBuf();
 #endif
 
-  void createCoeffs(const bool isPLTused);
   void destroyCoeffs();
 
   void allocateVectorsAtPicLevel();
@@ -253,6 +255,7 @@ public:
 #endif
 
 private:
+  void createCoeffs(const bool isPLTused);
   void createInternals(const UnitArea& _unit, const bool isTopLayer, const bool isPLTused);
 
 public:
@@ -268,7 +271,11 @@ public:
   template<class T> void addCCPToLut(static_vector<T, MAX_NUM_HCCP_CANDS> &lut, const T &model, int reusePos);
   template<class T> void getOneModelFromCCPLut(const static_vector<T, MAX_NUM_HCCP_CANDS> &lut, T &model, int pos);
 #endif
-
+#if JVET_AG0058_EIP
+  LutEIP                 eipLut;
+  template<class T> void addEipToLut(static_vector<T, MAX_NUM_HEIP_CANDS> &lut, const T &model, int reusePos);
+  template<class T> void getOneModelFromEipLut(const static_vector<T, MAX_NUM_HEIP_CANDS> &lut, T &model, int pos);
+#endif
   void addMiToLut(static_vector<MotionInfo, MAX_NUM_HMVP_CANDS>& lut, const MotionInfo &mi);
 #if JVET_Z0075_IBC_HMVP_ENLARGE
   void addMiToLutIBC(static_vector<MotionInfo, MAX_NUM_HMVP_IBC_CANDS>& lut, const MotionInfo &mi);
@@ -321,6 +328,14 @@ public:
   PelBuf m_pcBufPredRefTop;
   PelBuf m_pcBufPredRefLeft;
 #endif
+#if JVET_AE0043_CCP_MERGE_TEMPORAL
+  int    *m_ccpmIdxBuf;
+  std::vector<CCPModelCandidate> m_ccpModelLUT;
+#endif
+#if JVET_AG0058_EIP
+  int    *m_eipIdxBuf;
+  std::vector<EipModelCandidate> m_eipModelLUT;
+#endif
 private:
   PelStorage m_reco0; // for GDR dirty
   PelStorage m_reco1; // for GDR clean
@@ -331,7 +346,7 @@ private:
 
   TCoeff *m_coeffs [ MAX_NUM_COMPONENT ];
 #if SIGN_PREDICTION
-  TCoeff *m_coeffSigns [ MAX_NUM_COMPONENT ];
+  SIGN_PRED_TYPE *m_coeffSigns[MAX_NUM_COMPONENT];
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   unsigned *m_coeffSignsIdx[MAX_NUM_COMPONENT];
 #endif
@@ -385,6 +400,30 @@ public:
 
   MotionInfo& getMotionInfo( const Position& pos );
   const MotionInfo& getMotionInfo( const Position& pos ) const;
+
+#if JVET_AE0043_CCP_MERGE_TEMPORAL
+  CCPModelIdxBuf getCcpmIdxBuf( const     Area& bufArea);
+  CCPModelIdxBuf getCcpmIdxBuf( const UnitArea& bufArea) { return getCcpmIdxBuf( bufArea.Cb() ); }
+  CCPModelIdxBuf getCcpmIdxBuf()                         { return getCcpmIdxBuf( area.Cb() ); }
+  const CCCPModelIdxBuf getCcpmIdxBuf( const     Area& bufArea ) const;
+  const CCCPModelIdxBuf getCcpmIdxBuf( const UnitArea& bufArea ) const { return getCcpmIdxBuf( bufArea.Cb() ); }
+  const CCCPModelIdxBuf getCcpmIdxBuf()                          const { return getCcpmIdxBuf( area.Cb() ); }
+
+  int& getCcpmIdxInfo( const Position& pos );
+  const int& getCcpmIdxInfo( const Position& pos ) const;
+#endif
+
+#if JVET_AG0058_EIP
+  EipModelIdxBuf getEipIdxBuf( const     Area& bufArea);
+  EipModelIdxBuf getEipIdxBuf( const UnitArea& bufArea) { return getEipIdxBuf( bufArea.Y() ); }
+  EipModelIdxBuf getEipIdxBuf()                         { return getEipIdxBuf( area.Y() ); }
+  const CEipModelIdxBuf getEipIdxBuf( const     Area& bufArea ) const;
+  const CEipModelIdxBuf getEipIdxBuf( const UnitArea& bufArea ) const { return getEipIdxBuf( bufArea.Y() ); }
+  const CEipModelIdxBuf getEipIdxBuf()                          const { return getEipIdxBuf( area.Y() ); }
+
+  int& getEipIdxInfo( const Position& pos );
+  const int& getEipIdxInfo( const Position& pos ) const;
+#endif
 
 #if JVET_W0123_TIMD_FUSION && RPR_ENABLE
   bool  picContain( const Position _pos );
@@ -561,6 +600,46 @@ void CodingStructure::getOneModelFromCCPLut(const static_vector<T, MAX_NUM_HCCP_
 {
   size_t currCnt = lut.size();
   CHECK(pos >= currCnt, "Invalid entry in CCP LUT");
+  model = lut[currCnt - pos - 1];
+}
+
+#endif
+
+#if JVET_AG0058_EIP
+template<class T>
+void CodingStructure::addEipToLut(static_vector<T, MAX_NUM_HEIP_CANDS> &lut, const T &model, int reusePos)
+{
+  int currCnt = (int) lut.size();
+
+  int erasePos = 0;
+
+  if (reusePos == -1)
+  {
+    for (int j = 0; j < currCnt; j++)
+    {
+      if (lut[currCnt - j - 1] == model)
+      {
+        reusePos = j;
+        break;
+      }
+    }
+  }
+  if (reusePos != -1)
+  {
+    erasePos = currCnt - 1 - reusePos;   // reverse the order
+  }
+  if (reusePos != -1 || currCnt == lut.capacity())
+  {
+    lut.erase(lut.begin() + erasePos);
+  }
+  lut.push_back(model);
+}
+
+template<class T>
+void CodingStructure::getOneModelFromEipLut(const static_vector<T, MAX_NUM_HEIP_CANDS> &lut, T &model, int pos)
+{
+  size_t currCnt = lut.size();
+  CHECK(pos >= currCnt, "Invalid entry in EIP LUT");
   model = lut[currCnt - pos - 1];
 }
 

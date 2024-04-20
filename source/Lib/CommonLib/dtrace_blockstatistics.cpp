@@ -822,9 +822,8 @@ void writeAllData(const CodingStructure& cs, const UnitArea& ctuArea)
 #if JVET_Y0065_GPM_INTRA
                 if (candIdx0 >= GEO_MAX_NUM_UNI_CANDS)
                 {
-                  const int intraDir = tmpPu.intraMPM[candIdx0 - GEO_MAX_NUM_UNI_CANDS];
                   const int geoPartIdx = 0;
-                  DTRACE_POLYGON_SCALAR(g_trace_ctx, D_BLOCK_STATISTICS_ALL, cu.slice->getPOC(), geoPartitions[geoPartIdx], GetBlockStatisticName(BlockStatistic::GPMIntra), intraDir);
+                  DTRACE_POLYGON_SCALAR(g_trace_ctx, D_BLOCK_STATISTICS_ALL, cu.slice->getPOC(), geoPartitions[geoPartIdx], GetBlockStatisticName(BlockStatistic::GPMIntra), candIdx0);
                 }
                 else
                 {
@@ -859,9 +858,8 @@ void writeAllData(const CodingStructure& cs, const UnitArea& ctuArea)
 #if JVET_Y0065_GPM_INTRA
                 if (candIdx1 >= GEO_MAX_NUM_UNI_CANDS)
                 {
-                  const int intraDir = tmpPu.intraMPM[candIdx1 - GEO_MAX_NUM_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS];
                   const int geoPartIdx = 0;
-                  DTRACE_POLYGON_SCALAR(g_trace_ctx, D_BLOCK_STATISTICS_ALL, cu.slice->getPOC(), geoPartitions[geoPartIdx], GetBlockStatisticName(BlockStatistic::GPMIntra), intraDir);
+                  DTRACE_POLYGON_SCALAR(g_trace_ctx, D_BLOCK_STATISTICS_ALL, cu.slice->getPOC(), geoPartitions[geoPartIdx], GetBlockStatisticName(BlockStatistic::GPMIntra), candIdx1);
                 }
                 else
                 {
@@ -940,6 +938,10 @@ void writeAllData(const CodingStructure& cs, const UnitArea& ctuArea)
             }
           }
         }
+        break;
+      case MODE_IBC:
+      case MODE_PLT:
+        // TODO add relevant statistics
         break;
       default:
         THROW( "Invalid prediction mode" );
@@ -1188,6 +1190,10 @@ void writeAllCodedData(const CodingStructure & cs, const UnitArea & ctuArea)
 #endif
             break;
           }
+          case MODE_IBC:
+          case MODE_PLT:
+            // TODO add relevant statistics
+            break;
           default:
           {
             CHECK(1, "Invalid prediction mode");

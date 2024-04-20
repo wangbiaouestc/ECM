@@ -100,7 +100,11 @@ private:
   PelStorage        m_ciipBuffer;
 
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  MotionInfo        m_subPuMiBuf[SUB_BUFFER_SIZE][(MAX_CU_SIZE * MAX_CU_SIZE) >> (MIN_CU_LOG2 << 1)];
+#else
   MotionInfo        m_subPuMiBuf[SUB_TMVP_NUM][(MAX_CU_SIZE * MAX_CU_SIZE) >> (MIN_CU_LOG2 << 1)];
+#endif
 #else
   MotionInfo        m_subPuMiBuf[(MAX_CU_SIZE * MAX_CU_SIZE) >> (MIN_CU_LOG2 << 1)];
 #endif
@@ -108,7 +112,7 @@ private:
   bool applyBDMVR4BM[BM_MRG_MAX_NUM_INIT_CANDS];
 #endif
 #if MULTI_PASS_DMVR
-#if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+#if JVET_AA0093_REFINED_MOTION_FOR_ARMC || JVET_AE0046_BI_GPM
   Mv                m_mvBufBDMVR[MRG_MAX_NUM_CANDS << 1][MAX_NUM_SUBCU_DMVR];
 #else
   Mv                m_mvBufBDMVR[2][MAX_NUM_SUBCU_DMVR];
@@ -120,8 +124,14 @@ private:
   bool              m_licAmListDec[MAX_NUM_AMVP_CANDS_MAX_REF << 1];
 #endif
 #endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+  Mv                m_mvBufDecAffineBDOF[BDOF_SUBPU_MAX_NUM];
+#endif
 
   MergeCtx          m_geoMrgCtx;
+#if JVET_AG0164_AFFINE_GPM
+  AffineMergeCtx    m_geoAffMrgCtx;
+#endif
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   MergeCtx          m_geoTmMrgCtx[GEO_NUM_TM_MV_CAND];
@@ -131,6 +141,10 @@ private:
 #endif
 #if JVET_AC0112_IBC_GPM
   MergeCtx          m_ibcMrgCtx;
+#endif
+#if JVET_AE0046_BI_GPM
+protected:
+  Mv                m_mvBufBDOF4GPM[MRG_MAX_NUM_CANDS][BDOF_SUBPU_MAX_NUM];
 #endif
 };
 

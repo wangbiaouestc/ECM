@@ -69,6 +69,15 @@ EncSlice::~EncSlice()
 
 void EncSlice::create( int iWidth, int iHeight, ChromaFormat chromaFormat, uint32_t iMaxCUWidth, uint32_t iMaxCUHeight, uint8_t uhTotalDepth )
 {
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+  int numBinBuffers = iWidth / iMaxCUWidth + 1;
+  
+  for ( int i = 0; i < numBinBuffers; i++ )
+  {
+    m_binVectors.push_back( BinStoreVector() );
+    m_binVectors[i].reserve( CABAC_SPATIAL_MAX_BINS );
+  }
+#endif
 }
 
 void EncSlice::destroy()
@@ -77,6 +86,9 @@ void EncSlice::destroy()
   m_vdRdPicLambda.clear();
   m_vdRdPicQp.clear();
   m_viRdPicQp.clear();
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+  m_binVectors.clear();
+#endif
 }
 
 void EncSlice::init( EncLib* pcEncLib, const SPS& sps )
@@ -584,6 +596,32 @@ void EncSlice::initEncSlice(Picture* pcPic, const int pocLast, const int pocCurr
       int rprSegment = m_pcCfg->getRprSwitchingSegment(currPoc);
       cbQP += mappedQpDelta(COMPONENT_Cb, m_pcCfg->getRprSwitchingQPOffsetOrderList(rprSegment));
       crQP += mappedQpDelta(COMPONENT_Cr, m_pcCfg->getRprSwitchingQPOffsetOrderList(rprSegment));
+    }
+#endif
+#if JVET_AG0116
+    // adjust chroma QP such that it corresponds to the luma QP change when encoding in reduced resolution
+    if (m_pcCfg->getGOPBasedRPREnabledFlag())
+    {
+      auto mappedQpDelta = [&](ComponentID c, int qpOffset) -> int {
+        const int mappedQpBefore = rpcSlice->getSPS()->getMappedChromaQpValue(c, iQP - qpOffset);
+        const int mappedQpAfter = rpcSlice->getSPS()->getMappedChromaQpValue(c, iQP);
+        return mappedQpBefore - mappedQpAfter + qpOffset;
+      };
+      if (rpcSlice->getPPS()->getPPSId() == ENC_PPS_ID_RPR) // ScalingRatioHor/ScalingRatioVer
+      {
+        cbQP += mappedQpDelta(COMPONENT_Cb, m_pcCfg->getQpOffsetChromaRPR());
+        crQP += mappedQpDelta(COMPONENT_Cr, m_pcCfg->getQpOffsetChromaRPR());
+      }
+      else if (rpcSlice->getPPS()->getPPSId() == ENC_PPS_ID_RPR2) // ScalingRatioHor2/ScalingRatioVer2
+      {
+        cbQP += mappedQpDelta(COMPONENT_Cb, m_pcCfg->getQpOffsetChromaRPR2());
+        crQP += mappedQpDelta(COMPONENT_Cr, m_pcCfg->getQpOffsetChromaRPR2());
+      }
+      else if (rpcSlice->getPPS()->getPPSId() == ENC_PPS_ID_RPR3) // ScalingRatioHor3/ScalingRatioVer3
+      {
+        cbQP += mappedQpDelta(COMPONENT_Cb, m_pcCfg->getQpOffsetChromaRPR3());
+        crQP += mappedQpDelta(COMPONENT_Cr, m_pcCfg->getQpOffsetChromaRPR3());
+      }
     }
 #endif
     int cbCrQP = (cbQP + crQP) >> 1; // use floor of average chroma QP offset for joint-Cb/Cr coding
@@ -1560,6 +1598,9 @@ void EncSlice::compressSlice( Picture* pcPic, const bool bCompressEntireSlice, c
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT 
   m_CABACEstimator->m_CABACDataStore->updateBufferState( pcSlice );
 #endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  clearAmvpSbTmvpStatArea(pcSlice);
+#endif
 
   m_CABACEstimator->initCtxModels( *pcSlice );
 
@@ -1599,6 +1640,85 @@ void EncSlice::compressSlice( Picture* pcPic, const bool bCompressEntireSlice, c
     }
   }
 #endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  if (pcSlice->getUseIBC())
+#else
+  if (pcSlice->getSPS()->getIBCFlag())
+#endif
+  {
+    bool mode = m_pcCfg->getIbcBiPred();
+    pcSlice->setBiPredictionIBCFlag(mode);
+  }
+  else
+  {
+    pcSlice->setBiPredictionIBCFlag(false);
+  }
+#endif
+
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  if (pcSlice->getPicHeader()->getEnableTMVPFlag() && !pcSlice->isIntra())
+  {
+    int minPoc = abs(pcSlice->getRefPic(RefPicList(1 - pcSlice->getColFromL0Flag()), pcSlice->getColRefIdx())->getPOC() - pcSlice->getPOC());
+    if (pcSlice->isInterB() && pcSlice->getCheckLDC())
+    {
+      int min2ndPoc = abs(pcSlice->getRefPic(RefPicList(1 - pcSlice->getColFromL0Flag2nd()), pcSlice->getColRefIdx2nd())->getPOC() - pcSlice->getPOC());
+      minPoc = min(minPoc, min2ndPoc);
+    }
+    if (minPoc > 4)
+    {
+      pcSlice->setAmvpSbTmvpEnabledFlag(false);
+    }
+    else
+    {
+      pcSlice->setAmvpSbTmvpEnabledFlag(true);
+
+      g_picAmvpSbTmvpEnabledArea = 0;
+      uint32_t prevEnabledArea;
+      bool isExist = loadAmvpSbTmvpStatArea(pcSlice->getTLayer(), prevEnabledArea);
+      if (isExist)
+      {
+        int ratio = int(prevEnabledArea * 100.0 / (pcSlice->getPic()->getPicWidthInLumaSamples() * pcSlice->getPic()->getPicHeightInLumaSamples()));
+        if (ratio < 4)
+        {
+          pcSlice->setAmvpSbTmvpNumOffset(1);
+        }
+        else if (ratio < 7)
+        {
+          pcSlice->setAmvpSbTmvpNumOffset(2);
+        }
+        else
+        {
+          pcSlice->setAmvpSbTmvpNumOffset(3);
+        }
+      }
+      else
+      {
+        pcSlice->setAmvpSbTmvpNumOffset(2);
+      }
+      if (pcSlice->isInterB() && pcSlice->getCheckLDC())
+      {
+        if (pcSlice->getRefPic(RefPicList(1 - pcSlice->getColFromL0Flag()), pcSlice->getColRefIdx())->getPOC() == pcSlice->getRefPic(RefPicList(1 - pcSlice->getColFromL0Flag2nd()), pcSlice->getColRefIdx2nd())->getPOC())
+        {
+          pcSlice->setAmvpSbTmvpNumColPic(1);
+        }
+        else
+        {
+          pcSlice->setAmvpSbTmvpNumColPic(2);
+        }
+      }
+      else
+      {
+        pcSlice->setAmvpSbTmvpNumColPic(1);
+      }
+      pcSlice->setAmvpSbTmvpAmvrEnabledFlag(pcSlice->getPic()->getPicWidthInLumaSamples() * pcSlice->getPic()->getPicHeightInLumaSamples() < 3840*2160 ? false : true);
+    }
+  }
+  else
+  {
+    pcSlice->setAmvpSbTmvpEnabledFlag(false);
+  }
+#endif
 
   if ( bWp_explicit )
   {
@@ -1636,6 +1756,9 @@ void EncSlice::compressSlice( Picture* pcPic, const bool bCompressEntireSlice, c
     {
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT 
       m_CABACEstimator->m_CABACDataStore->updateBufferState( pcSlice );
+#endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+      clearAmvpSbTmvpStatArea(pcSlice);
 #endif
       m_CABACEstimator->initCtxModels (*pcSlice);
 #if ENABLE_SPLIT_PARALLELISM
@@ -1759,6 +1882,7 @@ void EncSlice::setJointCbCrModes( CodingStructure& cs, const Position topLeftLum
   cs.picHeader->setJointCbCrSignFlag( sgnFlag );
 }
 
+
 void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, const bool bFastDeltaQP, EncLib* pEncLib )
 {
   CodingStructure&  cs            = *pcPic->cs;
@@ -1767,6 +1891,98 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
   const uint32_t        widthInCtus   = pcv.widthInCtus;
 #if ENABLE_QPA
   const int iQPIndex              = pcSlice->getSliceQpBase();
+#endif
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+  int pelMax = pcPic->getLumaClpRng().max;
+  int pelMin = pcPic->getLumaClpRng().min;
+  int targetMin = 64, targetMax = 940;
+  if (cs.slice->getSliceType() != I_SLICE)
+  {
+    const Picture* const pColPic = pcPic->cs->slice->getRefPic(RefPicList(1 - pcPic->cs->slice->getColFromL0Flag()), pcPic->cs->slice->getColRefIdx())->unscaledPic;
+    ClpRng colLumaClpRng = pColPic->getLumaClpRng();
+    targetMin = colLumaClpRng.min;
+    targetMax = colLumaClpRng.max;
+  }
+  int clipDeltaShift = 0;
+  if (cs.slice->getSliceType()!=I_SLICE && cs.slice->getCheckLDC())
+  {
+    clipDeltaShift = ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_1;
+    pcPic->cs->slice->setAdaptiveClipQuant(true);
+  }
+  else
+  {
+    clipDeltaShift = ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_0;
+    pcPic->cs->slice->setAdaptiveClipQuant(false);
+  }
+  int pelMaxOF = 0;
+  int pelMinOF = (1 << pcPic->cs->sps->getBitDepth(toChannelType(COMPONENT_Y))) - 1;
+  const int orgPelMin = pelMin;
+  {
+    int deltaMinToSignal = (pelMin - targetMin);
+    if (deltaMinToSignal < 0)
+    {
+      int absDelta = ((targetMin - pelMin) >> clipDeltaShift) << clipDeltaShift;
+      pelMin = targetMin - absDelta;
+      while (pelMin > orgPelMin)
+      {
+        pelMin -= (1 << clipDeltaShift);
+      }
+      while (pelMin < 0)
+      {
+        pelMinOF = pelMin;
+        pelMin = 0;
+      }
+      CHECK(pelMin < 0, "this is not possible");
+    }
+    else if (deltaMinToSignal > 0)
+    {
+      int absDelta = (deltaMinToSignal >> clipDeltaShift) << clipDeltaShift;
+      pelMin = targetMin + absDelta;
+      CHECK(pelMin > orgPelMin, "this is not possible");
+      CHECK(pelMin < 0, "this is not possible");
+    }
+    else
+    {
+      CHECK(pelMin != targetMin, "this is not possible");
+    }
+  }
+
+  const int orgPelMax = pelMax;
+  {
+    int deltaMaxToSignal = (pelMax - targetMax);
+    if (deltaMaxToSignal < 0)
+    {
+      int absDelta = ((targetMax - pelMax) >> clipDeltaShift) << clipDeltaShift;
+      pelMax = targetMax - absDelta;
+      CHECK(pelMax < orgPelMax, "this is not possible");
+      CHECK(pelMax > (1 << pcPic->cs->sps->getBitDepth(toChannelType(COMPONENT_Y))) - 1, "this is not possible");
+    }
+    else if (deltaMaxToSignal > 0)
+    {
+      int absDelta = (deltaMaxToSignal >> clipDeltaShift) << clipDeltaShift;
+      pelMax = targetMax + absDelta;
+      while (pelMax < orgPelMax)
+      {
+        pelMax += (1 << clipDeltaShift);
+      }
+      while (pelMax >= (1 << pcPic->cs->sps->getBitDepth(toChannelType(COMPONENT_Y))))
+      {
+        pelMaxOF = pelMax;
+        pelMax = (1 << pcPic->cs->sps->getBitDepth(toChannelType(COMPONENT_Y))) - 1;
+      }
+      CHECK(pelMax > (1 << pcPic->cs->sps->getBitDepth(toChannelType(COMPONENT_Y))) - 1, "this is not possible");
+    }
+    else
+    {
+      CHECK(pelMax != targetMax, "this is not possible");
+    }
+  }
+  pcPic->cs->slice->setLumaPelMax(pelMax);
+  pcPic->cs->slice->setLumaPelMin(pelMin);
+  pcPic->lumaClpRng.min = pelMin;
+  pcPic->lumaClpRng.max = pelMax;
+  pcPic->lumaClpRngforQuant.min = min(pelMin, pelMinOF);
+  pcPic->lumaClpRngforQuant.max = max(pelMax, pelMaxOF);
 #endif
 
 #if ENABLE_SPLIT_PARALLELISM
@@ -1842,6 +2058,27 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
     }
   }
 #endif
+#if JVET_AE0159_FIBC
+  if (m_pcCuEncoder->getEncCfg()->getIbcFilter())
+  {
+    SPS* spsTmp = const_cast<SPS*>(cs.sps);
+    hashBlkHitPerc = (hashBlkHitPerc == -1) ? m_pcCuEncoder->getIbcHashMap().calHashBlkMatchPerc(cs.area.Y()) : hashBlkHitPerc;
+    bool isSCC = hashBlkHitPerc >= 20;
+    spsTmp->setUseIbcFilter(isSCC);   
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+    if (cs.slice->getPOC() == 0 || cs.slice->getSliceType() == I_SLICE) // ensure sequential and parallel simulation generate same output
+    {
+      spsTmp->setUseGeoBlend(!isSCC);
+    }
+#endif
+#if JVET_AG0164_AFFINE_GPM
+    if (m_pcCuEncoder->getEncCfg()->getMaxNumGpmAffCand() > 0 && isSCC)
+    {
+      spsTmp->setMaxNumGpmAffCand(m_pcCuEncoder->getEncCfg()->getMaxNumGpmAffCand());
+    }
+#endif
+  }
+#endif
 #if JVET_AD0188_CCP_MERGE
   if ((pCfg->getSwitchPOC() != pcPic->poc || -1 == pCfg->getDebugCTU()))
   {
@@ -1850,6 +2087,17 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
     cs.ccpLut.lutCCP1.resize(0);
 #else
     cs.ccpLut.lutCCP.resize(0);
+#endif
+  }
+#endif
+#if JVET_AG0058_EIP
+  if ((pCfg->getSwitchPOC() != pcPic->poc || -1 == pCfg->getDebugCTU()))
+  {
+#if JVET_Z0118_GDR
+    cs.eipLut.lutEip0.resize(0);
+    cs.eipLut.lutEip1.resize(0);
+#else
+    cs.eipLut.lutEip.resize(0);
 #endif
   }
 #endif
@@ -1934,7 +2182,17 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
 #endif
     }
 #endif
-
+#if JVET_AG0058_EIP
+    if ((pCfg->getSwitchPOC() != pcPic->poc || -1 == pCfg->getDebugCTU()) && cs.pps->ctuIsTileColBd(ctuXPosInCtus))
+    {
+#if JVET_Z0118_GDR
+      cs.eipLut.lutEip0.resize(0);
+      cs.eipLut.lutEip1.resize(0);
+#else
+      cs.eipLut.lutEip.resize(0);
+#endif
+    }
+#endif
     const SubPic &curSubPic = pcSlice->getPPS()->getSubPicFromPos(pos);
     // padding/restore at slice level
     if (pcSlice->getPPS()->getNumSubPics() >= 2 && curSubPic.getTreatedAsPicFlag() && ctuIdx == 0)
@@ -2081,8 +2339,24 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
       pcPic->mctsInfo.init( &cs, ctuRsAddr );
     }
 
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+    // Update the CABAC states based on CTU above
+    if ( ctuYPosInCtus )
+    {
+      pCABACWriter->updateCtxs( getBinVector(ctuXPosInCtus) );
+    }
+
+    // No data collection during the compress pass
+    pCABACWriter->setBinBuffer( nullptr );
+#endif
+
   if (pCfg->getSwitchPOC() != pcPic->poc || ctuRsAddr >= pCfg->getDebugCTU())
     m_pcCuEncoder->compressCtu( cs, ctuArea, ctuRsAddr, prevQP, currQP );
+
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+    // Clear the bin counters and prepare for collecting new data for this CTU
+    pCABACWriter->setBinBuffer( getBinVector(ctuXPosInCtus) );
+#endif
 
 #if K0149_BLOCK_STATISTICS
     getAndStoreBlockStatistics(cs, ctuArea);
@@ -2091,6 +2365,11 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
     pCABACWriter->resetBits();
     pCABACWriter->coding_tree_unit( cs, ctuArea, prevQP, ctuRsAddr, true, true );
     const int numberOfWrittenBits = int( pCABACWriter->getEstFracBits() >> SCALE_BITS );
+
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+    // Done with the data collection for this CTU
+    pCABACWriter->setBinBuffer( nullptr );
+#endif
 
 #if ENABLE_SPLIT_PARALLELISM
 #pragma omp critical
@@ -2193,7 +2472,6 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
 //  m_uiPicDist       = cs.dist;
 
 }
-
 void EncSlice::encodeSlice   ( Picture* pcPic, OutputBitstream* pcSubstreams, uint32_t &numBinsCoded )
 {
 
@@ -2221,7 +2499,6 @@ void EncSlice::encodeSlice   ( Picture* pcPic, OutputBitstream* pcSubstreams, ui
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   static Ctx storedCtx;
 #endif
-
   // for every CTU in the slice...
   for( uint32_t ctuIdx = 0; ctuIdx < pcSlice->getNumCtuInSlice(); ctuIdx++ )
   {
@@ -2271,19 +2548,31 @@ void EncSlice::encodeSlice   ( Picture* pcPic, OutputBitstream* pcSubstreams, ui
 #if JVET_V0094_BILATERAL_FILTER
     if (ctuRsAddr == 0)
     {
-      BifParams& bifParam = cs.picture->getBifParam();
-      m_CABACWriter->bif(*pcSlice, bifParam);
-    }
-#endif
+      m_CABACWriter->bif( COMPONENT_Y, *pcSlice, cs.picture->getBifParam( COMPONENT_Y ) );
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-    if(ctuRsAddr == 0)
-    {
-        ChromaBifParams& chromaBifParam = cs.picture->getChromaBifParam();
-        m_CABACWriter->chromaBifCb(*pcSlice, chromaBifParam);
-        m_CABACWriter->chromaBifCr(*pcSlice, chromaBifParam);
+      m_CABACWriter->bif( COMPONENT_Cb, *pcSlice, cs.picture->getBifParam( COMPONENT_Cb ) );
+      m_CABACWriter->bif( COMPONENT_Cr, *pcSlice, cs.picture->getBifParam( COMPONENT_Cr ) );
+#endif
     }
 #endif
+
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+    // Final writing of the bitstream - update the CABAC states based on CTU above
+    if ( ctuYPosInCtus )
+    {
+      m_CABACWriter->updateCtxs( getBinVector(ctuXPosInCtus) );
+    }
+
+    // Clear the bin counters and prepare for collecting new data for this CTU
+    m_CABACWriter->setBinBuffer( getBinVector(ctuXPosInCtus) );
+#endif
+
     m_CABACWriter->coding_tree_unit( cs, ctuArea, pcPic->m_prevQP, ctuRsAddr );
+
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+    // Done with data collection for this CTU
+    m_CABACWriter->setBinBuffer( nullptr );
+#endif
 
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
     // store CABAC context to be used in next frames
@@ -2325,7 +2614,6 @@ void EncSlice::encodeSlice   ( Picture* pcPic, OutputBitstream* pcSubstreams, ui
       uiSubStrm++;
     }
   } // CTU-loop
-
   if(pcSlice->getPPS()->getCabacInitPresentFlag())
   {
     m_encCABACTableIdx = m_CABACWriter->getCtxInitId( *pcSlice );
@@ -2341,6 +2629,12 @@ void EncSlice::encodeSlice   ( Picture* pcPic, OutputBitstream* pcSubstreams, ui
   if( pcSlice->getPPS()->pcv->sizeInCtus - 1 == pcSlice->getCtuAddrInSlice( pcSlice->getNumCtuInSlice() - 1 ) )
   {
     m_CABACWriter->m_CABACDataStore->storeCtxStates( pcSlice, storedCtx );
+  }
+#endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  if (!pcSlice->isIntra())
+  {
+    storeAmvpSbTmvpStatArea(pcSlice->getTLayer(), g_picAmvpSbTmvpEnabledArea);
   }
 #endif
 }

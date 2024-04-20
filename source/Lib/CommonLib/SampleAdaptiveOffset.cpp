@@ -113,7 +113,9 @@ const SAOBlkParam& SAOBlkParam::operator= (const SAOBlkParam& src)
 SampleAdaptiveOffset::SampleAdaptiveOffset()
 {
   m_numberOfComponents = 0;
+#if JVET_W0066_CCSAO
   m_ccSaoControl[0] = m_ccSaoControl[1] = m_ccSaoControl[2] = nullptr;
+#endif
 }
 
 
@@ -163,21 +165,17 @@ void SampleAdaptiveOffset::create( int picWidth, int picHeight, ChromaFormat for
 
   for (int compIdx = 0; compIdx < MAX_NUM_COMPONENT; compIdx++)
   {
-    if( m_ccSaoControl[compIdx] )
-    {
-      delete[] m_ccSaoControl[compIdx];
-      m_ccSaoControl[compIdx] = nullptr;
-    }
+    if( m_ccSaoControl[compIdx] ) { delete[] m_ccSaoControl[compIdx]; m_ccSaoControl[compIdx] = nullptr; }
   }
 
   for (int compIdx = 0; compIdx < MAX_NUM_COMPONENT; compIdx++)
   {
-    if( m_ccSaoControl[compIdx] == nullptr )
-    {
-      m_ccSaoControl[compIdx] = new uint8_t[m_numCTUsInPic];
-    }
+    if(m_ccSaoControl[compIdx] == nullptr) { m_ccSaoControl[compIdx] = new uint8_t[m_numCTUsInPic]; }
     ::memset(m_ccSaoControl[compIdx], 0, sizeof(uint8_t) * m_numCTUsInPic);
   }
+#endif
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
+  m_bilateralFilter.create();
 #endif
 }
 
@@ -198,11 +196,7 @@ void SampleAdaptiveOffset::destroy()
 
   for (int compIdx = 0; compIdx < MAX_NUM_COMPONENT; compIdx++)
   {
-    if (m_ccSaoControl[compIdx]) 
-    { 
-      delete [] m_ccSaoControl[compIdx];
-      m_ccSaoControl[compIdx] = nullptr;
-    }
+    if (m_ccSaoControl[compIdx]) { delete [] m_ccSaoControl[compIdx]; m_ccSaoControl[compIdx] = nullptr; }
   }
 #endif
 }
@@ -1158,15 +1152,24 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
 #if JVET_V0094_BILATERAL_FILTER
       if (cs.pps->getUseBIF())
       {
-        BifParams& bifParams = cs.picture->getBifParam();
+        BifParams& bifParams = cs.picture->getBifParam( COMPONENT_Y );
 
         // And now we traverse the CTU to do BIF
         for (auto& currCU : cs.traverseCUs(CS::getArea(cs, area, CH_L), CH_L))
         {
           for (auto& currTU : CU::traverseTUs(currCU))
           {
-            bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
-            if (bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
+            bool applyBIF = bifParams.ctuOn[ctuRsAddr];
+            if (applyBIF)
+            {
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+              applyBIF = m_bilateralFilter.getApplyBIF(currTU, COMPONENT_Y);
+#else
+              bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
+              applyBIF = ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height)));
+#endif
+            }
+            if (applyBIF)
             {
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
               bool clipTop = false, clipBottom = false, clipLeft = false, clipRight = false;
@@ -1177,10 +1180,9 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
                 cs, currTU.Y().x, currTU.Y().y, currTU.lumaSize().width, currTU.lumaSize().height, clipTop, clipBottom,
                 clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
 #endif
-              m_bilateralFilter.bilateralFilterDiamond5x5NoClip(m_tempBuf, rec, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU
+              m_bilateralFilter.bilateralFilterDiamond5x5( COMPONENT_Y, m_tempBuf, rec, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU, true
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-                , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
-                , clipTop, clipBottom, clipLeft, clipRight
+                , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry, clipTop, clipBottom, clipLeft, clipRight
 #endif
               );
             }
@@ -1191,12 +1193,9 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
       if(cs.pps->getUseChromaBIF())
       {
-        bool tuValid = false;
-        bool tuCBF = false;
         bool isDualTree = CS::isDualITree(cs);
         ChannelType chType = isDualTree ? CH_C : CH_L;
         bool applyChromaBIF = false;
-        ChromaBifParams& chromaBifParams = cs.picture->getChromaBifParam();
 
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
         const int chromaScaleX = getChannelTypeScaleX( CHANNEL_TYPE_CHROMA, cs.pcv->chrFormat );
@@ -1213,13 +1212,19 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
           }
           for (auto &currTU : CU::traverseTUs(currCU))
           {
-            bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
             for(int compIdx = COMPONENT_Cb; compIdx < MAX_NUM_COMPONENT; compIdx++)
             {
               applyChromaBIF = false;
-              bool isCb = compIdx == COMPONENT_Cb ? true : false;
-              ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
-              bool ctuEnableChromaBIF = isCb ? chromaBifParams.ctuOnCb[ctuRsAddr] : chromaBifParams.ctuOnCr[ctuRsAddr];
+              ComponentID compID = ComponentID( compIdx );
+              BifParams& chromaBifParams = cs.picture->getBifParam( compID );
+              bool ctuEnableChromaBIF = chromaBifParams.ctuOn[ctuRsAddr];
+
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+              applyChromaBIF = ctuEnableChromaBIF && m_bilateralFilter.getApplyBIF(currTU, compID);
+#else
+              bool tuValid = false;
+              bool tuCBF = false;
+              bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
               if(!isDualTree)
               {
                 tuValid = currTU.blocks[compIdx].valid();
@@ -1235,6 +1240,8 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
                 tuCBF = TU::getCbf(currTU, compID);
                 applyChromaBIF = (ctuEnableChromaBIF && ((tuCBF || isInter == false) && (currTU.cu->qp > 17)));
               }
+#endif
+
               if(applyChromaBIF)
               {
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
@@ -1250,10 +1257,9 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
                   clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
 
 #endif
-                m_bilateralFilter.bilateralFilterDiamond5x5NoClipChroma(m_tempBuf, rec, currTU.cu->qp, cs.slice->clpRng(compID), currTU, isCb
+                m_bilateralFilter.bilateralFilterDiamond5x5( compID, m_tempBuf, rec, currTU.cu->qp, cs.slice->clpRng(compID), currTU, true
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-                  , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
-                  , clipTop, clipBottom, clipLeft, clipRight
+                  , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry, clipTop, clipBottom, clipLeft, clipRight
 #endif
                 );
               }
@@ -1273,31 +1279,33 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
         // We are using BIF, so we run SAO without clipping
         // However, if 'SAO=0', bAllDisabled=true and we should not run offsetCTUnoClip.
         if( !bAllDisabled )
-          offsetCTUnoClip( area, m_tempBuf, rec, cs.picture->getSAO()[ctuRsAddr], cs);
+        {
+          offsetCTUnoClip( area, m_tempBuf, rec, cs.picture->getSAO()[ctuRsAddr], cs );
+        }
         
         // We don't need to clip if SAO was not performed on luma.
         SAOBlkParam mySAOblkParam = cs.picture->getSAO()[ctuRsAddr];
         SAOOffset& myCtbOffset     = mySAOblkParam[0];
-        BifParams& bifParams = cs.picture->getBifParam();
+        BifParams& bifParams = cs.picture->getBifParam(COMPONENT_Y);
         
         bool clipLumaIfNoBilat = false;
-        if(!bAllDisabled && myCtbOffset.modeIdc != SAO_MODE_OFF)
+        if( !bAllDisabled && myCtbOffset.modeIdc != SAO_MODE_OFF )
+        {
           clipLumaIfNoBilat = true;
+        }
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
         SAOOffset& myCtbOffsetCb     = mySAOblkParam[1];
         SAOOffset& myCtbOffsetCr     = mySAOblkParam[2];
-        ChromaBifParams& chromaBifParams = cs.picture->getChromaBifParam();
 
-        bool clipChromaIfNoBilatCb = false;
-        bool clipChromaIfNoBilatCr = false;
+        bool clipChromaIfNoBilat[MAX_NUM_COMPONENT] = { false };
 
         if(!bAllDisabled && myCtbOffsetCb.modeIdc != SAO_MODE_OFF)
         {
-          clipChromaIfNoBilatCb = true;
+          clipChromaIfNoBilat[COMPONENT_Cb] = true;
         }
         if(!bAllDisabled && myCtbOffsetCr.modeIdc != SAO_MODE_OFF)
         {
-          clipChromaIfNoBilatCr = true;
+          clipChromaIfNoBilat[COMPONENT_Cr] = true;
         }
         if(cs.pps->getUseBIF())
         {
@@ -1309,20 +1317,29 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
           for (auto &currTU : CU::traverseTUs(currCU))
           {
             
-            bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
-            if ( bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
+            bool applyBIF = bifParams.ctuOn[ctuRsAddr];
+            if (applyBIF)
+            {
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+              applyBIF = m_bilateralFilter.getApplyBIF(currTU, COMPONENT_Y);
+#else
+              bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
+              applyBIF = ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height)));
+#endif
+            }
+            if (applyBIF)
             {
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
               bool clipTop = false, clipBottom = false, clipLeft = false, clipRight = false;
               int  numHorVirBndry = 0, numVerVirBndry = 0;
               int  horVirBndryPos[]               = { 0, 0, 0 };
               int  verVirBndryPos[]               = { 0, 0, 0 };
-              bool isTUCrossedByVirtualBoundaries = bilateralFilter.isCrossedByVirtualBoundaries(
+              bool isTUCrossedByVirtualBoundaries = m_bilateralFilter.isCrossedByVirtualBoundaries(
                 cs, currTU.Y().x, currTU.Y().y, currTU.lumaSize().width, currTU.lumaSize().height, clipTop, clipBottom,
                 clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
 #endif
 
-              m_bilateralFilter.bilateralFilterDiamond5x5(m_tempBuf, rec, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU
+              m_bilateralFilter.bilateralFilterDiamond5x5( COMPONENT_Y, m_tempBuf, rec, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU, false
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                   , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
                   , clipTop, clipBottom, clipLeft, clipRight
@@ -1332,8 +1349,10 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
             else
             {
               // We don't need to clip if SAO was not performed on luma.
-              if(clipLumaIfNoBilat)
-                m_bilateralFilter.clipNotBilaterallyFilteredBlocks(m_tempBuf, rec, cs.slice->clpRng(COMPONENT_Y), currTU);
+              if( clipLumaIfNoBilat )
+              {
+                m_bilateralFilter.clipNotBilaterallyFilteredBlocks( COMPONENT_Y, m_tempBuf, rec, cs.slice->clpRng( COMPONENT_Y ), currTU );
+              }
             }
           }
         }
@@ -1347,15 +1366,13 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
             {
               if(clipLumaIfNoBilat)
               {
-                m_bilateralFilter.clipNotBilaterallyFilteredBlocks(m_tempBuf, rec, cs.slice->clpRng(COMPONENT_Y), currTU);
+                m_bilateralFilter.clipNotBilaterallyFilteredBlocks( COMPONENT_Y, m_tempBuf, rec, cs.slice->clpRng(COMPONENT_Y), currTU);
               }
             }
           }
         }
         if(cs.pps->getUseChromaBIF())
-        {
-          bool tuValid = false;
-          bool tuCBF = false;
+        {          
           bool isDualTree = CS::isDualITree(cs);
           ChannelType chType = isDualTree ? CH_C : CH_L;
           bool applyChromaBIF = false;
@@ -1369,12 +1386,17 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
             }
             for (auto &currTU : CU::traverseTUs(currCU))
             {
-              bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
               for(int compIdx = COMPONENT_Cb; compIdx < MAX_NUM_COMPONENT; compIdx++)
               {
-                bool isCb = compIdx == COMPONENT_Cb ? true : false;
-                ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
-                bool ctuEnableChromaBIF = isCb ? chromaBifParams.ctuOnCb[ctuRsAddr] : chromaBifParams.ctuOnCr[ctuRsAddr];
+                ComponentID compID = ComponentID( compIdx );
+                BifParams& chromaBifParams = cs.picture->getBifParam( compID );
+                bool ctuEnableChromaBIF = chromaBifParams.ctuOn[ctuRsAddr];
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+                applyChromaBIF = ctuEnableChromaBIF && m_bilateralFilter.getApplyBIF(currTU, compID);
+#else
+                bool tuValid = false;
+                bool tuCBF = false;
+                bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
                 applyChromaBIF = false;
                 if(!isDualTree)
                 {
@@ -1391,6 +1413,7 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
                   tuCBF = TU::getCbf(currTU, compID);
                   applyChromaBIF = (ctuEnableChromaBIF && ((tuCBF || isInter == false) && (currTU.cu->qp > 17)));
                 }
+#endif
                 if(applyChromaBIF)
                 {
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
@@ -1408,19 +1431,18 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
                     clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
 
 #endif
-                  m_bilateralFilter.bilateralFilterDiamond5x5Chroma(m_tempBuf, rec, currTU.cu->qp, cs.slice->clpRng(compID), currTU, isCb
+                  m_bilateralFilter.bilateralFilterDiamond5x5( compID, m_tempBuf, rec, currTU.cu->qp, cs.slice->clpRng(compID), currTU, false
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-                  , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
-                  , clipTop, clipBottom, clipLeft, clipRight
+                  , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry, clipTop, clipBottom, clipLeft, clipRight
 #endif
                   );
                 }
                 else
                 {
-                  bool useClip = isCb ? clipChromaIfNoBilatCb : clipChromaIfNoBilatCr;
+                  bool useClip = clipChromaIfNoBilat[compID];
                   if(useClip && currTU.blocks[compIdx].valid())
                   {
-                    m_bilateralFilter.clipNotBilaterallyFilteredBlocksChroma(m_tempBuf, rec, cs.slice->clpRng(compID), currTU, isCb);
+                    m_bilateralFilter.clipNotBilaterallyFilteredBlocks( compID, m_tempBuf, rec, cs.slice->clpRng(compID), currTU );
                   }
                 }
               }
@@ -1441,13 +1463,13 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
             }
             for (auto &currTU : CU::traverseTUs(currCU))
             {
-              if(clipChromaIfNoBilatCb && currTU.blocks[COMPONENT_Cb].valid())
+              if( clipChromaIfNoBilat[COMPONENT_Cb] && currTU.blocks[COMPONENT_Cb].valid())
               {
-                m_bilateralFilter.clipNotBilaterallyFilteredBlocksChroma(m_tempBuf, rec, cs.slice->clpRng(COMPONENT_Cb), currTU, true);
+                m_bilateralFilter.clipNotBilaterallyFilteredBlocks( COMPONENT_Cb, m_tempBuf, rec, cs.slice->clpRng(COMPONENT_Cb), currTU );
               }
-              if(clipChromaIfNoBilatCr && currTU.blocks[COMPONENT_Cr].valid())
+              if( clipChromaIfNoBilat[COMPONENT_Cr] && currTU.blocks[COMPONENT_Cr].valid())
               {
-                m_bilateralFilter.clipNotBilaterallyFilteredBlocksChroma(m_tempBuf, rec, cs.slice->clpRng(COMPONENT_Cr), currTU, false);
+                m_bilateralFilter.clipNotBilaterallyFilteredBlocks( COMPONENT_Cr, m_tempBuf, rec, cs.slice->clpRng(COMPONENT_Cr), currTU );
               }
             }
           }
@@ -1477,18 +1499,16 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
 
         SAOOffset& myCtbOffsetCb     = mySAOblkParam[1];
         SAOOffset& myCtbOffsetCr     = mySAOblkParam[2];
-        ChromaBifParams& chromaBifParams = cs.picture->getChromaBifParam();
 
-        bool clipChromaIfNoBilatCb = false;
-        bool clipChromaIfNoBilatCr = false;
+        bool clipChromaIfNoBilat[MAX_NUM_COMPONENT] = { false };
 
         if(!bAllDisabled && myCtbOffsetCb.modeIdc != SAO_MODE_OFF)
         {
-          clipChromaIfNoBilatCb = true;
+          clipChromaIfNoBilat[COMPONENT_Cb] = true;
         }
         if(!bAllDisabled && myCtbOffsetCr.modeIdc != SAO_MODE_OFF)
         {
-          clipChromaIfNoBilatCr = true;
+          clipChromaIfNoBilat[COMPONENT_Cr] = true;
         }
 
         for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, CH_L), CH_L))
@@ -1497,7 +1517,7 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
           {
             if(clipLumaIfNoBilat)
             {
-              m_bilateralFilter.clipNotBilaterallyFilteredBlocks(m_tempBuf, rec, cs.slice->clpRng(COMPONENT_Y), currTU);
+              m_bilateralFilter.clipNotBilaterallyFilteredBlocks( COMPONENT_Y, m_tempBuf, rec, cs.slice->clpRng(COMPONENT_Y), currTU );
             }
           }
         }
@@ -1522,10 +1542,13 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
               bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
               for(int compIdx = COMPONENT_Cb; compIdx < MAX_NUM_COMPONENT; compIdx++)
               {
-                bool isCb = compIdx == COMPONENT_Cb ? true : false;
-                ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
-                bool ctuEnableChromaBIF = isCb ? chromaBifParams.ctuOnCb[ctuRsAddr] : chromaBifParams.ctuOnCr[ctuRsAddr];
+                ComponentID compID = ComponentID( compIdx );
+                BifParams& chromaBifParams = cs.picture->getBifParam( compID );
+                bool ctuEnableChromaBIF = chromaBifParams.ctuOn[ctuRsAddr];
 
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+                applyChromaBIF = ctuEnableChromaBIF && m_bilateralFilter.getApplyBIF(currTU, compID);
+#else
                 applyChromaBIF = false;
                 if(!isDualTree)
                 {
@@ -1542,6 +1565,7 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
                   tuCBF = TU::getCbf(currTU, compID);
                   applyChromaBIF = (ctuEnableChromaBIF && ((tuCBF || isInter == false) && (currTU.cu->qp > 17)));
                 }
+#endif
                 if(applyChromaBIF)
                 {
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
@@ -1559,19 +1583,18 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
                     clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
 
 #endif
-                  m_bilateralFilter.bilateralFilterDiamond5x5Chroma(m_tempBuf, rec, currTU.cu->qp, cs.slice->clpRng(compID), currTU, isCb
+                  m_bilateralFilter.bilateralFilterDiamond5x5( compID, m_tempBuf, rec, currTU.cu->qp, cs.slice->clpRng(compID), currTU, false,
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-                  , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
-                  , clipTop, clipBottom, clipLeft, clipRight
+                  , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry, clipTop, clipBottom, clipLeft, clipRight
 #endif
                   );
                 }
                 else
                 {
-                  bool useClip = isCb ? clipChromaIfNoBilatCb : clipChromaIfNoBilatCr;
+                  bool useClip = clipChromaIfNoBilat[compID];
                   if(useClip && currTU.blocks[compIdx].valid())
                   {
-                    m_bilateralFilter.clipNotBilaterallyFilteredBlocksChroma(m_tempBuf, rec, cs.slice->clpRng(compID), currTU, true);
+                    m_bilateralFilter.clipNotBilaterallyFilteredBlocks( compID, m_tempBuf, rec, cs.slice->clpRng(compID), currTU );
                   }
                 }
               }
@@ -1591,13 +1614,13 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
             }
             for (auto &currTU : CU::traverseTUs(currCU))
             {
-              if(clipChromaIfNoBilatCb && currTU.blocks[COMPONENT_Cb].valid())
+              if( clipChromaIfNoBilat[COMPONENT_Cb] && currTU.blocks[COMPONENT_Cb].valid())
               {
-                m_bilateralFilter.clipNotBilaterallyFilteredBlocksChroma(m_tempBuf, rec, cs.slice->clpRng(COMPONENT_Cb), currTU, true);
+                m_bilateralFilter.clipNotBilaterallyFilteredBlocks( COMPONENT_Cb, m_tempBuf, rec, cs.slice->clpRng(COMPONENT_Cb), currTU );
               }
-              if(clipChromaIfNoBilatCr && currTU.blocks[COMPONENT_Cr].valid())
+              if( clipChromaIfNoBilat[COMPONENT_Cr] && currTU.blocks[COMPONENT_Cr].valid())
               {
-                m_bilateralFilter.clipNotBilaterallyFilteredBlocksChroma(m_tempBuf, rec, cs.slice->clpRng(COMPONENT_Cr), currTU, false);
+                m_bilateralFilter.clipNotBilaterallyFilteredBlocks( COMPONENT_Cr, m_tempBuf, rec, cs.slice->clpRng(COMPONENT_Cr), currTU );
               }
             }
           }
@@ -1622,6 +1645,10 @@ void SampleAdaptiveOffset::SAOProcess( CodingStructure& cs, SAOBlkParam* saoBlkP
 }
 
 #if JVET_W0066_CCSAO
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+std::vector<CcSaoPrvParam> g_ccSaoPrvParam[MAX_NUM_COMPONENT];
+#endif
+
 void SampleAdaptiveOffset::CCSAOProcess(CodingStructure& cs)
 {
   const uint32_t numberOfComponents = getNumberValidComponents(cs.area.chromaFormat);
@@ -1645,7 +1672,6 @@ void SampleAdaptiveOffset::CCSAOProcess(CodingStructure& cs)
 
   applyCcSao(cs, pcv, srcYuv, dstYuv);
 }
-
 void SampleAdaptiveOffset::applyCcSao(CodingStructure &cs, const PreCalcValues& pcv, const CPelUnitBuf& srcYuv, PelUnitBuf& dstYuv)
 {
   int ctuRsAddr = 0;
@@ -1698,6 +1724,7 @@ void SampleAdaptiveOffset::jointClipSaoBifCcSao(CodingStructure& cs)
 
       for (int compIdx = 0; compIdx < numberOfComponents; compIdx++)
       {
+        ComponentID compID = ComponentID( compIdx );
         bool saoOn = false;
         bool ccsaoOn = false;
         if (cs.sps->getSAOEnabledFlag())
@@ -1714,79 +1741,80 @@ void SampleAdaptiveOffset::jointClipSaoBifCcSao(CodingStructure& cs)
         if (ccsaoOn || saoOn)
         {
           // We definitely need to clip if either SAO or CCSAO is on for the given component of the CTU                  
-          clipCTU(cs, dstYuv, area, ComponentID(compIdx));
+          clipCTU(cs, dstYuv, area, compID );
         }
 #if JVET_V0094_BILATERAL_FILTER
         else
         {
           // When BIF is on, the luma component might need to be clipped
-          if (cs.pps->getUseBIF())
+          if (cs.pps->getUseBIF() && isLuma( compID ) )
           {
-            if (compIdx == COMPONENT_Y)
-            {
-              BifParams& bifParams = cs.picture->getBifParam();
+            BifParams& bifParams = cs.picture->getBifParam( compID );
 
-              // And now we traverse the CTU to do clipping
-              for (auto& currCU : cs.traverseCUs(CS::getArea(cs, area, CH_L), CH_L))
+            // And now we traverse the CTU to do clipping
+            for( auto& currCU : cs.traverseCUs( CS::getArea( cs, area, CH_L ), CH_L ) )
+            {
+              for( auto& currTU : CU::traverseTUs( currCU ) )
               {
-                for (auto& currTU : CU::traverseTUs(currCU))
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+                bool applyBIF = bifParams.ctuOn[ctuRsAddr] && m_bilateralFilter.getApplyBIF(currTU, compID);
+#else
+                bool isInter = ( currCU.predMode == MODE_INTER ) ? true : false;
+                bool applyBIF = bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, compID) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height)));
+#endif
+                if (applyBIF)
                 {
-                  bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
-                  if (bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
-                  {
-                    m_bilateralFilter.clipNotBilaterallyFilteredBlocks(m_tempBuf, dstYuv, cs.slice->clpRng(COMPONENT_Y), currTU);
-                  }
+                  m_bilateralFilter.clipNotBilaterallyFilteredBlocks( compID, m_tempBuf, dstYuv, cs.slice->clpRng( compID ), currTU );
                 }
               }
             }
           }
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-          if(cs.pps->getUseChromaBIF())
+          if( cs.pps->getUseChromaBIF() && isChroma( compID ) )
           {
-            if(compIdx == COMPONENT_Cb || compIdx == COMPONENT_Cr)
+            bool ctuEnableChromaBIF = false;
+            bool isDualTree = CS::isDualITree( cs );
+            ChannelType chType = isDualTree ? CH_C : CH_L;
+            bool applyChromaBIF = false;
+            for( auto &currCU : cs.traverseCUs( CS::getArea( cs, area, chType ), chType ) )
             {
-              ChromaBifParams& chromaBifParams = cs.picture->getChromaBifParam();
-              bool isCb = compIdx == COMPONENT_Cb ? true : false;
-              ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
-
-              bool tuValid = false;
-              bool tuCBF = false;
-              bool ctuEnableChromaBIF = false;
-              bool isDualTree = CS::isDualITree(cs);
-              ChannelType chType = isDualTree ? CH_C : CH_L;
-              bool applyChromaBIF = false;
-              for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, chType), chType))
+              bool chromaValid = currCU.Cb().valid() && currCU.Cr().valid();
+              if( !chromaValid )
               {
-                bool chromaValid = currCU.Cb().valid() && currCU.Cr().valid();
-                if(!chromaValid)
+                continue;
+              }
+              for( auto &currTU : CU::traverseTUs( currCU ) )
+              {
+                //Cb or Cr
+                applyChromaBIF = false;
+                BifParams& chromaBifParams = cs.picture->getBifParam( compID );
+                ctuEnableChromaBIF = chromaBifParams.ctuOn[ctuRsAddr];
+
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+                applyChromaBIF = ctuEnableChromaBIF && m_bilateralFilter.getApplyBIF(currTU, compID);
+#else
+                bool tuValid = false;
+                bool tuCBF = false;
+                bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
+                if( !isDualTree )
                 {
-                  continue;
+                  tuValid = currTU.blocks[compIdx].valid();
+                  tuCBF = false;//if CHROMA TU is not vaild, CBF must be zero
+                  if( tuValid )
+                  {
+                    tuCBF = TU::getCbf( currTU, compID );
+                  }
+                  applyChromaBIF = ( ctuEnableChromaBIF && ( ( tuCBF || isInter == false ) && ( currTU.cu->qp > 17 ) ) && ( tuValid ) );
                 }
-                for (auto &currTU : CU::traverseTUs(currCU))
+                else
                 {
-                  bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
-                  //Cb or Cr
-                  applyChromaBIF = false;
-                  ctuEnableChromaBIF = isCb ? chromaBifParams.ctuOnCb[ctuRsAddr] : chromaBifParams.ctuOnCr[ctuRsAddr];
-                  if(!isDualTree)
-                  {
-                    tuValid = currTU.blocks[compIdx].valid();
-                    tuCBF = false;//if CHROMA TU is not vaild, CBF must be zero
-                    if(tuValid)
-                    {
-                      tuCBF = TU::getCbf(currTU, compID);
-                    }
-                    applyChromaBIF = (ctuEnableChromaBIF && ((tuCBF || isInter == false) && (currTU.cu->qp > 17)) && (tuValid));
-                  }
-                  else
-                  {
-                    tuCBF = TU::getCbf(currTU, compID);
-                    applyChromaBIF = (ctuEnableChromaBIF && ((tuCBF || isInter == false) && (currTU.cu->qp > 17)));
-                  }
-                  if(applyChromaBIF)
-                  {
-                    m_bilateralFilter.clipNotBilaterallyFilteredBlocksChroma(m_tempBuf, dstYuv, cs.slice->clpRng(compID) , currTU, isCb);
-                  }
+                  tuCBF = TU::getCbf( currTU, compID );
+                  applyChromaBIF = ( ctuEnableChromaBIF && ( ( tuCBF || isInter == false ) && ( currTU.cu->qp > 17 ) ) );
+                }
+#endif
+                if( applyChromaBIF )
+                {
+                  m_bilateralFilter.clipNotBilaterallyFilteredBlocks( compID, m_tempBuf, dstYuv, cs.slice->clpRng( compID ), currTU );
                 }
               }
             }
@@ -1854,47 +1882,65 @@ void SampleAdaptiveOffset::offsetCTUCcSaoNoClip(CodingStructure& cs, const UnitA
       const int setIdc = m_ccSaoControl[compIdx][ctuRsAddr];
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
       int setType = m_ccSaoComParam.setType[compIdx][setIdc - 1];
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+      if (setType == CCSAO_SET_TYPE_EDGE)
+      {
+#else
       if (setType)
       {
         /* Edge offset over here */
+#endif
         if (setIdc != 0)
         {
           const ComponentID compID     = ComponentID(compIdx);
-          const CompArea &  compArea   = area.block(compID);
-          const int         srcStrideY = srcYuv.get(COMPONENT_Y).stride;
+          const CompArea   &compArea   = area.block(compID);
+          const int         srcStrideY = srcYuv.get(COMPONENT_Y ).stride;
           const int         srcStrideU = srcYuv.get(COMPONENT_Cb).stride;
           const int         srcStrideV = srcYuv.get(COMPONENT_Cr).stride;
+          const Pel        *srcBlkY    = srcYuv.get(COMPONENT_Y ).bufAt(area.block(COMPONENT_Y ));
+          const Pel        *srcBlkU    = srcYuv.get(COMPONENT_Cb).bufAt(area.block(COMPONENT_Cb));
+          const Pel        *srcBlkV    = srcYuv.get(COMPONENT_Cr).bufAt(area.block(COMPONENT_Cr));
           const int         dstStride  = dstYuv.get(compID).stride;
-          const Pel *       srcBlkY    = srcYuv.get(COMPONENT_Y).bufAt(area.block(COMPONENT_Y));
-          const Pel *       srcBlkU    = srcYuv.get(COMPONENT_Cb).bufAt(area.block(COMPONENT_Cb));
-          const Pel *       srcBlkV    = srcYuv.get(COMPONENT_Cr).bufAt(area.block(COMPONENT_Cr));
-          Pel *             dstBlk     = dstYuv.get(compID).bufAt(compArea);
+          Pel              *dstBlk     = dstYuv.get(compID).bufAt(compArea);
 
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+          const uint16_t edgeCmp  = m_ccSaoComParam.candPos[compIdx][setIdc - 1][COMPONENT_Cb];
+          const uint16_t edgeIdc  = m_ccSaoComParam.bandNum[compIdx][setIdc - 1][COMPONENT_Cr];
+          const uint16_t edgeDir  = m_ccSaoComParam.candPos[compIdx][setIdc - 1][COMPONENT_Y ];
+          const uint16_t edgeThr  = m_ccSaoComParam.bandNum[compIdx][setIdc - 1][COMPONENT_Cb];
+          const uint16_t bandIdc  = m_ccSaoComParam.bandNum[compIdx][setIdc - 1][COMPONENT_Y ];
+#else
           const uint16_t candPosY = m_ccSaoComParam.candPos[compIdx][setIdc - 1][COMPONENT_Y];  /* Edge Type */
           const uint16_t bandNumY = m_ccSaoComParam.bandNum[compIdx][setIdc - 1][COMPONENT_Y];  /* Num Bands */
           const uint16_t bandNumU = m_ccSaoComParam.bandNum[compIdx][setIdc - 1][COMPONENT_Cb]; /* treshold */
           const uint16_t bandNumV = bandNumU;
-
-          const short *offset = m_ccSaoComParam.offset[compIdx][setIdc - 1];
+#endif
+          const short   *offset   = m_ccSaoComParam.offset[compIdx][setIdc - 1];
       
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-        for (int i = 0; i < numHorVirBndry; i++)
-        {
-          horVirBndryPosComp[i] = (horVirBndryPos[i] >> ::getComponentScaleY(compID, area.chromaFormat)) - compArea.y;
-        }
-        for (int i = 0; i < numVerVirBndry; i++)
-        {
-          verVirBndryPosComp[i] = (verVirBndryPos[i] >> ::getComponentScaleX(compID, area.chromaFormat)) - compArea.x;
-        }
+          for (int i = 0; i < numHorVirBndry; i++)
+          {
+            horVirBndryPosComp[i] = (horVirBndryPos[i] >> ::getComponentScaleY(compID, area.chromaFormat)) - compArea.y;
+          }
+          for (int i = 0; i < numVerVirBndry; i++)
+          {
+            verVirBndryPosComp[i] = (verVirBndryPos[i] >> ::getComponentScaleX(compID, area.chromaFormat)) - compArea.x;
+          }
 #endif
 
-          offsetBlockCcSaoNoClipEdge(compID, cs.sps->getChromaFormatIdc(), cs.sps->getBitDepth(toChannelType(compID)), cs.slice->clpRng(compID),
-                                     candPosY, bandNumY, bandNumU, bandNumV, offset, srcBlkY, srcBlkU, srcBlkV, dstBlk,
-                                     srcStrideY, srcStrideU, srcStrideV, dstStride, compArea.width, compArea.height,
-                                     isLeftAvail, isRightAvail, isAboveAvail, isBelowAvail, isAboveLeftAvail,
-                                     isAboveRightAvail, isBelowLeftAvail, isBelowRightAvail
+          offsetBlockCcSaoNoClipEdge(compID, cs.sps->getChromaFormatIdc(), cs.sps->getBitDepth(toChannelType(compID)), cs.slice->clpRng(compID)
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+                                   , edgeCmp
+                                   , edgeDir, bandIdc, edgeThr, edgeIdc
+#else
+                                   , candPosY, bandNumY, bandNumU, bandNumV
+#endif
+                                   , offset
+                                   , srcBlkY, srcBlkU, srcBlkV, dstBlk, srcStrideY, srcStrideU, srcStrideV, dstStride
+                                   , compArea.width, compArea.height
+                                   , isLeftAvail, isRightAvail, isAboveAvail, isBelowAvail, isAboveLeftAvail, isAboveRightAvail, isBelowLeftAvail, isBelowRightAvail
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-                                     , isCtuCrossedByVirtualBoundaries, horVirBndryPosComp, verVirBndryPosComp, numHorVirBndry, numVerVirBndry
+                                   , isCtuCrossedByVirtualBoundaries, horVirBndryPosComp, verVirBndryPosComp, numHorVirBndry, numVerVirBndry
 #endif
           );
         }
@@ -1905,42 +1951,43 @@ void SampleAdaptiveOffset::offsetCTUCcSaoNoClip(CodingStructure& cs, const UnitA
         if (setIdc != 0)
         {
           const ComponentID compID     = ComponentID(compIdx);
-          const CompArea &  compArea   = area.block(compID);
-          const int         srcStrideY = srcYuv.get(COMPONENT_Y).stride;
+          const CompArea   &compArea   = area.block(compID);
+          const int         srcStrideY = srcYuv.get(COMPONENT_Y ).stride;
           const int         srcStrideU = srcYuv.get(COMPONENT_Cb).stride;
           const int         srcStrideV = srcYuv.get(COMPONENT_Cr).stride;
+          const Pel        *srcBlkY    = srcYuv.get(COMPONENT_Y ).bufAt(area.block(COMPONENT_Y ));
+          const Pel        *srcBlkU    = srcYuv.get(COMPONENT_Cb).bufAt(area.block(COMPONENT_Cb));
+          const Pel        *srcBlkV    = srcYuv.get(COMPONENT_Cr).bufAt(area.block(COMPONENT_Cr));
           const int         dstStride  = dstYuv.get(compID).stride;
-          const Pel *       srcBlkY    = srcYuv.get(COMPONENT_Y).bufAt(area.block(COMPONENT_Y));
-          const Pel *       srcBlkU    = srcYuv.get(COMPONENT_Cb).bufAt(area.block(COMPONENT_Cb));
-          const Pel *       srcBlkV    = srcYuv.get(COMPONENT_Cr).bufAt(area.block(COMPONENT_Cr));
-          Pel *             dstBlk     = dstYuv.get(compID).bufAt(compArea);
+          Pel              *dstBlk     = dstYuv.get(compID).bufAt(compArea);
 
-          const uint16_t candPosY = m_ccSaoComParam.candPos[compIdx][setIdc - 1][COMPONENT_Y];
-          const uint16_t bandNumY = m_ccSaoComParam.bandNum[compIdx][setIdc - 1][COMPONENT_Y];
+          const uint16_t candPosY = m_ccSaoComParam.candPos[compIdx][setIdc - 1][COMPONENT_Y ];
+          const uint16_t bandNumY = m_ccSaoComParam.bandNum[compIdx][setIdc - 1][COMPONENT_Y ];
           const uint16_t bandNumU = m_ccSaoComParam.bandNum[compIdx][setIdc - 1][COMPONENT_Cb];
           const uint16_t bandNumV = m_ccSaoComParam.bandNum[compIdx][setIdc - 1][COMPONENT_Cr];
-          const short *  offset   = m_ccSaoComParam.offset[compIdx][setIdc - 1];
+          const short   *offset   = m_ccSaoComParam.offset [compIdx][setIdc - 1];
 
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-        for (int i = 0; i < numHorVirBndry; i++)
-        {
-          horVirBndryPosComp[i] = (horVirBndryPos[i] >> ::getComponentScaleY(compID, area.chromaFormat)) - compArea.y;
-        }
-        for (int i = 0; i < numVerVirBndry; i++)
-        {
-          verVirBndryPosComp[i] = (verVirBndryPos[i] >> ::getComponentScaleX(compID, area.chromaFormat)) - compArea.x;
-        }
+          for (int i = 0; i < numHorVirBndry; i++)
+          {
+            horVirBndryPosComp[i] = (horVirBndryPos[i] >> ::getComponentScaleY(compID, area.chromaFormat)) - compArea.y;
+          }
+          for (int i = 0; i < numVerVirBndry; i++)
+          {
+            verVirBndryPosComp[i] = (verVirBndryPos[i] >> ::getComponentScaleX(compID, area.chromaFormat)) - compArea.x;
+          }
 #endif
       
-          offsetBlockCcSaoNoClip(compID, cs.sps->getChromaFormatIdc(), cs.sps->getBitDepth(toChannelType(compID)), cs.slice->clpRng(compID), candPosY,
-                                 bandNumY, bandNumU, bandNumV, offset, srcBlkY, srcBlkU, srcBlkV, dstBlk, srcStrideY,
-                                 srcStrideU, srcStrideV, dstStride, compArea.width, compArea.height, isLeftAvail,
-                                 isRightAvail, isAboveAvail, isBelowAvail, isAboveLeftAvail, isAboveRightAvail,
-                                 isBelowLeftAvail, isBelowRightAvail
+          offsetBlockCcSaoNoClip(compID, cs.sps->getChromaFormatIdc(), cs.sps->getBitDepth(toChannelType(compID)), cs.slice->clpRng(compID)
+                               , candPosY, bandNumY, bandNumU, bandNumV
+                               , offset
+                               , srcBlkY, srcBlkU, srcBlkV, dstBlk, srcStrideY, srcStrideU, srcStrideV, dstStride
+                               , compArea.width, compArea.height
+                               , isLeftAvail, isRightAvail, isAboveAvail, isBelowAvail, isAboveLeftAvail, isAboveRightAvail, isBelowLeftAvail, isBelowRightAvail
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-                                 , isCtuCrossedByVirtualBoundaries, horVirBndryPosComp, verVirBndryPosComp, numHorVirBndry, numVerVirBndry
+                               , isCtuCrossedByVirtualBoundaries, horVirBndryPosComp, verVirBndryPosComp, numHorVirBndry, numVerVirBndry
 #endif
-                              );
+                                );
         }
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
       }
@@ -1949,6 +1996,7 @@ void SampleAdaptiveOffset::offsetCTUCcSaoNoClip(CodingStructure& cs, const UnitA
   }
 }
 
+#if !JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
 void SampleAdaptiveOffset::offsetCTUCcSao(CodingStructure& cs, const UnitArea& area, const CPelUnitBuf& srcYuv, PelUnitBuf& dstYuv, const int ctuRsAddr)
 {
   const uint32_t numberOfComponents = getNumberValidComponents( area.chromaFormat );
@@ -2030,7 +2078,32 @@ void SampleAdaptiveOffset::offsetCTUCcSao(CodingStructure& cs, const UnitArea& a
     }
   }
 }
+#endif
+
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+int SampleAdaptiveOffset::getCcSaoClassNum(const int compIdx, const int setIdx, const CcSaoComParam& ccSaoParam)
+{
+  int classNum = 0;
+
+  if (ccSaoParam.setType[compIdx][setIdx] == CCSAO_SET_TYPE_EDGE)
+  {
+    int bandIdc = ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y ], bandNum = g_ccSaoBandTab[bandIdc][1];
+    int edgeIdc = ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cr], edgeNum = g_ccSaoEdgeNum[edgeIdc][0];
+    classNum = bandNum * edgeNum;
+  }
+  else
+  {
+    classNum = ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Y ]
+             * ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cb]
+             * ccSaoParam.bandNum[compIdx][setIdx][COMPONENT_Cr];
+  }
+  
+  return classNum;
+}
+#endif
+
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+#if !JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
 int calcDiffRange(Pel a, Pel b, int th)
 {
   int diff      = a - b;
@@ -2061,24 +2134,42 @@ int calcDiffRange(Pel a, Pel b, int th)
   }
   return value;
 }
-
-void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
-  const ComponentID compID, const ChromaFormat chromaFormat, const int bitDepth, const ClpRng &clpRng, const uint16_t candPosY, const uint16_t bandNumY,
-  const uint16_t bandNumU, const uint16_t bandNumV, const short *offset, const Pel *srcY, const Pel *srcU,
-  const Pel *srcV, Pel *dst, const int srcStrideY, const int srcStrideU, const int srcStrideV, const int dstStride,
-  const int width, const int height, bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail,
-  bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail
-#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-  ,bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
 #endif
-)
+
+void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(const ComponentID compID, const ChromaFormat chromaFormat, const int bitDepth, const ClpRng &clpRng
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+                                                    , const uint16_t edgeCmp
+                                                    , const uint16_t edgeDir, const uint16_t bandIdc, const uint16_t edgeThr, const uint16_t edgeIdc
+#else
+                                                    , const uint16_t candPosY, const uint16_t bandNumY, const uint16_t bandNumU, const uint16_t bandNumV
+#endif
+                                                    , const short *offset
+                                                    , const Pel *srcY, const Pel *srcU, const Pel *srcV, Pel *dst
+                                                    , const int srcStrideY, const int srcStrideU, const int srcStrideV, const int dstStride
+                                                    , const int width, const int height
+                                                    , bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail, bool isBelowLeftAvail, bool isBelowRightAvail
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+                                                    , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
+#endif
+                                                     )
 {
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+  const int edgePosXA  = g_ccSaoEdgePosX[edgeDir][0], edgePosYA = g_ccSaoEdgePosY[edgeDir][0];
+  const int edgePosXB  = g_ccSaoEdgePosX[edgeDir][1], edgePosYB = g_ccSaoEdgePosY[edgeDir][1];
+  const int bandCmp    = g_ccSaoBandTab [bandIdc][0];
+  const int bandNum    = g_ccSaoBandTab [bandIdc][1];
+  const int edgeThrVal = g_ccSaoEdgeThr [edgeIdc][edgeThr];
+  const int edgeNum    = g_ccSaoEdgeNum [edgeIdc][0];
+  const int edgeNumUni = g_ccSaoEdgeNum [edgeIdc][1];
+  const int srcStrideE = edgeCmp == COMPONENT_Y ? srcStrideY : edgeCmp == COMPONENT_Cb ? srcStrideU : srcStrideV;
+#else
   const int candPosYXA = g_ccSaoEdgeTypeX[candPosY][0];
   const int candPosYYA = g_ccSaoEdgeTypeY[candPosY][0];
   const int candPosYXB = g_ccSaoEdgeTypeX[candPosY][1];
   const int candPosYYB = g_ccSaoEdgeTypeY[candPosY][1];
   int       signa, signb, band;
   int       th = bandNumU - 1;
+#endif
 
   const int chromaScaleX = getChannelTypeScaleX( CHANNEL_TYPE_CHROMA, chromaFormat );
   const int chromaScaleY = getChannelTypeScaleY( CHANNEL_TYPE_CHROMA, chromaFormat );
@@ -2091,7 +2182,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
   {
   case COMPONENT_Y:
   {
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+    switch (edgeDir)
+#else
     switch (candPosY)
+#endif
     {
     case SAO_TYPE_EO_0:
     {
@@ -2101,11 +2196,28 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
       {
         for (x = startX; x < endX; x++)
         {
-          if (isCtuCrossedByVirtualBoundaries
-              && isProcessDisabled(x, y, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
           {
             continue;
           }
+
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+          const Pel *colY = srcY + x;
+          const Pel *colU = srcU + (x >> chromaScaleX);
+          const Pel *colV = srcV + (x >> chromaScaleX);
+          const Pel *col[MAX_NUM_COMPONENT] = { colY, colU, colV };
+          const Pel *colE = col[edgeCmp];
+          const Pel *colA = colE + srcStrideE * edgePosYA + edgePosXA;
+          const Pel *colB = colE + srcStrideE * edgePosYB + edgePosXB;
+
+          const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
+          const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
+          const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
+          const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
+        
+          const int classIdx = bandIdx * edgeNum + edgeIdx;
+          dst[x] = dst[x] + offset[classIdx];
+#else
           const Pel *colY = srcY + x;
           const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
           const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
@@ -2139,6 +2251,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
             const int classIdx = band;
             dst[x]             = dst[x] + offset[classIdx];
           }
+#endif
         }
         srcY += srcStrideY;
         srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
@@ -2147,11 +2260,10 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
       }
     }
     break;
-
     case SAO_TYPE_EO_90:
     {
       startY = isAboveAvail ? 0 : 1;
-      endY   = isBelowAvail ? height : height - 1;
+      endY   = isBelowAvail ? height : (height - 1);
       if (!isAboveAvail)
       {
         srcY += srcStrideY;
@@ -2163,11 +2275,28 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
       {
         for (x = 0; x < width; x++)
         {
-          if (isCtuCrossedByVirtualBoundaries
-              && isProcessDisabled(x, y, 0, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, 0, numHorVirBndry, verVirBndryPos, horVirBndryPos))
           {
             continue;
           }
+
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+          const Pel *colY = srcY + x;
+          const Pel *colU = srcU + (x >> chromaScaleX);
+          const Pel *colV = srcV + (x >> chromaScaleX);
+          const Pel *col[MAX_NUM_COMPONENT] = { colY, colU, colV };
+          const Pel *colE = col[edgeCmp];
+          const Pel *colA = colE + srcStrideE * edgePosYA + edgePosXA;
+          const Pel *colB = colE + srcStrideE * edgePosYB + edgePosXB;
+
+          const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
+          const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
+          const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
+          const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
+        
+          const int classIdx = bandIdx * edgeNum + edgeIdx;
+          dst[x] = dst[x] + offset[classIdx];
+#else
           const Pel *colY = srcY + x;
           const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
           const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
@@ -2201,6 +2330,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
             const int classIdx = band;
             dst[x]             = dst[x] + offset[classIdx];
           }
+#endif
         }
         srcY += srcStrideY;
         srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
@@ -2209,7 +2339,6 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
       }
     }
     break;
-
     case SAO_TYPE_EO_135:
     {
       startX = isLeftAvail ? 0 : 1;
@@ -2220,11 +2349,28 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
       firstLineEndX   = isAboveAvail ? endX : 1;
       for (x = firstLineStartX; x < firstLineEndX; x++)
       {
-        if (isCtuCrossedByVirtualBoundaries
-            && isProcessDisabled(x, 0, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, 0, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
         {
           continue;
         }
+
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+        const Pel *colY = srcY + x;
+        const Pel *colU = srcU + (x >> chromaScaleX);
+        const Pel *colV = srcV + (x >> chromaScaleX);
+        const Pel *col[MAX_NUM_COMPONENT] = { colY, colU, colV };
+        const Pel *colE = col[edgeCmp];
+        const Pel *colA = colE + srcStrideE * edgePosYA + edgePosXA;
+        const Pel *colB = colE + srcStrideE * edgePosYB + edgePosXB;
+
+        const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
+        const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
+        const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
+        const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
+        
+        const int classIdx = bandIdx * edgeNum + edgeIdx;
+        dst[x] = dst[x] + offset[classIdx];
+#else
         const Pel *colY = srcY + x;
         const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
         const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
@@ -2258,6 +2404,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
           const int classIdx = band;
           dst[x]             = dst[x] + offset[classIdx];
         }
+#endif
       }
       srcY += srcStrideY;
       srcU += srcStrideU * chromaScaleYM1;
@@ -2269,11 +2416,28 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
       {
         for (x = startX; x < endX; x++)
         {
-          if (isCtuCrossedByVirtualBoundaries
-              && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
           {
             continue;
           }
+
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+          const Pel *colY = srcY + x;
+          const Pel *colU = srcU + (x >> chromaScaleX);
+          const Pel *colV = srcV + (x >> chromaScaleX);
+          const Pel *col[MAX_NUM_COMPONENT] = { colY, colU, colV };
+          const Pel *colE = col[edgeCmp];
+          const Pel *colA = colE + srcStrideE * edgePosYA + edgePosXA;
+          const Pel *colB = colE + srcStrideE * edgePosYB + edgePosXB;
+
+          const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
+          const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
+          const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
+          const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
+        
+          const int classIdx = bandIdx * edgeNum + edgeIdx;
+          dst[x] = dst[x] + offset[classIdx];
+#else
           const Pel *colY = srcY + x;
           const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
           const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
@@ -2307,6 +2471,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
             const int classIdx = band;
             dst[x]             = dst[x] + offset[classIdx];
           }
+#endif
         }
         srcY += srcStrideY;
         srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
@@ -2319,11 +2484,28 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
       lastLineEndX   = isBelowRightAvail ? width : (width - 1);
       for (x = lastLineStartX; x < lastLineEndX; x++)
       {
-        if (isCtuCrossedByVirtualBoundaries
-            && isProcessDisabled(x, height - 1, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, height - 1, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
         {
           continue;
         }
+
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+        const Pel *colY = srcY + x;
+        const Pel *colU = srcU + (x >> chromaScaleX);
+        const Pel *colV = srcV + (x >> chromaScaleX);
+        const Pel *col[MAX_NUM_COMPONENT] = { colY, colU, colV };
+        const Pel *colE = col[edgeCmp];
+        const Pel *colA = colE + srcStrideE * edgePosYA + edgePosXA;
+        const Pel *colB = colE + srcStrideE * edgePosYB + edgePosXB;
+
+        const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
+        const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
+        const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
+        const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
+        
+        const int classIdx = bandIdx * edgeNum + edgeIdx;
+        dst[x] = dst[x] + offset[classIdx];
+#else
         const Pel *colY = srcY + x;
         const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
         const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
@@ -2357,6 +2539,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
           const int classIdx = band;
           dst[x]             = dst[x] + offset[classIdx];
         }
+#endif
       }
     }
     break;
@@ -2370,11 +2553,28 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
       firstLineEndX   = isAboveRightAvail ? width : (width - 1);
       for (x = firstLineStartX; x < firstLineEndX; x++)
       {
-        if (isCtuCrossedByVirtualBoundaries
-            && isProcessDisabled(x, 0, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, 0, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
         {
           continue;
         }
+
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+        const Pel *colY = srcY + x;
+        const Pel *colU = srcU + (x >> chromaScaleX);
+        const Pel *colV = srcV + (x >> chromaScaleX);
+        const Pel *col[MAX_NUM_COMPONENT] = { colY, colU, colV };
+        const Pel *colE = col[edgeCmp];
+        const Pel *colA = colE + srcStrideE * edgePosYA + edgePosXA;
+        const Pel *colB = colE + srcStrideE * edgePosYB + edgePosXB;
+
+        const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
+        const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
+        const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
+        const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
+        
+        const int classIdx = bandIdx * edgeNum + edgeIdx;
+        dst[x] = dst[x] + offset[classIdx];
+#else
         const Pel *colY = srcY + x;
         const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
         const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
@@ -2408,6 +2608,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
           const int classIdx = band;
           dst[x]             = dst[x] + offset[classIdx];
         }
+#endif
       }
       srcY += srcStrideY;
       srcU += srcStrideU * chromaScaleYM1;
@@ -2419,11 +2620,28 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
       {
         for (x = startX; x < endX; x++)
         {
-          if (isCtuCrossedByVirtualBoundaries
-              && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
           {
             continue;
           }
+
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+          const Pel *colY = srcY + x;
+          const Pel *colU = srcU + (x >> chromaScaleX);
+          const Pel *colV = srcV + (x >> chromaScaleX);
+          const Pel *col[MAX_NUM_COMPONENT] = { colY, colU, colV };
+          const Pel *colE = col[edgeCmp];
+          const Pel *colA = colE + srcStrideE * edgePosYA + edgePosXA;
+          const Pel *colB = colE + srcStrideE * edgePosYB + edgePosXB;
+
+          const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
+          const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
+          const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
+          const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
+        
+          const int classIdx = bandIdx * edgeNum + edgeIdx;
+          dst[x] = dst[x] + offset[classIdx];
+#else
           const Pel *colY = srcY + x;
           const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
           const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
@@ -2457,6 +2675,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
             const int classIdx = band;
             dst[x]             = dst[x] + offset[classIdx];
           }
+#endif
         }
         srcY += srcStrideY;
         srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
@@ -2469,11 +2688,28 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
       lastLineEndX   = isBelowAvail ? endX : 1;
       for (x = lastLineStartX; x < lastLineEndX; x++)
       {
-        if (isCtuCrossedByVirtualBoundaries
-            && isProcessDisabled(x, height - 1, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, height - 1, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
         {
           continue;
         }
+
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+        const Pel *colY = srcY + x;
+        const Pel *colU = srcU + (x >> chromaScaleX);
+        const Pel *colV = srcV + (x >> chromaScaleX);
+        const Pel *col[MAX_NUM_COMPONENT] = { colY, colU, colV };
+        const Pel *colE = col[edgeCmp];
+        const Pel *colA = colE + srcStrideE * edgePosYA + edgePosXA;
+        const Pel *colB = colE + srcStrideE * edgePosYB + edgePosXB;
+
+        const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
+        const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
+        const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
+        const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
+        
+        const int classIdx = bandIdx * edgeNum + edgeIdx;
+        dst[x] = dst[x] + offset[classIdx];
+#else
         const Pel *colY = srcY + x;
         const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
         const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
@@ -2507,6 +2743,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
           const int classIdx = band;
           dst[x]             = dst[x] + offset[classIdx];
         }
+#endif
       }
     }
     break;
@@ -2517,7 +2754,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
   case COMPONENT_Cb:
   case COMPONENT_Cr:
   {
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+    switch (edgeDir)
+#else
     switch (candPosY)
+#endif
     {
     case SAO_TYPE_EO_0:
     {
@@ -2527,11 +2768,28 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
       {
         for (x = startX; x < endX; x++)
         {
-          if (isCtuCrossedByVirtualBoundaries
-              && isProcessDisabled(x, y, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
           {
             continue;
           }
+
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+          const Pel *colY = srcY + (x << chromaScaleX);
+          const Pel *colU = srcU + x;
+          const Pel *colV = srcV + x;
+          const Pel *col[MAX_NUM_COMPONENT] = { colY, colU, colV };
+          const Pel *colE = col[edgeCmp];
+          const Pel *colA = colE + srcStrideE * edgePosYA + edgePosXA;
+          const Pel *colB = colE + srcStrideE * edgePosYB + edgePosXB;
+
+          const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
+          const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
+          const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
+          const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
+          
+          const int classIdx = bandIdx * edgeNum + edgeIdx;
+          dst[x] = dst[x] + offset[classIdx];
+#else
           const Pel *colY = srcY + (x << chromaScaleX);
           const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
           const Pel *colB = srcY + (x << chromaScaleX) + srcStrideY * candPosYYB + candPosYXB;
@@ -2566,6 +2824,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
             const int classIdx = band;
             dst[x]             = dst[x] + offset[classIdx];
           }
+#endif
         }
         srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
@@ -2574,11 +2833,10 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
       }
     }
     break;
-
     case SAO_TYPE_EO_90:
     {
       startY = isAboveAvail ? 0 : 1;
-      endY   = isBelowAvail ? height : height - 1;
+      endY   = isBelowAvail ? height : (height - 1);
       if (!isAboveAvail)
       {
         srcY += srcStrideY << chromaScaleY;
@@ -2590,11 +2848,28 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
       {
         for (x = 0; x < width; x++)
         {
-          if (isCtuCrossedByVirtualBoundaries
-              && isProcessDisabled(x, y, 0, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, 0, numHorVirBndry, verVirBndryPos, horVirBndryPos))
           {
             continue;
           }
+
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+          const Pel *colY = srcY + (x << chromaScaleX);
+          const Pel *colU = srcU + x;
+          const Pel *colV = srcV + x;
+          const Pel *col[MAX_NUM_COMPONENT] = { colY, colU, colV };
+          const Pel *colE = col[edgeCmp];
+          const Pel *colA = colE + srcStrideE * edgePosYA + edgePosXA;
+          const Pel *colB = colE + srcStrideE * edgePosYB + edgePosXB;
+
+          const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
+          const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
+          const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
+          const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
+          
+          const int classIdx = bandIdx * edgeNum + edgeIdx;
+          dst[x] = dst[x] + offset[classIdx];
+#else
           const Pel *colY = srcY + (x << chromaScaleX);
           const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
           const Pel *colB = srcY + (x << chromaScaleX) + srcStrideY * candPosYYB + candPosYXB;
@@ -2629,6 +2904,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
             const int classIdx = band;
             dst[x]             = dst[x] + offset[classIdx];
           }
+#endif
         }
         srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
@@ -2637,7 +2913,6 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
       }
     }
     break;
-
     case SAO_TYPE_EO_135:
     {
       startX = isLeftAvail ? 0 : 1;
@@ -2648,11 +2923,28 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
       firstLineEndX   = isAboveAvail ? endX : 1;
       for (x = firstLineStartX; x < firstLineEndX; x++)
       {
-        if (isCtuCrossedByVirtualBoundaries
-            && isProcessDisabled(x, 0, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, 0, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
         {
           continue;
         }
+
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+        const Pel *colY = srcY + (x << chromaScaleX);
+        const Pel *colU = srcU + x;
+        const Pel *colV = srcV + x;
+        const Pel *col[MAX_NUM_COMPONENT] = { colY, colU, colV };
+        const Pel *colE = col[edgeCmp];
+        const Pel *colA = colE + srcStrideE * edgePosYA + edgePosXA;
+        const Pel *colB = colE + srcStrideE * edgePosYB + edgePosXB;
+
+        const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
+        const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
+        const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
+        const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
+        
+        const int classIdx = bandIdx * edgeNum + edgeIdx;
+        dst[x] = dst[x] + offset[classIdx];
+#else
         const Pel *colY = srcY + (x << chromaScaleX);
         const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
         const Pel *colB = srcY + (x << chromaScaleX) + srcStrideY * candPosYYB + candPosYXB;
@@ -2687,6 +2979,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
           const int classIdx = band;
           dst[x]             = dst[x] + offset[classIdx];
         }
+#endif
       }
       srcY += srcStrideY << chromaScaleY;
       srcU += srcStrideU;
@@ -2698,11 +2991,28 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
       {
         for (x = startX; x < endX; x++)
         {
-          if (isCtuCrossedByVirtualBoundaries
-              && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
           {
             continue;
           }
+
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+          const Pel *colY = srcY + (x << chromaScaleX);
+          const Pel *colU = srcU + x;
+          const Pel *colV = srcV + x;
+          const Pel *col[MAX_NUM_COMPONENT] = { colY, colU, colV };
+          const Pel *colE = col[edgeCmp];
+          const Pel *colA = colE + srcStrideE * edgePosYA + edgePosXA;
+          const Pel *colB = colE + srcStrideE * edgePosYB + edgePosXB;
+
+          const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
+          const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
+          const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
+          const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
+          
+          const int classIdx = bandIdx * edgeNum + edgeIdx;
+          dst[x] = dst[x] + offset[classIdx];
+#else
           const Pel *colY = srcY + (x << chromaScaleX);
           const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
           const Pel *colB = srcY + (x << chromaScaleX) + srcStrideY * candPosYYB + candPosYXB;
@@ -2737,6 +3047,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
             const int classIdx = band;
             dst[x]             = dst[x] + offset[classIdx];
           }
+#endif
         }
         srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
@@ -2749,11 +3060,28 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
       lastLineEndX   = isBelowRightAvail ? width : (width - 1);
       for (x = lastLineStartX; x < lastLineEndX; x++)
       {
-        if (isCtuCrossedByVirtualBoundaries
-            && isProcessDisabled(x, height - 1, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, height - 1, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
         {
           continue;
         }
+
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+        const Pel *colY = srcY + (x << chromaScaleX);
+        const Pel *colU = srcU + x;
+        const Pel *colV = srcV + x;
+        const Pel *col[MAX_NUM_COMPONENT] = { colY, colU, colV };
+        const Pel *colE = col[edgeCmp];
+        const Pel *colA = colE + srcStrideE * edgePosYA + edgePosXA;
+        const Pel *colB = colE + srcStrideE * edgePosYB + edgePosXB;
+
+        const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
+        const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
+        const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
+        const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
+        
+        const int classIdx = bandIdx * edgeNum + edgeIdx;
+        dst[x] = dst[x] + offset[classIdx];
+#else
         const Pel *colY = srcY + (x << chromaScaleX);
         const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
         const Pel *colB = srcY + (x << chromaScaleX) + srcStrideY * candPosYYB + candPosYXB;
@@ -2788,6 +3116,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
           const int classIdx = band;
           dst[x]             = dst[x] + offset[classIdx];
         }
+#endif
       }
     }
     break;
@@ -2801,11 +3130,28 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
       firstLineEndX   = isAboveRightAvail ? width : (width - 1);
       for (x = firstLineStartX; x < firstLineEndX; x++)
       {
-        if (isCtuCrossedByVirtualBoundaries
-            && isProcessDisabled(x, 0, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, 0, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
         {
           continue;
         }
+
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+        const Pel *colY = srcY + (x << chromaScaleX);
+        const Pel *colU = srcU + x;
+        const Pel *colV = srcV + x;
+        const Pel *col[MAX_NUM_COMPONENT] = { colY, colU, colV };
+        const Pel *colE = col[edgeCmp];
+        const Pel *colA = colE + srcStrideE * edgePosYA + edgePosXA;
+        const Pel *colB = colE + srcStrideE * edgePosYB + edgePosXB;
+
+        const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
+        const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
+        const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
+        const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
+        
+        const int classIdx = bandIdx * edgeNum + edgeIdx;
+        dst[x] = dst[x] + offset[classIdx];
+#else
         const Pel *colY = srcY + (x << chromaScaleX);
         const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
         const Pel *colB = srcY + (x << chromaScaleX) + srcStrideY * candPosYYB + candPosYXB;
@@ -2840,6 +3186,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
           const int classIdx = band;
           dst[x]             = dst[x] + offset[classIdx];
         }
+#endif
       }
       srcY += srcStrideY << chromaScaleY;
       srcU += srcStrideU;
@@ -2851,11 +3198,28 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
       {
         for (x = startX; x < endX; x++)
         {
-          if (isCtuCrossedByVirtualBoundaries
-              && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+          if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
           {
             continue;
           }
+
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+          const Pel *colY = srcY + (x << chromaScaleX);
+          const Pel *colU = srcU + x;
+          const Pel *colV = srcV + x;
+          const Pel *col[MAX_NUM_COMPONENT] = { colY, colU, colV };
+          const Pel *colE = col[edgeCmp];
+          const Pel *colA = colE + srcStrideE * edgePosYA + edgePosXA;
+          const Pel *colB = colE + srcStrideE * edgePosYB + edgePosXB;
+
+          const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
+          const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
+          const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
+          const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
+          
+          const int classIdx = bandIdx * edgeNum + edgeIdx;
+          dst[x] = dst[x] + offset[classIdx];
+#else
           const Pel *colY = srcY + (x << chromaScaleX);
           const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
           const Pel *colB = srcY + (x << chromaScaleX) + srcStrideY * candPosYYB + candPosYXB;
@@ -2890,6 +3254,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
             const int classIdx = band;
             dst[x]             = dst[x] + offset[classIdx];
           }
+#endif
         }
         srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
@@ -2902,11 +3267,28 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
       lastLineEndX   = isBelowAvail ? endX : 1;
       for (x = lastLineStartX; x < lastLineEndX; x++)
       {
-        if (isCtuCrossedByVirtualBoundaries
-            && isProcessDisabled(x, height - 1, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+        if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, height - 1, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
         {
           continue;
         }
+
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+        const Pel *colY = srcY + (x << chromaScaleX);
+        const Pel *colU = srcU + x;
+        const Pel *colV = srcV + x;
+        const Pel *col[MAX_NUM_COMPONENT] = { colY, colU, colV };
+        const Pel *colE = col[edgeCmp];
+        const Pel *colA = colE + srcStrideE * edgePosYA + edgePosXA;
+        const Pel *colB = colE + srcStrideE * edgePosYB + edgePosXB;
+
+        const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
+        const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
+        const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
+        const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
+        
+        const int classIdx = bandIdx * edgeNum + edgeIdx;
+        dst[x] = dst[x] + offset[classIdx];
+#else
         const Pel *colY = srcY + (x << chromaScaleX);
         const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
         const Pel *colB = srcY + (x << chromaScaleX) + srcStrideY * candPosYYB + candPosYXB;
@@ -2941,6 +3323,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
           const int classIdx = band;
           dst[x]             = dst[x] + offset[classIdx];
         }
+#endif
       }
     }
     break;
@@ -2962,6 +3345,23 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
     {
       for (int x = 0; x < width; x++)
       {
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+        const Pel *colY = srcY + x;
+        const Pel *colU = srcU + (x >> chromaScaleX);
+        const Pel *colV = srcV + (x >> chromaScaleX);
+        const Pel *col[MAX_NUM_COMPONENT] = { colY, colU, colV };
+        const Pel *colE = col[edgeCmp];
+        const Pel *colA = colE + srcStrideE * edgePosYA + edgePosXA;
+        const Pel *colB = colE + srcStrideE * edgePosYB + edgePosXB;
+
+        const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
+        const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
+        const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
+        const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
+        
+        const int classIdx = bandIdx * edgeNum + edgeIdx;
+        dst[x] = dst[x] + offset[classIdx];
+#else
         const Pel *colY = srcY + x;
         const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
         const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
@@ -2995,7 +3395,9 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
           const int classIdx = band;
           dst[x]             = dst[x] + offset[classIdx];
         }
+#endif
       }
+
       srcY += srcStrideY;
       srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
       srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
@@ -3010,6 +3412,23 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
     {
       for (int x = 0; x < width; x++)
       {
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+        const Pel *colY = srcY + (x << chromaScaleX);
+        const Pel *colU = srcU + x;
+        const Pel *colV = srcV + x;
+        const Pel *col[MAX_NUM_COMPONENT] = { colY, colU, colV };
+        const Pel *colE = col[edgeCmp];
+        const Pel *colA = colE + srcStrideE * edgePosYA + edgePosXA;
+        const Pel *colB = colE + srcStrideE * edgePosYB + edgePosXB;
+
+        const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
+        const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
+        const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
+        const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
+        
+        const int classIdx = bandIdx * edgeNum + edgeIdx;
+        dst[x] = dst[x] + offset[classIdx];
+#else
         const Pel *colY = srcY + (x << chromaScaleX);
         const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
         const Pel *colB = srcY + (x << chromaScaleX) + srcStrideY * candPosYYB + candPosYXB;
@@ -3044,7 +3463,9 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(
           const int classIdx = band;
           dst[x]             = dst[x] + offset[classIdx];
         }
+#endif
       }
+
       srcY += srcStrideY << chromaScaleY;
       srcU += srcStrideU;
       srcV += srcStrideV;
@@ -3927,9 +4348,9 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
         const Pel *colU = srcU + (x >> chromaScaleX);
         const Pel *colV = srcV + (x >> chromaScaleX);
 
-        const int bandY = (*colY * bandNumY) >> bitDepth;
-        const int bandU = (*colU * bandNumU) >> bitDepth;
-        const int bandV = (*colV * bandNumV) >> bitDepth;
+        const int bandY   = (*colY * bandNumY) >> bitDepth;
+        const int bandU   = (*colU * bandNumU) >> bitDepth;
+        const int bandV   = (*colV * bandNumV) >> bitDepth;
         const int bandIdx = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
         const int classIdx = bandIdx;
 
@@ -3951,19 +4372,21 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
     {
       for (int x = 0; x < width; x++)
       {
+
         const Pel *colY = srcY + (x << chromaScaleX) + srcStrideY * candPosYY + candPosYX;
         const Pel *colU = srcU + x;
         const Pel *colV = srcV + x;
 
-        const int bandY = (*colY * bandNumY) >> bitDepth;
-        const int bandU = (*colU * bandNumU) >> bitDepth;
-        const int bandV = (*colV * bandNumV) >> bitDepth;
+        const int bandY   = (*colY * bandNumY) >> bitDepth;
+        const int bandU   = (*colU * bandNumU) >> bitDepth;
+        const int bandV   = (*colV * bandNumV) >> bitDepth;
         const int bandIdx = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
         const int classIdx = bandIdx;
 
         // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
         dst[x] = dst[x] + offset[classIdx];
       }
+
       srcY += srcStrideY << chromaScaleY;
       srcU += srcStrideU;
       srcV += srcStrideV;
@@ -3979,6 +4402,7 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
 #endif
 }
 
+#if !JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
 void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const ChromaFormat chromaFormat, const int bitDepth, const ClpRng& clpRng
                                           , const uint16_t candPosY
                                           , const uint16_t bandNumY, const uint16_t bandNumU, const uint16_t bandNumV
@@ -4871,6 +5295,7 @@ void SampleAdaptiveOffset::offsetBlockCcSao(const ComponentID compID, const Chro
   }
 #endif  
 }
+#endif
 #endif
 
 void SampleAdaptiveOffset::deriveLoopFilterBoundaryAvailibility(CodingStructure& cs, const Position &pos,

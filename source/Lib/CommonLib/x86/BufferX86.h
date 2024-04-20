@@ -533,6 +533,79 @@ void licRemoveWeightHighFreq_SSE(Pel* src0, Pel* src1, Pel* dst, int length, int
 }
 #endif
 
+#if JVET_AE0169_BIPREDICTIVE_IBC
+template< X86_VEXT vext >
+void avg_SSE( const int16_t* src1, int src1Stride, const int16_t* src2, int src2Stride, int16_t *dst, int dstStride, int width, int height)
+{
+#ifdef USE_AVX2
+  if( !( width & 15 ) )
+  {
+    for( int y = 0; y < height; y++ )
+    {
+      for( int x = 0; x < width; x += 16 )
+      {
+        __m256i mmSrc1 = _mm256_loadu_si256( ( const __m256i* )( src1 + x ) );
+        __m256i mmSrc2 = _mm256_loadu_si256( ( const __m256i* )( src2 + x ) );
+        __m256i mmDst = _mm256_avg_epu16( mmSrc1, mmSrc2 );
+        _mm256_storeu_si256( ( __m256i * ) ( dst + x ), mmDst );
+      }
+      src1 += src1Stride;
+      src2 += src2Stride;
+      dst += dstStride;
+    }
+  }
+  else
+#endif
+  {
+    if( !( width & 7 ) )
+    {
+      for( int y = 0; y < height; y++ )
+      {
+        for( int x = 0; x < width; x += 8 )
+        {
+          __m128i mmSrc1 = _mm_loadu_si128( ( const __m128i* )( src1 + x ) );
+          __m128i mmSrc2 = _mm_loadu_si128( ( const __m128i* )( src2 + x ) );
+          __m128i mmDst = _mm_avg_epu16( mmSrc1, mmSrc2 );
+          _mm_storeu_si128( ( __m128i * )( dst + x ), mmDst );
+        }
+        src1 += src1Stride;
+        src2 += src2Stride;
+        dst += dstStride;
+      }
+    }
+    else if( !( width & 3 ) )
+    {
+      for( int y = 0; y < height; y++ )
+      {
+        for( int x = 0; x < width; x += 4 )
+        {
+          __m128i mmSrc1 = _mm_loadl_epi64( ( const __m128i* )( src1 + x ) );
+          __m128i mmSrc2 = _mm_loadl_epi64( ( const __m128i* )( src2 + x ) );
+          __m128i mmDst = _mm_avg_epu16( mmSrc1, mmSrc2 );
+          _mm_storel_epi64( ( __m128i * )( dst + x ), mmDst );
+        }
+        src1 += src1Stride;
+        src2 += src2Stride;
+        dst += dstStride;
+      }
+    }
+    else
+    {
+      for( int y = 0; y < height; y++ )
+      {
+        for( int x = 0; x < width; x++ )
+        {
+          dst[x] = ( src1[x] + src2[x] + 1 ) >> 1;
+        }
+        src1 += src1Stride;
+        src2 += src2Stride;
+        dst += dstStride;
+      }
+    }
+  }
+}
+#endif
+
 template<X86_VEXT vext>
 void copyBufferSimd(Pel *src, int srcStride, Pel *dst, int dstStride, int width, int height)
 {
@@ -555,8 +628,11 @@ void copyBufferSimd(Pel *src, int srcStride, Pel *dst, int dstStride, int width,
   {
     for (size_t x = 0; x < width; x += 8)
     {
-      if (x > width - 8)
+      if( x > width - 8 )
+      {
         x = width - 8;
+      }
+
       for (size_t y = 0; y < height; y++)
       {
         __m128i val = _mm_loadu_si128((const __m128i *) (src + y * srcStride + x));
@@ -966,6 +1042,9 @@ void calcBIOParamSum5_SSE(Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signG
       c1 = _mm_add_epi32(c1, _mm_unpackhi_epi64(a12, b12));
       c1 = _mm_add_epi32(c1, _mm_unpacklo_epi64(a3, b3));
       
+#if JVET_AE0091_ITERATIVE_BDOF
+      int regVxVy = (1 << 8);
+#endif
       *(sumAbsGX+0) = _mm_cvtsi128_si32(c1);
       *(sumAbsGY+0) = _mm_cvtsi128_si32(_mm_shuffle_epi32(c1, 0x55));
       *(sumDIX+0)   = _mm_cvtsi128_si32(_mm_shuffle_epi32(c1, 0xaa));
@@ -1041,6 +1120,16 @@ void calcBIOParamSum5_SSE(Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signG
       *(sumAbsGY+3) = _mm_cvtsi128_si32(_mm_shuffle_epi32(c1, 0x55));
       *(sumDIX+3)   = _mm_cvtsi128_si32(_mm_shuffle_epi32(c1, 0xaa));
       *(sumDIY+3)   = _mm_cvtsi128_si32(_mm_shuffle_epi32(c1, 0xff));
+#if JVET_AE0091_ITERATIVE_BDOF 
+      *(sumAbsGX+0) += regVxVy;
+      *(sumAbsGY+0) += regVxVy;
+      *(sumAbsGX+1) += regVxVy;
+      *(sumAbsGY+1) += regVxVy;
+      *(sumAbsGX+2) += regVxVy;
+      *(sumAbsGY+2) += regVxVy;
+      *(sumAbsGX+3) += regVxVy;
+      *(sumAbsGY+3) += regVxVy;
+#endif
       
       sumSignGyGxTmp32 = _mm_madd_epi16(sumSignGyGxTmp16, vmask[3]);
       sumSignGyGxTmp32 = _mm_add_epi32(sumSignGyGxTmp32, _mm_shuffle_epi32(sumSignGyGxTmp32, 0x4e));   // 01001110
@@ -1246,7 +1335,11 @@ void calcBIOParamSum5_SSE(Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signG
 #endif
 #if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
 template< X86_VEXT vext >
-void calcBIOParameterHighPrecision_SSE(const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0, Pel* gradX1, Pel* gradY0, Pel* gradY1, int width, int height, const int src0Stride, const int src1Stride, const int widthG, const int bitDepth, int32_t* s1, int32_t* s2, int32_t* s3, int32_t* s5, int32_t* s6, Pel* dI)
+void calcBIOParameterHighPrecision_SSE(const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0, Pel* gradX1, Pel* gradY0, Pel* gradY1, int width, int height, const int src0Stride, const int src1Stride, const int widthG, const int bitDepth, int32_t* s1, int32_t* s2, int32_t* s3, int32_t* s5, int32_t* s6, Pel* dI
+#if JVET_AG0067_DMVR_EXTENSIONS
+                                       ,Pel* gX, Pel* gY
+#endif
+)
 {
   width -= 2;
   height -= 2;
@@ -1256,8 +1349,12 @@ void calcBIOParameterHighPrecision_SSE(const Pel* srcY0Tmp, const Pel* srcY1Tmp,
   gradX0 += bioParamOffset;  gradX1 += bioParamOffset;
   gradY0 += bioParamOffset;  gradY1 += bioParamOffset;
   s1  += bioParamOffset;  s2  += bioParamOffset;
-  s3    += bioParamOffset;  s5    += bioParamOffset;
-  s6 += bioParamOffset;
+  s3  += bioParamOffset;  s5  += bioParamOffset;
+  s6  += bioParamOffset;
+#if JVET_AG0067_DMVR_EXTENSIONS
+  gX  += bioParamOffset;
+  gY  += bioParamOffset;
+#endif
   int shift4 = 4;
   dI += bioParamOffset;
 #ifdef USE_AVX2
@@ -1268,6 +1365,10 @@ void calcBIOParameterHighPrecision_SSE(const Pel* srcY0Tmp, const Pel* srcY1Tmp,
       
       __m128i tempGX = _mm_add_epi16(_mm_loadu_si128((const __m128i*)(gradX0 )), _mm_loadu_si128((const __m128i*)(gradX1 )));
       __m128i tempGY = _mm_add_epi16(_mm_loadu_si128((const __m128i*)(gradY0 )), _mm_loadu_si128((const __m128i*)(gradY1 )));
+#if JVET_AG0067_DMVR_EXTENSIONS
+      _mm_storeu_si128((__m128i *) (gX ), tempGX);
+      _mm_storeu_si128((__m128i *) (gY ), tempGY);
+#endif
       __m128i temp = _mm_sub_epi16(_mm_srai_epi16(_mm_loadu_si128((const __m128i*)(srcY1Tmp )), shift4), _mm_srai_epi16(_mm_loadu_si128((const __m128i*)(srcY0Tmp )), shift4));
       _mm_storeu_si128((__m128i *) (dI ),  temp);
       //s1[x] =  tempGX * tempGX;
@@ -1307,6 +1408,10 @@ void calcBIOParameterHighPrecision_SSE(const Pel* srcY0Tmp, const Pel* srcY1Tmp,
       s5 += widthG;
       s6 += widthG;
       dI += widthG;
+#if JVET_AG0067_DMVR_EXTENSIONS
+      gX += widthG;
+      gY += widthG;
+#endif
     }
   }
   else
@@ -1317,6 +1422,10 @@ void calcBIOParameterHighPrecision_SSE(const Pel* srcY0Tmp, const Pel* srcY1Tmp,
       {
         __m256i tempGX = _mm256_add_epi16(_mm256_loadu_si256((const __m256i*)(gradX0 + x)), _mm256_loadu_si256((const __m256i*)(gradX1 + x)));
         __m256i tempGY = _mm256_add_epi16(_mm256_loadu_si256((const __m256i*)(gradY0 + x)), _mm256_loadu_si256((const __m256i*)(gradY1 + x)));
+#if JVET_AG0067_DMVR_EXTENSIONS
+        _mm256_storeu_si256((__m256i *) (gX + x ), tempGX);
+        _mm256_storeu_si256((__m256i *) (gY + x ), tempGY);
+#endif
         __m256i temp = _mm256_sub_epi16(_mm256_srai_epi16(_mm256_loadu_si256((const __m256i*)(srcY1Tmp + x )), shift4), _mm256_srai_epi16(_mm256_loadu_si256((const __m256i*)(srcY0Tmp + x )), shift4));
         _mm256_storeu_si256((__m256i *) (dI + x ),  temp);
         //s1[x] =  tempGX * tempGX;
@@ -1368,6 +1477,10 @@ void calcBIOParameterHighPrecision_SSE(const Pel* srcY0Tmp, const Pel* srcY1Tmp,
       s5 += widthG;
       s6 += widthG;
       dI += widthG;
+#if JVET_AG0067_DMVR_EXTENSIONS
+      gX += widthG;
+      gY += widthG;
+#endif
     }
   }
 #else
@@ -1377,6 +1490,10 @@ void calcBIOParameterHighPrecision_SSE(const Pel* srcY0Tmp, const Pel* srcY1Tmp,
     {
       __m128i tempGX = _mm_add_epi16(_mm_loadu_si128((const __m128i*)(gradX0 + x)), _mm_loadu_si128((const __m128i*)(gradX1 + x)));
       __m128i tempGY = _mm_add_epi16(_mm_loadu_si128((const __m128i*)(gradY0 + x)), _mm_loadu_si128((const __m128i*)(gradY1 + x)));
+#if JVET_AG0067_DMVR_EXTENSIONS
+      _mm_storeu_si128((__m128i *) (gX + x ), tempGX);
+      _mm_storeu_si128((__m128i *) (gY + x ), tempGY);
+#endif
       __m128i temp = _mm_sub_epi16(_mm_srai_epi16(_mm_loadu_si128((const __m128i*)(srcY1Tmp + x )), shift4), _mm_srai_epi16(_mm_loadu_si128((const __m128i*)(srcY0Tmp + x)), shift4));
       _mm_storeu_si128((__m128i *) (dI + x ), temp);
       
@@ -1419,10 +1536,271 @@ void calcBIOParameterHighPrecision_SSE(const Pel* srcY0Tmp, const Pel* srcY1Tmp,
     s5 += widthG;
     s6 += widthG;
     dI += widthG;
+#if JVET_AG0067_DMVR_EXTENSIONS
+    gX += widthG;
+    gY += widthG;
+#endif
   }
 #endif
 }
-
+#if JVET_AG0067_DMVR_EXTENSIONS
+template< X86_VEXT vext , int WW>
+void calcBIOParamSumHighPrecision_SSE(int32_t* s1, int32_t* s2, int32_t* s3, int32_t* s5, int32_t* s6, int width, int height, const int widthG, int32_t* sumS1, int32_t* sumS2, int32_t* sumS3, int32_t* sumS5, int32_t* sumS6, Pel* dI, Pel* gX, Pel* gY , bool isGPM = false, bool isSub = false)
+{
+  int meanDiff = 0;
+  int absmeanDiff = 0;
+  if (!isGPM)
+  {
+    __m128i vzero = _mm_setzero_si128();
+    __m128i vsum32 = vzero;
+    __m128i vdiff = vzero;
+    __m128i vsumabs32 = vzero;
+    __m128i vdiffabs = vzero;
+    
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x = x+8)
+      {
+        vdiff    = _mm_loadu_si128((const __m128i*)(dI + x));
+        __m128i vsign = _mm_cmpgt_epi16( vzero, vdiff );
+        vdiffabs = _mm_abs_epi16(vdiff);
+        vsum32    = _mm_add_epi32(vsum32,    _mm_unpacklo_epi16(vdiff,    vsign));
+        vsumabs32 = _mm_add_epi32(vsumabs32, _mm_unpacklo_epi16(vdiffabs, vzero));
+        if (x+8 < width || width == 8)
+        {
+          vsum32    = _mm_add_epi32(vsum32,    _mm_unpackhi_epi16(vdiff,    vsign));
+          vsumabs32 = _mm_add_epi32(vsumabs32, _mm_unpackhi_epi16(vdiffabs, vzero));
+        }
+      }
+      dI += widthG;
+    }
+    
+    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
+    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
+    meanDiff = _mm_cvtsi128_si32(vsum32);
+    
+    vsumabs32 = _mm_add_epi32(vsumabs32, _mm_shuffle_epi32(vsumabs32, 0x4e));   // 01001110
+    vsumabs32 = _mm_add_epi32(vsumabs32, _mm_shuffle_epi32(vsumabs32, 0xb1));   // 10110001
+    absmeanDiff = _mm_cvtsi128_si32(vsumabs32);
+        
+    if (isSub )
+    {
+      meanDiff = getMean( meanDiff + (height*width >> 1), height*width);
+    }
+    else
+    {
+      if ((absmeanDiff > 2 * abs(meanDiff)))
+      {
+        meanDiff = 0;
+      }
+      meanDiff = getMean( meanDiff + height*width, height*width << 1);
+    }
+  }
+  __m128i vmask0 = _mm_setr_epi16(-meanDiff, -meanDiff, -meanDiff, -meanDiff, -meanDiff, -meanDiff, -meanDiff, -meanDiff);
+  //int bdofWidth[]  = {8,  8,  8,   12,  12,  12,  20,  20,   20};
+  //int bdofHeight[] = {8, 12, 20,    8,  12,  20,   8,  12,   20};
+  int weightOffset[] = {0, 64, 160, 320, 416, 560, 800, 960, 1200};
+  int idx = 0;
+  __m128i vzero = _mm_setzero_si128();
+  __m128i sumS1Temp = vzero;
+  __m128i sumS2Temp = vzero;
+  __m128i sumS5Temp = vzero;
+  __m128i sumS3Temp = vzero;
+  __m128i sumS6Temp = vzero;
+  
+  if (WW == 4)
+  {
+    idx = (height == 8) ? 0 : ((height == 12) ? 1 : 2);
+    int * weight = g_bdofWeight + weightOffset[idx];
+    for (int y = 0; y < height; y++)
+    {
+      __m128i w0 = _mm_loadu_si128((const __m128i*)weight);
+      __m128i w1 = _mm_loadu_si128((const __m128i*)(weight+4));
+      
+      sumS1Temp  = _mm_add_epi32(sumS1Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)s1), w0));
+      sumS1Temp  = _mm_add_epi32(sumS1Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s1+4)),w1));
+      
+      sumS2Temp  = _mm_add_epi32(sumS2Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)s2),w0));
+      sumS2Temp  = _mm_add_epi32(sumS2Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s2+4)), w1));
+      
+      sumS5Temp  = _mm_add_epi32(sumS5Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)s5), w0));
+      sumS5Temp  = _mm_add_epi32(sumS5Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s5+4)), w1));
+      
+      sumS3Temp  = _mm_add_epi32(sumS3Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)s3), w0));
+      sumS3Temp  = _mm_add_epi32(sumS3Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s3+4)), w1));
+      __m128i lowS3   = _mm_mullo_epi16 (_mm_loadu_si128((const __m128i*)gX),  vmask0);
+      __m128i highS3  = _mm_mulhi_epi16 (_mm_loadu_si128((const __m128i*)gX),  vmask0);
+      sumS3Temp  = _mm_add_epi32(sumS3Temp, _mm_mullo_epi32(_mm_unpacklo_epi16 (lowS3, highS3), w0));
+      sumS3Temp  = _mm_add_epi32(sumS3Temp, _mm_mullo_epi32(_mm_unpackhi_epi16 (lowS3, highS3), w1));
+      
+      sumS6Temp  = _mm_add_epi32(sumS6Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)s6), w0));
+      sumS6Temp  = _mm_add_epi32(sumS6Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s6+4)), w1));
+      __m128i lowS6   = _mm_mullo_epi16 (_mm_loadu_si128((const __m128i*)gY), vmask0);
+      __m128i highS6  = _mm_mulhi_epi16 (_mm_loadu_si128((const __m128i*)gY), vmask0);
+      sumS6Temp  = _mm_add_epi32(sumS6Temp, _mm_mullo_epi32(_mm_unpacklo_epi16 (lowS6, highS6), w0));
+      sumS6Temp  = _mm_add_epi32(sumS6Temp, _mm_mullo_epi32(_mm_unpackhi_epi16 (lowS6, highS6),w1));
+      
+      // bio parameter increment
+      s1 += widthG;
+      s2 += widthG;
+      s5 += widthG;
+      s3 += widthG;
+      s6 += widthG;
+      gX += widthG;
+      gY += widthG;
+      weight += width;
+    }
+  }
+  else if (WW == 8)// width = 12
+  {
+    idx = (height == 8) ? 3 : ((height == 12) ? 4 : 5);
+    int * weight = g_bdofWeight + weightOffset[idx];
+    for (int y = 0; y < height; y++)
+    {
+      __m128i w0 = _mm_loadu_si128((const __m128i*)weight);
+      __m128i w1 = _mm_loadu_si128((const __m128i*)(weight+4));
+      __m128i w2 = _mm_loadu_si128((const __m128i*)(weight+8));
+      sumS1Temp  = _mm_add_epi32(sumS1Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)s1), w0));
+      sumS1Temp  = _mm_add_epi32(sumS1Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s1+4)), w1));
+      sumS1Temp  = _mm_add_epi32(sumS1Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s1+8)), w2));
+      
+      sumS2Temp  = _mm_add_epi32(sumS2Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)s2), w0));
+      sumS2Temp  = _mm_add_epi32(sumS2Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s2+4)), w1));
+      sumS2Temp  = _mm_add_epi32(sumS2Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s2+8)), w2));
+      
+      sumS5Temp  = _mm_add_epi32(sumS5Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)s5), w0));
+      sumS5Temp  = _mm_add_epi32(sumS5Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s5+4)), w1));
+      sumS5Temp  = _mm_add_epi32(sumS5Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s5+8)), w2));
+      
+      sumS3Temp  = _mm_add_epi32(sumS3Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)s3), w0));
+      sumS3Temp  = _mm_add_epi32(sumS3Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s3+4)), w1));
+      sumS3Temp  = _mm_add_epi32(sumS3Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s3+8)), w2));
+      __m128i lowS3   = _mm_mullo_epi16 (_mm_loadu_si128((const __m128i*)gX), vmask0);
+      __m128i highS3  = _mm_mulhi_epi16 (_mm_loadu_si128((const __m128i*)gX), vmask0);
+      sumS3Temp  = _mm_add_epi32(sumS3Temp, _mm_mullo_epi32(_mm_unpacklo_epi16 (lowS3, highS3), w0));
+      sumS3Temp  = _mm_add_epi32(sumS3Temp, _mm_mullo_epi32(_mm_unpackhi_epi16 (lowS3, highS3), w1));
+      lowS3   = _mm_mullo_epi16 (_mm_loadu_si128((const __m128i*)(gX+8)), vmask0);
+      highS3  = _mm_mulhi_epi16 (_mm_loadu_si128((const __m128i*)(gX+8)), vmask0);
+      sumS3Temp  = _mm_add_epi32(sumS3Temp, _mm_mullo_epi32(_mm_unpacklo_epi16 (lowS3, highS3), w2));
+      
+      sumS6Temp  = _mm_add_epi32(sumS6Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)s6), w0));
+      sumS6Temp  = _mm_add_epi32(sumS6Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s6+4)), w1));
+      sumS6Temp  = _mm_add_epi32(sumS6Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s6+8)), w2));
+      __m128i lowS6   = _mm_mullo_epi16 (_mm_loadu_si128((const __m128i*)gY), vmask0);
+      __m128i highS6  = _mm_mulhi_epi16 (_mm_loadu_si128((const __m128i*)gY), vmask0);
+      sumS6Temp  = _mm_add_epi32(sumS6Temp, _mm_mullo_epi32(_mm_unpacklo_epi16 (lowS6, highS6), w0));
+      sumS6Temp  = _mm_add_epi32(sumS6Temp, _mm_mullo_epi32(_mm_unpackhi_epi16 (lowS6, highS6), w1));
+      lowS6   = _mm_mullo_epi16 (_mm_loadu_si128((const __m128i*)(gY+8)), vmask0);
+      highS6  = _mm_mulhi_epi16 (_mm_loadu_si128((const __m128i*)(gY+8)), vmask0);
+      sumS6Temp  = _mm_add_epi32(sumS6Temp, _mm_mullo_epi32(_mm_unpacklo_epi16 (lowS6, highS6), w2));
+      
+      // bio parameter increment
+      s1 += widthG;
+      s2 += widthG;
+      s5 += widthG;
+      s3 += widthG;
+      s6 += widthG;
+      gX += widthG;
+      gY += widthG;
+      weight += width;
+    }
+  }
+  else if (WW == 16) // width = 20
+  {
+    idx = (height == 8) ? 6 : ((height == 12) ? 7 : 8);
+    int * weight = g_bdofWeight + weightOffset[idx];
+    for (int y = 0; y < height; y++)
+    {
+      __m128i w0 = _mm_loadu_si128((const __m128i*)weight);
+      __m128i w1 = _mm_loadu_si128((const __m128i*)(weight+4));
+      __m128i w2 = _mm_loadu_si128((const __m128i*)(weight+8));
+      __m128i w3 = _mm_loadu_si128((const __m128i*)(weight+12));
+      __m128i w4 = _mm_loadu_si128((const __m128i*)(weight+16));
+      sumS1Temp  = _mm_add_epi32(sumS1Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)s1), w0));
+      sumS1Temp  = _mm_add_epi32(sumS1Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s1+4)), w1));
+      sumS1Temp  = _mm_add_epi32(sumS1Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s1+8)), w2));
+      sumS1Temp  = _mm_add_epi32(sumS1Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s1+12)), w3));
+      sumS1Temp  = _mm_add_epi32(sumS1Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s1+16)), w4));
+      
+      sumS2Temp  = _mm_add_epi32(sumS2Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)s2), w0));
+      sumS2Temp  = _mm_add_epi32(sumS2Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s2+4)), w1));
+      sumS2Temp  = _mm_add_epi32(sumS2Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s2+8)), w2));
+      sumS2Temp  = _mm_add_epi32(sumS2Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s2+12)), w3));
+      sumS2Temp  = _mm_add_epi32(sumS2Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s2+16)), w4));
+      
+      sumS5Temp  = _mm_add_epi32(sumS5Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)s5), w0));
+      sumS5Temp  = _mm_add_epi32(sumS5Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s5+4)), w1));
+      sumS5Temp  = _mm_add_epi32(sumS5Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s5+8)), w2));
+      sumS5Temp  = _mm_add_epi32(sumS5Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s5+12)), w3));
+      sumS5Temp  = _mm_add_epi32(sumS5Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s5+16)), w4));
+      
+      sumS3Temp  = _mm_add_epi32(sumS3Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)s3), w0));
+      sumS3Temp  = _mm_add_epi32(sumS3Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s3+4)), w1));
+      sumS3Temp  = _mm_add_epi32(sumS3Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s3+8)), w2));
+      sumS3Temp  = _mm_add_epi32(sumS3Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s3+12)), w3));
+      sumS3Temp  = _mm_add_epi32(sumS3Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s3+16)), w4));
+      __m128i lowS3   = _mm_mullo_epi16 (_mm_loadu_si128((const __m128i*)gX), vmask0);
+      __m128i highS3  = _mm_mulhi_epi16 (_mm_loadu_si128((const __m128i*)gX), vmask0);
+      sumS3Temp  = _mm_add_epi32(sumS3Temp, _mm_mullo_epi32(_mm_unpacklo_epi16 (lowS3, highS3), w0));
+      sumS3Temp  = _mm_add_epi32(sumS3Temp, _mm_mullo_epi32(_mm_unpackhi_epi16 (lowS3, highS3), w1));
+      lowS3   = _mm_mullo_epi16 (_mm_loadu_si128((const __m128i*)(gX+8)), vmask0);
+      highS3  = _mm_mulhi_epi16 (_mm_loadu_si128((const __m128i*)(gX+8)), vmask0);
+      sumS3Temp  = _mm_add_epi32(sumS3Temp, _mm_mullo_epi32(_mm_unpacklo_epi16 (lowS3, highS3), w2));
+      sumS3Temp  = _mm_add_epi32(sumS3Temp, _mm_mullo_epi32(_mm_unpackhi_epi16 (lowS3, highS3), w3));
+      lowS3   = _mm_mullo_epi16 (_mm_loadu_si128((const __m128i*)(gX+16)), vmask0);
+      highS3  = _mm_mulhi_epi16 (_mm_loadu_si128((const __m128i*)(gX+16)), vmask0);
+      sumS3Temp  = _mm_add_epi32(sumS3Temp, _mm_mullo_epi32(_mm_unpacklo_epi16 (lowS3, highS3), w4));
+      
+      sumS6Temp  = _mm_add_epi32(sumS6Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)s6), w0));
+      sumS6Temp  = _mm_add_epi32(sumS6Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s6+4)), w1));
+      sumS6Temp  = _mm_add_epi32(sumS6Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s6+8)), w2));
+      sumS6Temp  = _mm_add_epi32(sumS6Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s6+12)), w3));
+      sumS6Temp  = _mm_add_epi32(sumS6Temp, _mm_mullo_epi32(_mm_loadu_si128((const __m128i*)(s6+16)), w4));
+      __m128i lowS6   = _mm_mullo_epi16 (_mm_loadu_si128((const __m128i*)gY), vmask0);
+      __m128i highS6  = _mm_mulhi_epi16 (_mm_loadu_si128((const __m128i*)gY), vmask0);
+      sumS6Temp  = _mm_add_epi32(sumS6Temp, _mm_mullo_epi32(_mm_unpacklo_epi16 (lowS6, highS6), w0));
+      sumS6Temp  = _mm_add_epi32(sumS6Temp, _mm_mullo_epi32(_mm_unpackhi_epi16 (lowS6, highS6), w1));
+      lowS6   = _mm_mullo_epi16 (_mm_loadu_si128((const __m128i*)(gY+8)), vmask0);
+      highS6  = _mm_mulhi_epi16 (_mm_loadu_si128((const __m128i*)(gY+8)), vmask0);
+      sumS6Temp  = _mm_add_epi32(sumS6Temp, _mm_mullo_epi32(_mm_unpacklo_epi16 (lowS6, highS6), w2));
+      sumS6Temp  = _mm_add_epi32(sumS6Temp, _mm_mullo_epi32(_mm_unpackhi_epi16 (lowS6, highS6), w3));
+      lowS6   = _mm_mullo_epi16 (_mm_loadu_si128((const __m128i*)(gY+16)), vmask0);
+      highS6  = _mm_mulhi_epi16 (_mm_loadu_si128((const __m128i*)(gY+16)), vmask0);
+      sumS6Temp  = _mm_add_epi32(sumS6Temp, _mm_mullo_epi32(_mm_unpacklo_epi16 (lowS6, highS6), w4));
+      
+      // bio parameter increment
+      s1 += widthG;
+      s2 += widthG;
+      s5 += widthG;
+      s3 += widthG;
+      s6 += widthG;
+      gX += widthG;
+      gY += widthG;
+      weight += width;
+    }
+  }
+  
+  sumS1Temp = _mm_add_epi32(sumS1Temp, _mm_shuffle_epi32(sumS1Temp, 0x4e));   // 01001110
+  sumS1Temp = _mm_add_epi32(sumS1Temp, _mm_shuffle_epi32(sumS1Temp, 0xb1));   // 10110001
+  *sumS1 = _mm_cvtsi128_si32(sumS1Temp);
+  
+  sumS2Temp = _mm_add_epi32(sumS2Temp, _mm_shuffle_epi32(sumS2Temp, 0x4e));   // 01001110
+  sumS2Temp = _mm_add_epi32(sumS2Temp, _mm_shuffle_epi32(sumS2Temp, 0xb1));   // 10110001
+  *sumS2 = _mm_cvtsi128_si32(sumS2Temp);
+  
+  sumS5Temp = _mm_add_epi32(sumS5Temp, _mm_shuffle_epi32(sumS5Temp, 0x4e));   // 01001110
+  sumS5Temp = _mm_add_epi32(sumS5Temp, _mm_shuffle_epi32(sumS5Temp, 0xb1));   // 10110001
+  *sumS5 = _mm_cvtsi128_si32(sumS5Temp);
+  
+  sumS3Temp = _mm_add_epi32(sumS3Temp, _mm_shuffle_epi32(sumS3Temp, 0x4e));   // 01001110
+  sumS3Temp = _mm_add_epi32(sumS3Temp, _mm_shuffle_epi32(sumS3Temp, 0xb1));   // 10110001
+  *sumS3 = _mm_cvtsi128_si32(sumS3Temp);
+  
+  sumS6Temp = _mm_add_epi32(sumS6Temp, _mm_shuffle_epi32(sumS6Temp, 0x4e));   // 01001110
+  sumS6Temp = _mm_add_epi32(sumS6Temp, _mm_shuffle_epi32(sumS6Temp, 0xb1));   // 10110001
+  *sumS6 = _mm_cvtsi128_si32(sumS6Temp);
+}
+#else
 template< X86_VEXT vext >
 void calcBIOParamSumHighPrecision_SSE(int32_t* s1, int32_t* s2, int32_t* s3, int32_t* s5, int32_t* s6, int width, int height, const int widthG, int32_t* sumS1, int32_t* sumS2, int32_t* sumS3, int32_t* sumS5, int32_t* sumS6)
 {
@@ -1521,6 +1899,7 @@ void calcBIOParamSumHighPrecision_SSE(int32_t* s1, int32_t* s2, int32_t* s3, int
   sumS6Temp = _mm_add_epi32(sumS6Temp, _mm_shuffle_epi32(sumS6Temp, 0xb1));   // 10110001
   *sumS6 = _mm_cvtsi128_si32(sumS6Temp);
 }
+#endif
 #endif
 template< X86_VEXT vext >
 void calcBIOParamSum4_SSE(Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGyGx, int width, int height, const int widthG, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGyGx)
@@ -1721,6 +2100,46 @@ void addBIOAvgN_SSE(const Pel* src0, int src0Stride, const Pel* src1, int src1St
   __m128i var1 = _mm_setzero_si128();
   __m128i var2 = _mm_setzero_si128();
 
+#if JVET_AG0067_DMVR_EXTENSIONS
+  if (width != 4)
+  {
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x = x+8)
+      {
+        var1        = _mm_loadu_si128((const __m128i *)(gradX0 + x));
+        var1        = _mm_sub_epi16(var1,  _mm_loadu_si128((const __m128i *)(gradX1 + x)));
+        var2        = _mm_loadu_si128((const __m128i *)(gradY0 + x));
+        var2        = _mm_sub_epi16(var2,  _mm_loadu_si128((const __m128i *)(gradY1 + x)));
+        __m256i a   = _mm256_inserti128_si256(_mm256_castsi128_si256(_mm_unpacklo_epi16(var1, var2)),
+                                              _mm_unpackhi_epi16(var1, var2), 1);
+        
+        __m256i vClipTmpx256 = _mm256_loadu_si256((const __m256i *)(tmpx + x));
+        __m256i vClipTmpy256 = _mm256_loadu_si256((const __m256i *)(tmpy + x));
+        __m256i c   = _mm256_packs_epi32 (_mm256_unpacklo_epi32(vClipTmpx256, vClipTmpy256), _mm256_unpackhi_epi32(vClipTmpx256, vClipTmpy256));
+        
+        __m256i sum32 = _mm256_madd_epi16(a, c);  // 8 32bits
+        
+        var1        = _mm_loadu_si128((const __m128i *)(src0 + x));
+        var2        = _mm_loadu_si128((const __m128i *)(src1 + x));
+        a           = _mm256_inserti128_si256(_mm256_castsi128_si256(_mm_unpacklo_epi16(var1, var2)),
+                                              _mm_unpackhi_epi16(var1, var2), 1);
+        
+        sum32 = _mm256_add_epi32(sum32, _mm256_madd_epi16(a, _mm256_set1_epi16(1)));
+        sum32 = _mm256_add_epi32(sum32, _mm256_set1_epi32(offset));
+        sum32 = _mm256_sra_epi32(sum32, _mm_cvtsi32_si128(shift));
+        __m128i sum16 = _mm_packs_epi32(_mm256_castsi256_si128(sum32), _mm256_extractf128_si256(sum32, 1));
+        sum16 = _mm_max_epi16(sum16, vibdimin);
+        sum16 = _mm_min_epi16(sum16, vibdimax);
+        _mm_storeu_si128((__m128i *)(dst+x), sum16);
+      }
+        dst += dstStride;       src0 += src0Stride;     src1 += src1Stride;
+        gradX0 += gradStride; gradX1 += gradStride; gradY0 += gradStride; gradY1 += gradStride;
+        tmpx += width; tmpy += width;
+      
+    }
+  }
+#else
   if (width == 8)
   {
     for (int y = 0; y < height; y++)
@@ -1755,6 +2174,7 @@ void addBIOAvgN_SSE(const Pel* src0, int src0Stride, const Pel* src1, int src1St
       tmpx += width; tmpy += width;
     }
   }
+#endif
   else // (width == 4)
   {
     for (int y = 0; y < height; y++)
@@ -1830,6 +2250,22 @@ void calAbsSum_SSE(const Pel* diff, int stride, int width, int height, int* absS
   __m128i vsum32 = vzero;
   __m128i vdiff = vzero;
 
+#if JVET_AG0067_DMVR_EXTENSIONS
+  if (width != 4)
+  {
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x = x+8)
+      {
+        vdiff = _mm_abs_epi16(_mm_loadu_si128((const __m128i*)(diff + x)));
+        vsum32 = _mm_add_epi32(vsum32, _mm_unpacklo_epi16(vdiff, vzero));
+        vsum32 = _mm_add_epi32(vsum32, _mm_unpackhi_epi16(vdiff, vzero));
+      }
+      diff += stride;
+    }
+    
+  }
+#else
   if (width == 8)
   {
     for (int y = 0; y < height; y++)
@@ -1840,6 +2276,7 @@ void calAbsSum_SSE(const Pel* diff, int stride, int width, int height, int* absS
       diff += stride;
     }
   }
+#endif
   else // (width == 4)
   {
     const int strideDouble = (stride << 1);
@@ -2676,12 +3113,71 @@ int64_t getSumOfDifference_SSE(const Pel* src0, int src0Stride, const Pel* src1,
 
   // internal bit-depth must be 12-bit or lower
 
-  if (width & 7) // multiple of 4
+#ifdef USE_AVX2
+  if( vext >= AVX2 && !( width & 15 ) ) // multiple of 16
+  {
+    __m256i vzero = _mm256_setzero_si256();
+    __m256i vsum32 = vzero;
+
+    for( int m = 0; m < height; m += subStep )
+    {
+      __m256i vsum16 = vzero;
+
+      for( int n = 0; n < width; n += 16 )
+      {
+        __m256i org = _mm256_lddqu_si256( ( __m256i* )( pOrg + n ) );
+        __m256i cur = _mm256_lddqu_si256( ( __m256i* )( pCur + n ) );
+        vsum16 = _mm256_adds_epi16( vsum16, _mm256_sub_epi16( org, cur ) );
+      }
+
+      __m256i vsign = _mm256_cmpgt_epi16( vzero, vsum16 );
+      __m256i vsumtemp = _mm256_add_epi32( _mm256_unpacklo_epi16( vsum16, vsign ), _mm256_unpackhi_epi16( vsum16, vsign ) );
+      vsum32 = _mm256_add_epi32( vsum32, vsumtemp );
+
+      pOrg += strideOrg;
+      pCur += strideCur;
+    }
+
+    vsum32 = _mm256_hadd_epi32( vsum32, vzero );
+    vsum32 = _mm256_hadd_epi32( vsum32, vzero );
+    deltaAvg = _mm_cvtsi128_si32( _mm256_castsi256_si128( vsum32 ) ) + _mm_cvtsi128_si32( _mm256_castsi256_si128( _mm256_permute2x128_si256( vsum32, vsum32, 0x11 ) ) );
+  }
+  else
+#endif
+  if( !( width & 7 ) )// multiple of 8
   {
     __m128i vzero = _mm_setzero_si128();
     __m128i vsum32 = vzero;
 
-    for (; height != 0; height -= subStep)
+    for( int m = 0; m < height; m += subStep )
+    {
+      __m128i vsum16 = vzero;
+
+      for( int n = 0; n < width; n += 8 )
+      {
+        __m128i org = _mm_lddqu_si128( ( __m128i* )( pOrg + n ) );
+        __m128i cur = _mm_lddqu_si128( ( __m128i* )( pCur + n ) );
+        vsum16 = _mm_adds_epi16( vsum16, _mm_sub_epi16( org, cur ) );
+      }
+
+      __m128i vsign = _mm_cmpgt_epi16( vzero, vsum16 );
+      __m128i vsumtemp = _mm_add_epi32( _mm_unpacklo_epi16( vsum16, vsign ), _mm_unpackhi_epi16( vsum16, vsign ) );
+      vsum32 = _mm_add_epi32( vsum32, vsumtemp );
+
+      pOrg += strideOrg;
+      pCur += strideCur;
+    }
+
+    vsum32 = _mm_add_epi32( vsum32, _mm_shuffle_epi32( vsum32, 0x4e ) );   // 01001110
+    vsum32 = _mm_add_epi32( vsum32, _mm_shuffle_epi32( vsum32, 0xb1 ) );   // 10110001
+    deltaAvg = _mm_cvtsi128_si32( vsum32 );
+  }
+  else if( !( width & 3 ) ) // multiple of 4
+  {
+    __m128i vzero = _mm_setzero_si128();
+    __m128i vsum32 = vzero;
+
+    for( int m = 0; m < height; m += subStep )
     {
       __m128i vsum16 = vzero;
 
@@ -2703,63 +3199,9 @@ int64_t getSumOfDifference_SSE(const Pel* src0, int src0Stride, const Pel* src1,
     vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
     deltaAvg = _mm_cvtsi128_si32(vsum32);
   }
-#ifdef USE_AVX2
-  else if (vext >= AVX2 && width >= 16) // multiple of 16
+  else
   {
-    __m256i vzero = _mm256_setzero_si256();
-    __m256i vsum32 = vzero;
-
-    for (; height != 0; height -= subStep)
-    {
-      __m256i vsum16 = vzero;
-
-      for (int n = 0; n < width; n += 16)
-      {
-        __m256i org = _mm256_lddqu_si256((__m256i*)(pOrg + n));
-        __m256i cur = _mm256_lddqu_si256((__m256i*)(pCur + n));
-        vsum16 = _mm256_adds_epi16(vsum16, _mm256_sub_epi16(org, cur));
-      }
-
-      __m256i vsign = _mm256_cmpgt_epi16(vzero, vsum16);
-      __m256i vsumtemp = _mm256_add_epi32(_mm256_unpacklo_epi16(vsum16, vsign), _mm256_unpackhi_epi16(vsum16, vsign));
-      vsum32 = _mm256_add_epi32(vsum32, vsumtemp);
-
-      pOrg += strideOrg;
-      pCur += strideCur;
-    }
-
-    vsum32 = _mm256_hadd_epi32(vsum32, vzero);
-    vsum32 = _mm256_hadd_epi32(vsum32, vzero);
-    deltaAvg = _mm_cvtsi128_si32(_mm256_castsi256_si128(vsum32)) + _mm_cvtsi128_si32(_mm256_castsi256_si128(_mm256_permute2x128_si256(vsum32, vsum32, 0x11)));
-  }
-#endif
-  else // multiple of 8
-  {
-    __m128i vzero = _mm_setzero_si128();
-    __m128i vsum32 = vzero;
-
-    for (; height != 0; height -= subStep)
-    {
-      __m128i vsum16 = vzero;
-
-      for (int n = 0; n < width; n += 8)
-      {
-        __m128i org = _mm_lddqu_si128((__m128i*)(pOrg + n));
-        __m128i cur = _mm_lddqu_si128((__m128i*)(pCur + n));
-        vsum16 = _mm_adds_epi16(vsum16, _mm_sub_epi16(org, cur));
-      }
-
-      __m128i vsign = _mm_cmpgt_epi16(vzero, vsum16);
-      __m128i vsumtemp = _mm_add_epi32(_mm_unpacklo_epi16(vsum16, vsign), _mm_unpackhi_epi16(vsum16, vsign));
-      vsum32 = _mm_add_epi32(vsum32, vsumtemp);
-
-      pOrg += strideOrg;
-      pCur += strideCur;
-    }
-
-    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
-    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
-    deltaAvg = _mm_cvtsi128_si32(vsum32);
+    return getSumOfDifferenceCore( src0, src0Stride, src1, src1Stride, width, height, rowSubShift, bitDepth );
   }
 
   deltaAvg <<= subShift;
@@ -3808,6 +4250,9 @@ void PelBufferOps::_initPelBufOpsX86()
 #endif
   addAvg8 = addAvg_SSE<vext, 8>;
   addAvg4 = addAvg_SSE<vext, 4>;
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  avg = avg_SSE<vext>;
+#endif
 #if JVET_AD0213_LIC_IMP
   toLast4 = toLast_SSE<vext, 4>;
   toLast2 = toLast_SSE<vext, 2>;
@@ -3820,7 +4265,13 @@ void PelBufferOps::_initPelBufOpsX86()
   calcBIOParameter   = calcBIOParameter_SSE<vext>;
 #if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
   calcBIOParameterHighPrecision = calcBIOParameterHighPrecision_SSE<vext>;
+#if JVET_AG0067_DMVR_EXTENSIONS
+  calcBIOParamSum4HighPrecision4  = calcBIOParamSumHighPrecision_SSE<vext, 4>;
+  calcBIOParamSum4HighPrecision8  = calcBIOParamSumHighPrecision_SSE<vext, 8>;
+  calcBIOParamSum4HighPrecision16 = calcBIOParamSumHighPrecision_SSE<vext, 16>;
+#else
   calcBIOParamSum4HighPrecision = calcBIOParamSumHighPrecision_SSE<vext>;
+#endif
 #endif
   calcBIOParamSum5   = calcBIOParamSum5_SSE<vext>;
   calcBIOParamSum4   = calcBIOParamSum4_SSE<vext>;

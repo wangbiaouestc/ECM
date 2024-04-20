@@ -99,14 +99,18 @@ struct Picture : public UnitArea
   uint32_t margin;
   Picture();
 
+void create(
+    const bool rprEnabled,
 #if JVET_Z0118_GDR
-  void create(const bool gdrEnabled, const ChromaFormat &_chromaFormat, const Size &size, const unsigned _maxCUSize, const unsigned _margin, const bool _decoder, const int _layerId, const bool gopBasedTemporalFilterEnabled = false);
-#else
-  void create( const ChromaFormat &_chromaFormat, const Size &size, const unsigned _maxCUSize, const unsigned margin, const bool bDecoder, const int layerId, const bool gopBasedTemporalFilterEnabled = false );
+    const bool gdrEnabled,
 #endif
+    const bool useWrapAround, const ChromaFormat &_chromaFormat, const Size &size, const unsigned _maxCUSize,
+    const unsigned _margin,
+    const bool _decoder, const int _layerId, const bool gopBasedTemporalFilterEnabled = false);
+
   void destroy();
 
-  void createTempBuffers( const unsigned _maxCUSize );
+  void createTempBuffers( const unsigned _maxCUSize, bool useFilterFrame, bool resChange, bool decoder );
   void destroyTempBuffers();
 
          PelBuf     getOrigBuf(const CompArea &blk);
@@ -165,6 +169,9 @@ struct Picture : public UnitArea
   void finalInit( const VPS* vps, const SPS& sps, const PPS& pps, PicHeader *picHeader, APS** alfApss, APS* lmcsAps, APS* scalingListAps );
 
   int  getPOC()                               const { return poc; }
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+  ClpRng getLumaClpRng()                      const { return lumaClpRng; }
+#endif
   int  getDecodingOrderNumber()               const { return m_decodingOrderNumber; }
   void setDecodingOrderNumber(const int val)        { m_decodingOrderNumber = val;  }
   NalUnitType getPictureType()                const { return m_pictureType;         }
@@ -246,6 +253,10 @@ public:
 #endif
 
   int  poc;
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+  ClpRng lumaClpRng;
+  ClpRng lumaClpRngforQuant;
+#endif
   uint32_t temporalId;
   int      layerId;
 #if JVET_S0258_SUBPIC_CONSTRAINTS
@@ -338,24 +349,15 @@ public:
   void            copySAO(const Picture& src, int dstid)    { std::copy(src.m_sao[0].begin(), src.m_sao[0].end(), m_sao[dstid].begin()); }
 
 #if JVET_V0094_BILATERAL_FILTER
-  BifParams&       getBifParam() { return m_BifParams; }
-  void resizeBIF(unsigned numEntries)
+  BifParams&       getBifParam( const ComponentID compID )  { return m_bifParams[compID]; }
+  void resizeBIF( const ComponentID compID, unsigned numEntries )
   {
-    m_BifParams.numBlocks = numEntries;
-    m_BifParams.ctuOn.resize(numEntries);
-    std::fill(m_BifParams.ctuOn.begin(), m_BifParams.ctuOn.end(), 0);
+    m_bifParams[compID].numBlocks = numEntries;
+    m_bifParams[compID].ctuOn.resize(numEntries);
+    std::fill(m_bifParams[compID].ctuOn.begin(), m_bifParams[compID].ctuOn.end(), 0);
   };
-#endif
-#if JVET_X0071_CHROMA_BILATERAL_FILTER
-  ChromaBifParams&       getChromaBifParam() { return m_ChromaBifParams; }
-  void resizeBIFChroma(unsigned numEntries)
-  {
-    m_ChromaBifParams.numBlocks = numEntries;
-    m_ChromaBifParams.ctuOnCb.resize(numEntries);
-    m_ChromaBifParams.ctuOnCr.resize(numEntries);
-    std::fill(m_ChromaBifParams.ctuOnCb.begin(), m_ChromaBifParams.ctuOnCb.end(), 0);
-    std::fill(m_ChromaBifParams.ctuOnCr.begin(), m_ChromaBifParams.ctuOnCr.end(), 0);
-  }
+
+  void              copyBIF( const Picture& src )            { m_bifParams[COMPONENT_Y] = src.m_bifParams[COMPONENT_Y]; m_bifParams[COMPONENT_Cb] = src.m_bifParams[COMPONENT_Cb]; m_bifParams[COMPONENT_Cr] = src.m_bifParams[COMPONENT_Cr]; }
 #endif
 #if ENABLE_QPA
   std::vector<double>     m_uEnerHpCtu;                         ///< CTU-wise L2 or squared L1 norm of high-passed luma input
@@ -367,10 +369,11 @@ public:
 
   std::vector<SAOBlkParam> m_sao[2];
 #if JVET_V0094_BILATERAL_FILTER
-  static BifParams        m_BifParams;
-#endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  static ChromaBifParams       m_ChromaBifParams;
+  BifParams        m_bifParams[MAX_NUM_COMPONENT];
+#else
+  BifParams        m_bifParams[1];
+#endif
 #endif
   std::vector<uint8_t> m_alfCtuEnableFlag[MAX_NUM_COMPONENT];
   uint8_t* getAlfCtuEnableFlag( int compIdx ) { return m_alfCtuEnableFlag[compIdx].data(); }

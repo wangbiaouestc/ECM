@@ -346,6 +346,9 @@ uint32_t DecApp::decode()
         }
 #endif
         m_cDecLib.executeLoopFilters();
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+        m_cDecLib.adaptiveClipToRealRange();
+#endif
 #if JVET_R0270
         m_cDecLib.finishPicture(poc, pcListPic, INFO, m_newCLVS[nalu.m_nuhLayerId]);
 #else

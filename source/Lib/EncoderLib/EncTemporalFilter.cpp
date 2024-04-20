@@ -36,6 +36,7 @@
 */
 
 #include "EncTemporalFilter.h"
+#include "Utilities/VideoIOYuv.h"
 #include <math.h>
 
 
@@ -142,12 +143,12 @@ void EncTemporalFilter::init( const int frameSkip, const int inputBitDepth[MAX_N
 // Public member functions
 // ====================================================================================================================
 
-bool EncTemporalFilter::filter(PelStorage *orgPic, int receivedPoc)
+bool EncTemporalFilter::filter(PelStorage &orgPic, int receivedPoc)
 {
   bool isFilterThisFrame = false;
   if (m_QP >= 17)  // disable filter for QP < 17
   {
-    for (map<int, double>::iterator it = m_temporalFilterStrengths.begin(); it != m_temporalFilterStrengths.end(); ++it)
+    for (std::map<int, double>::iterator it = m_temporalFilterStrengths.begin(); it != m_temporalFilterStrengths.end(); ++it)
     {
       int filteredFrame = it->first;
       if (receivedPoc % filteredFrame == 0)
@@ -173,7 +174,7 @@ bool EncTemporalFilter::filter(PelStorage *orgPic, int receivedPoc)
     PelStorage origPadded;
 
     origPadded.create(m_chromaFormatIDC, m_area, 0, m_padding);
-    origPadded.copyFrom(*orgPic);
+    origPadded.copyFrom(orgPic);
     origPadded.extendBorderPel(m_padding, m_padding);
 
     PelStorage origSubsampled2;
@@ -207,7 +208,16 @@ bool EncTemporalFilter::filter(PelStorage *orgPic, int receivedPoc)
       srcPic.mvs.allocate(m_sourceWidth / 4, m_sourceHeight / 4);
 
       motionEstimation(srcPic.mvs, origPadded, srcPic.picBuffer, origSubsampled2, origSubsampled4);
+      applyMotion(srcPic.mvs, srcPic.picBuffer, dummyPicBufferTO);
+      srcPic.picBuffer.swap(dummyPicBufferTO);
       srcPic.origOffset = poc - currentFilePoc;
+    }
+
+    const int numRefs = int(srcFrameInfo.size());
+    if (numRefs == 0)
+    {
+      yuvFrames.close();
+      return false;
     }
 
     // filter
@@ -224,8 +234,7 @@ bool EncTemporalFilter::filter(PelStorage *orgPic, int receivedPoc)
       }
     }
 #if JVET_Y0240_BIM
-    const int numRefs = int(srcFrameInfo.size());
-    if ( m_bimEnabled && ( numRefs > 0 ) )
+    if ( m_bimEnabled )
     {
       const int bimFirstFrame = std::max(currentFilePoc - 2, firstFrame);
       const int bimLastFrame  = std::min(currentFilePoc + 2, lastFrame);
@@ -294,13 +303,13 @@ bool EncTemporalFilter::filter(PelStorage *orgPic, int receivedPoc)
 #endif
 
 #if JVET_Y0240_BIM
-    if ( m_mctfEnabled && ( numRefs > 0 ) )
+    if ( m_mctfEnabled )
 #endif
     {
       bilateralFilter(origPadded, srcFrameInfo, newOrgPic, overallStrength);
 
       // move filtered to orgPic
-      orgPic->copyFrom(newOrgPic);
+      orgPic.copyFrom(newOrgPic);
     }
 
     yuvFrames.close();
@@ -703,12 +712,6 @@ void EncTemporalFilter::bilateralFilter(const PelStorage &orgPic,
   double overallStrength) const
 {
   const int numRefs = int(srcFrameInfo.size());
-  std::vector<PelStorage> correctedPics(numRefs);
-  for (int i = 0; i < numRefs; i++)
-  {
-    correctedPics[i].create(m_chromaFormatIDC, m_area, 0, m_padding);
-    applyMotion(srcFrameInfo[i].mvs, srcFrameInfo[i].picBuffer, correctedPics[i]);
-  }
 
   const int refStrengthRow = m_futureRefs > 0 ? 0 : 1;
 
@@ -751,8 +754,8 @@ void EncTemporalFilter::bilateralFilter(const PelStorage &orgPic,
           for (int i = 0; i < numRefs; i++)
           {
             double variance = 0, diffsum = 0;
-            const ptrdiff_t refStride = correctedPics[i].bufs[c].stride;
-            const Pel *     refPel = correctedPics[i].bufs[c].buf + y * refStride + x;
+            const ptrdiff_t refStride = srcFrameInfo[i].picBuffer.bufs[c].stride;
+            const Pel *     refPel = srcFrameInfo[i].picBuffer.bufs[c].buf + y * refStride + x;
             for( int y1 = 0; y1 < blockSizeY; y1++ )
             {
               for( int x1 = 0; x1 < blockSizeX; x1++ )
@@ -795,7 +798,7 @@ void EncTemporalFilter::bilateralFilter(const PelStorage &orgPic,
           const int error = srcFrameInfo[i].mvs.get(x / blockSizeX, y / blockSizeY).error;
           const int noise = srcFrameInfo[i].mvs.get(x / blockSizeX, y / blockSizeY).noise;
 #endif
-          const Pel *pCorrectedPelPtr = correctedPics[i].bufs[c].buf + (y * correctedPics[i].bufs[c].stride + x);
+          const Pel* pCorrectedPelPtr = srcFrameInfo[i].picBuffer.bufs[c].buf + (y * srcFrameInfo[i].picBuffer.bufs[c].stride + x);
           const int refVal = (int) *pCorrectedPelPtr;
           double diff = (double)(refVal - orgVal);
           diff *= bitDepthDiffWeighting;

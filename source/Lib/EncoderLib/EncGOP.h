@@ -272,6 +272,11 @@ public:
   void arrangeCompositeReference(Slice* pcSlice, PicList& rcListPic, int pocCurr);
   void updateCompositeReference(Slice* pcSlice, PicList& rcListPic, int pocCurr);
 
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+  void adaptiveClipToRealRange(Picture* pcPic);
+  void getRealRange(Picture* pcPic);
+#endif
+
 #if EXTENSION_360_VIDEO
   Analyze& getAnalyzeAllData() { return m_gcAnalyzeAll; }
   Analyze& getAnalyzeIData() { return m_gcAnalyzeI; }

@@ -41,11 +41,140 @@
 #if RExt__DECODER_DEBUG_BIT_STATISTICS
 #include "CommonLib/CodingStatistics.h"
 #endif
+#if JVET_AG0196_CABAC_RETRAIN
+#include <memory>
+#endif
 
 #include "CommonLib/dtrace_next.h"
 
 #define CNT_OFFSET 0
 
+
+#if JVET_AG0196_CABAC_RETRAIN
+#include <fstream>
+namespace CabacRetrain
+{
+  extern std::vector<std::pair<uint16_t, uint16_t>>  vprobaInit;
+  extern std::vector<int>                            vrate;
+#if JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE
+  extern std::vector<int>                            vdrate0;
+  extern std::vector<int>                            vdrate1;
+#endif
+  extern std::vector<int>                            vweight;
+  extern int                                         ctx;
+  extern bool                                        report;
+  extern bool                                        activate;
+  static std::vector<std::vector<char>>              vbins;
+  uint64_t                                           filesize = 0;
+  int                                                startctx = 0;
+  int                                                endctx = 0;
+  SliceType                                          sliceReport;
+  static std::vector<std::unique_ptr<std::ofstream>> files;
+
+  static void dumpBin( int bin, int ctx_ )
+  {
+    if (!activate) return;
+    vbins[ctx_].push_back( bin );
+  }
+
+  void endFrame( int poc, int qp, bool switchBp, SliceType st )
+  {
+    if (!activate) return;
+    for( int ctxi = startctx; ctxi < endctx; ++ctxi )
+    {
+      auto &file = *files[ctxi];
+      file << poc << ' ';
+      switch( st )
+      {
+      case B_SLICE: file << "B "; break;
+      case P_SLICE: file << "P "; break;
+      case I_SLICE: file << "I "; break;
+      default: file << "? "; break;
+      }
+      file << qp << " " << ( int ) switchBp << ' ' << ( int ) report << ' ';
+      switch( sliceReport )
+      {
+      case B_SLICE: file << "B "; break;
+      case P_SLICE: file << "P "; break;
+      case I_SLICE: file << "I "; break;
+      default: file << "? "; break;
+      }
+
+      file << vprobaInit[ctxi].first << ' ' << vprobaInit[ctxi].second << ' ' << ( int ) vrate[ctxi] << ' ' << ( int ) vweight[ctxi] << ' '
+#if JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE
+           << ( int ) vdrate0[ctxi] << ' '<< ( int ) vdrate1[ctxi] << ' '
+#endif
+      ;
+
+      for( auto b : vbins[ctxi] )
+      {
+        file << ( int ) b;
+      }
+
+      file << std::endl;
+      vbins[ctxi].clear();
+      vprobaInit[ctxi] = { 0,0 };
+    }
+    report = false;
+  }
+
+  void init( const std::string &fn, bool iactivate )
+  {
+    activate = iactivate;
+    if (!activate) return;
+    // get file size
+    std::ifstream file( fn, std::ios::binary );
+    file.seekg( 0, std::ios_base::end );
+    filesize = file.tellg();
+
+    auto n = fn.find_last_of( "/\\" );
+    std::string s = fn;
+
+    if( n != std::string::npos )
+    {
+      s = fn.substr( n + 1 );
+    }
+
+    n = s.find_last_of( "." );
+    startctx = 0;
+    endctx = (int)ContextSetCfg::getInitTable( 0 ).size();
+    files.resize( endctx - startctx );
+    vbins.resize( endctx - startctx );
+    vprobaInit.resize( endctx - startctx );
+#if JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE
+    vdrate0.resize( endctx - startctx );
+    vdrate1.resize( endctx - startctx );
+#endif
+    vrate.resize( endctx - startctx );
+    vweight.resize( endctx - startctx );
+
+    for( int ctxi = startctx; ctxi < endctx; ++ctxi )
+    {
+      s = s.substr( 0, n ) + ".cabac_" + std::to_string( ctxi );
+      files[ctxi].reset( new std::ofstream{ s,std::ios::binary } );
+      auto &file = *files[ctxi];
+      file << "ctx " << ctxi << "\n";
+      if( ctxi < 0 || ctxi >= ( int ) ContextSetCfg::getInitTable( 0 ).size() )
+      {
+        std::cerr << "[ERROR] ctx idx out or range ([0-" << ContextSetCfg::getInitTable( 0 ).size() << "[ )" << std::endl;
+        exit( -1 );
+      }
+#if JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE
+      constexpr int N=3*3+3*2;
+#else
+      constexpr int N=3*3+2;
+#endif
+      for( int k = 0; k < N; ++k )
+      {
+        file << ( int ) ContextSetCfg::getInitTable( k )[ctxi] << ' ';
+      }
+      file << "\n";
+      file << "# SIZE " << filesize << '\n';
+      file << "# POC SLICETYPE QP SWITCHBP REPORT SLICEREPORT S0 S1 RATE WEIGHT DRATE0 DRATE1 BINS[]\n";
+    }
+  }
+}
+#endif
 
 
 template <class BinProbModel>
@@ -354,9 +483,18 @@ unsigned TBinDecoder<BinProbModel>::decodeBin( unsigned ctxId )
       m_bitsNeeded -= 8;
     }
   }
+#if JVET_AG0196_CABAC_RETRAIN
+  CabacRetrain::dumpBin(bin,ctxId);
+#endif
   rcProbModel.update( bin );
+  
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+  m_binBuffer.addBin(bin, ctxId);
+#endif
+
   //DTRACE_DECR_COUNTER( g_trace_ctx, D_CABAC );
   DTRACE_WITHOUT_COUNT( g_trace_ctx, D_CABAC, "  -  " "%d" "\n", bin );
+
   return  bin;
 }
 

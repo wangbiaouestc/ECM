@@ -64,6 +64,13 @@ public:
   const Ctx&  getCtx                    ()                                            const   { return m_BinDecoder.getCtx();  }
   Ctx&        getCtx                    ()                                                    { return m_BinDecoder.getCtx();  }
 
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+  void                  setBinBufferActive (bool b)      { m_BinDecoder.setBinBufferActive(b); }
+  void                  setBinBuffer(BinStoreVector *bb) { m_BinDecoder.setBinBuffer(bb);      }
+  const BinStoreVector *getBinBuffer()             const { return m_BinDecoder.getBinBuffer(); }
+  void                  updateCtxs  (BinStoreVector *bb) { m_BinDecoder.updateCtxs(bb);        }
+#endif
+
 public:
   // slice segment data (clause 7.3.8.1)
   bool        terminating_bit           ();
@@ -76,14 +83,8 @@ public:
   void        sao                       ( CodingStructure&              cs,     unsigned        ctuRsAddr );
 
 #if JVET_V0094_BILATERAL_FILTER
-  void        bif                      (CodingStructure&              cs);
-  void        bif                      (CodingStructure&              cs, unsigned ctuRsAddr);
-#endif
-#if JVET_X0071_CHROMA_BILATERAL_FILTER
-  void        chromaBifCb              (CodingStructure&              cs);
-  void        chromaBifCb              (CodingStructure&              cs, unsigned ctuRsAddr);
-  void        chromaBifCr              (CodingStructure&              cs);
-  void        chromaBifCr              (CodingStructure&              cs, unsigned ctuRsAddr);
+  void        bif                      ( const ComponentID compID, CodingStructure&              cs);
+  void        bif                      ( const ComponentID compID, CodingStructure&              cs, unsigned ctuRsAddr);
 #endif
   
 #if JVET_W0066_CCSAO
@@ -131,7 +132,10 @@ public:
 #if JVET_AA0057_CCCM
   void        cccmFlag                  ( PredictionUnit&               pu );
 #endif
-#if JVET_AD0188_CCP_MERGE
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  void        decoderDerivedCcpModes    ( PredictionUnit&               pu );
+#endif
+#if JVET_AD0188_CCP_MERGE || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   void        nonLocalCCPIndex          ( PredictionUnit&               pu );
 #endif
 #if JVET_AD0120_LBCCP
@@ -142,6 +146,7 @@ public:
  #endif
   void        cu_residual               ( CodingUnit&                   cu,     Partitioner&    pm,       CUCtx& cuCtx );
   void        rqt_root_cbf              ( CodingUnit&                   cu );
+
   void        adaptive_color_transform(CodingUnit&             cu);
   void        sbt_mode                  ( CodingUnit&                   cu );
   void        end_of_ctu                ( CodingUnit&                   cu,     CUCtx&          cuCtx );
@@ -159,6 +164,9 @@ public:
   void        mip_pred_mode             ( PredictionUnit&               pu );
   void        cu_palette_info           ( CodingUnit&                   cu,     ComponentID     compBegin, uint32_t numComp, CUCtx& cuCtx );
   void        cuPaletteSubblockInfo     ( CodingUnit&                   cu,     ComponentID     compBegin, uint32_t numComp, int subSetId, uint32_t& prevRunPos, unsigned& prevRunType );
+#if JVET_AG0058_EIP
+  void        cu_eip_flag              ( CodingUnit& cu                   );
+#endif
   // prediction unit (clause 7.3.8.6)
   void        prediction_unit           ( PredictionUnit&               pu,     MergeCtx&       mrgCtx );
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AC0104_IBC_BVD_PREDICTION
@@ -169,6 +177,10 @@ public:
   void        affine_flag               ( CodingUnit&                   cu );
   void        subblock_merge_flag       ( CodingUnit&                   cu );
   void        merge_idx                 ( PredictionUnit&               pu );
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  void        ibcBiPredictionFlag     ( PredictionUnit&               pu );
+  void        ibcMergeIdx1            ( PredictionUnit&               pu );
+#endif
   void        mmvd_merge_idx(PredictionUnit&               pu);
 #if AFFINE_MMVD
   void        affine_mmvd_data          ( PredictionUnit&               pu );
@@ -216,7 +228,14 @@ public:
 #endif
   void        mvp_flag                ( PredictionUnit&               pu,     RefPicList      eRefList );
   void        Ciip_flag               ( PredictionUnit&               pu );
+#if JVET_AG0135_AFFINE_CIIP
+  void        ciipAffineFlag          ( PredictionUnit&               pu);
+#endif
   void        smvd_mode               ( PredictionUnit&               pu );
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  void        amvpSbTmvpFlag          ( PredictionUnit&               pu );
+  void        amvpSbTmvpMvdCoding     ( PredictionUnit&               pu,     Mv &rMvd );
+#endif
 #if MULTI_HYP_PRED
   int         ref_idx_mh              ( const int                     numRef);
   void        mh_pred_data            ( PredictionUnit&               pu);
@@ -234,7 +253,11 @@ public:
 
 
   // transform tree (clause 7.3.8.8)
-  void        transform_tree           ( CodingStructure&              cs, Partitioner&    pm, CUCtx& cuCtx, const PartSplit ispType = TU_NO_ISP, const int subTuIdx = -1 );
+  void        transform_tree(CodingStructure&              cs, Partitioner&    pm, CUCtx& cuCtx, const PartSplit ispType = TU_NO_ISP, const int subTuIdx = -1
+#if JVET_AE0102_LFNST_CTX  
+    , const bool codeTuCoeff = false
+#endif      
+  );
   bool        cbf_comp                 ( CodingStructure&              cs,     const CompArea& area,     unsigned depth, const bool prevCbf = false, const bool useISP = false );
 
   // mvd coding (clause 7.3.8.9)
@@ -330,35 +353,50 @@ public:
 #endif
 
   // transform unit (clause 7.3.8.10)
-  void        transform_unit            ( TransformUnit&                tu,     CUCtx&          cuCtx, Partitioner& pm,        const int subTuCounter = -1 );
+  void        transform_unit            ( TransformUnit&                tu,     CUCtx&          cuCtx, Partitioner& pm,        const int subTuCounter = -1
+#if JVET_AE0102_LFNST_CTX  
+    , const bool codeTuCoeff = false
+#endif      
+  );
   void        cu_qp_delta               ( CodingUnit&                   cu,     int             predQP, int8_t& qp );
   void        cu_chroma_qp_offset       ( CodingUnit&                   cu );
 
   // residual coding (clause 7.3.8.11)
-  void        residual_coding           ( TransformUnit&                tu,     ComponentID     compID, CUCtx& cuCtx );
+  void        residual_coding           ( TransformUnit&                tu,     ComponentID     compID, CUCtx& cuCtx
+#if JVET_AE0102_LFNST_CTX  
+    , const bool codeTuCoeff = true
+#endif      
+  );
   void        ts_flag                   ( TransformUnit&                tu,     ComponentID     compID );
   void        mts_idx                   ( CodingUnit&                   cu,     CUCtx&          cuCtx  );
   void        residual_lfnst_mode       ( CodingUnit&                   cu,     CUCtx&          cuCtx  );
   void        isp_mode                  ( CodingUnit&                   cu );
   int         last_sig_coeff            ( CoeffCodingContext&           cctx,   TransformUnit& tu, ComponentID   compID );
+
 #if TCQ_8STATES
 #if SIGN_PREDICTION
-  void        residual_coding_subblock  ( CoeffCodingContext&           cctx,   TCoeff*         coeff,   TCoeff*         sign, const uint64_t stateTransTable, int& state );
+#if JVET_AE0102_LFNST_CTX
+  void        residual_coding_subblock(CoeffCodingContext& cctx, TCoeff* coeff, SIGN_PRED_TYPE* sign, const uint64_t stateTransTable, int& state, int lfnstIdx);
 #else
-  void        residual_coding_subblock  ( CoeffCodingContext&           cctx,   TCoeff*         coeff, const uint64_t stateTransTable, int& state );
+  void        residual_coding_subblock(CoeffCodingContext& cctx, TCoeff* coeff, SIGN_PRED_TYPE* sign, const uint64_t stateTransTable, int& state);
+#endif
+#else
+  void residual_coding_subblock(CoeffCodingContext &cctx, TCoeff *coeff, const uint64_t stateTransTable, int &state);
 #endif
 #else
 #if SIGN_PREDICTION
-	void        residual_coding_subblock  ( CoeffCodingContext&           cctx,   TCoeff*         coeff,   TCoeff*         sign, const int stateTransTable, int& state );
+  void        residual_coding_subblock(CoeffCodingContext &cctx, TCoeff *coeff, SIGN_PRED_TYPE *sign,
+                                       const int stateTransTable, int &state);
 #else
-	void        residual_coding_subblock  ( CoeffCodingContext&           cctx,   TCoeff*         coeff, const int stateTransTable, int& state );
+  void residual_coding_subblock(CoeffCodingContext &cctx, TCoeff *coeff, const int stateTransTable, int &state);
 #endif
 #endif
+
 #if SIGN_PREDICTION
   void        parsePredictedSigns       ( TransformUnit &tu, ComponentID compID);
 #endif
 	void        residual_codingTS         ( TransformUnit&                tu,     ComponentID     compID );
-  void        residual_coding_subblockTS( CoeffCodingContext&           cctx,   TCoeff*         coeff  );
+  void   residual_coding_subblockTS(CoeffCodingContext &cctx, TCoeff *coeff);
   void        joint_cb_cr               ( TransformUnit&                tu,     const int cbfMask );
 
 
@@ -382,6 +420,12 @@ public:
 #endif
 #if JVET_AA0070_RRIBC
   void        rribcData                 ( CodingUnit &cu );
+#endif
+#if JVET_AE0059_INTER_CCCM
+  void        interCccm                 ( TransformUnit& tu );
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  void        interCcpMerge             ( TransformUnit& tu );
 #endif
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   CABACDataStore*         m_CABACDataStore;
@@ -407,6 +451,10 @@ public:
 
     m_CABACReaderStd.m_CABACDataStore = m_CABACDataStore;
 
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+    m_BinDecoderStd.initBufferer(CABAC_SPATIAL_MAX_BINS, Ctx::NumberOfContexts, CABAC_SPATIAL_MAX_BINS_PER_CTX);
+#endif
+
     for( int i = 0; i < BPM_NUM - 1; i++ )
     {
       m_CABACReader[i]->m_CABACDataStore = m_CABACDataStore;
@@ -424,7 +472,11 @@ public:
   CABACDecoder()
     : m_CABACReaderStd( m_BinDecoderStd )
     , m_CABACReader{ &m_CABACReaderStd }
-  {}
+  {
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+    m_BinDecoderStd.initBufferer(CABAC_SPATIAL_MAX_BINS, Ctx::NumberOfContexts, CABAC_SPATIAL_MAX_BINS_PER_CTX);
+#endif
+  }
 #endif
 
   CABACReader*                getCABACReader    ( int           id    )       { return m_CABACReader[id]; }

@@ -186,6 +186,12 @@ struct MotionInfo
 #endif
 #if JVET_AC0112_IBC_LIC
   bool     useIbcLic;
+#if JVET_AE0078_IBC_LIC_EXTENSION
+  int      ibcLicIdx;
+#endif
+#endif
+#if JVET_AE0159_FIBC
+  bool      useIbcFilter;
 #endif
 #if JVET_AA0070_RRIBC
   int  rribcFlipType;
@@ -195,6 +201,13 @@ struct MotionInfo
   MultiHypVec addHypData;
 #endif
   Mv      bv;
+
+#if JVET_AG0164_AFFINE_GPM
+  int8_t     gpmPartIdx;
+  MotionInfo() : isSCC(false), isRefSCC(false), isRefRefSCC(false), isInter(false), isIBCmot(false), interDir(0), useAltHpelIf(false), sliceIdx(0), refIdx{ NOT_VALID, NOT_VALID }, bcwIdx(0), usesLIC(false),gpmPartIdx(-1) { }
+  // ensure that MotionInfo(0) produces '\x000....' bit pattern - needed to work with AreaBuf - don't use this constructor for anything else
+  MotionInfo(int i) : isSCC(false), isRefSCC(false), isRefRefSCC(false), isInter(i != 0), isIBCmot(false), interDir(0), useAltHpelIf(false), sliceIdx(0), refIdx{ 0,         0 }, bcwIdx(0), usesLIC(false), gpmPartIdx(-1){ CHECKD(i != 0, "The argument for this constructor has to be '0'"); }
+#else
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
 #if INTER_LIC
   MotionInfo() : isSCC(false), isRefSCC(false), isRefRefSCC(false), isInter(false), isIBCmot(false), interDir(0), useAltHpelIf(false), sliceIdx(0), refIdx{ NOT_VALID, NOT_VALID }, bcwIdx(0), usesLIC(false) { }
@@ -216,7 +229,7 @@ struct MotionInfo
   MotionInfo(int i) : isInter(i != 0), isIBCmot(false), interDir(0), useAltHpelIf(false), sliceIdx(0), refIdx{ 0,         0 }, bcwIdx(0) { CHECKD(i != 0, "The argument for this constructor has to be '0'"); }
 #endif
 #endif
-
+#endif
   bool operator==( const MotionInfo& mi ) const
   {
     if( isInter != mi.isInter  ) return false;

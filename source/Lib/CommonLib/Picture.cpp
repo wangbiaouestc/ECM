@@ -39,12 +39,6 @@
 #include "SEI.h"
 #include "ChromaFormat.h"
 #include "CommonLib/InterpolationFilter.h"
-#if JVET_V0094_BILATERAL_FILTER
-BifParams Picture::m_BifParams;
-#endif
-#if JVET_X0071_CHROMA_BILATERAL_FILTER
-ChromaBifParams Picture::m_ChromaBifParams;
-#endif
 
 #if ENABLE_SPLIT_PARALLELISM
 
@@ -212,15 +206,18 @@ Picture::Picture()
 #endif
 }
 
+void Picture::create(
+  const bool rprEnabled,
 #if JVET_Z0118_GDR
-void Picture::create(const bool gdrEnabled, const ChromaFormat &_chromaFormat, const Size &size, const unsigned _maxCUSize, const unsigned _margin, const bool _decoder, const int _layerId, const bool gopBasedTemporalFilterEnabled)
-#else
-void Picture::create( const ChromaFormat &_chromaFormat, const Size &size, const unsigned _maxCUSize, const unsigned _margin, const bool _decoder, const int _layerId, const bool gopBasedTemporalFilterEnabled )
+  const bool gdrEnabled,
 #endif
+  const bool useWrapAround, const ChromaFormat &_chromaFormat, const Size &size, const unsigned _maxCUSize,
+  const unsigned _margin,
+  const bool _decoder, const int _layerId, const bool gopBasedTemporalFilterEnabled)
 {
   layerId = _layerId;
   UnitArea::operator=( UnitArea( _chromaFormat, Area( Position{ 0, 0 }, size ) ) );
-  margin            =  MAX_SCALING_RATIO*_margin;
+  margin            =  rprEnabled?(MAX_SCALING_RATIO*_margin):_margin;
   const Area a      = Area( Position(), size );
 
 #if JVET_Z0118_GDR
@@ -233,19 +230,15 @@ void Picture::create( const ChromaFormat &_chromaFormat, const Size &size, const
   M_BUFS( 0, PIC_RECONSTRUCTION ).create( _chromaFormat, a, _maxCUSize, margin, MEMORY_ALIGN_DEF_SIZE );
 #endif
 
-  M_BUFS( 0, PIC_RECON_WRAP ).create( _chromaFormat, a, _maxCUSize, margin, MEMORY_ALIGN_DEF_SIZE );
+  if (useWrapAround)
+  {
+    M_BUFS( 0, PIC_RECON_WRAP ).create( _chromaFormat, a, _maxCUSize, margin, MEMORY_ALIGN_DEF_SIZE );
+  }
 
   
   if( !_decoder )
   {
     M_BUFS( 0, PIC_ORIGINAL ).    create( _chromaFormat, a );
-    M_BUFS( 0, PIC_TRUE_ORIGINAL ). create( _chromaFormat, a );
-
-    if( gopBasedTemporalFilterEnabled )
-    {
-      M_BUFS( 0, PIC_FILTERED_ORIGINAL ).create( _chromaFormat, a );
-    }
-
   }
 #if !KEEP_PRED_AND_RESI_SIGNALS
   m_ctuArea = UnitArea( _chromaFormat, Area( Position{ 0, 0 }, Size( _maxCUSize, _maxCUSize ) ) );
@@ -291,7 +284,7 @@ void Picture::destroy()
   }
 }
 
-void Picture::createTempBuffers( const unsigned _maxCUSize )
+void Picture::createTempBuffers( const unsigned _maxCUSize, bool useFilterFrame, bool resChange, bool decoder)
 {
 #if KEEP_PRED_AND_RESI_SIGNALS
   const Area a( Position{ 0, 0 }, lumaSize() );
@@ -314,6 +307,23 @@ void Picture::createTempBuffers( const unsigned _maxCUSize )
 #else
     M_BUFS( jId, PIC_RESIDUAL                     ).create( chromaFormat, a,   _maxCUSize );
 #endif
+    if (!decoder)
+    {
+      M_BUFS(jId, PIC_TRUE_ORIGINAL).create(chromaFormat, aOld, _maxCUSize);
+      if (useFilterFrame)
+      {
+        M_BUFS(jId, PIC_FILTERED_ORIGINAL).create(chromaFormat, aOld, _maxCUSize);
+      }
+      if (resChange)
+      {
+        const Area aInput(Position{ 0, 0 }, Size(M_BUFS(jId, PIC_ORIGINAL_INPUT).Y().width, M_BUFS(jId, PIC_ORIGINAL_INPUT).Y().height));
+        M_BUFS(jId, PIC_TRUE_ORIGINAL_INPUT).create(chromaFormat, aInput, _maxCUSize);
+        if (useFilterFrame)
+        {
+          M_BUFS(jId, PIC_FILTERED_ORIGINAL_INPUT).create(chromaFormat, aInput, _maxCUSize);
+        }
+      }
+    }
 #if ENABLE_SPLIT_PARALLELISM
     if (jId > 0)
     {
@@ -338,7 +348,8 @@ void Picture::destroyTempBuffers()
   {
     for (uint32_t t = 0; t < NUM_PIC_TYPES; t++)
     {
-      if (t == PIC_RESIDUAL || t == PIC_PREDICTION)
+      if (t == PIC_RESIDUAL || t == PIC_PREDICTION || t == PIC_FILTERED_ORIGINAL || t == PIC_TRUE_ORIGINAL
+        || t == PIC_TRUE_ORIGINAL_INPUT || t == PIC_FILTERED_ORIGINAL_INPUT)
       {
         M_BUFS(jId, t).destroy();
       }
@@ -445,15 +456,9 @@ void Picture::finalInit( const VPS* vps, const SPS& sps, const PPS& pps, PicHead
   const int          iWidth = pps.getPicWidthInLumaSamples();
   const int          iHeight = pps.getPicHeightInLumaSamples();
 
-  if( cs )
-  {
-    cs->initStructData();
-    cs->sps = &sps; 
-  }
-  else
+  if (cs == nullptr)
   {
     cs = new CodingStructure( g_globalUnitCache.cuCache, g_globalUnitCache.puCache, g_globalUnitCache.tuCache );
-    cs->sps = &sps;
 #if JVET_Z0118_GDR
     cs->create(chromaFormatIDC, Area(0, 0, iWidth, iHeight), true, (bool)sps.getPLTMode(), sps.getGDREnabledFlag());
 #else
@@ -461,6 +466,7 @@ void Picture::finalInit( const VPS* vps, const SPS& sps, const PPS& pps, PicHead
 #endif
 
   }
+  cs->sps = &sps;
 
   cs->vps = vps;
   cs->picture = this;

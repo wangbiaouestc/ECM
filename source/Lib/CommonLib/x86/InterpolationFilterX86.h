@@ -5062,6 +5062,300 @@ void xWeightedGeoTpl_SSE(const PredictionUnit &pu, const uint8_t splitDir, PelUn
 }
 #endif
 
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+template< X86_VEXT vext >
+void  xWeightedBlendBlk_SSE(const PredictionUnit& pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1, WeightBuf& weightBuf, const int log2WeightBase, const bool roundOutputBD)
+{
+  Pel* dst  = predDst.get(compIdx).buf;
+  Pel* src0 = predSrc0.get(compIdx).buf;
+  Pel* src1 = predSrc1.get(compIdx).buf;
+  int32_t strideDst  = predDst.get(compIdx).stride;
+  int32_t strideSrc0 = predSrc0.get(compIdx).stride;
+  int32_t strideSrc1 = predSrc1.get(compIdx).stride;
+
+  const ClpRng  clpRng = pu.cu->slice->clpRngs().comp[compIdx];
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+  const int32_t shiftWeighted = (roundOutputBD ? IF_INTERNAL_FRAC_BITS(clpRng.bd) : 0) + log2WeightBase;
+#else
+  const int32_t shiftWeighted = std::max<int>(2, (IF_INTERNAL_PREC - clpRng.bd)) + log2WeightBase;
+#endif
+  const int32_t offsetWeighted = (1 << (shiftWeighted - 1)) + (roundOutputBD ? (IF_INTERNAL_OFFS << log2WeightBase) : 0);
+
+  int16_t* weight = weightBuf.buf;
+  int16_t stepY   = weightBuf.stride;
+
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
+  const __m128i mmEight = _mm_set1_epi16(32);
+#else
+  const __m128i mmEight = _mm_set1_epi16(8);
+#endif
+  const __m128i mmOffset = _mm_set1_epi32(offsetWeighted);
+  const __m128i mmShift = _mm_cvtsi32_si128(shiftWeighted);
+  const __m128i mmMin = _mm_set1_epi16(clpRng.min);
+  const __m128i mmMax = _mm_set1_epi16(clpRng.max);
+
+  if (compIdx != COMPONENT_Y && pu.chromaFormat == CHROMA_420)
+  {
+    stepY <<= 1;
+  }
+  if (width == 4)
+  {
+    // it will occur to chroma only
+    for (int y = 0; y < height; y++)
+    {
+      __m128i s0 = _mm_loadl_epi64((__m128i *) (src0));
+      __m128i s1 = _mm_loadl_epi64((__m128i *) (src1));
+      __m128i w0 = _mm_loadu_si128((__m128i *) (weight));
+      w0 = _mm_shuffle_epi8(w0, _mm_setr_epi8(0, 1, 4, 5, 8, 9, 12, 13, 0, 0, 0, 0, 0, 0, 0, 0));
+      __m128i w1 = _mm_sub_epi16(mmEight, w0);
+      s0 = _mm_unpacklo_epi16(s0, s1);
+      w0 = _mm_unpacklo_epi16(w1, w0);
+      s0 = _mm_add_epi32(_mm_madd_epi16(s0, w0), mmOffset);
+      s0 = _mm_sra_epi32(s0, mmShift);
+      s0 = _mm_packs_epi32(s0, s0);
+      s0 = _mm_min_epi16(mmMax, _mm_max_epi16(s0, mmMin));
+      _mm_storel_epi64((__m128i *) (dst), s0);
+      dst += strideDst;
+      src0 += strideSrc0;
+      src1 += strideSrc1;
+      weight += stepY;
+    }
+  }
+#if USE_AVX2
+  else if (width >= 16)
+  {
+#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
+    const __m256i mmEightAVX2 = _mm256_set1_epi16(32);
+#else
+    const __m256i mmEightAVX2 = _mm256_set1_epi16(8);
+#endif
+    const __m256i mmOffsetAVX2 = _mm256_set1_epi32(offsetWeighted);
+    const __m256i mmMinAVX2 = _mm256_set1_epi16(clpRng.min);
+    const __m256i mmMaxAVX2 = _mm256_set1_epi16(clpRng.max);
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x += 16)
+      {
+        __m256i s0 = _mm256_lddqu_si256((__m256i *) (src0 + x)); // why not aligned with 128/256 bit boundaries
+        __m256i s1 = _mm256_lddqu_si256((__m256i *) (src1 + x));
+        __m256i w0;
+        if (compIdx != COMPONENT_Y &&  pu.chromaFormat != CHROMA_444)
+        {
+          const __m256i mask = _mm256_set_epi16(0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1);
+          __m256i w0p0, w0p1;
+          w0p0 = _mm256_lddqu_si256((__m256i *) (weight + (x << 1))); // first sub-sample the required weights.
+          w0p1 = _mm256_lddqu_si256((__m256i *) (weight + (x << 1) + 16));
+          w0p0 = _mm256_mullo_epi16(w0p0, mask);
+          w0p1 = _mm256_mullo_epi16(w0p1, mask);
+          w0 = _mm256_packs_epi16(w0p0, w0p1);
+          w0 = _mm256_permute4x64_epi64(w0, _MM_SHUFFLE(3, 1, 2, 0));
+        }
+        else
+        {
+          w0 = _mm256_lddqu_si256((__m256i *) (weight + x));
+        }
+        __m256i w1 = _mm256_sub_epi16(mmEightAVX2, w0);
+
+        __m256i s0tmp = _mm256_unpacklo_epi16(s0, s1);
+        __m256i w0tmp = _mm256_unpacklo_epi16(w1, w0);
+        s0tmp = _mm256_add_epi32(_mm256_madd_epi16(s0tmp, w0tmp), mmOffsetAVX2);
+        s0tmp = _mm256_sra_epi32(s0tmp, mmShift);
+
+        s0 = _mm256_unpackhi_epi16(s0, s1);
+        w0 = _mm256_unpackhi_epi16(w1, w0);
+        s0 = _mm256_add_epi32(_mm256_madd_epi16(s0, w0), mmOffsetAVX2);
+        s0 = _mm256_sra_epi32(s0, mmShift);
+
+        s0 = _mm256_packs_epi32(s0tmp, s0);
+        s0 = _mm256_min_epi16(mmMaxAVX2, _mm256_max_epi16(s0, mmMinAVX2));
+        _mm256_storeu_si256((__m256i *) (dst + x), s0);
+      }
+      dst += strideDst;
+      src0 += strideSrc0;
+      src1 += strideSrc1;
+      weight += stepY;
+    }
+  }
+#endif
+  else
+  {
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x += 8)
+      {
+        __m128i s0 = _mm_lddqu_si128((__m128i *) (src0 + x));
+        __m128i s1 = _mm_lddqu_si128((__m128i *) (src1 + x));
+        __m128i w0;
+        if (compIdx != COMPONENT_Y && pu.chromaFormat != CHROMA_444)
+        {
+          const __m128i mask = _mm_set_epi16(0, 1, 0, 1, 0, 1, 0, 1);
+          __m128i w0p0, w0p1;
+          w0p0 = _mm_lddqu_si128((__m128i *) (weight + (x << 1))); // first sub-sample the required weights.
+          w0p1 = _mm_lddqu_si128((__m128i *) (weight + (x << 1) + 8));
+          w0p0 = _mm_mullo_epi16(w0p0, mask);
+          w0p1 = _mm_mullo_epi16(w0p1, mask);
+          w0 = _mm_packs_epi32(w0p0, w0p1);
+        }
+        else
+        {
+          w0 = _mm_lddqu_si128((__m128i *) (weight + x));
+        }
+        __m128i w1 = _mm_sub_epi16(mmEight, w0);
+
+        __m128i s0tmp = _mm_unpacklo_epi16(s0, s1);
+        __m128i w0tmp = _mm_unpacklo_epi16(w1, w0);
+        s0tmp = _mm_add_epi32(_mm_madd_epi16(s0tmp, w0tmp), mmOffset);
+        s0tmp = _mm_sra_epi32(s0tmp, mmShift);
+
+        s0 = _mm_unpackhi_epi16(s0, s1);
+        w0 = _mm_unpackhi_epi16(w1, w0);
+        s0 = _mm_add_epi32(_mm_madd_epi16(s0, w0), mmOffset);
+        s0 = _mm_sra_epi32(s0, mmShift);
+
+        s0 = _mm_packs_epi32(s0tmp, s0);
+        s0 = _mm_min_epi16(mmMax, _mm_max_epi16(s0, mmMin));
+        _mm_storeu_si128((__m128i *) (dst + x), s0);
+      }
+      dst += strideDst;
+      src0 += strideSrc0;
+      src1 += strideSrc1;
+      weight += stepY;
+    }
+  }
+}
+
+template<X86_VEXT vext>
+void  xWeightAffineBlk_SSE( const PredictionUnit& pu, WeightBuf& bufWeight, const int bcwBlendingLog2WeightBase, AffineBlendingModel& blendModel )
+{
+  int* param  = blendModel.params;
+  int offset  = blendModel.offset;
+  int shift   = blendModel.shift;
+  int min     = blendModel.min;
+  int max     = blendModel.max;
+
+  const int biasPlusOffset = param[2] + offset;
+  const int x0 = 0;
+  const int y0 = 0;
+
+  int width   = pu.lwidth();
+  int height  = pu.lheight();
+
+  int16_t*  bcwBlendBuf = bufWeight.buf;
+  int       stride      = bufWeight.stride;
+
+  if ( width % 8 )
+  {
+    printf("computeWeightMap_X86( width = %d ) not implemented.", width );
+    exit(0);
+  }
+#if USE_AVX2
+  else if ( (width % 16) == 0 )
+  {
+    const __m256i mmMin = _mm256_set1_epi16( min );
+    const __m256i mmMax = _mm256_set1_epi16( max );
+
+    __m256i vOne    = _mm256_set1_epi32( 1 );
+    __m256i vEight  = _mm256_set1_epi32( 8 );
+    __m256i vSixt   = _mm256_set1_epi32( 16 );
+
+    __m256i vpar0 = _mm256_set1_epi32( param[0] ); // 8 32-bits values
+    __m256i vpar1 = _mm256_set1_epi32( param[1] );
+    __m256i bias0 = _mm256_set1_epi32( biasPlusOffset ); // 8 32-bits values
+
+    __m256i vparXA = _mm256_set_epi32( x0 + 7, x0 + 6, x0 + 5, x0 + 4, x0 + 3, x0 + 2, x0 + 1, x0 + 0 );
+    __m256i vparXB = _mm256_add_epi32( vparXA, vEight ); // X = X + 8
+    __m256i vparY  = _mm256_set1_epi32( y0 );
+
+    const int imm8_control = 0b11011000;
+
+    for (int row = 0; row < height; row++)
+    {
+      __m256i vparX0 = vparXA;
+      __m256i vparX1 = vparXB;
+      __m256i vsum03 = _mm256_mullo_epi32( vparY, vpar1 );  // b.Y
+      for (int col = 0; col < width; col += 16)
+      {
+        __m256i vsum01 = _mm256_add_epi32( _mm256_mullo_epi32( vparX0, vpar0 ), vsum03 ); // a.X + b.Y
+        __m256i vsum02 = _mm256_add_epi32( _mm256_mullo_epi32( vparX1, vpar0 ), vsum03 ); // a.X + b.Y
+
+        vsum01 = _mm256_add_epi32( vsum01, bias0 );  // a.X + b.Y + c
+        vsum02 = _mm256_add_epi32( vsum02, bias0 );  // a.X + b.Y + c
+
+        vsum01 = _mm256_srai_epi32( vsum01, shift );
+        vsum02 = _mm256_srai_epi32( vsum02, shift );
+
+        vsum01 = _mm256_packs_epi32( vsum01, vsum02 );
+
+        vsum01 = _mm256_permute4x64_epi64( vsum01, imm8_control );
+
+        vsum01 = _mm256_min_epi16( mmMax, _mm256_max_epi16( vsum01, mmMin ) );  // clipping
+
+        _mm256_storeu_si256( (__m256i*)(bcwBlendBuf + col), vsum01 );
+
+        vparX0 = _mm256_add_epi32( vparX0, vSixt ); // X = X + 16
+        vparX1 = _mm256_add_epi32( vparX1, vSixt ); // X = X + 16
+      }
+
+      vparY = _mm256_add_epi32( vparY, vOne ); // increment by 1
+
+      bcwBlendBuf += stride;
+    }
+
+  }
+#endif
+  else if ( (width % 8) == 0 )
+  {
+
+    const __m128i mmMin = _mm_set1_epi16( min );
+    const __m128i mmMax = _mm_set1_epi16( max );
+
+    __m128i vOne    = _mm_set1_epi32( 1 );
+    __m128i vEight  = _mm_set1_epi32( 8 );
+
+    __m128i vpar0 = _mm_set1_epi32( param[0] ); // 4 32-bits values
+    __m128i vpar1 = _mm_set1_epi32( param[1] );
+    __m128i bias0 = _mm_set1_epi32( biasPlusOffset ); // 4 32-bits values
+
+    __m128i vparXA = _mm_set_epi32( x0 + 3, x0 + 2, x0 + 1, x0 + 0 );
+    __m128i vparXB = _mm_set_epi32( x0 + 7, x0 + 6, x0 + 5, x0 + 4 );
+    __m128i vparY  = _mm_set1_epi32( y0 );
+
+    for (int row = 0; row < height; row++)
+    {
+      __m128i vparX0 = vparXA;
+      __m128i vparX1 = vparXB;
+      for (int col = 0; col < width; col += 8)
+      {
+        __m128i vsum03 = _mm_mullo_epi32( vparY, vpar1 );
+        __m128i vsum01 = _mm_add_epi32( _mm_mullo_epi32( vparX0, vpar0 ), vsum03 ); // a.X + b.Y
+        __m128i vsum02 = _mm_add_epi32( _mm_mullo_epi32( vparX1, vpar0 ), vsum03 ); // a.X + b.Y
+
+        vsum01 = _mm_add_epi32( vsum01, bias0 );  // a.X + b.Y + c
+        vsum02 = _mm_add_epi32( vsum02, bias0 );  // a.X + b.Y + c
+
+        vsum01 = _mm_srai_epi32( vsum01, shift );
+        vsum02 = _mm_srai_epi32( vsum02, shift );
+
+        vsum01 = _mm_packs_epi32( vsum01, vsum02 );
+
+        vsum01 = _mm_min_epi16( mmMax, _mm_max_epi16( vsum01, mmMin ) );  // clipping
+
+        _mm_storeu_si128( (__m128i*)(bcwBlendBuf + col), vsum01 );
+
+        vparX0 = _mm_add_epi32( vparX0, vEight ); // X = X + 8
+        vparX1 = _mm_add_epi32( vparX1, vEight ); // X = X + 8
+      }
+
+      vparY = _mm_add_epi32( vparY, vOne ); // increment by 1
+
+      bcwBlendBuf += stride;
+    }
+
+  }
+}
+
+#endif
+
 template <X86_VEXT vext>
 void InterpolationFilter::_initInterpolationFilterX86()
 {
@@ -5221,6 +5515,10 @@ void InterpolationFilter::_initInterpolationFilterX86()
   m_weightedGeoBlk = xWeightedGeoBlk_SSE<vext>;
 #if JVET_Y0065_GPM_INTRA
   m_weightedGeoBlkRounded = xWeightedGeoBlkRounded_SSE<vext>;
+#endif
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  m_weightedBlendBlk = xWeightedBlendBlk_SSE<vext>;
+  m_weightAffineBlk  = xWeightAffineBlk_SSE<vext>;
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   m_weightedGeoTplA = xWeightedGeoTpl_SSE<vext, true>;

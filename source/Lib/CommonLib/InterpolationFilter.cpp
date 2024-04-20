@@ -187,10 +187,37 @@ const TFilterCoeff InterpolationFilter::m_affineLumaFilterUpRPR[LUMA_INTERPOLATI
 };
 #endif
 
+#if JVET_AE0150_SMALL_SCALE_RPR_FILTERS
+// 1.35x
+const TFilterCoeff InterpolationFilter::m_lumaFilterRPR1[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS + 1][12] =
+{
+  {   -1,    0,    7,  -28,   55,  190,   55,  -28,    7,    0,   -1,    0},
+  {   -1,    0,    8,  -26,   43,  189,   66,  -29,    6,    1,   -1,    0},
+  {    0,   -1,    8,  -24,   32,  187,   77,  -29,    5,    2,   -1,    0},
+  {    0,   -1,    8,  -22,   22,  183,   90,  -29,    3,    3,   -1,    0},
+  {    0,   -1,    8,  -19,   13,  178,  101,  -28,    2,    3,   -1,    0},
+  {    0,   -1,    8,  -17,    5,  172,  113,  -26,    0,    4,   -2,    0},
+  {    0,   -2,    8,  -14,   -3,  165,  125,  -23,   -3,    5,   -2,    0},
+  {    0,   -2,    7,  -11,   -9,  156,  136,  -20,   -5,    6,   -2,    0},
+  {    0,   -2,    7,   -8,  -15,  146,  146,  -15,   -8,    7,   -2,    0},
+  {    0,   -2,    6,   -5,  -20,  136,  156,   -9,  -11,    7,   -2,    0},
+  {    0,   -2,    5,   -3,  -23,  125,  165,   -3,  -14,    8,   -2,    0},
+  {    0,   -2,    4,    0,  -26,  113,  172,    5,  -17,    8,   -1,    0},
+  {    0,   -1,    3,    2,  -28,  101,  178,   13,  -19,    8,   -1,    0},
+  {    0,   -1,    3,    3,  -29,   90,  183,   22,  -22,    8,   -1,    0},
+  {    0,   -1,    2,    5,  -29,   77,  187,   32,  -24,    8,   -1,    0},
+  {    0,   -1,    1,    6,  -29,   66,  189,   43,  -26,    8,    0,   -1},
+};
+#endif
+
 // 1.5x
 #if IF_12TAP
 #if JVET_AA0042_RPR_FILTERS
+#if JVET_AE0150_SMALL_SCALE_RPR_FILTERS
+const TFilterCoeff InterpolationFilter::m_lumaFilterRPR2[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS + 1][12] =
+#else
 const TFilterCoeff InterpolationFilter::m_lumaFilterRPR1[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS + 1][12] =
+#endif
 #else
 const TFilterCoeff InterpolationFilter::m_lumaFilterRPR1[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][8] =
 #endif
@@ -260,7 +287,11 @@ const TFilterCoeff InterpolationFilter::m_lumaFilterRPR1[LUMA_INTERPOLATION_FILT
 // 2x
 #if IF_12TAP
 #if JVET_AA0042_RPR_FILTERS
+#if JVET_AE0150_SMALL_SCALE_RPR_FILTERS
+const TFilterCoeff InterpolationFilter::m_lumaFilterRPR3[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS + 1][12] =
+#else
 const TFilterCoeff InterpolationFilter::m_lumaFilterRPR2[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS + 1][12] =
+#endif
 #else
 const TFilterCoeff InterpolationFilter::m_lumaFilterRPR2[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][8] =
 #endif
@@ -327,10 +358,37 @@ const TFilterCoeff InterpolationFilter::m_lumaFilterRPR2[LUMA_INTERPOLATION_FILT
 #endif
 };
 
+#if JVET_AE0150_SMALL_SCALE_RPR_FILTERS
+// 1.35x
+const TFilterCoeff InterpolationFilter::m_affineLumaFilterRPR1[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS + 1][12] =
+{
+    {    0,   -1,    7,  -28,   55,  190,   55,  -28,    7,    0,   -1,    0 },
+    {    0,   -1,    8,  -26,   43,  189,   66,  -29,    6,    1,   -1,    0 },
+    {    0,   -1,    8,  -24,   32,  187,   77,  -29,    5,    2,   -1,    0 },
+    {    0,   -1,    8,  -22,   22,  183,   90,  -29,    3,    3,   -1,    0 },
+    {    0,   -1,    8,  -19,   13,  178,  101,  -28,    2,    3,   -1,    0 },
+    {    0,   -1,    8,  -17,    5,  172,  113,  -26,    0,    4,   -2,    0 },
+    {    0,   -2,    8,  -14,   -3,  165,  125,  -23,   -3,    5,   -2,    0 },
+    {    0,   -2,    7,  -11,   -9,  156,  136,  -20,   -5,    6,   -2,    0 },
+    {    0,   -2,    7,   -8,  -15,  146,  146,  -15,   -8,    7,   -2,    0 },
+    {    0,   -2,    6,   -5,  -20,  136,  156,   -9,  -11,    7,   -2,    0 },
+    {    0,   -2,    5,   -3,  -23,  125,  165,   -3,  -14,    8,   -2,    0 },
+    {    0,   -2,    4,    0,  -26,  113,  172,    5,  -17,    8,   -1,    0 },
+    {    0,   -1,    3,    2,  -28,  101,  178,   13,  -19,    8,   -1,    0 },
+    {    0,   -1,    3,    3,  -29,   90,  183,   22,  -22,    8,   -1,    0 },
+    {    0,   -1,    2,    5,  -29,   77,  187,   32,  -24,    8,   -1,    0 },
+    {    0,   -1,    1,    6,  -29,   66,  189,   43,  -26,    8,   -1,    0 },
+};
+#endif
+
 // 1.5x
 #if IF_12TAP
 #if JVET_AA0042_RPR_FILTERS
+#if JVET_AE0150_SMALL_SCALE_RPR_FILTERS
+const TFilterCoeff InterpolationFilter::m_affineLumaFilterRPR2[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS + 1][12] =
+#else
 const TFilterCoeff InterpolationFilter::m_affineLumaFilterRPR1[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS + 1][12] =
+#endif
 #else
 const TFilterCoeff InterpolationFilter::m_affineLumaFilterRPR1[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][8] =
 #endif
@@ -400,7 +458,11 @@ const TFilterCoeff InterpolationFilter::m_affineLumaFilterRPR1[LUMA_INTERPOLATIO
 // 2x
 #if IF_12TAP
 #if JVET_AA0042_RPR_FILTERS
+#if JVET_AE0150_SMALL_SCALE_RPR_FILTERS
+const TFilterCoeff InterpolationFilter::m_affineLumaFilterRPR3[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS + 1][12] =
+#else
 const TFilterCoeff InterpolationFilter::m_affineLumaFilterRPR2[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS + 1][12] =
+#endif
 #else
 const TFilterCoeff InterpolationFilter::m_affineLumaFilterRPR2[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][8] =
 #endif
@@ -709,7 +771,7 @@ const TFilterCoeff InterpolationFilter::m_lumaIntraFilterExt[CHROMA_INTERPOLATIO
   {   3, -23, 121, 178, -26,   3 },
   {   3, -22, 116, 181, -25,   3 },
   {   3, -21, 111, 185, -25,   3 },
-  {   3, -21, 106, 180, -25,   3 },
+  {   3, -20, 106, 189, -25,   3 },
   {   3, -20, 101, 194, -25,   3 },
   {   2, -20,  97, 198, -24,   3 },
   {   2, -19,  92, 202, -24,   3 },
@@ -879,9 +941,52 @@ const TFilterCoeff InterpolationFilter::g_aiExtIntraGaussFilter[CHROMA_INTERPOLA
 };
 #endif
 
+#if JVET_AE0150_SMALL_SCALE_RPR_FILTERS
+// 1.35x
+const TFilterCoeff InterpolationFilter::m_chromaFilterRPR1[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA_RPR] =
+{
+  {   -8,   41,  190,   41,   -8,    0},
+  {   -7,   36,  189,   46,   -8,    0},
+  {   -7,   31,  190,   51,   -9,    0},
+  {   -6,   27,  187,   57,   -9,    0},
+  {   -5,   22,  186,   63,  -10,    0},
+  {   -5,   18,  184,   69,  -10,    0},
+  {   -4,   15,  181,   74,  -10,    0},
+  {   -4,   11,  179,   81,  -11,    0},
+  {   -3,    8,  175,   87,  -11,    0},
+  {   -3,    5,  172,   93,  -11,    0},
+  {   -3,    3,  167,  100,  -11,    0},
+  {   -2,    0,  163,  106,  -11,    0},
+  {   -2,   -2,  158,  112,  -10,    0},
+  {   -2,   -4,  153,  119,  -10,    0},
+  {   -1,   -5,  147,  124,   -9,    0},
+  {   -1,   -7,  143,  131,   -9,   -1},
+  {   -1,   -8,  137,  137,   -8,   -1},
+  {   -1,   -9,  131,  143,   -7,   -1},
+  {    0,   -9,  124,  147,   -5,   -1},
+  {    0,  -10,  119,  153,   -4,   -2},
+  {    0,  -10,  112,  158,   -2,   -2},
+  {    0,  -11,  106,  163,    0,   -2},
+  {    0,  -11,  100,  167,    3,   -3},
+  {    0,  -11,   93,  172,    5,   -3},
+  {    0,  -11,   87,  175,    8,   -3},
+  {    0,  -11,   81,  179,   11,   -4},
+  {    0,  -10,   74,  181,   15,   -4},
+  {    0,  -10,   69,  184,   18,   -5},
+  {    0,  -10,   63,  186,   22,   -5},
+  {    0,   -9,   57,  187,   27,   -6},
+  {    0,   -9,   51,  190,   31,   -7},
+  {    0,   -8,   46,  189,   36,   -7},
+};
+#endif
+
 //1.5x
 #if JVET_Z0117_CHROMA_IF
+#if JVET_AE0150_SMALL_SCALE_RPR_FILTERS
+const TFilterCoeff InterpolationFilter::m_chromaFilterRPR2[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA_RPR] =
+#else
 const TFilterCoeff InterpolationFilter::m_chromaFilterRPR1[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA_RPR] =
+#endif
 #else
 const TFilterCoeff InterpolationFilter::m_chromaFilterRPR1[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA] =
 #endif
@@ -992,7 +1097,11 @@ const TFilterCoeff InterpolationFilter::m_chromaFilterRPR1[CHROMA_INTERPOLATION_
 
 //2x
 #if JVET_Z0117_CHROMA_IF
+#if JVET_AE0150_SMALL_SCALE_RPR_FILTERS
+const TFilterCoeff InterpolationFilter::m_chromaFilterRPR3[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA_RPR] =
+#else
 const TFilterCoeff InterpolationFilter::m_chromaFilterRPR2[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA_RPR] =
+#endif
 #else
 const TFilterCoeff InterpolationFilter::m_chromaFilterRPR2[CHROMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][NTAPS_CHROMA] =
 #endif
@@ -1328,6 +1437,10 @@ InterpolationFilter::InterpolationFilter()
   m_weightedGeoBlk = xWeightedGeoBlk;
 #if JVET_Y0065_GPM_INTRA
   m_weightedGeoBlkRounded = xWeightedGeoBlkRounded;
+#endif
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  m_weightedBlendBlk = xWeightedBlendBlk;
+  m_weightAffineBlk = xWeightAffineBlk;
 #endif
 #if JVET_AB0155_SGPM
   m_weightedSgpm = xWeightedSgpm;
@@ -2159,12 +2272,30 @@ void InterpolationFilter::filterVer(const ComponentID compID, Pel const *src, in
     }
     else if (nFilterIdx == 5)
     {
+#if JVET_AE0150_SMALL_SCALE_RPR_FILTERS
+      filterVer<NTAPS_LUMA(0)>(clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_lumaFilterRPR3[frac], biMCForDMVR);
+#else
       filterVer<NTAPS_LUMA(0)>(clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_affineLumaFilterRPR1[frac], biMCForDMVR);
+#endif
     }
     else if (nFilterIdx == 6)
     {
+#if JVET_AE0150_SMALL_SCALE_RPR_FILTERS
+      filterVer<NTAPS_LUMA(0)>(clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_affineLumaFilterRPR1[frac], biMCForDMVR);
+#else
+      filterVer<NTAPS_LUMA(0)>(clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_affineLumaFilterRPR2[frac], biMCForDMVR);
+#endif
+    }
+#if JVET_AE0150_SMALL_SCALE_RPR_FILTERS
+    else if (nFilterIdx == 7)
+    {
       filterVer<NTAPS_LUMA(0)>(clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_affineLumaFilterRPR2[frac], biMCForDMVR);
     }
+    else if (nFilterIdx == 8)
+    {
+      filterVer<NTAPS_LUMA(0)>(clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_affineLumaFilterRPR3[frac], biMCForDMVR);
+    }
+#endif
 #else
     else if (nFilterIdx == 3)
     {
@@ -2282,6 +2413,12 @@ void InterpolationFilter::filterVer(const ComponentID compID, Pel const *src, in
       filterVer<NTAPS_CHROMA>( clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_chromaFilterRPR2[frac << ( 1 - csy )], biMCForDMVR );
 #endif
     }
+#if JVET_AE0150_SMALL_SCALE_RPR_FILTERS
+    else if (nFilterIdx == 5)
+    {
+      filterVer<NTAPS_CHROMA_RPR>(clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_chromaFilterRPR3[frac << (1 - csy)], biMCForDMVR);
+    }
+#endif
     else
     {
       filterVer<NTAPS_CHROMA>( clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_chromaFilter[frac << ( 1 - csy )], biMCForDMVR );
@@ -2765,6 +2902,81 @@ void InterpolationFilter::xWeightedGeoBlkRounded(const PredictionUnit &pu, const
     weight += stepY;
   }
 }
+#endif
+
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+void InterpolationFilter::weightedBlendBlk( const PredictionUnit& pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1, WeightBuf& weightBuf, const int log2WeightBase, const bool roundOutputBD )
+{
+  m_weightedBlendBlk( pu, width, height, compIdx, predDst, predSrc0, predSrc1, weightBuf, log2WeightBase, roundOutputBD );
+}
+
+void InterpolationFilter::xWeightedBlendBlk( const PredictionUnit& pu, const uint32_t width, const uint32_t height, const ComponentID compIdx, PelUnitBuf& predDst, PelUnitBuf& predSrc0, PelUnitBuf& predSrc1, WeightBuf& weightBuf, const int log2WeightBase, const bool roundOutputBD )
+{
+        Pel*    dst   = predDst.get(compIdx).buf;
+  const Pel*    src0  = predSrc0.get(compIdx).buf;
+  const Pel*    src1  = predSrc1.get(compIdx).buf;
+  int32_t strideDst   = predDst.get(compIdx).stride;
+  int32_t strideSrc0  = predSrc0.get(compIdx).stride;
+  int32_t strideSrc1  = predSrc1.get(compIdx).stride;
+
+//#if JVET_AA0058_GPM_ADAPTIVE_BLENDING
+//  const char    log2WeightBase = 5;
+//#else
+//  const char    log2WeightBase = 3;
+//#endif
+  const ClpRng  clipRng = pu.cu->slice->clpRngs().comp[compIdx];
+  const int32_t clipbd = clipRng.bd;
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+  const int32_t shiftWeighted = (roundOutputBD ? IF_INTERNAL_FRAC_BITS(clipbd) : 0) + log2WeightBase;
+#else
+  const int32_t shiftWeighted = std::max<int>(2, (IF_INTERNAL_PREC - clipbd)) + log2WeightBase;
+#endif
+  const int32_t offsetWeighted = (1 << (shiftWeighted - 1)) + (roundOutputBD ? (IF_INTERNAL_OFFS << log2WeightBase) : 0 );
+  const uint32_t scaleX = getComponentScaleX(compIdx, pu.chromaFormat);
+  const uint32_t scaleY = getComponentScaleY(compIdx, pu.chromaFormat);
+
+  int16_t stepX = 1 << scaleX;
+  int16_t stepY = 1 << scaleY;
+  //int16_t* weight = nullptr;
+  int16_t* weight = weightBuf.buf;
+  int16_t one = 1 << log2WeightBase;
+  //int32_t strideWeight = weightBuf.stride;
+
+  for( int y = 0; y < height; y++ )
+  {
+    for( int x = 0; x < width; x++ )
+    {
+      dst[x] = ClipPel(rightShift(( (one - weight[x * stepX])*(src0[x]) + ( (weight[x * stepX]) * (src1[x])) + offsetWeighted), shiftWeighted), clipRng);
+    }
+    dst    += strideDst;
+    src0   += strideSrc0;
+    src1   += strideSrc1;
+    weight += weightBuf.stride * stepY;
+  }
+}
+
+void InterpolationFilter::weightAffineBlk(const PredictionUnit& pu, WeightBuf& bufWeight, const int log2WeightBase, AffineBlendingModel& blendModel)
+{
+  m_weightAffineBlk( pu, bufWeight, log2WeightBase, blendModel );
+}
+
+void InterpolationFilter::xWeightAffineBlk( const PredictionUnit& pu, WeightBuf& bufWeight, const int log2WeightBase, AffineBlendingModel& blendModel )
+{
+  const int width   = pu.lwidth();
+  const int height  = pu.lheight();
+
+  for (int y = 0; y < height; y++)
+  {
+    int16_t* weight = bufWeight.bufAt( 0, y );
+
+    for (int x = 0; x < width; x++)
+    {
+      int iWeight = blendModel.compute( x, y );
+      weight[x] = iWeight;
+    }
+  }
+}
+
 #endif
 
 /**

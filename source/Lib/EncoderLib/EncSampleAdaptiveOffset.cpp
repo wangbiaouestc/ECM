@@ -107,7 +107,6 @@ EncSampleAdaptiveOffset::EncSampleAdaptiveOffset()
 
 EncSampleAdaptiveOffset::~EncSampleAdaptiveOffset()
 {
-  destroyEncData();
 }
 
 void EncSampleAdaptiveOffset::createEncData(bool isPreDBFSamplesUsed, uint32_t numCTUsPic)
@@ -204,17 +203,22 @@ void EncSampleAdaptiveOffset::createEncData(bool isPreDBFSamplesUsed, uint32_t n
 
   for (int i = 0; i < MAX_CCSAO_SET_NUM; i++)
   {
-    m_ccSaoStatData[i] = new CcSaoStatData[m_numCTUsInPic];
+    m_ccSaoStatData    [i] = new CcSaoStatData[m_numCTUsInPic];
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
     m_ccSaoStatDataEdge[i] = new CcSaoStatData[m_numCTUsInPic];
 #endif
   }
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+  int numStatsEdge = m_numCTUsInPic * MAX_CCSAO_EDGE_DIR * MAX_CCSAO_EDGE_THR * MAX_CCSAO_BAND_IDC * MAX_NUM_COMPONENT * MAX_CCSAO_EDGE_IDC;
+  m_ccSaoStatDataEdgePre = new CcSaoStatData[numStatsEdge];
+#else
   for (int comp = Y_C; comp < N_C; comp++)
   {
     m_ccSaoStatDataEdgeNew[comp] = new CcSaoStatData[m_numCTUsInPic * (CCSAO_EDGE_BAND_NUM_Y + CCSAO_EDGE_BAND_NUM_C)
                                                      * CCSAO_QUAN_NUM * CCSAO_EDGE_TYPE];
   }
+#endif
 #endif
   m_bestCcSaoControl = new uint8_t[m_numCTUsInPic];
   m_tempCcSaoControl = new uint8_t[m_numCTUsInPic];
@@ -259,16 +263,15 @@ void EncSampleAdaptiveOffset::destroyEncData()
 
   for (int i = 0; i < MAX_CCSAO_SET_NUM; i++)
   {
-    if (m_ccSaoStatData[i]) { delete[] m_ccSaoStatData[i]; m_ccSaoStatData[i] = nullptr; }
+    if (m_ccSaoStatData    [i]) { delete[] m_ccSaoStatData    [i]; m_ccSaoStatData    [i] = nullptr; }
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
-    if (m_ccSaoStatDataEdge[i])
-    {
-      delete[] m_ccSaoStatDataEdge[i];
-      m_ccSaoStatDataEdge[i] = nullptr;
-    }
+    if (m_ccSaoStatDataEdge[i]) { delete[] m_ccSaoStatDataEdge[i]; m_ccSaoStatDataEdge[i] = nullptr; }
 #endif
   }
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+  if (m_ccSaoStatDataEdgePre) { delete[] m_ccSaoStatDataEdgePre; m_ccSaoStatDataEdgePre = nullptr; }
+#else
   for (int comp = Y_C; comp < N_C; comp++)
   {
     if (m_ccSaoStatDataEdgeNew[comp])
@@ -277,6 +280,7 @@ void EncSampleAdaptiveOffset::destroyEncData()
       m_ccSaoStatDataEdgeNew[comp] = nullptr;
     }
   }
+#endif
 #endif
 
   if (m_bestCcSaoControl) { delete[] m_bestCcSaoControl; m_bestCcSaoControl = nullptr; }
@@ -305,10 +309,7 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
 #endif
                                           const bool bTestSAODisableAtPictureLevel, const double saoEncodingRate, const double saoEncodingRateChroma, const bool isPreDBFSamplesUsed, bool isGreedyMergeEncoding
 #if JVET_V0094_BILATERAL_FILTER
-                                          ,BIFCabacEst* BifCABACEstimator
-#endif
-#if JVET_X0071_CHROMA_BILATERAL_FILTER
-                                          ,ChromaBIFCabacEst* ChromaBifCABACEstimator
+                                          ,BIFCabacEst* bifCABACEstimator
 #endif
                                          )
 {
@@ -328,7 +329,7 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
 
 #if JVET_V0094_BILATERAL_FILTER
   const PreCalcValues& pcv = *cs.pcv;
-  BifParams& bifParams = cs.picture->getBifParam();
+  BifParams& bifParams = cs.picture->getBifParam(COMPONENT_Y);
   int width = cs.picture->lwidth();
   int height = cs.picture->lheight();
   int block_width = pcv.maxCUWidth;
@@ -346,10 +347,14 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
   bifParams.frmOn = 1;
   bifParams.allCtuOn = 1;
 
-  if (bifParams.frmOn == 0)
-    std::fill(bifParams.ctuOn.begin(), bifParams.ctuOn.end(), 0);
-  else if (bifParams.allCtuOn)
-      std::fill(bifParams.ctuOn.begin(), bifParams.ctuOn.end(), 1);
+  if( bifParams.frmOn == 0 )
+  {
+    std::fill( bifParams.ctuOn.begin(), bifParams.ctuOn.end(), 0 );
+  }
+  else if( bifParams.allCtuOn )
+  {
+    std::fill( bifParams.ctuOn.begin(), bifParams.ctuOn.end(), 1 );
+  }
 
   //double MseNoFltFrame = 0;
   //double MseFltDefFrame = 0;
@@ -360,7 +365,8 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
   if(cs.pps->getUseChromaBIF())
   {
     const PreCalcValues& pcv = *cs.pcv;
-    ChromaBifParams& chromaBifParams = cs.picture->getChromaBifParam();
+    BifParams& bifParamsCb = cs.picture->getBifParam( COMPONENT_Cb );
+    BifParams& bifParamsCr = cs.picture->getBifParam( COMPONENT_Cr );
     int width = cs.picture->lwidth();
     int height = cs.picture->lheight();
     int blockWidth = pcv.maxCUWidth;
@@ -369,33 +375,34 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
     int widthInBlocks = width / blockWidth + (width % blockWidth != 0);
     int heightInBlocks = height / blockHeight + (height % blockHeight != 0);
 
-    chromaBifParams.numBlocks = widthInBlocks * heightInBlocks;
+    bifParamsCb.numBlocks = widthInBlocks * heightInBlocks;
+    bifParamsCr.numBlocks = widthInBlocks * heightInBlocks;
 
-    chromaBifParams.ctuOnCb.resize(chromaBifParams.numBlocks);
-    chromaBifParams.ctuOnCr.resize(chromaBifParams.numBlocks);
-    std::fill(chromaBifParams.ctuOnCb.begin(), chromaBifParams.ctuOnCb.end(), 0);
-    std::fill(chromaBifParams.ctuOnCr.begin(), chromaBifParams.ctuOnCr.end(), 0);
-    chromaBifParams.frmOnCb = 0;
-    chromaBifParams.frmOnCr = 0;
-    chromaBifParams.allCtuOnCb = 0;
-    chromaBifParams.allCtuOnCr = 0;
+    bifParamsCb.ctuOn.resize( bifParamsCb.numBlocks);
+    bifParamsCr.ctuOn.resize( bifParamsCr.numBlocks);
+    std::fill( bifParamsCb.ctuOn.begin(), bifParamsCb.ctuOn.end(), 0);
+    std::fill( bifParamsCr.ctuOn.begin(), bifParamsCr.ctuOn.end(), 0);
+    bifParamsCb.frmOn = 0;
+    bifParamsCr.frmOn = 0;
+    bifParamsCb.allCtuOn = 0;
+    bifParamsCr.allCtuOn = 0;
 
-    if (chromaBifParams.frmOnCb == 0)
+    if ( bifParamsCb.frmOn == 0)
     {
-        std::fill(chromaBifParams.ctuOnCb.begin(), chromaBifParams.ctuOnCb.end(), 0);
+      std::fill( bifParamsCb.ctuOn.begin(), bifParamsCb.ctuOn.end(), 0 );
     }
-    else if (chromaBifParams.allCtuOnCb)
+    else if ( bifParamsCb.allCtuOn)
     {
-        std::fill(chromaBifParams.ctuOnCb.begin(), chromaBifParams.ctuOnCb.end(), 1);
+      std::fill( bifParamsCb.ctuOn.begin(), bifParamsCb.ctuOn.end(), 1 );
     }
 
-    if (chromaBifParams.frmOnCr == 0)
+    if ( bifParamsCr.frmOn == 0)
     {
-        std::fill(chromaBifParams.ctuOnCr.begin(), chromaBifParams.ctuOnCr.end(), 0);
+      std::fill( bifParamsCr.ctuOn.begin(), bifParamsCr.ctuOn.end(), 0 );
     }
-    else if (chromaBifParams.allCtuOnCr)
+    else if ( bifParamsCr.allCtuOn)
     {
-        std::fill(chromaBifParams.ctuOnCr.begin(), chromaBifParams.ctuOnCr.end(), 1);
+      std::fill( bifParamsCr.ctuOn.begin(), bifParamsCr.ctuOn.end(), 1 );
     }
   }
 #endif
@@ -405,20 +412,20 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
     BilateralFilter bilateralFilter;
     if(!cs.sps->getSAOEnabledFlag() && (cs.pps->getUseBIF() || cs.pps->getUseChromaBIF()))
     {
-        bilateralFilter.create();
-        if(cs.pps->getUseBIF())
-        {
-            bilateralFilter.bilateralFilterPicRDOperCTU(cs, src, BifCABACEstimator); // Filters from src to res
-        }
-        if(cs.pps->getUseChromaBIF())
-        {
-          //Cb
-          bilateralFilter.bilateralFilterPicRDOperCTUChroma(cs, src, ChromaBifCABACEstimator, true);
-          //Cr
-          bilateralFilter.bilateralFilterPicRDOperCTUChroma(cs, src, ChromaBifCABACEstimator, false);
-        }
-        bilateralFilter.destroy();
-        return;
+      bilateralFilter.create();
+      if( cs.pps->getUseBIF() )
+      {
+        bilateralFilter.bilateralFilterPicRDOperCTU( COMPONENT_Y, cs, src, bifCABACEstimator ); // Filters from src to res
+      }
+      if( cs.pps->getUseChromaBIF() )
+      {
+        //Cb
+        bilateralFilter.bilateralFilterPicRDOperCTU( COMPONENT_Cb, cs, src, bifCABACEstimator );
+        //Cr
+        bilateralFilter.bilateralFilterPicRDOperCTU( COMPONENT_Cr, cs, src, bifCABACEstimator );
+      }
+      bilateralFilter.destroy();
+      return;
     }
     memcpy(m_lambda, lambdas, sizeof(m_lambda));
 #else
@@ -430,7 +437,7 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
   if(!cs.sps->getSAOEnabledFlag() && cs.pps->getUseBIF())
   {
     bilateralFilter.create();
-    bilateralFilter.bilateralFilterPicRDOperCTU(cs, src, BifCABACEstimator); // Filters from src to res
+    bilateralFilter.bilateralFilterPicRDOperCTU( COMPONENT_Y, cs, src, bifCABACEstimator); // Filters from src to res
     bilateralFilter.destroy();
     return;
   }
@@ -443,9 +450,9 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
   {
     bilateralFilter.create();
     //Cb
-    bilateralFilter.bilateralFilterPicRDOperCTUChroma(cs, src, ChromaBifCABACEstimator, true);
+    bilateralFilter.bilateralFilterPicRDOperCTU( COMPONENT_Cb, cs, src, bifCABACEstimator );
     //Cr
-    bilateralFilter.bilateralFilterPicRDOperCTUChroma(cs, src, ChromaBifCABACEstimator, false);
+    bilateralFilter.bilateralFilterPicRDOperCTU( COMPONENT_Cr, cs, src, bifCABACEstimator );
     bilateralFilter.destroy();
     return;
   }
@@ -458,21 +465,21 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
   //collect statistics
 #if JVET_V0094_BILATERAL_FILTER
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-  if(cs.pps->getUseBIF() || cs.pps->getUseChromaBIF())
+  if( cs.pps->getUseBIF() || cs.pps->getUseChromaBIF() )
   {
     bilateralFilter.create();
-    if(cs.pps->getUseBIF())
+    if( cs.pps->getUseBIF() )
     {
-        bilateralFilter.bilateralFilterPicRDOperCTU(cs, src, BifCABACEstimator); // Filters from src to res'
+      bilateralFilter.bilateralFilterPicRDOperCTU( COMPONENT_Y, cs, src, bifCABACEstimator ); // Filters from src to res'
     }
-    if(cs.pps->getUseChromaBIF())
+    if( cs.pps->getUseChromaBIF() )
     {
       //Cb
-      bilateralFilter.bilateralFilterPicRDOperCTUChroma(cs, src, ChromaBifCABACEstimator, true);
+      bilateralFilter.bilateralFilterPicRDOperCTU( COMPONENT_Cb, cs, src, bifCABACEstimator );
       //Cr
-      bilateralFilter.bilateralFilterPicRDOperCTUChroma(cs, src, ChromaBifCABACEstimator, false);
+      bilateralFilter.bilateralFilterPicRDOperCTU( COMPONENT_Cr, cs, src, bifCABACEstimator );
     }
-    getStatistics(m_statData, org, src, res, cs);
+    getStatistics( m_statData, org, src, res, cs );
     bilateralFilter.destroy();
   }
   else
@@ -484,7 +491,7 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
   if(cs.pps->getUseBIF())
   {
     bilateralFilter.create();
-    bilateralFilter.bilateralFilterPicRDOperCTU(cs, src, BifCABACEstimator); // Filters from src to res
+    bilateralFilter.bilateralFilterPicRDOperCTU( COMPONENT_Y, cs, src, bifCABACEstimator); // Filters from src to res
     getStatistics(m_statData, org, src, res, cs);
     bilateralFilter.destroy();
   }
@@ -499,9 +506,9 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
   {
     bilateralFilter.create();
     //Cb
-    bilateralFilter.bilateralFilterPicRDOperCTUChroma(cs, src, ChromaBifCABACEstimator, true);
+    bilateralFilter.bilateralFilterPicRDOperCTU( COMPONENT_Cb, cs, src, bifCABACEstimator );
     //Cr
-    bilateralFilter.bilateralFilterPicRDOperCTUChroma(cs, src, ChromaBifCABACEstimator, false);
+    bilateralFilter.bilateralFilterPicRDOperCTU( COMPONENT_Cr, cs, src, bifCABACEstimator );
     getStatistics(m_statData, org, src, res, cs);
     bilateralFilter.destroy();
   }
@@ -943,52 +950,50 @@ void EncSampleAdaptiveOffset::deriveModeNewRDO(const BitDepths &bitDepths, int c
   const TempCtx ctxStartLuma  ( m_ctxCache, SAOCtx( m_CABACEstimator->getCtx() ) );
   TempCtx       ctxBestLuma   ( m_ctxCache );
 
-    //------ luma --------//
+  //------ luma --------//
+  const ComponentID compIdx = COMPONENT_Y;
+  //"off" case as initial cost
+  modeParam[compIdx].modeIdc = SAO_MODE_OFF;
+  m_CABACEstimator->resetBits();
+  m_CABACEstimator->sao_offset_pars( modeParam[compIdx], compIdx, sliceEnabled[compIdx], bitDepths.recon[CHANNEL_TYPE_LUMA] );
+  modeDist[compIdx] = 0;
+  minCost = m_lambda[compIdx] * (FRAC_BITS_SCALE * m_CABACEstimator->getEstFracBits());
+  ctxBestLuma = SAOCtx( m_CABACEstimator->getCtx() );
+  if( sliceEnabled[compIdx] )
   {
-    const ComponentID compIdx = COMPONENT_Y;
-    //"off" case as initial cost
-    modeParam[compIdx].modeIdc = SAO_MODE_OFF;
-    m_CABACEstimator->resetBits();
-    m_CABACEstimator->sao_offset_pars( modeParam[compIdx], compIdx, sliceEnabled[compIdx], bitDepths.recon[CHANNEL_TYPE_LUMA] );
-    modeDist[compIdx] = 0;
-    minCost           = m_lambda[compIdx] * (FRAC_BITS_SCALE * m_CABACEstimator->getEstFracBits());
-    ctxBestLuma = SAOCtx( m_CABACEstimator->getCtx() );
-    if(sliceEnabled[compIdx])
+    for( int typeIdc = 0; typeIdc < NUM_SAO_NEW_TYPES; typeIdc++ )
     {
-      for(int typeIdc=0; typeIdc< NUM_SAO_NEW_TYPES; typeIdc++)
+      testOffset[compIdx].modeIdc = SAO_MODE_NEW;
+      testOffset[compIdx].typeIdc = typeIdc;
+
+      //derive coded offset
+      deriveOffsets( compIdx, bitDepths.recon[CHANNEL_TYPE_LUMA], typeIdc, blkStats[ctuRsAddr][compIdx][typeIdc], testOffset[compIdx].offset, testOffset[compIdx].typeAuxInfo );
+
+      //inversed quantized offsets
+      invertQuantOffsets( compIdx, typeIdc, testOffset[compIdx].typeAuxInfo, invQuantOffset, testOffset[compIdx].offset );
+
+      //get distortion
+      dist[compIdx] = getDistortion( bitDepths.recon[CHANNEL_TYPE_LUMA], testOffset[compIdx].typeIdc, testOffset[compIdx].typeAuxInfo, invQuantOffset, blkStats[ctuRsAddr][compIdx][typeIdc] );
+
+      //get rate
+      m_CABACEstimator->getCtx() = SAOCtx( ctxStartLuma );
+      m_CABACEstimator->resetBits();
+      m_CABACEstimator->sao_offset_pars( testOffset[compIdx], compIdx, sliceEnabled[compIdx], bitDepths.recon[CHANNEL_TYPE_LUMA] );
+      double rate = FRAC_BITS_SCALE * m_CABACEstimator->getEstFracBits();
+      cost = ( double ) dist[compIdx] + m_lambda[compIdx] * rate;
+      if( cost < minCost )
       {
-        testOffset[compIdx].modeIdc = SAO_MODE_NEW;
-        testOffset[compIdx].typeIdc = typeIdc;
-
-        //derive coded offset
-        deriveOffsets(compIdx, bitDepths.recon[CHANNEL_TYPE_LUMA], typeIdc, blkStats[ctuRsAddr][compIdx][typeIdc], testOffset[compIdx].offset, testOffset[compIdx].typeAuxInfo);
-
-        //inversed quantized offsets
-        invertQuantOffsets(compIdx, typeIdc, testOffset[compIdx].typeAuxInfo, invQuantOffset, testOffset[compIdx].offset);
-
-        //get distortion
-        dist[compIdx] = getDistortion(bitDepths.recon[CHANNEL_TYPE_LUMA], testOffset[compIdx].typeIdc, testOffset[compIdx].typeAuxInfo, invQuantOffset, blkStats[ctuRsAddr][compIdx][typeIdc]);
-
-        //get rate
-        m_CABACEstimator->getCtx() = SAOCtx( ctxStartLuma );
-        m_CABACEstimator->resetBits();
-        m_CABACEstimator->sao_offset_pars( testOffset[compIdx], compIdx, sliceEnabled[compIdx], bitDepths.recon[CHANNEL_TYPE_LUMA] );
-        double rate = FRAC_BITS_SCALE * m_CABACEstimator->getEstFracBits();
-        cost = (double)dist[compIdx] + m_lambda[compIdx]*rate;
-        if(cost < minCost)
-        {
-          minCost = cost;
-          modeDist[compIdx] = dist[compIdx];
-          modeParam[compIdx]= testOffset[compIdx];
-          ctxBestLuma = SAOCtx( m_CABACEstimator->getCtx() );
-        }
+        minCost = cost;
+        modeDist[compIdx] = dist[compIdx];
+        modeParam[compIdx] = testOffset[compIdx];
+        ctxBestLuma = SAOCtx( m_CABACEstimator->getCtx() );
       }
     }
-    m_CABACEstimator->getCtx() = SAOCtx( ctxBestLuma );
   }
+  m_CABACEstimator->getCtx() = SAOCtx( ctxBestLuma );
 
   //------ chroma --------//
-//"off" case as initial cost
+  //"off" case as initial cost
   cost = 0;
   previousFracBits = 0;
   m_CABACEstimator->resetBits();
@@ -1413,14 +1418,18 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
 #if JVET_V0094_BILATERAL_FILTER
       if (cs.pps->getUseBIF())
       {
-        BifParams& bifParams = cs.picture->getBifParam();
+        BifParams& bifParams = cs.picture->getBifParam( COMPONENT_Y );
         for (auto& currCU : cs.traverseCUs(CS::getArea(cs, area, CH_L), CH_L))
         {
           for (auto& currTU : CU::traverseTUs(currCU))
           {
-
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+            bool applyBIF = bifParams.ctuOn[ctuRsAddr] && m_bilateralFilter.getApplyBIF(currTU, COMPONENT_Y);
+#else
             bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
-            if (bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
+            bool applyBIF = bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height)));
+#endif
+            if (applyBIF)
             {
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
               bool clipTop = false, clipBottom = false, clipLeft = false, clipRight = false;
@@ -1431,10 +1440,9 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                 cs, currTU.Y().x, currTU.Y().y, currTU.lumaSize().width, currTU.lumaSize().height, clipTop, clipBottom,
                 clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
 #endif
-              bilateralFilter.bilateralFilterDiamond5x5NoClip(srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU
+              bilateralFilter.bilateralFilterDiamond5x5( COMPONENT_Y, srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU, true
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-                , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
-                , clipTop, clipBottom, clipLeft, clipRight
+                , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry, clipTop, clipBottom, clipLeft, clipRight
 #endif
               );
             }
@@ -1445,10 +1453,6 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
       if(cs.pps->getUseChromaBIF())
       {
-        ChromaBifParams& chromaBifParams = cs.picture->getChromaBifParam();
-
-        bool tuValid = false;
-        bool tuCBF = false;
         bool isDualTree = CS::isDualITree(cs);
         ChannelType chType = isDualTree ? CH_C : CH_L;
         bool applyChromaBIF = false;
@@ -1461,17 +1465,24 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
         for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, chType), chType))
         {
           bool chromaValid = currCU.Cb().valid() && currCU.Cr().valid();
-          if(!chromaValid){
+          if(!chromaValid)
+          {
             continue;
           }
           for (auto &currTU : CU::traverseTUs(currCU))
           {
-            bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
             for(int compIdx = COMPONENT_Cb ; compIdx < MAX_NUM_COMPONENT; compIdx++)
             {
-              bool isCb = compIdx == COMPONENT_Cb ? true : false;
-              ComponentID compID = isCb ? COMPONENT_Cb :COMPONENT_Cr;
-              bool ctuEnableChromaBIF = isCb ? chromaBifParams.ctuOnCb[ctuRsAddr] :  chromaBifParams.ctuOnCr[ctuRsAddr];
+              ComponentID compID = ComponentID( compIdx );
+              BifParams& chromaBifParams = cs.picture->getBifParam( compID );
+              bool ctuEnableChromaBIF = chromaBifParams.ctuOn[ctuRsAddr];
+
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+              applyChromaBIF = ctuEnableChromaBIF && m_bilateralFilter.getApplyBIF(currTU, compID);
+#else
+              bool tuValid = false;
+              bool tuCBF = false;
+              bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
               applyChromaBIF = false;
               if(!isDualTree)
               {
@@ -1488,6 +1499,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                 tuCBF = TU::getCbf(currTU, compID);
                 applyChromaBIF = (ctuEnableChromaBIF && ((tuCBF || isInter == false) && (currTU.cu->qp > 17)));
               }
+#endif
               if(applyChromaBIF)
               {
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
@@ -1503,10 +1515,9 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                   clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
 
 #endif
-                bilateralFilter.bilateralFilterDiamond5x5NoClipChroma(srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(compID), currTU, isCb
+                bilateralFilter.bilateralFilterDiamond5x5(compID, srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(compID), currTU, true
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-                  , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
-                  , clipTop, clipBottom, clipLeft, clipRight
+                  , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry, clipTop, clipBottom, clipLeft, clipRight
 #endif
                 );
               }
@@ -1531,7 +1542,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
           // We don't need to clip if SAO was not performed on luma.
           SAOBlkParam mySAOblkParam = cs.picture->getSAO()[ctuRsAddr];
           SAOOffset& myCtbOffset     = mySAOblkParam[0];
-          BifParams& bifParams = cs.picture->getBifParam();
+          BifParams& bifParams = cs.picture->getBifParam(COMPONENT_Y);
           
           bool clipLumaIfNoBilat = false;
           if(myCtbOffset.modeIdc != SAO_MODE_OFF)
@@ -1539,18 +1550,16 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
           SAOOffset& myCtbOffsetCb     = mySAOblkParam[1];
           SAOOffset& myCtbOffsetCr     = mySAOblkParam[2];
-          ChromaBifParams& chromaBifParams = cs.picture->getChromaBifParam();
 
-          bool clipChromaIfNoBilatCb = false;
-          bool clipChromaIfNoBilatCr = false;
+          bool clipChromaIfNoBilat[MAX_NUM_COMPONENT] = { false };
 
           if(myCtbOffsetCb.modeIdc != SAO_MODE_OFF)
           {
-            clipChromaIfNoBilatCb = true;
+            clipChromaIfNoBilat[COMPONENT_Cb] = true;
           }
           if(myCtbOffsetCr.modeIdc != SAO_MODE_OFF)
           {
-            clipChromaIfNoBilatCr = true;
+            clipChromaIfNoBilat[COMPONENT_Cr] = true;
           }
           if(cs.pps->getUseBIF())
           {
@@ -1560,9 +1569,14 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
           {
             for (auto &currTU : CU::traverseTUs(currCU))
             {
-              
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+              bool applyBIF = bifParams.ctuOn[ctuRsAddr] && m_bilateralFilter.getApplyBIF(currTU, COMPONENT_Y);
+#else
               bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
-              if ( bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
+              bool applyBIF = bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height)));
+#endif
+              
+              if (applyBIF)
               {
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                 bool clipTop = false, clipBottom = false, clipLeft = false, clipRight = false;
@@ -1573,7 +1587,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                   cs, currTU.Y().x, currTU.Y().y, currTU.lumaSize().width, currTU.lumaSize().height, clipTop,
                   clipBottom, clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
 #endif
-                bilateralFilter.bilateralFilterDiamond5x5(srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU
+                bilateralFilter.bilateralFilterDiamond5x5( COMPONENT_Y, srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU, false
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                   , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
                   , clipTop, clipBottom, clipLeft, clipRight
@@ -1583,8 +1597,10 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
               else
               {
                 // We don't need to clip if SAO was not performed on luma.
-                if(clipLumaIfNoBilat)
-                  bilateralFilter.clipNotBilaterallyFilteredBlocks(srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Y), currTU);
+                if( clipLumaIfNoBilat )
+                {
+                  bilateralFilter.clipNotBilaterallyFilteredBlocks( COMPONENT_Y, srcYuv, resYuv, cs.slice->clpRng( COMPONENT_Y ), currTU );
+                }
               }
             }
           }
@@ -1598,15 +1614,13 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
               {
                 if(clipLumaIfNoBilat)
                 {
-                  m_bilateralFilter.clipNotBilaterallyFilteredBlocks(srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Y), currTU);
+                  m_bilateralFilter.clipNotBilaterallyFilteredBlocks( COMPONENT_Y, srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Y), currTU );
                 }
               }
             }
           }
           if(cs.pps->getUseChromaBIF())
           {
-            bool tuValid = false;
-            bool tuCBF = false;
             bool isDualTree = CS::isDualITree(cs);
             ChannelType chType = isDualTree ? CH_C : CH_L;
             bool applyChromaBIF = false;
@@ -1620,12 +1634,17 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
               }
               for (auto &currTU : CU::traverseTUs(currCU))
               {
-                bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
                 for(int compIdx = COMPONENT_Cb; compIdx < MAX_NUM_COMPONENT; compIdx++)
                 {
-                  bool isCb = compIdx == COMPONENT_Cb ? true : false;
-                  ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
-                  bool ctuEnableChromaBIF = isCb ? chromaBifParams.ctuOnCb[ctuRsAddr] : chromaBifParams.ctuOnCr[ctuRsAddr];
+                  ComponentID compID = ComponentID( compIdx );
+                  BifParams& chromaBifParams = cs.picture->getBifParam( compID );
+                  bool ctuEnableChromaBIF = chromaBifParams.ctuOn[ctuRsAddr];
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+                  applyChromaBIF = ctuEnableChromaBIF && m_bilateralFilter.getApplyBIF(currTU, compID);
+#else
+                  bool tuValid = false;
+                  bool tuCBF = false;
+                  bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
                   applyChromaBIF = false;
                   if(!isDualTree)
                   {
@@ -1642,6 +1661,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                     tuCBF = TU::getCbf(currTU, compID);
                     applyChromaBIF = (ctuEnableChromaBIF && ((tuCBF || isInter == false) && (currTU.cu->qp > 17)));
                   }
+#endif
                   if(applyChromaBIF)
                   {
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
@@ -1659,19 +1679,18 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                       clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
 
 #endif
-                    m_bilateralFilter.bilateralFilterDiamond5x5Chroma(srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(compID), currTU, isCb
+                    m_bilateralFilter.bilateralFilterDiamond5x5(compID, srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(compID), currTU, false
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-                    , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
-                    , clipTop, clipBottom, clipLeft, clipRight
+                    , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry, clipTop, clipBottom, clipLeft, clipRight
 #endif
                     );
                   }
                   else
                   {
-                    bool useClip = isCb ? clipChromaIfNoBilatCb : clipChromaIfNoBilatCr;
+                    bool useClip = clipChromaIfNoBilat[compID];
                     if(useClip && currTU.blocks[compID].valid())
                     {
-                      m_bilateralFilter.clipNotBilaterallyFilteredBlocksChroma(srcYuv, resYuv, cs.slice->clpRng(compID), currTU, isCb);
+                      m_bilateralFilter.clipNotBilaterallyFilteredBlocks( compID, srcYuv, resYuv, cs.slice->clpRng(compID), currTU );
                     }
                   }
                 }
@@ -1692,13 +1711,13 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
               }
               for (auto &currTU : CU::traverseTUs(currCU))
               {
-                if(clipChromaIfNoBilatCb && currTU.blocks[COMPONENT_Cb].valid())
+                if( clipChromaIfNoBilat[COMPONENT_Cb] && currTU.blocks[COMPONENT_Cb].valid())
                 {
-                  m_bilateralFilter.clipNotBilaterallyFilteredBlocksChroma(srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Cb), currTU, true);
+                  m_bilateralFilter.clipNotBilaterallyFilteredBlocks( COMPONENT_Cb, srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Cb), currTU );
                 }
-                if(clipChromaIfNoBilatCr && currTU.blocks[COMPONENT_Cr].valid())
+                if( clipChromaIfNoBilat[COMPONENT_Cr] && currTU.blocks[COMPONENT_Cr].valid())
                 {
-                  m_bilateralFilter.clipNotBilaterallyFilteredBlocksChroma(srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Cr), currTU, false);
+                  m_bilateralFilter.clipNotBilaterallyFilteredBlocks( COMPONENT_Cr, srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Cr), currTU );
                 }
               }
             }
@@ -1730,24 +1749,22 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
             {
               if(clipLumaIfNoBilat)
               {
-                bilateralFilter.clipNotBilaterallyFilteredBlocks(srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Y), currTU);
+                bilateralFilter.clipNotBilaterallyFilteredBlocks( COMPONENT_Y, srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Y), currTU );
               }
             }
           }
 
           SAOOffset& myCtbOffsetCb     = mySAOblkParam[1];
           SAOOffset& myCtbOffsetCr     = mySAOblkParam[2];
-          bool clipChromaIfNoBilatCb = false;
-          bool clipChromaIfNoBilatCr = false;
-          ChromaBifParams& chromaBifParams = cs.picture->getChromaBifParam();
+          bool clipChromaIfNoBilat[MAX_NUM_COMPONENT] = { false };
 
           if(myCtbOffsetCb.modeIdc != SAO_MODE_OFF)
           {
-            clipChromaIfNoBilatCb = true;
+            clipChromaIfNoBilat[COMPONENT_Cb] = true;
           }
           if(myCtbOffsetCr.modeIdc != SAO_MODE_OFF)
           {
-            clipChromaIfNoBilatCr = true;
+            clipChromaIfNoBilat[COMPONENT_Cr] = true;
           }
 
           bool tuValid = false;
@@ -1768,9 +1785,12 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
               bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
               for(int compIdx = COMPONENT_Cb; compIdx < MAX_NUM_COMPONENT; compIdx++)
               {
-                bool isCb = compIdx == COMPONENT_Cb ? true : false;
-                ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
-                bool ctuEnableChromaBIF = isCb ? chromaBifParams.ctuOnCb[ctuRsAddr] : chromaBifParams.ctuOnCr[ctuRsAddr];
+                ComponentID compID = ComponentID( compIdx );
+                BifParams& chromaBifParams = cs.picture->getBifParam( compID );
+                bool ctuEnableChromaBIF = chromaBifParams.ctuOn[ctuRsAddr];
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+                applyChromaBIF = ctuEnableChromaBIF && m_bilateralFilter.getApplyBIF(currTU, compID);
+#else
                 applyChromaBIF = false;
                 if(!isDualTree)
                 {
@@ -1787,6 +1807,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                   tuCBF = TU::getCbf(currTU, compID);
                   applyChromaBIF = (ctuEnableChromaBIF && ((tuCBF || isInter == false) && (currTU.cu->qp > 17)));
                 }
+#endif
                 if(applyChromaBIF)
                 {
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
@@ -1804,19 +1825,18 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                     clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
 
 #endif
-                  m_bilateralFilter.bilateralFilterDiamond5x5Chroma(srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(compID), currTU, isCb
+                  m_bilateralFilter.bilateralFilterDiamond5x5(compID, srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(compID), currTU, false,
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-                    , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
-                    , clipTop, clipBottom, clipLeft, clipRight
+                    , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry, clipTop, clipBottom, clipLeft, clipRight
 #endif
                   );
                 }
                 else
                 {
-                  bool useClip = isCb ? clipChromaIfNoBilatCb : clipChromaIfNoBilatCr;
+                  bool useClip = clipChromaIfNoBilat[compID];
                   if(useClip && currTU.blocks[compID].valid())
                   {
-                    m_bilateralFilter.clipNotBilaterallyFilteredBlocksChroma(srcYuv, resYuv, cs.slice->clpRng(compID), currTU, isCb);
+                    m_bilateralFilter.clipNotBilaterallyFilteredBlocks( compID, srcYuv, resYuv, cs.slice->clpRng(compID), currTU );
                   }
                 }
               }
@@ -1872,40 +1892,14 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
 #if JVET_V0094_BILATERAL_FILTER
         if(cs.pps->getUseBIF())
         {
-          // Sorry for not using nice copy method and using ugly code instead:
-          int  myResStride = resYuv.get(COMPONENT_Y).stride;
-          const CompArea& myCompArea = area.block(COMPONENT_Y);
-          Pel* myResBlk = resYuv.get(COMPONENT_Y).bufAt(myCompArea);
-          int mySrcStride = srcYuv.get(COMPONENT_Y).stride;
-          Pel* mySrcBlk = srcYuv.get(COMPONENT_Y).bufAt(myCompArea);
-          
-          for(int yy = 0; yy<area.lheight(); yy++)
-            for(int xx = 0; xx<area.lwidth(); xx++)
-              myResBlk[yy*myResStride+xx] = mySrcBlk[yy*mySrcStride+xx];
+          resYuv.subBuf( area ).bufs[COMPONENT_Y].copyFrom( srcYuv.subBuf( area ).bufs[COMPONENT_Y] );
         }
 #endif
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
         if(cs.pps->getUseChromaBIF())
         {
-          for(int chromaIdx = COMPONENT_Cb; chromaIdx < MAX_NUM_COMPONENT; chromaIdx++)
-          {
-            bool isCb = chromaIdx == COMPONENT_Cb ? true : false;
-            ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
-
-            int  myResStrideChroma = resYuv.get(compID).stride;
-            const CompArea& myCompAreaChroma = area.block(compID);
-            Pel* myResBlkChroma = resYuv.get(compID).bufAt(myCompAreaChroma);
-            int mySrcStrideChroma = srcYuv.get(compID).stride;
-            Pel* mySrcBlkChroma = srcYuv.get(compID).bufAt(myCompAreaChroma);
-
-            for(int yy = 0; yy<area.chromaSize().height; yy++)
-            {
-              for(int xx = 0; xx<area.chromaSize().width; xx++)
-              {
-                myResBlkChroma[yy*myResStrideChroma+xx] = mySrcBlkChroma[yy*mySrcStrideChroma+xx];
-              }
-            }
-          }
+          resYuv.subBuf( area ).bufs[COMPONENT_Cb].copyFrom( srcYuv.subBuf( area ).bufs[COMPONENT_Cb] );
+          resYuv.subBuf( area ).bufs[COMPONENT_Cr].copyFrom( srcYuv.subBuf( area ).bufs[COMPONENT_Cr] );
         }
 #endif
 
@@ -1914,14 +1908,18 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
 #if JVET_V0094_BILATERAL_FILTER
         if (cs.pps->getUseBIF())
         {
-          BifParams& bifParams = cs.picture->getBifParam();
+          BifParams& bifParams = cs.picture->getBifParam( COMPONENT_Y );
           for (auto& currCU : cs.traverseCUs(CS::getArea(cs, area, CH_L), CH_L))
           {
             for (auto& currTU : CU::traverseTUs(currCU))
             {
-
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+              bool applyBIF = bifParams.ctuOn[ctuRsAddr] && m_bilateralFilter.getApplyBIF(currTU, COMPONENT_Y);
+#else
               bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
-              if (bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
+              bool applyBIF = bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height)));
+#endif
+              if (applyBIF)
               {
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                 bool clipTop = false, clipBottom = false, clipLeft = false, clipRight = false;
@@ -1933,10 +1931,9 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                   clipBottom, clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
 #endif
 
-                bilateralFilter.bilateralFilterDiamond5x5NoClip(srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU
+                bilateralFilter.bilateralFilterDiamond5x5( COMPONENT_Y, srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU, true
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-                  , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
-                  , clipTop, clipBottom, clipLeft, clipRight
+                  , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry, clipTop, clipBottom, clipLeft, clipRight
 #endif
                 );
               }
@@ -1947,9 +1944,6 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
         if(cs.pps->getUseChromaBIF())
         {
-          ChromaBifParams& chromaBifParams = cs.picture->getChromaBifParam();
-          bool tuValid = false;
-          bool tuCBF = false;
           bool isDualTree = CS::isDualITree(cs);
           ChannelType chType = isDualTree ? CH_C : CH_L;
           bool applyChromaBIF = false;
@@ -1968,13 +1962,18 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
 
             for (auto &currTU : CU::traverseTUs(currCU))
             {
-              bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
               for(int compIdx = COMPONENT_Cb; compIdx < MAX_NUM_COMPONENT; compIdx++)
               {
-                bool isCb = compIdx == COMPONENT_Cb ? true : false;
-                ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
-                bool ctuEnableChromaBIF = isCb ? chromaBifParams.ctuOnCb[ctuRsAddr] : chromaBifParams.ctuOnCr[ctuRsAddr];
+                ComponentID compID = ComponentID( compIdx );
+                BifParams& chromaBifParams = cs.picture->getBifParam( compID );
+                bool ctuEnableChromaBIF = chromaBifParams.ctuOn[ctuRsAddr];
 
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+                applyChromaBIF = ctuEnableChromaBIF && m_bilateralFilter.getApplyBIF(currTU, compID);
+#else
+                bool tuValid = false;
+                bool tuCBF = false;
+                bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
                 applyChromaBIF = false;
                 if(!isDualTree)
                 {
@@ -1991,6 +1990,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                   tuCBF = TU::getCbf(currTU, compID);
                   applyChromaBIF = (ctuEnableChromaBIF && ((tuCBF || isInter == false) && (currTU.cu->qp > 17)));
                 }
+#endif
                 if(applyChromaBIF)
                 {
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
@@ -2006,10 +2006,9 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                     clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
 
 #endif
-                  bilateralFilter.bilateralFilterDiamond5x5NoClipChroma(srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(compID), currTU, isCb
+                  bilateralFilter.bilateralFilterDiamond5x5(compID, srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(compID), currTU, true
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-                    , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
-                    , clipTop, clipBottom, clipLeft, clipRight
+                    , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry, clipTop, clipBottom, clipLeft, clipRight
 #endif
                   );
                 }
@@ -2026,7 +2025,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
           offsetCTUnoClip(area, srcYuv, resYuv, reconParams[ctuRsAddr], cs);
           SAOBlkParam mySAOblkParam = cs.picture->getSAO()[ctuRsAddr];
           SAOOffset& myCtbOffset     = mySAOblkParam[0];
-          BifParams& bifParams = cs.picture->getBifParam();
+          BifParams& bifParams = cs.picture->getBifParam(COMPONENT_Y);
 
           bool clipLumaIfNoBilat = false;
           if(myCtbOffset.modeIdc != SAO_MODE_OFF)
@@ -2034,19 +2033,17 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
             clipLumaIfNoBilat = true;
           }
 
-          ChromaBifParams& chromaBifParams = cs.picture->getChromaBifParam();
           SAOOffset& myCtbOffsetCb     = mySAOblkParam[1];
           SAOOffset& myCtbOffsetCr     = mySAOblkParam[2];
-          bool clipChromaIfNoBilatCb = false;
-          bool clipChromaIfNoBilatCr = false;
+          bool clipChromaIfNoBilat[MAX_NUM_COMPONENT] = { false };
 
           if(myCtbOffsetCb.modeIdc != SAO_MODE_OFF)
           {
-            clipChromaIfNoBilatCb = true;
+            clipChromaIfNoBilat[COMPONENT_Cb] = true;
           }
           if(myCtbOffsetCr.modeIdc != SAO_MODE_OFF)
           {
-            clipChromaIfNoBilatCr = true;
+            clipChromaIfNoBilat[COMPONENT_Cr] = true;
           }
           if(cs.pps->getUseBIF())
           {
@@ -2054,8 +2051,13 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
             {
               for (auto &currTU : CU::traverseTUs(currCU))
               {
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+                bool applyBIF = bifParams.ctuOn[ctuRsAddr] && m_bilateralFilter.getApplyBIF(currTU, COMPONENT_Y);
+#else
                 bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
-                if ( bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
+                bool applyBIF = bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height)));
+#endif
+                if (applyBIF)
                 {
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                   bool clipTop = false, clipBottom = false, clipLeft = false, clipRight = false;
@@ -2066,7 +2068,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                     cs, currTU.Y().x, currTU.Y().y, currTU.lumaSize().width, currTU.lumaSize().height, clipTop,
                     clipBottom, clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
 #endif
-                  bilateralFilter.bilateralFilterDiamond5x5(srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU
+                  bilateralFilter.bilateralFilterDiamond5x5( COMPONENT_Y, srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU, false
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                   , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
                   , clipTop, clipBottom, clipLeft, clipRight
@@ -2078,7 +2080,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                   // We don't need to clip if SAO was not performed on luma.
                   if(clipLumaIfNoBilat)
                   {
-                    bilateralFilter.clipNotBilaterallyFilteredBlocks(srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Y), currTU);
+                    bilateralFilter.clipNotBilaterallyFilteredBlocks( COMPONENT_Y, srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Y), currTU );
                   }
                 }
               }
@@ -2092,7 +2094,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
               {
                 if(clipLumaIfNoBilat)
                 {
-                  bilateralFilter.clipNotBilaterallyFilteredBlocks(srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Y), currTU);
+                  bilateralFilter.clipNotBilaterallyFilteredBlocks( COMPONENT_Y, srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Y), currTU );
                 }
               }
             }
@@ -2100,8 +2102,6 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
 
           if(cs.pps->getUseChromaBIF())
           {
-            bool tuValid = false;
-            bool tuCBF = false;
             bool isDualTree = CS::isDualITree(cs);
             ChannelType chType = isDualTree ? CH_C : CH_L;
             bool applyChromaBIF = false;
@@ -2115,12 +2115,18 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
               }
               for (auto &currTU : CU::traverseTUs(currCU))
               {
-                bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
                 for(int compIdx = COMPONENT_Cb; compIdx < MAX_NUM_COMPONENT; compIdx++)
                 {
-                  bool isCb = compIdx == COMPONENT_Cb ? true : false;
-                  ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
-                  bool ctuEnableChromaBIF = isCb ? chromaBifParams.ctuOnCb[ctuRsAddr] : chromaBifParams.ctuOnCr[ctuRsAddr];
+                  ComponentID compID = ComponentID( compIdx );
+                  BifParams& chromaBifParams = cs.picture->getBifParam( compID );
+                  bool ctuEnableChromaBIF = chromaBifParams.ctuOn[ctuRsAddr];
+
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+                  applyChromaBIF = ctuEnableChromaBIF && m_bilateralFilter.getApplyBIF(currTU, compID);
+#else
+                  bool tuValid = false;
+                  bool tuCBF = false;
+                  bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
                   applyChromaBIF = false;
                   if(!isDualTree)
                   {
@@ -2137,6 +2143,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                     tuCBF = TU::getCbf(currTU, compID);
                     applyChromaBIF = (ctuEnableChromaBIF && ((tuCBF || isInter == false) && (currTU.cu->qp > 17)));
                   }
+#endif
                   if(applyChromaBIF)
                   {
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
@@ -2154,19 +2161,18 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                       clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
 
 #endif
-                    bilateralFilter.bilateralFilterDiamond5x5Chroma(srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(compID), currTU, isCb
+                    bilateralFilter.bilateralFilterDiamond5x5(compID, srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(compID), currTU, false
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-                      ,isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry,
-                      clipTop, clipBottom, clipLeft, clipRight
+                      ,isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry, clipTop, clipBottom, clipLeft, clipRight
 #endif
                     );
                   }
                   else
                   {
-                    bool useClip = isCb ? clipChromaIfNoBilatCb : clipChromaIfNoBilatCr;
+                    bool useClip = clipChromaIfNoBilat[compID];
                     if(useClip && currTU.blocks[compIdx].valid())
                     {
-                      bilateralFilter.clipNotBilaterallyFilteredBlocksChroma(srcYuv, resYuv, cs.slice->clpRng(compID), currTU, isCb);
+                      bilateralFilter.clipNotBilaterallyFilteredBlocks( compID, srcYuv, resYuv, cs.slice->clpRng(compID), currTU );
                     }
                   }
                 }
@@ -2187,13 +2193,13 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
               }
               for (auto &currTU : CU::traverseTUs(currCU))
               {
-                if(clipChromaIfNoBilatCb && currTU.blocks[COMPONENT_Cb].valid())
+                if( clipChromaIfNoBilat[COMPONENT_Cb] && currTU.blocks[COMPONENT_Cb].valid())
                 {
-                  bilateralFilter.clipNotBilaterallyFilteredBlocksChroma(srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Cb), currTU, true);
+                  bilateralFilter.clipNotBilaterallyFilteredBlocks( COMPONENT_Cb, srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Cb), currTU );
                 }
-                if(clipChromaIfNoBilatCr && currTU.blocks[COMPONENT_Cr].valid())
+                if( clipChromaIfNoBilat[COMPONENT_Cr] && currTU.blocks[COMPONENT_Cr].valid())
                 {
-                  bilateralFilter.clipNotBilaterallyFilteredBlocksChroma(srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Cr), currTU, false);
+                  bilateralFilter.clipNotBilaterallyFilteredBlocks( COMPONENT_Cr, srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Cr), currTU );
                 }
               }
             }
@@ -2215,19 +2221,25 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
           // We don't need to clip if SAO was not performed on luma.
           SAOBlkParam mySAOblkParam = cs.picture->getSAO()[ctuRsAddr];
           SAOOffset& myCtbOffset     = mySAOblkParam[0];
-          BifParams& bifParams = cs.picture->getBifParam();
+          BifParams& bifParams = cs.picture->getBifParam(COMPONENT_Y);
           
           bool clipLumaIfNoBilat = false;
-          if(myCtbOffset.modeIdc != SAO_MODE_OFF)
+          if( myCtbOffset.modeIdc != SAO_MODE_OFF )
+          {
             clipLumaIfNoBilat = true;
+          }
           
           for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, CH_L), CH_L))
           {
             for (auto &currTU : CU::traverseTUs(currCU))
             {
-              
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+              bool applyBIF = bifParams.ctuOn[ctuRsAddr] && m_bilateralFilter.getApplyBIF(currTU, COMPONENT_Y);
+#else
               bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
-              if ( bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height))))
+              bool applyBIF = bifParams.ctuOn[ctuRsAddr] && ((TU::getCbf(currTU, COMPONENT_Y) || isInter == false) && (currTU.cu->qp > 17)) && (128 > std::max(currTU.lumaSize().width, currTU.lumaSize().height)) && ((isInter == false) || (32 > std::min(currTU.lumaSize().width, currTU.lumaSize().height)));
+#endif
+              if (applyBIF)
               {
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                 bool clipTop = false, clipBottom = false, clipLeft = false, clipRight = false;
@@ -2239,7 +2251,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                   clipBottom, clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
 #endif
 
-                bilateralFilter.bilateralFilterDiamond5x5(srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU
+                bilateralFilter.bilateralFilterDiamond5x5( COMPONENT_Y, srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(COMPONENT_Y), currTU, false
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                   , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
                   , clipTop, clipBottom, clipLeft, clipRight
@@ -2249,8 +2261,10 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
               else
               {
                 // We don't need to clip if SAO was not performed on luma.
-                if(clipLumaIfNoBilat)
-                  bilateralFilter.clipNotBilaterallyFilteredBlocks(srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Y), currTU);
+                if( clipLumaIfNoBilat )
+                {
+                  bilateralFilter.clipNotBilaterallyFilteredBlocks( COMPONENT_Y, srcYuv, resYuv, cs.slice->clpRng( COMPONENT_Y ), currTU );
+                }
               }
             }
           }
@@ -2268,7 +2282,6 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
           offsetCTUnoClip(area, srcYuv, resYuv, reconParams[ctuRsAddr], cs);
 
           SAOBlkParam mySAOblkParam = cs.picture->getSAO()[ctuRsAddr];
-          ChromaBifParams& chromaBifParams = cs.picture->getChromaBifParam();
 
           SAOOffset& myCtbOffset     = mySAOblkParam[0];
           bool clipLumaIfNoBilat = false;
@@ -2279,16 +2292,15 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
 
           SAOOffset& myCtbOffsetCb     = mySAOblkParam[1];
           SAOOffset& myCtbOffsetCr     = mySAOblkParam[2];
-          bool clipChromaIfNoBilatCb = false;
-          bool clipChromaIfNoBilatCr = false;
+          bool clipChromaIfNoBilat[MAX_NUM_COMPONENT] = { false };
 
           if(myCtbOffsetCb.modeIdc != SAO_MODE_OFF)
           {
-            clipChromaIfNoBilatCb = true;
+            clipChromaIfNoBilat[COMPONENT_Cb] = true;
           }
           if(myCtbOffsetCr.modeIdc != SAO_MODE_OFF)
           {
-            clipChromaIfNoBilatCr = true;
+            clipChromaIfNoBilat[COMPONENT_Cr] = true;
           }
 
           for (auto &currCU : cs.traverseCUs(CS::getArea(cs, area, CH_L), CH_L))
@@ -2297,7 +2309,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
             {
               if(clipLumaIfNoBilat)
               {
-                bilateralFilter.clipNotBilaterallyFilteredBlocks(srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Y), currTU);
+                bilateralFilter.clipNotBilaterallyFilteredBlocks( COMPONENT_Y, srcYuv, resYuv, cs.slice->clpRng(COMPONENT_Y), currTU );
               }
             }
           }
@@ -2319,9 +2331,12 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
               bool isInter = (currCU.predMode == MODE_INTER) ? true : false;
               for(int compIdx = COMPONENT_Cb; compIdx < MAX_NUM_COMPONENT; compIdx++)
               {
-                bool isCb = compIdx == COMPONENT_Cb ? true : false;
-                ComponentID compID = isCb ? COMPONENT_Cb : COMPONENT_Cr;
-                bool ctuEnableChromaBIF = isCb ? chromaBifParams.ctuOnCb[ctuRsAddr] : chromaBifParams.ctuOnCr[ctuRsAddr];
+                ComponentID compID = ComponentID( compIdx );
+                BifParams& chromaBifParams = cs.picture->getBifParam( compID );
+                bool ctuEnableChromaBIF = chromaBifParams.ctuOn[ctuRsAddr];
+#if JVET_AF0112_BIF_DYNAMIC_SCALING
+                applyChromaBIF = ctuEnableChromaBIF && m_bilateralFilter.getApplyBIF(currTU, compID);
+#else
                 applyChromaBIF = false;
                 if(!isDualTree)
                 {
@@ -2338,6 +2353,7 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                   tuCBF = TU::getCbf(currTU, compID);
                   applyChromaBIF = (ctuEnableChromaBIF && ((tuCBF || isInter == false) && (currTU.cu->qp > 17)));
                 }
+#endif
                 if(applyChromaBIF)
                 {
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
@@ -2355,19 +2371,18 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
                     clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos);
 
 #endif
-                  bilateralFilter.bilateralFilterDiamond5x5Chroma(srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(compID), currTU, isCb
+                  bilateralFilter.bilateralFilterDiamond5x5(compID, srcYuv, resYuv, currTU.cu->qp, cs.slice->clpRng(compID), currTU, false,
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-                  , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry
-                  , clipTop, clipBottom, clipLeft, clipRight
+                  , isTUCrossedByVirtualBoundaries, horVirBndryPos, verVirBndryPos, numHorVirBndry, numVerVirBndry, clipTop, clipBottom, clipLeft, clipRight
 #endif
                   );
                 }
                 else
                 {
-                  bool useClip = isCb ? clipChromaIfNoBilatCb : clipChromaIfNoBilatCr;
+                  bool useClip = clipChromaIfNoBilat[compID];
                   if(useClip && currTU.blocks[compIdx].valid())
                   {
-                    bilateralFilter.clipNotBilaterallyFilteredBlocksChroma(srcYuv, resYuv, cs.slice->clpRng(compID), currTU, isCb);
+                    bilateralFilter.clipNotBilaterallyFilteredBlocksChroma( compID, srcYuv, resYuv, cs.slice->clpRng(compID), currTU );
                   }
                 }
               }
@@ -2983,6 +2998,19 @@ void EncSampleAdaptiveOffset::getBlkStats(const ComponentID compIdx, const int c
 #if JVET_W0066_CCSAO
 void EncSampleAdaptiveOffset::CCSAOProcess(CodingStructure& cs, const double* lambdas, const int intraPeriod)
 {
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+#if JVET_Z0118_GDR
+  if( cs.slice->isIDRorBLA() || cs.slice->getPendingRasInit() || cs.slice->isInterGDR() )
+#else
+  if( cs.slice->isIDRorBLA() || cs.slice->getPendingRasInit() )
+#endif
+  {
+    g_ccSaoPrvParam[COMPONENT_Y ].clear();
+    g_ccSaoPrvParam[COMPONENT_Cb].clear();
+    g_ccSaoPrvParam[COMPONENT_Cr].clear();
+  }
+#endif
+
   PelUnitBuf orgYuv = cs.getOrgBuf(); 
   PelUnitBuf dstYuv = cs.getRecoBuf();
   PelUnitBuf srcYuv = m_ccSaoBuf.getBuf( cs.area );
@@ -2990,19 +3018,38 @@ void EncSampleAdaptiveOffset::CCSAOProcess(CodingStructure& cs, const double* la
   m_intraPeriod = intraPeriod;
 
   setupCcSaoLambdas(cs, lambdas);
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+  setupCcSaoSH(cs, orgYuv);
+#endif
 
+#if !JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
   if (cs.slice->getSPS()->getCCSAOEnabledFlag())
   {
-    const TempCtx ctxStartCcSao(m_ctxCache, SubCtx(Ctx::CcSaoControlIdc, m_CABACEstimator->getCtx()));
-#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
-    resetblkStatsEdgePre(m_ccSaoStatDataEdgeNew);
-    getCcSaoStatisticsEdgeNew(cs, orgYuv, srcYuv, dstYuv, m_ccSaoStatDataEdgeNew, m_bestCcSaoParam);
 #endif
-    m_CABACEstimator->getCtx() = SubCtx(Ctx::CcSaoControlIdc, ctxStartCcSao); deriveCcSao(cs, COMPONENT_Y,  orgYuv, srcYuv, dstYuv);
-    m_CABACEstimator->getCtx() = SubCtx(Ctx::CcSaoControlIdc, ctxStartCcSao); deriveCcSao(cs, COMPONENT_Cb, orgYuv, srcYuv, dstYuv);
-    m_CABACEstimator->getCtx() = SubCtx(Ctx::CcSaoControlIdc, ctxStartCcSao); deriveCcSao(cs, COMPONENT_Cr, orgYuv, srcYuv, dstYuv);
-    applyCcSao(cs, *cs.pcv, srcYuv, dstYuv);
+  const TempCtx ctxStartCcSao(m_ctxCache, SubCtx(Ctx::CcSaoControlIdc, m_CABACEstimator->getCtx()));
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER && !JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+  resetblkStatsEdgePre(m_ccSaoStatDataEdgeNew);
+  getCcSaoStatisticsEdgeNew(cs, orgYuv, srcYuv, dstYuv, m_ccSaoStatDataEdgeNew, m_bestCcSaoParam);
+#endif
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+  for (int compIdx = COMPONENT_Y; compIdx < MAX_NUM_COMPONENT; compIdx++)
+  {
+    ComponentID compID = (ComponentID)compIdx;
+    resetCcSaoEdgeStats(m_ccSaoStatDataEdgePre);
+    prepareCcSaoEdgeStats(cs, compID, orgYuv, srcYuv, dstYuv, m_ccSaoStatDataEdgePre, m_bestCcSaoParam);
+    m_CABACEstimator->getCtx() = SubCtx(Ctx::CcSaoControlIdc, ctxStartCcSao); 
+    deriveCcSao(cs, compID, orgYuv, srcYuv, dstYuv);
   }
+  setupCcSaoPrv(cs);
+#else
+  m_CABACEstimator->getCtx() = SubCtx(Ctx::CcSaoControlIdc, ctxStartCcSao); deriveCcSao(cs, COMPONENT_Y,  orgYuv, srcYuv, dstYuv);
+  m_CABACEstimator->getCtx() = SubCtx(Ctx::CcSaoControlIdc, ctxStartCcSao); deriveCcSao(cs, COMPONENT_Cb, orgYuv, srcYuv, dstYuv);
+  m_CABACEstimator->getCtx() = SubCtx(Ctx::CcSaoControlIdc, ctxStartCcSao); deriveCcSao(cs, COMPONENT_Cr, orgYuv, srcYuv, dstYuv);
+#endif
+  applyCcSao(cs, *cs.pcv, srcYuv, dstYuv);
+#if !JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+  }
+#endif
 }
 
 void EncSampleAdaptiveOffset::setupCcSaoLambdas(CodingStructure& cs, const double* lambdas)
@@ -3014,7 +3061,73 @@ void EncSampleAdaptiveOffset::setupCcSaoLambdas(CodingStructure& cs, const doubl
   m_lambda[COMPONENT_Cr] = lambdas[COMPONENT_Cr];
 }
 
-void EncSampleAdaptiveOffset::deriveCcSao(CodingStructure& cs, const ComponentID compID, const CPelUnitBuf& orgYuv, const CPelUnitBuf& srcYuv, const CPelUnitBuf& dstYuv)
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+void EncSampleAdaptiveOffset::setupCcSaoSH(CodingStructure& cs, const CPelUnitBuf& orgYuv)
+{
+  Position topLeftLuma = Position(0, 0);
+  Size     sizeLuma    = cs.area.lumaSize();
+
+  if( isChromaEnabled( cs.picture->chromaFormat) )
+  {
+    const CompArea  yArea   = CompArea( COMPONENT_Y,  cs.picture->chromaFormat, Area(topLeftLuma,sizeLuma), true );
+    const CompArea  cbArea  = CompArea( COMPONENT_Cb, cs.picture->chromaFormat, Area(topLeftLuma,sizeLuma), true );
+    const CompArea  crArea  = CompArea( COMPONENT_Cr, cs.picture->chromaFormat, Area(topLeftLuma,sizeLuma), true );
+    const CPelBuf   orgY    = cs.picture->getOrigBuf( yArea  );
+    const CPelBuf   orgCb   = cs.picture->getOrigBuf( cbArea );
+    const CPelBuf   orgCr   = cs.picture->getOrigBuf( crArea );
+
+    const int       m0      = ( yArea.x > 0 ? 0 : 1 );
+    const int       n0      = ( yArea.y > 0 ? 0 : 1 );
+    const int       m1      = ( yArea.x + yArea.width  < cs.picture->Y().width  ? yArea.width  : yArea.width  - 1 );
+    const int       n1      = ( yArea.y + yArea.height < cs.picture->Y().height ? yArea.height : yArea.height - 1 );
+    const int       x0      = ( cbArea.x > 0 ? 0 : 1 );
+    const int       y0      = ( cbArea.y > 0 ? 0 : 1 );
+    const int       x1      = ( cbArea.x + cbArea.width  < cs.picture->Cb().width  ? cbArea.width  : cbArea.width  - 1 );
+    const int       y1      = ( cbArea.y + cbArea.height < cs.picture->Cb().height ? cbArea.height : cbArea.height - 1 );
+    const int       ys      = orgY .stride;
+    const int       cbs     = orgCb.stride;
+    const int       crs     = orgCr.stride;
+    const Pel*      pY      = orgY .buf + n0 * ys;
+    const Pel*      pCb     = orgCb.buf + y0 * cbs;
+    const Pel*      pCr     = orgCr.buf + y0 * crs;
+
+    int             absSumY  = 0;
+    int             absSumCb = 0;
+    int             absSumCr = 0;
+    double          avgY     = 0;
+    double          avgCb    = 0;
+    double          avgCr    = 0;
+
+    for( int n = n0; n < n1; n++, pY += ys )
+    {
+      for( int m = m0; m < m1; m++ )
+      {
+        int y  = ( 12*(int)pY [m] - 2*((int)pY [m-1] + (int)pY [m+1] + (int)pY [m-ys ] + (int)pY [m+ys ]) - ((int)pY [m-1-ys ] + (int)pY [m+1-ys ] + (int)pY [m-1+ys ] + (int)pY [m+1+ys ]) );
+        absSumY += abs(y);
+      }
+    }
+
+    for( int y = y0; y < y1; y++, pCb += cbs, pCr += crs )
+    {
+      for( int x = x0; x < x1; x++ )
+      {
+        int cb = ( 12*(int)pCb[x] - 2*((int)pCb[x-1] + (int)pCb[x+1] + (int)pCb[x-cbs] + (int)pCb[x+cbs]) - ((int)pCb[x-1-cbs] + (int)pCb[x+1-cbs] + (int)pCb[x-1+cbs] + (int)pCb[x+1+cbs]) );
+        int cr = ( 12*(int)pCr[x] - 2*((int)pCr[x-1] + (int)pCr[x+1] + (int)pCr[x-crs] + (int)pCr[x+crs]) - ((int)pCr[x-1-crs] + (int)pCr[x+1-crs] + (int)pCr[x-1+crs] + (int)pCr[x+1+crs]) );
+        absSumCb += abs(cb);
+        absSumCr += abs(cr);
+      }
+    }
+
+    avgY  = (double)absSumY  / (yArea .width * yArea .height);
+    avgCb = (double)absSumCb / (cbArea.width * cbArea.height);
+    avgCr = (double)absSumCr / (crArea.width * crArea.height);
+    m_extChroma = 1.2 * avgCb > avgY || 1.2 * avgCr > avgY;
+  }
+}
+#endif
+
+void EncSampleAdaptiveOffset::deriveCcSao( CodingStructure& cs, const ComponentID compID
+                                           , const CPelUnitBuf& orgYuv, const CPelUnitBuf& srcYuv, const CPelUnitBuf& dstYuv )
 {
   double bestCost = 0;
   double tempCost = 0;
@@ -3023,65 +3136,118 @@ void EncSampleAdaptiveOffset::deriveCcSao(CodingStructure& cs, const ComponentID
   double bestCostG[17] = { 0 };
   int    classNumG[17] = { 0 };
   int    stageNum = m_intraPeriod == 1 ? MAX_CCSAO_CLASS_NUM / 4 : MAX_CCSAO_CLASS_NUM / 16;
-  for (int stage = 1; stage <= stageNum; stage++)
+  for( int stage = 1; stage <= stageNum; stage++ )
+  {
     classNumG[stage] = stage * (MAX_CCSAO_CLASS_NUM / stageNum);
+  }
+
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+  const int edgeCmpNum = m_extChroma ? MAX_NUM_COMPONENT : MAX_NUM_LUMA_COMP;
+  const int edgeIdcNum = m_intraPeriod != 1 || cs.sps->getPLTMode() || m_extChroma ? MAX_CCSAO_EDGE_IDC : 1;
+#endif
 
   m_bestCcSaoParam.reset();
-  memset(m_bestCcSaoControl, 0, sizeof(uint8_t) * m_numCTUsInPic);
+  memset( m_bestCcSaoControl, 0, sizeof( uint8_t ) * m_numCTUsInPic );
 
-  for (int setNum = 1; setNum <= MAX_CCSAO_SET_NUM; setNum++)
+  for( int setNum = 1; setNum <= MAX_CCSAO_SET_NUM; setNum++ )
   {
-    if (setNum > 1)
+    if( setNum > 1 )
     {
-      getCcSaoStatistics(cs, compID, orgYuv, srcYuv, dstYuv, m_ccSaoStatData, m_bestCcSaoParam);
+      getCcSaoStatistics( cs, compID, orgYuv, srcYuv, dstYuv, m_ccSaoStatData, m_bestCcSaoParam );
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
-      getCcSaoStatisticsEdge(cs, compID, orgYuv, srcYuv, dstYuv, m_ccSaoStatDataEdge, m_ccSaoStatDataEdgeNew,
-                             m_bestCcSaoParam);
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+      getCcSaoStatisticsEdge( cs, compID, orgYuv, srcYuv, dstYuv, m_ccSaoStatDataEdge, m_ccSaoStatDataEdgePre, m_bestCcSaoParam );
+#else
+      getCcSaoStatisticsEdge( cs, compID, orgYuv, srcYuv, dstYuv, m_ccSaoStatDataEdge, m_ccSaoStatDataEdgeNew, m_bestCcSaoParam );
+#endif
 #endif
     }
-    setupInitCcSaoParam(cs, compID, setNum, m_trainingDistortion, m_ccSaoStatData, m_ccSaoStatFrame
+    setupInitCcSaoParam( cs, compID, setNum, m_trainingDistortion, m_ccSaoStatData, m_ccSaoStatFrame
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
-                        , m_ccSaoStatDataEdge, m_ccSaoStatFrameEdge
+                         , m_ccSaoStatDataEdge, m_ccSaoStatFrameEdge
 #endif
-                        , m_initCcSaoParam, m_bestCcSaoParam, m_initCcSaoControl, m_bestCcSaoControl);
+                         , m_initCcSaoParam, m_bestCcSaoParam, m_initCcSaoControl, m_bestCcSaoControl );
 
-    for (int stage = 1; stage <= stageNum; stage++)
+
+    for( int stage = 1; stage <= stageNum; stage++ )
     {
-      for (int bandNumY = 1; bandNumY <= MAX_CCSAO_BAND_NUM_Y; bandNumY++)
-      for (int bandNumU = 1; bandNumU <= MAX_CCSAO_BAND_NUM_U; bandNumU++)
-      for (int bandNumV = 1; bandNumV <= MAX_CCSAO_BAND_NUM_V; bandNumV++)
-      for (int candPosY = 0; candPosY <  MAX_CCSAO_CAND_POS_Y && bandNumY > 1; candPosY++)
+      for( int bandNumY = 1; bandNumY <= MAX_CCSAO_BAND_NUM_Y; bandNumY++ )
       {
-        if (bandNumY < bandNumU || bandNumY < bandNumV)
-          continue;
+        for( int bandNumU = 1; bandNumU <= MAX_CCSAO_BAND_NUM_U; bandNumU++ )
+        {
+          for( int bandNumV = 1; bandNumV <= MAX_CCSAO_BAND_NUM_V; bandNumV++ )
+          {
+            for( int candPosY = 0; candPosY < MAX_CCSAO_CAND_POS_Y && bandNumY > 1; candPosY++ )
+            {
+              if( bandNumY < bandNumU || bandNumY < bandNumV )
+              {
+                continue;
+              }
 
-        int classNum = bandNumY * bandNumU * bandNumV;
-        if (classNum > MAX_CCSAO_CLASS_NUM)
-          continue;
+              int classNum = bandNumY * bandNumU * bandNumV;
+              if( classNum > MAX_CCSAO_CLASS_NUM )
+              {
+                continue;
+              }
 
-        if (classNum <= classNumG[stage - 1] || classNum > classNumG[stage])
-          continue;
+              if( classNum <= classNumG[stage - 1] || classNum > classNumG[stage] )
+              {
+                continue;
+              }
 
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
-        setupTempCcSaoParam(cs, compID, setNum, candPosY, bandNumY, bandNumU, bandNumV, m_tempCcSaoParam,
-                            m_initCcSaoParam, m_tempCcSaoControl, m_initCcSaoControl /*, 0 (default Band type*/);
+              setupTempCcSaoParam( cs, compID, setNum
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+                                   , 0 /*dummy*/
+#endif
+                                   , candPosY, bandNumY, bandNumU, bandNumV
+                                   , m_tempCcSaoParam, m_initCcSaoParam, m_tempCcSaoControl, m_initCcSaoControl /*, 0 (default Band type*/ );
 #else
-        setupTempCcSaoParam(cs, compID, setNum, candPosY, bandNumY, bandNumU, bandNumV, m_tempCcSaoParam,
-                            m_initCcSaoParam, m_tempCcSaoControl, m_initCcSaoControl);
+              setupTempCcSaoParam( cs, compID, setNum, candPosY, bandNumY, bandNumU, bandNumV, m_tempCcSaoParam,
+                                   m_initCcSaoParam, m_tempCcSaoControl, m_initCcSaoControl );
 #endif
-        getCcSaoStatistics(cs, compID, orgYuv, srcYuv, dstYuv, m_ccSaoStatData, m_tempCcSaoParam);
-        deriveCcSaoRDO(cs, compID, m_trainingDistortion, m_ccSaoStatData, m_ccSaoStatFrame
+              getCcSaoStatistics( cs, compID, orgYuv, srcYuv, dstYuv, m_ccSaoStatData, m_tempCcSaoParam );
+              deriveCcSaoRDO( cs, compID, m_trainingDistortion, m_ccSaoStatData, m_ccSaoStatFrame
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
-                       ,m_ccSaoStatDataEdge,  m_ccSaoStatFrameEdge
+                              , m_ccSaoStatDataEdge, m_ccSaoStatFrameEdge
 #endif
-                       ,m_bestCcSaoParam, m_tempCcSaoParam, m_bestCcSaoControl, m_tempCcSaoControl, bestCost, tempCost);
+                              , m_bestCcSaoParam, m_tempCcSaoParam, m_bestCcSaoControl, m_tempCcSaoControl, bestCost, tempCost );
+            }
+          }
+        }
       }
 
       bestCostG[stage] = bestCost;
-      if (bestCostG[stage] >= bestCostG[stage - 1])
+      if( bestCostG[stage] >= bestCostG[stage - 1] )
+      {
         break;
+      }
     }
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+    for (int edgeCmp = COMPONENT_Y; edgeCmp < edgeCmpNum; edgeCmp++)
+    {
+      for (int edgeDir = 0; edgeDir < MAX_CCSAO_EDGE_DIR; edgeDir++)
+      {
+        for (int edgeIdc = 0; edgeIdc < edgeIdcNum; edgeIdc++)
+        {
+          for (int bandIdc = 0; bandIdc < MAX_CCSAO_BAND_IDC; bandIdc++)
+          {
+            for (int edgeThr = 0; edgeThr < MAX_CCSAO_EDGE_THR; edgeThr++)
+            {
+              const int edgeNum = g_ccSaoEdgeNum[edgeIdc][0];
+              const int bandNum = g_ccSaoBandTab[bandIdc][1];
+              if (bandNum * edgeNum > MAX_CCSAO_CLASS_NUM)
+              {
+                continue;
+              }
+              
+              setupTempCcSaoParam(cs, compID, setNum
+                                , edgeCmp
+                                , edgeDir, bandIdc, edgeThr
+                                , edgeIdc
+                                , m_tempCcSaoParam, m_initCcSaoParam, m_tempCcSaoControl, m_initCcSaoControl, CCSAO_SET_TYPE_EDGE);
+#else
     tempCost = 0;
     for (int type = 0; type < CCSAO_EDGE_TYPE; type++)
     {
@@ -3091,22 +3257,55 @@ void EncSampleAdaptiveOffset::deriveCcSao(CodingStructure& cs, const ComponentID
         {
           setupTempCcSaoParam(cs, compID, setNum, type, mode, th, th, m_tempCcSaoParam, m_initCcSaoParam,
                               m_tempCcSaoControl, m_initCcSaoControl, 1 /* Edge Class Type */);
-          getCcSaoStatisticsEdge(cs, compID, orgYuv, srcYuv, dstYuv, m_ccSaoStatDataEdge, m_ccSaoStatDataEdgeNew,
-                                 m_tempCcSaoParam);
-          deriveCcSaoRDO(cs, compID, m_trainingDistortion, m_ccSaoStatData, m_ccSaoStatFrame
-#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
-                         , m_ccSaoStatDataEdge, m_ccSaoStatFrameEdge
 #endif
-                         , m_bestCcSaoParam, m_tempCcSaoParam, m_bestCcSaoControl, m_tempCcSaoControl, bestCost,
-                         tempCost);
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+              getCcSaoStatisticsEdge(cs, compID, orgYuv, srcYuv, dstYuv, m_ccSaoStatDataEdge, m_ccSaoStatDataEdgePre, m_tempCcSaoParam);
+#else
+              getCcSaoStatisticsEdge(cs, compID, orgYuv, srcYuv, dstYuv, m_ccSaoStatDataEdge, m_ccSaoStatDataEdgeNew, m_tempCcSaoParam);
+#endif
+              deriveCcSaoRDO(cs, compID, m_trainingDistortion, m_ccSaoStatData, m_ccSaoStatFrame
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+                           , m_ccSaoStatDataEdge, m_ccSaoStatFrameEdge
+#endif
+                       , m_bestCcSaoParam, m_tempCcSaoParam, m_bestCcSaoControl, m_tempCcSaoControl, bestCost, tempCost);
+            }
+          }
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
         }
+#endif
       }
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
     }
+#endif
 #endif
     bestCostS[setNum] = bestCost;
     if (bestCostS[setNum] >= bestCostS[setNum - 1])
+    {
       break;
+    }
   }
+
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+  if (!cs.slice->isIntra())
+  {
+    for (int prvId = 0; prvId < g_ccSaoPrvParam[compID].size(); prvId++)
+    {
+      if (g_ccSaoPrvParam[compID][prvId].temporalId > cs.slice->getTLayer())
+      {
+        continue;
+      }
+
+      setupTempCcSaoParamFromPrv(cs, compID, prvId, m_tempCcSaoParam, g_ccSaoPrvParam[compID][prvId], m_tempCcSaoControl);
+
+      getCcSaoStatistics    (cs, compID, orgYuv, srcYuv, dstYuv, m_ccSaoStatData,                             m_tempCcSaoParam);
+      getCcSaoStatisticsEdge(cs, compID, orgYuv, srcYuv, dstYuv, m_ccSaoStatDataEdge, m_ccSaoStatDataEdgePre, m_tempCcSaoParam);
+
+      deriveCcSaoRDO(cs, compID, m_trainingDistortion, m_ccSaoStatData, m_ccSaoStatFrame
+                   , m_ccSaoStatDataEdge,  m_ccSaoStatFrameEdge
+                   , m_bestCcSaoParam, m_tempCcSaoParam, m_bestCcSaoControl, m_tempCcSaoControl, bestCost, tempCost);
+    }
+  }
+#endif
 
   bool oneBlockFiltered = false;
   for (int ctbIdx = 0; m_bestCcSaoParam.setNum > 0 && ctbIdx < m_numCTUsInPic; ctbIdx++)
@@ -3121,7 +3320,10 @@ void EncSampleAdaptiveOffset::deriveCcSao(CodingStructure& cs, const ComponentID
   m_ccSaoComParam.reset(compID);
   memset(m_ccSaoControl[compID], 0, sizeof(uint8_t) * m_numCTUsInPic);
 
-  m_ccSaoComParam.enabled[compID] = oneBlockFiltered;
+  m_ccSaoComParam.enabled  [compID] = oneBlockFiltered;
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+  m_ccSaoComParam.extChroma[compID] = m_extChroma;
+#endif
   if (oneBlockFiltered)
   {
     CcSaoEncParam storedBestCcSaoParam = m_bestCcSaoParam;
@@ -3143,6 +3345,9 @@ void EncSampleAdaptiveOffset::deriveCcSao(CodingStructure& cs, const ComponentID
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
         m_bestCcSaoParam.setType[setIdc - 1]               = storedBestCcSaoParam.setType[setIdx];
 #endif
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+        m_bestCcSaoParam.candPos[setIdc - 1][COMPONENT_Cb] = storedBestCcSaoParam.candPos[setIdx][COMPONENT_Cb];
+#endif
         m_bestCcSaoParam.candPos[setIdc - 1][COMPONENT_Y ] = storedBestCcSaoParam.candPos[setIdx][COMPONENT_Y ];
         m_bestCcSaoParam.bandNum[setIdc - 1][COMPONENT_Y ] = storedBestCcSaoParam.bandNum[setIdx][COMPONENT_Y ];
         m_bestCcSaoParam.bandNum[setIdc - 1][COMPONENT_Cb] = storedBestCcSaoParam.bandNum[setIdx][COMPONENT_Cb];
@@ -3154,7 +3359,11 @@ void EncSampleAdaptiveOffset::deriveCcSao(CodingStructure& cs, const ComponentID
     }
     CHECK(setNum != m_bestCcSaoParam.setNum, "Number of sets enabled != setNum");
 
-    m_ccSaoComParam.setNum [compID] = m_bestCcSaoParam.setNum;
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+    m_ccSaoComParam.reusePrv  [compID] = m_bestCcSaoParam.reusePrv;
+    m_ccSaoComParam.reusePrvId[compID] = m_bestCcSaoParam.reusePrvId;
+#endif
+    m_ccSaoComParam.setNum    [compID] = m_bestCcSaoParam.setNum;
 
     for ( int setIdx = 0; setIdx < m_bestCcSaoParam.setNum; setIdx++ )
     {
@@ -3162,26 +3371,27 @@ void EncSampleAdaptiveOffset::deriveCcSao(CodingStructure& cs, const ComponentID
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
       m_ccSaoComParam.setType[compID][setIdx] = m_bestCcSaoParam.setType[setIdx];
 #endif
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+      m_ccSaoComParam.candPos   [compID][setIdx][COMPONENT_Cb] = m_bestCcSaoParam.candPos   [setIdx][COMPONENT_Cb];
+#endif
       m_ccSaoComParam.candPos   [compID][setIdx][COMPONENT_Y ] = m_bestCcSaoParam.candPos   [setIdx][COMPONENT_Y ];
-#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER && !JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
       int offset = m_ccSaoComParam.setType[compID][setIdx] ? 1 : 0;
-#else
-      ;
 #endif
       m_ccSaoComParam.bandNum   [compID][setIdx][COMPONENT_Y ] = m_bestCcSaoParam.bandNum   [setIdx][COMPONENT_Y ]
-#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER && !JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
       + offset;
 #else
         ;
 #endif
       m_ccSaoComParam.bandNum   [compID][setIdx][COMPONENT_Cb] = m_bestCcSaoParam.bandNum   [setIdx][COMPONENT_Cb]
-#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER && !JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
       + offset;
 #else
         ;
 #endif
       m_ccSaoComParam.bandNum   [compID][setIdx][COMPONENT_Cr] = m_bestCcSaoParam.bandNum   [setIdx][COMPONENT_Cr]
-#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER && !JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
       + offset;
 #else
         ;
@@ -3193,9 +3403,9 @@ void EncSampleAdaptiveOffset::deriveCcSao(CodingStructure& cs, const ComponentID
 }
 
 void EncSampleAdaptiveOffset::setupInitCcSaoParam(CodingStructure& cs, const ComponentID compID, const int setNum, int64_t* trainingDistortion[MAX_CCSAO_SET_NUM]
-                                                , CcSaoStatData* blkStats[MAX_CCSAO_SET_NUM], CcSaoStatData frameStats[MAX_CCSAO_SET_NUM]
+                                                , CcSaoStatData* blkStats    [MAX_CCSAO_SET_NUM], CcSaoStatData frameStats    [MAX_CCSAO_SET_NUM]
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
-   , CcSaoStatData *blkStatsEdge[MAX_CCSAO_SET_NUM], CcSaoStatData frameStatsEdge[MAX_CCSAO_SET_NUM]
+                                                , CcSaoStatData* blkStatsEdge[MAX_CCSAO_SET_NUM], CcSaoStatData frameStatsEdge[MAX_CCSAO_SET_NUM]
 #endif
                                                 , CcSaoEncParam& initCcSaoParam, CcSaoEncParam& bestCcSaoParam
                                                 , uint8_t* initCcSaoControl, uint8_t* bestCcSaoControl)
@@ -3215,10 +3425,15 @@ void EncSampleAdaptiveOffset::setupInitCcSaoParam(CodingStructure& cs, const Com
     {
       getCcSaoFrameStats(compID, setIdx, bestCcSaoControl, blkStats, frameStats
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
-        , blkStatsEdge, frameStatsEdge, bestCcSaoParam.setType[setIdx]
+                       , blkStatsEdge, frameStatsEdge, bestCcSaoParam.setType[setIdx]
 #endif
       );
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+      getCcSaoDistortion(compID, setIdx
+                       , bestCcSaoParam.setType[setIdx] == CCSAO_SET_TYPE_BAND ? blkStats : blkStatsEdge
+                       , bestCcSaoParam.offset, trainingDistortion);
+#else
       if (bestCcSaoParam.setType[setIdx] == 0) /* band */
       {
         getCcSaoDistortion(compID, setIdx, blkStats, bestCcSaoParam.offset, trainingDistortion);
@@ -3227,6 +3442,7 @@ void EncSampleAdaptiveOffset::setupInitCcSaoParam(CodingStructure& cs, const Com
       {
         getCcSaoDistortionEdge(compID, setIdx, blkStatsEdge, bestCcSaoParam.offset, trainingDistortion);
       }
+#endif
 #else
       getCcSaoDistortion(compID, setIdx, blkStats, bestCcSaoParam.offset, trainingDistortion);
 #endif
@@ -3280,35 +3496,70 @@ void EncSampleAdaptiveOffset::setupInitCcSaoParam(CodingStructure& cs, const Com
 }
 
 void EncSampleAdaptiveOffset::setupTempCcSaoParam(CodingStructure& cs, const ComponentID compID, const int setNum
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+                                                , const int edgeCmp
+#endif
                                                 , const int candPosY, const int bandNumY, const int bandNumU, const int bandNumV
                                                 , CcSaoEncParam& tempCcSaoParam, CcSaoEncParam& initCcSaoParam
                                                 , uint8_t* tempCcSaoControl, uint8_t* initCcSaoControl
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
-  , int setType /* by default setType is 0 (Band)*/
+                                                , int setType
 #endif
-)
+                                                 )
 {
   tempCcSaoParam.reset();
   memset(tempCcSaoControl, 0, sizeof(uint8_t) * m_numCTUsInPic);
 
-  tempCcSaoParam = initCcSaoParam;;
+  tempCcSaoParam = initCcSaoParam;
   memcpy(tempCcSaoControl, initCcSaoControl, sizeof(uint8_t) * m_numCTUsInPic);
 
   tempCcSaoParam.setNum = setNum;
   tempCcSaoParam.setEnabled[setNum - 1] = true;
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+  tempCcSaoParam.setType   [setNum - 1] = setType;
+#endif
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+  tempCcSaoParam.candPos   [setNum - 1][COMPONENT_Cb] = edgeCmp;
+#endif
   tempCcSaoParam.candPos   [setNum - 1][COMPONENT_Y ] = candPosY;
   tempCcSaoParam.bandNum   [setNum - 1][COMPONENT_Y ] = bandNumY;
   tempCcSaoParam.bandNum   [setNum - 1][COMPONENT_Cb] = bandNumU;
   tempCcSaoParam.bandNum   [setNum - 1][COMPONENT_Cr] = bandNumV;
-#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
-  tempCcSaoParam.setType[setNum - 1] = setType; /* setType = 0 is the Band Offset, setType = 1 is the Edge Offset */
-#endif
+
+  CHECK( setNum > MAX_CCSAO_SET_NUM, "setNum exceeds the buffer size" );
 
   for (int setIdx = 0; setIdx <= setNum; setIdx++)
   {
     tempCcSaoParam.mapIdxToIdc[setIdx] = setIdx < setNum ? setIdx + 1 : 0;
   }
 }
+
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+void EncSampleAdaptiveOffset::setupTempCcSaoParamFromPrv(CodingStructure& cs, const ComponentID compID, const int prvId
+                                                       , CcSaoEncParam& tempCcSaoParam, CcSaoPrvParam& prvCcSaoParam
+                                                       , uint8_t* tempCcSaoControl)
+{
+  tempCcSaoParam.reset();
+  memset(tempCcSaoControl, 0, sizeof(uint8_t) * m_numCTUsInPic);
+  std::fill_n(tempCcSaoControl, m_numCTUsInPic, 1);
+
+  tempCcSaoParam.reusePrv   = true;
+  tempCcSaoParam.reusePrvId = prvId;
+  tempCcSaoParam.setNum     = prvCcSaoParam.setNum;
+  memcpy( tempCcSaoParam.setEnabled, prvCcSaoParam.setEnabled, sizeof( tempCcSaoParam.setEnabled ) );
+  memcpy( tempCcSaoParam.setType   , prvCcSaoParam.setType   , sizeof( tempCcSaoParam.setType    ) );
+  memcpy( tempCcSaoParam.candPos   , prvCcSaoParam.candPos   , sizeof( tempCcSaoParam.candPos    ) );
+  memcpy( tempCcSaoParam.bandNum   , prvCcSaoParam.bandNum   , sizeof( tempCcSaoParam.bandNum    ) );
+  memcpy( tempCcSaoParam.offset    , prvCcSaoParam.offset    , sizeof( tempCcSaoParam.offset     ) );
+
+  CHECK( tempCcSaoParam.setNum > MAX_CCSAO_SET_NUM, "setNum exceeds the buffer size" );
+
+  for (int setIdx = 0; setIdx <= tempCcSaoParam.setNum; setIdx++)
+  {
+    tempCcSaoParam.mapIdxToIdc[setIdx] = setIdx < tempCcSaoParam.setNum ? setIdx + 1 : 0;
+  }
+}
+#endif
 
 void EncSampleAdaptiveOffset::getCcSaoStatistics(CodingStructure& cs, const ComponentID compID
                                                , const CPelUnitBuf& orgYuv, const CPelUnitBuf& srcYuv, const CPelUnitBuf& dstYuv
@@ -3336,8 +3587,6 @@ void EncSampleAdaptiveOffset::getCcSaoStatistics(CodingStructure& cs, const Comp
       int horVirBndryPosComp[] = { -1,-1,-1 };
       int verVirBndryPosComp[] = { -1,-1,-1 };
       bool isCtuCrossedByVirtualBoundaries = isCrossedByVirtualBoundaries(area.Y().x, area.Y().y, area.Y().width, area.Y().height, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos, cs.picHeader);
-
-
 #endif
 
       //NOTE: The number of skipped lines during gathering CTU statistics depends on the slice boundary availabilities.
@@ -3353,7 +3602,11 @@ void EncSampleAdaptiveOffset::getCcSaoStatistics(CodingStructure& cs, const Comp
         if (!ccSaoParam.setEnabled[setIdx])
           continue;
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+        if (ccSaoParam.setType[setIdx] != CCSAO_SET_TYPE_BAND)
+#else
         if (ccSaoParam.setType[setIdx] != 0)
+#endif
         {
           continue;
         }
@@ -3362,11 +3615,11 @@ void EncSampleAdaptiveOffset::getCcSaoStatistics(CodingStructure& cs, const Comp
         const int         srcStrideY = srcYuv.get(COMPONENT_Y ).stride;
         const int         srcStrideU = srcYuv.get(COMPONENT_Cb).stride;
         const int         srcStrideV = srcYuv.get(COMPONENT_Cr).stride;
-        const int         dstStride  = dstYuv.get(compID      ).stride;
-        const int         orgStride  = orgYuv.get(compID      ).stride;
         const Pel        *srcBlkY    = srcYuv.get(COMPONENT_Y ).bufAt(area.block(COMPONENT_Y ));
         const Pel        *srcBlkU    = srcYuv.get(COMPONENT_Cb).bufAt(area.block(COMPONENT_Cb));
         const Pel        *srcBlkV    = srcYuv.get(COMPONENT_Cr).bufAt(area.block(COMPONENT_Cr));
+        const int         dstStride  = dstYuv.get(compID      ).stride;
+        const int         orgStride  = orgYuv.get(compID      ).stride;
         const Pel        *dstBlk     = dstYuv.get(compID      ).bufAt(compArea);
         const Pel        *orgBlk     = orgYuv.get(compID      ).bufAt(compArea);
 
@@ -3395,13 +3648,25 @@ void EncSampleAdaptiveOffset::getCcSaoStatistics(CodingStructure& cs, const Comp
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                        , isCtuCrossedByVirtualBoundaries, horVirBndryPosComp, verVirBndryPosComp, numHorVirBndry, numVerVirBndry
 #endif
-                       );
+                        );
       }
       ctuRsAddr++;
     }
   }
 }
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+void EncSampleAdaptiveOffset::resetCcSaoEdgeStats(CcSaoStatData *blkStatsEdge)
+{
+  int numStatsEdge = m_numCTUsInPic * MAX_CCSAO_BAND_IDC * MAX_CCSAO_EDGE_DIR * MAX_CCSAO_EDGE_THR
+                   * MAX_NUM_COMPONENT * MAX_CCSAO_EDGE_IDC;
+
+  for (int idx = 0; idx < numStatsEdge; idx++)
+  {
+    blkStatsEdge[idx].reset();
+  }
+}
+#else
 void EncSampleAdaptiveOffset::resetblkStatsEdgePre(CcSaoStatData *blkStatsEdge[MAX_CCSAO_SET_NUM - 1])
 {
   for (int comp = Y_C; comp < N_C; comp++)
@@ -3422,10 +3687,17 @@ void EncSampleAdaptiveOffset::resetblkStatsEdgePre(CcSaoStatData *blkStatsEdge[M
     }
   }
 }
+#endif
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+void EncSampleAdaptiveOffset::prepareCcSaoEdgeStats(CodingStructure& cs, const ComponentID compID
+                                                  , const CPelUnitBuf& orgYuv, const CPelUnitBuf& srcYuv, const CPelUnitBuf& dstYuv 
+                                                  , CcSaoStatData* blkStatsEdge, const CcSaoEncParam& ccSaoParam)
+#else
 void EncSampleAdaptiveOffset::getCcSaoStatisticsEdgeNew(CodingStructure &cs, const CPelUnitBuf &orgYuv,
                                                         const CPelUnitBuf &srcYuv, const CPelUnitBuf &dstYuv,
                                                         CcSaoStatData *      blkStatsEdge[MAX_CCSAO_SET_NUM - 1],
                                                         const CcSaoEncParam &ccSaoParam)
+#endif
 {
   bool isLeftAvail, isRightAvail, isAboveAvail, isBelowAvail, isAboveLeftAvail, isAboveRightAvail;
 
@@ -3458,20 +3730,22 @@ void EncSampleAdaptiveOffset::getCcSaoStatisticsEdgeNew(CodingStructure &cs, con
       isBelowAvail      = (yPos + pcv.maxCUHeight < pcv.lumaHeight);
       isAboveRightAvail = ((yPos > 0) && (isRightAvail));
 
+#if !JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
       for (int comp = Y_C; comp < N_C; comp++)
       {
         const ComponentID compID     = ComponentID(comp);
-        const CompArea &  compArea   = area.block(compID);
-        const int         srcStrideY = srcYuv.get(COMPONENT_Y).stride;
+#endif
+        const CompArea   &compArea   = area.block(compID);
+        const int         srcStrideY = srcYuv.get(COMPONENT_Y ).stride;
         const int         srcStrideU = srcYuv.get(COMPONENT_Cb).stride;
         const int         srcStrideV = srcYuv.get(COMPONENT_Cr).stride;
-        const int         dstStride  = dstYuv.get(compID).stride;
-        const int         orgStride  = orgYuv.get(compID).stride;
-        const Pel *       srcBlkY    = srcYuv.get(COMPONENT_Y).bufAt(area.block(COMPONENT_Y));
-        const Pel *       srcBlkU    = srcYuv.get(COMPONENT_Cb).bufAt(area.block(COMPONENT_Cb));
-        const Pel *       srcBlkV    = srcYuv.get(COMPONENT_Cr).bufAt(area.block(COMPONENT_Cr));
-        const Pel *       dstBlk     = dstYuv.get(compID).bufAt(compArea);
-        const Pel *       orgBlk     = orgYuv.get(compID).bufAt(compArea);
+        const Pel        *srcBlkY    = srcYuv.get(COMPONENT_Y ).bufAt(area.block(COMPONENT_Y ));
+        const Pel        *srcBlkU    = srcYuv.get(COMPONENT_Cb).bufAt(area.block(COMPONENT_Cb));
+        const Pel        *srcBlkV    = srcYuv.get(COMPONENT_Cr).bufAt(area.block(COMPONENT_Cr));
+        const int         dstStride  = dstYuv.get(compID      ).stride;
+        const int         orgStride  = orgYuv.get(compID      ).stride;
+        const Pel        *dstBlk     = dstYuv.get(compID      ).bufAt(compArea);
+        const Pel        *orgBlk     = orgYuv.get(compID      ).bufAt(compArea);
 
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
         for (int i = 0; i < numHorVirBndry; i++)
@@ -3484,32 +3758,45 @@ void EncSampleAdaptiveOffset::getCcSaoStatisticsEdgeNew(CodingStructure &cs, con
         }
 #endif
 
+#if !JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
         const uint16_t candPosY = 0;
         const uint16_t bandNumC = 0;
         const int      setIdx   = 0;
         const uint16_t mode     = 0; /* temporary setting */
+#endif
 
-        getCcSaoBlkStatsEdgeNew(compID, cs.area.chromaFormat, cs.sps->getBitDepth(toChannelType(compID)), setIdx,
-                                m_ccSaoStatDataEdgeNew, ctuRsAddr, candPosY, mode, bandNumC, bandNumC, srcBlkY, srcBlkU,
-                                srcBlkV, orgBlk, dstBlk, srcStrideY, srcStrideU, srcStrideV, orgStride, dstStride,
-                                compArea.width, compArea.height, isLeftAvail, isRightAvail, isAboveAvail, isBelowAvail,
-                                isAboveLeftAvail, isAboveRightAvail
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+        getCcSaoBlkStatsEdgePre(cs, compID, cs.area.chromaFormat, cs.sps->getBitDepth(toChannelType(compID))
+                              , m_ccSaoStatDataEdgePre, ctuRsAddr
+#else
+        getCcSaoBlkStatsEdgeNew(compID, cs.area.chromaFormat, cs.sps->getBitDepth(toChannelType(compID))
+                              , setIdx, m_ccSaoStatDataEdgeNew, ctuRsAddr
+                              , candPosY, mode, bandNumC, bandNumC
+#endif
+                              , srcBlkY, srcBlkU, srcBlkV, orgBlk, dstBlk, srcStrideY, srcStrideU, srcStrideV, orgStride, dstStride
+                              , compArea.width, compArea.height
+                              , isLeftAvail, isRightAvail, isAboveAvail, isBelowAvail, isAboveLeftAvail, isAboveRightAvail
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                               , isCtuCrossedByVirtualBoundaries, horVirBndryPosComp, verVirBndryPosComp, numHorVirBndry, numVerVirBndry
 #endif
-        );
+                               );
+#if !JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
       }
+#endif
       ctuRsAddr++;
     }
   }
 }
 
-void EncSampleAdaptiveOffset::getCcSaoStatisticsEdge(CodingStructure &cs, const ComponentID compID,
-                                                     const CPelUnitBuf &orgYuv, const CPelUnitBuf &srcYuv,
-                                                     const CPelUnitBuf &  dstYuv,
-                                                     CcSaoStatData *      blkStatsEdge[MAX_CCSAO_SET_NUM],
-                                                     CcSaoStatData *      blkStatsEdgePre[MAX_CCSAO_SET_NUM - 1],
-                                                     const CcSaoEncParam &ccSaoParam)
+void EncSampleAdaptiveOffset::getCcSaoStatisticsEdge(CodingStructure& cs, const ComponentID compID
+                                                   , const CPelUnitBuf& orgYuv, const CPelUnitBuf& srcYuv, const CPelUnitBuf& dstYuv
+                                                   , CcSaoStatData* blkStatsEdge[MAX_CCSAO_SET_NUM]
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+                                                   , CcSaoStatData* blkStatsEdgePre
+#else
+                                                   , CcSaoStatData* blkStatsEdgePre[MAX_CCSAO_SET_NUM - 1]
+#endif
+                                                   , const CcSaoEncParam& ccSaoParam)
 {
   const PreCalcValues &pcv = *cs.pcv;
 
@@ -3529,23 +3816,42 @@ void EncSampleAdaptiveOffset::getCcSaoStatisticsEdge(CodingStructure &cs, const 
         {
           continue;
         }
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+        if (ccSaoParam.setType[setIdx] != CCSAO_SET_TYPE_EDGE)
+#else
         if (ccSaoParam.setType[setIdx] != 1)
+#endif
         {
           continue;
         }
 
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+        const uint16_t edgeCmp = ccSaoParam.candPos[setIdx][COMPONENT_Cb];
+        const uint16_t edgeIdc = ccSaoParam.bandNum[setIdx][COMPONENT_Cr];
+        const uint16_t edgeDir = ccSaoParam.candPos[setIdx][COMPONENT_Y ];
+        const uint16_t edgeThr = ccSaoParam.bandNum[setIdx][COMPONENT_Cb];
+        const uint16_t bandIdc = ccSaoParam.bandNum[setIdx][COMPONENT_Y ];
+
+        int idx = getCcSaoEdgeStatIdx(ctuRsAddr, bandIdc
+                                    , edgeCmp, edgeIdc
+                                    , edgeDir, edgeThr
+                                     );
+        blkStatsEdge[setIdx][ctuRsAddr] = blkStatsEdgePre[idx];
+#else
         const uint16_t candPosY = ccSaoParam.candPos[setIdx][COMPONENT_Y];
         const uint16_t bandNumY = ccSaoParam.bandNum[setIdx][COMPONENT_Y];
         const uint16_t bandNumC = ccSaoParam.bandNum[setIdx][COMPONENT_Cb];   // treshold
 
         int index                       = calcEdgeStatIndex(ctuRsAddr, bandNumY, candPosY, bandNumC);
         blkStatsEdge[setIdx][ctuRsAddr] = blkStatsEdgePre[compID][index];
+#endif
       }
       ctuRsAddr++;
     }
   }
 }
 
+#if !JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
 int calcDiffRangeEnc(Pel a, Pel b, int th)
 {
   int diff      = a - b;
@@ -3576,7 +3882,24 @@ int calcDiffRangeEnc(Pel a, Pel b, int th)
   }
   return value;
 }
+#endif
 
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+inline int EncSampleAdaptiveOffset::getCcSaoEdgeStatIdx(const int ctuRsAddr, const int bandIdc
+                                                      , const int edgeCmp, const int edgeIdc
+                                                      , const int edgeDir, const int edgeThr
+                                                       )
+{
+  int idx = ctuRsAddr * MAX_CCSAO_BAND_IDC * MAX_CCSAO_EDGE_DIR * MAX_CCSAO_EDGE_THR
+           + bandIdc                       * MAX_CCSAO_EDGE_DIR * MAX_CCSAO_EDGE_THR
+           + edgeDir                                            * MAX_CCSAO_EDGE_THR 
+           + edgeThr;
+  idx = idx * MAX_NUM_COMPONENT + edgeCmp;
+  idx = idx * MAX_CCSAO_EDGE_IDC + edgeIdc;
+
+  return idx;
+}
+#else
 int EncSampleAdaptiveOffset::calcEdgeStatIndex(const int ctuRsAddr, const int mode, const int type, const int th)
 {
   int index = 0;
@@ -3584,28 +3907,43 @@ int EncSampleAdaptiveOffset::calcEdgeStatIndex(const int ctuRsAddr, const int mo
             + mode * CCSAO_EDGE_TYPE * CCSAO_QUAN_NUM + type * CCSAO_QUAN_NUM + th;
   return index;
 }
-
-void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
-  const ComponentID compID, const ChromaFormat chromaFormat, const int bitDepth, const int setIdx,
-  CcSaoStatData *blkStatsEdge[N_C], const int ctuRsAddr, const uint16_t candPosY, const uint16_t bandNumY,
-  const uint16_t bandNumU, const uint16_t bandNumV, const Pel *srcY, const Pel *srcU, const Pel *srcV, const Pel *org,
-  const Pel *dst, const int srcStrideY, const int srcStrideU, const int srcStrideV, const int orgStride,
-  const int dstStride, const int width, const int height, bool isLeftAvail, bool isRightAvail, bool isAboveAvail,
-  bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail
-#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-  , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
 #endif
-)
+
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgePre(CodingStructure& cs, const ComponentID compID, const ChromaFormat chromaFormat, const int bitDepth
+                                                    , CcSaoStatData *blkStatsEdge, const int ctuRsAddr
+#else
+void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(const ComponentID compID, const ChromaFormat chromaFormat, const int bitDepth
+                                                    , const int setIdx, CcSaoStatData *blkStatsEdge[N_C], const int ctuRsAddr
+                                                    , const uint16_t candPosY, const uint16_t bandNumY, const uint16_t bandNumU, const uint16_t bandNumV
+#endif
+                                                    , const Pel *srcY, const Pel *srcU, const Pel *srcV
+                                                    , const Pel *org, const Pel *dst
+                                                    , const int srcStrideY, const int srcStrideU, const int srcStrideV, const int orgStride, const int dstStride
+                                                    , const int width, const int height
+                                                    , bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail
+#if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
+                                                    , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
+#endif
+                                                     )
 {
+#if !JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
   int signa, signb, band;
+#endif
 
   const int chromaScaleX = getChannelTypeScaleX( CHANNEL_TYPE_CHROMA, chromaFormat );
   const int chromaScaleY = getChannelTypeScaleY( CHANNEL_TYPE_CHROMA, chromaFormat );
   const int chromaScaleYM1 = 1 - chromaScaleY;
 
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+  const int edgeCmpNum = m_extChroma ? MAX_NUM_COMPONENT : MAX_NUM_LUMA_COMP;
+  const int edgeIdcNum = m_intraPeriod != 1 || cs.sps->getPLTMode() || m_extChroma ? MAX_CCSAO_EDGE_IDC : 1;
+  const int srcStrideTab[MAX_NUM_COMPONENT] = { srcStrideY, srcStrideU, srcStrideU };
+#endif
+
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
-  int        x, y, startX, startY, endX, endY;
-  int        firstLineStartX, firstLineEndX;
+  int x, y, startX, startY, endX, endY;
+  int firstLineStartX, firstLineEndX;
   const Pel *srcYT = srcY;
   const Pel *srcUT = srcU;
   const Pel *srcVT = srcV;
@@ -3616,6 +3954,400 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
   {
   case COMPONENT_Y:
   {
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+    for (int edgeCmp = COMPONENT_Y; edgeCmp < edgeCmpNum; edgeCmp++)
+    {
+      const int srcStrideE = srcStrideTab[edgeCmp];
+      for (int edgeDir = 0; edgeDir < MAX_CCSAO_EDGE_DIR; edgeDir++)
+      {
+        srcY = srcYT;
+        srcU = srcUT;
+        srcV = srcVT;
+        org  = orgT;
+        dst  = dstT;
+        int edgePosXA = g_ccSaoEdgePosX[edgeDir][0], edgePosYA = g_ccSaoEdgePosY[edgeDir][0];
+        int edgePosXB = g_ccSaoEdgePosX[edgeDir][1], edgePosYB = g_ccSaoEdgePosY[edgeDir][1];
+
+        switch (edgeDir)
+        {
+        case SAO_TYPE_EO_0:
+        {
+          startX = isLeftAvail ? 0 : 1;
+          endX   = isRightAvail ? width : (width - 1);
+          for (y = 0; y < height; y++)
+          {
+            for (x = startX; x < endX; x++)
+            {
+              if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+              {
+                continue;
+              }
+
+              const Pel *colY = srcY + x;
+              const Pel *colU = srcU + (x >> chromaScaleX);
+              const Pel *colV = srcV + (x >> chromaScaleX);
+              const Pel *col[MAX_NUM_COMPONENT] = { colY, colU, colV };
+              const Pel *colE = col[edgeCmp];
+              const Pel *colA = colE + srcStrideE * edgePosYA + edgePosXA;
+              const Pel *colB = colE + srcStrideE * edgePosYB + edgePosXB;
+
+              for (int edgeIdc = 0; edgeIdc < edgeIdcNum; edgeIdc++)
+              {
+                const int edgeNum    = g_ccSaoEdgeNum[edgeIdc][0];
+                const int edgeNumUni = g_ccSaoEdgeNum[edgeIdc][1];
+                for (int edgeThr = 0; edgeThr < MAX_CCSAO_EDGE_THR; edgeThr++)
+                {
+                  const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr];
+                  const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
+                  const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
+                  const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
+                  for (int bandIdc = 0; bandIdc < MAX_CCSAO_BAND_IDC; bandIdc++)
+                  {
+                    const int bandCmp = g_ccSaoBandTab[bandIdc][0];
+                    const int bandNum = g_ccSaoBandTab[bandIdc][1];
+                    if (bandNum * edgeNum > MAX_CCSAO_CLASS_NUM)
+                    {
+                      continue;
+                    }
+
+                    const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
+                    const int classIdx = bandIdx * edgeNum + edgeIdx;
+
+                    int idx = getCcSaoEdgeStatIdx(ctuRsAddr, bandIdc
+                                                , edgeCmp, edgeIdc
+                                                , edgeDir, edgeThr
+                                                 );
+
+                    blkStatsEdge[idx].diff [classIdx] += org[x] - dst[x];
+                    blkStatsEdge[idx].count[classIdx]++;
+                  }
+                }
+              }
+            }
+            srcY += srcStrideY;
+            srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+            srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
+            org += orgStride;
+            dst += dstStride;
+          }
+        }
+        break;
+        case SAO_TYPE_EO_90:
+        {
+          startY = isAboveAvail ? 0 : 1;
+          endY   = isBelowAvail ? height : height - 1;
+          if (!isAboveAvail)
+          {
+            srcY += srcStrideY;
+            srcU += srcStrideU * chromaScaleYM1;
+            srcV += srcStrideV * chromaScaleYM1;
+            org += orgStride;
+            dst += dstStride;
+          }
+          for (y = startY; y < endY; y++)
+          {
+            for (x = 0; x < width; x++)
+            {
+              if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, 0, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+              {
+                continue;
+              }
+
+              const Pel *colY = srcY + x;
+              const Pel *colU = srcU + (x >> chromaScaleX);
+              const Pel *colV = srcV + (x >> chromaScaleX);
+              const Pel *col[MAX_NUM_COMPONENT] = { colY, colU, colV };
+              const Pel *colE = col[edgeCmp];
+              const Pel *colA = colE + srcStrideE * edgePosYA + edgePosXA;
+              const Pel *colB = colE + srcStrideE * edgePosYB + edgePosXB;
+
+              for (int edgeIdc = 0; edgeIdc < edgeIdcNum; edgeIdc++)
+              {
+                const int edgeNum    = g_ccSaoEdgeNum[edgeIdc][0];
+                const int edgeNumUni = g_ccSaoEdgeNum[edgeIdc][1];
+                for (int edgeThr = 0; edgeThr < MAX_CCSAO_EDGE_THR; edgeThr++)
+                {
+                  const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr];
+                  const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
+                  const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
+                  const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
+                  for (int bandIdc = 0; bandIdc < MAX_CCSAO_BAND_IDC; bandIdc++)
+                  {
+                    const int bandCmp = g_ccSaoBandTab[bandIdc][0];
+                    const int bandNum = g_ccSaoBandTab[bandIdc][1];
+                    if (bandNum * edgeNum > MAX_CCSAO_CLASS_NUM)
+                    {
+                      continue;
+                    }
+
+                    const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
+                    const int classIdx = bandIdx * edgeNum + edgeIdx;
+
+                    int idx = getCcSaoEdgeStatIdx(ctuRsAddr, bandIdc
+                                                , edgeCmp, edgeIdc
+                                                , edgeDir, edgeThr
+                                                 );
+
+                    blkStatsEdge[idx].diff [classIdx] += org[x] - dst[x];
+                    blkStatsEdge[idx].count[classIdx]++;
+                  }
+                }
+              }
+            }
+            srcY += srcStrideY;
+            srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+            srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
+            org += orgStride;
+            dst += dstStride;
+          }
+        }
+        break;
+        case SAO_TYPE_EO_135:
+        {
+          startX = isLeftAvail ? 0 : 1;
+          endX   = isRightAvail ? width : (width - 1);
+
+          // 1st line
+          firstLineStartX = isAboveLeftAvail ? 0 : 1;
+          firstLineEndX   = isAboveAvail ? endX : 1;
+          for (x = firstLineStartX; x < firstLineEndX; x++)
+          {
+            if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, 0, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+            {
+              continue;
+            }
+
+            const Pel *colY = srcY + x;
+            const Pel *colU = srcU + (x >> chromaScaleX);
+            const Pel *colV = srcV + (x >> chromaScaleX);
+            const Pel *col[MAX_NUM_COMPONENT] = { colY, colU, colV };
+            const Pel *colE = col[edgeCmp];
+            const Pel *colA = colE + srcStrideE * edgePosYA + edgePosXA;
+            const Pel *colB = colE + srcStrideE * edgePosYB + edgePosXB;
+
+            for (int edgeIdc = 0; edgeIdc < edgeIdcNum; edgeIdc++)
+            {
+              const int edgeNum    = g_ccSaoEdgeNum[edgeIdc][0];
+              const int edgeNumUni = g_ccSaoEdgeNum[edgeIdc][1];
+              for (int edgeThr = 0; edgeThr < MAX_CCSAO_EDGE_THR; edgeThr++)
+              {
+                const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr];
+                const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
+                const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
+                const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
+                for (int bandIdc = 0; bandIdc < MAX_CCSAO_BAND_IDC; bandIdc++)
+                {
+                  const int bandCmp = g_ccSaoBandTab[bandIdc][0];
+                  const int bandNum = g_ccSaoBandTab[bandIdc][1];
+                  if (bandNum * edgeNum > MAX_CCSAO_CLASS_NUM)
+                  {
+                    continue;
+                  }
+
+                  const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
+                  const int classIdx = bandIdx * edgeNum + edgeIdx;
+
+                  int idx = getCcSaoEdgeStatIdx(ctuRsAddr, bandIdc
+                                              , edgeCmp, edgeIdc
+                                              , edgeDir, edgeThr
+                                               );
+
+                  blkStatsEdge[idx].diff [classIdx] += org[x] - dst[x];
+                  blkStatsEdge[idx].count[classIdx]++;
+                }
+              }
+            }
+          }
+          srcY += srcStrideY;
+          srcU += srcStrideU * chromaScaleYM1;
+          srcV += srcStrideV * chromaScaleYM1;
+          org += orgStride;
+          dst += dstStride;
+
+          // middle lines
+          for (y = 1; y < height - 1; y++)
+          {
+            for (x = startX; x < endX; x++)
+            {
+              if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+              {
+                continue;
+              }
+
+              const Pel *colY = srcY + x;
+              const Pel *colU = srcU + (x >> chromaScaleX);
+              const Pel *colV = srcV + (x >> chromaScaleX);
+              const Pel *col[MAX_NUM_COMPONENT] = { colY, colU, colV };
+              const Pel *colE = col[edgeCmp];
+              const Pel *colA = colE + srcStrideE * edgePosYA + edgePosXA;
+              const Pel *colB = colE + srcStrideE * edgePosYB + edgePosXB;
+
+              for (int edgeIdc = 0; edgeIdc < edgeIdcNum; edgeIdc++)
+              {
+                const int edgeNum    = g_ccSaoEdgeNum[edgeIdc][0];
+                const int edgeNumUni = g_ccSaoEdgeNum[edgeIdc][1];
+                for (int edgeThr = 0; edgeThr < MAX_CCSAO_EDGE_THR; edgeThr++)
+                {
+                  const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr];
+                  const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
+                  const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
+                  const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
+                  for (int bandIdc = 0; bandIdc < MAX_CCSAO_BAND_IDC; bandIdc++)
+                  {
+                    const int bandCmp = g_ccSaoBandTab[bandIdc][0];
+                    const int bandNum = g_ccSaoBandTab[bandIdc][1];
+                    if (bandNum * edgeNum > MAX_CCSAO_CLASS_NUM)
+                    {
+                      continue;
+                    }
+
+                    const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
+                    const int classIdx = bandIdx * edgeNum + edgeIdx;
+
+                    int idx = getCcSaoEdgeStatIdx(ctuRsAddr, bandIdc
+                                                , edgeCmp, edgeIdc
+                                                , edgeDir, edgeThr
+                                                 );
+
+                    blkStatsEdge[idx].diff [classIdx] += org[x] - dst[x];
+                    blkStatsEdge[idx].count[classIdx]++;
+                  }
+                }
+              }
+            }
+            srcY += srcStrideY;
+            srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+            srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
+            org += orgStride;
+            dst += dstStride;
+          }
+        }
+        break;
+        case SAO_TYPE_EO_45:
+        {
+          startX = isLeftAvail ? 0 : 1;
+          endX   = isRightAvail ? width : (width - 1);
+          
+          // first line
+          firstLineStartX = isAboveAvail ? startX : (width - 1);
+          firstLineEndX   = isAboveRightAvail ? width : (width - 1);
+          for (x = firstLineStartX; x < firstLineEndX; x++)
+          {
+            if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, 0, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+            {
+              continue;
+            }
+
+            const Pel *colY = srcY + x;
+            const Pel *colU = srcU + (x >> chromaScaleX);
+            const Pel *colV = srcV + (x >> chromaScaleX);
+            const Pel *col[MAX_NUM_COMPONENT] = { colY, colU, colV };
+            const Pel *colE = col[edgeCmp];
+            const Pel *colA = colE + srcStrideE * edgePosYA + edgePosXA;
+            const Pel *colB = colE + srcStrideE * edgePosYB + edgePosXB;
+
+            for (int edgeIdc = 0; edgeIdc < edgeIdcNum; edgeIdc++)
+            {
+              const int edgeNum    = g_ccSaoEdgeNum[edgeIdc][0];
+              const int edgeNumUni = g_ccSaoEdgeNum[edgeIdc][1];
+              for (int edgeThr = 0; edgeThr < MAX_CCSAO_EDGE_THR; edgeThr++)
+              {
+                const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr];
+                const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
+                const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
+                const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
+                for (int bandIdc = 0; bandIdc < MAX_CCSAO_BAND_IDC; bandIdc++)
+                {
+                  const int bandCmp = g_ccSaoBandTab[bandIdc][0];
+                  const int bandNum = g_ccSaoBandTab[bandIdc][1];
+                  if (bandNum * edgeNum > MAX_CCSAO_CLASS_NUM)
+                  {
+                    continue;
+                  }
+
+                  const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
+                  const int classIdx = bandIdx * edgeNum + edgeIdx;
+
+                  int idx = getCcSaoEdgeStatIdx(ctuRsAddr, bandIdc
+                                              , edgeCmp, edgeIdc
+                                              , edgeDir, edgeThr
+                                               );
+
+                  blkStatsEdge[idx].diff [classIdx] += org[x] - dst[x];
+                  blkStatsEdge[idx].count[classIdx]++;
+                }
+              }
+            }
+          }
+          srcY += srcStrideY;
+          srcU += srcStrideU * chromaScaleYM1;
+          srcV += srcStrideV * chromaScaleYM1;
+          org += orgStride;
+          dst += dstStride;
+
+          // middle lines
+          for (y = 1; y < height - 1; y++)
+          {
+            for (x = startX; x < endX; x++)
+            {
+              if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+              {
+                continue;
+              }
+
+              const Pel *colY = srcY + x;
+              const Pel *colU = srcU + (x >> chromaScaleX);
+              const Pel *colV = srcV + (x >> chromaScaleX);
+              const Pel *col[MAX_NUM_COMPONENT] = { colY, colU, colV };
+              const Pel *colE = col[edgeCmp];
+              const Pel *colA = colE + srcStrideE * edgePosYA + edgePosXA;
+              const Pel *colB = colE + srcStrideE * edgePosYB + edgePosXB;
+
+              for (int edgeIdc = 0; edgeIdc < edgeIdcNum; edgeIdc++)
+              {
+                const int edgeNum    = g_ccSaoEdgeNum[edgeIdc][0];
+                const int edgeNumUni = g_ccSaoEdgeNum[edgeIdc][1];
+                for (int edgeThr = 0; edgeThr < MAX_CCSAO_EDGE_THR; edgeThr++)
+                {
+                  const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr];
+                  const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
+                  const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
+                  const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
+                  for (int bandIdc = 0; bandIdc < MAX_CCSAO_BAND_IDC; bandIdc++)
+                  {
+                    const int bandCmp = g_ccSaoBandTab[bandIdc][0];
+                    const int bandNum = g_ccSaoBandTab[bandIdc][1];
+                    if (bandNum * edgeNum > MAX_CCSAO_CLASS_NUM)
+                    {
+                      continue;
+                    }
+
+                    const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
+                    const int classIdx = bandIdx * edgeNum + edgeIdx;
+
+                    int idx = getCcSaoEdgeStatIdx(ctuRsAddr, bandIdc
+                                                , edgeCmp, edgeIdc
+                                                , edgeDir, edgeThr
+                                                 );
+
+                    blkStatsEdge[idx].diff [classIdx] += org[x] - dst[x];
+                    blkStatsEdge[idx].count[classIdx]++;
+                  }
+                }
+              }
+            }
+            srcY += srcStrideY;
+            srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
+            srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
+            org += orgStride;
+            dst += dstStride;
+          }
+        }
+        break;
+        }
+      }
+    }
+#else
     for (int type = 0; type < CCSAO_EDGE_TYPE; type++)
     {
       srcY           = srcYT;
@@ -3998,11 +4730,407 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
       break;
       }   // switch (type)
     }     // for(type =0; type < CCSAO_EDGE_TYPE; type ++)
+#endif
     break;
   }   // case COMPONENT_Y
   case COMPONENT_Cb:
   case COMPONENT_Cr:
   {
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+    for (int edgeCmp = COMPONENT_Y; edgeCmp < edgeCmpNum; edgeCmp++)
+    {
+      const int srcStrideE = srcStrideTab[edgeCmp];
+      for (int edgeDir = 0; edgeDir < MAX_CCSAO_EDGE_DIR; edgeDir++)
+      {
+        srcY = srcYT;
+        srcU = srcUT;
+        srcV = srcVT;
+        org  = orgT;
+        dst  = dstT;
+        int edgePosXA = g_ccSaoEdgePosX[edgeDir][0], edgePosYA = g_ccSaoEdgePosY[edgeDir][0];
+        int edgePosXB = g_ccSaoEdgePosX[edgeDir][1], edgePosYB = g_ccSaoEdgePosY[edgeDir][1];
+        
+        switch (edgeDir)
+        {
+        case SAO_TYPE_EO_0:
+        {
+          startX = isLeftAvail ? 0 : 1;
+          endX   = isRightAvail ? width : (width - 1);
+          for (y = 0; y < height; y++)
+          {
+            for (x = startX; x < endX; x++)
+            {
+              if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, 0, verVirBndryPos, horVirBndryPos))
+              {
+                continue;
+              }
+              
+              const Pel *colY = srcY + (x << chromaScaleX);
+              const Pel *colU = srcU + x;
+              const Pel *colV = srcV + x;
+              const Pel *col[MAX_NUM_COMPONENT] = { colY, colU, colV };
+              const Pel *colE = col[edgeCmp];
+              const Pel *colA = colE + srcStrideE * edgePosYA + edgePosXA;
+              const Pel *colB = colE + srcStrideE * edgePosYB + edgePosXB;
+
+              for (int edgeIdc = 0; edgeIdc < edgeIdcNum; edgeIdc++)
+              {
+                const int edgeNum    = g_ccSaoEdgeNum[edgeIdc][0];
+                const int edgeNumUni = g_ccSaoEdgeNum[edgeIdc][1];
+                for (int edgeThr = 0; edgeThr < MAX_CCSAO_EDGE_THR; edgeThr++)
+                {
+                  const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr];
+                  const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
+                  const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
+                  const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
+                  for (int bandIdc = 0; bandIdc < MAX_CCSAO_BAND_IDC; bandIdc++)
+                  {
+                    const int bandCmp = g_ccSaoBandTab[bandIdc][0];
+                    const int bandNum = g_ccSaoBandTab[bandIdc][1];
+                    if (bandNum * edgeNum > MAX_CCSAO_CLASS_NUM)
+                    {
+                      continue;
+                    }
+
+                    const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
+                    const int classIdx = bandIdx * edgeNum + edgeIdx;
+
+                    int idx = getCcSaoEdgeStatIdx(ctuRsAddr, bandIdc
+                                                , edgeCmp, edgeIdc
+                                                , edgeDir, edgeThr
+                                                );
+
+                    blkStatsEdge[idx].diff [classIdx] += org[x] - dst[x];
+                    blkStatsEdge[idx].count[classIdx]++;
+                  }
+                }
+              }
+            }
+            srcY += srcStrideY << chromaScaleY;
+            srcU += srcStrideU;
+            srcV += srcStrideV;
+            org += orgStride;
+            dst += dstStride;
+          }
+        }
+        break;
+        case SAO_TYPE_EO_90:
+        {
+          startY = isAboveAvail ? 0 : 1;
+          endY   = isBelowAvail ? height : height - 1;
+          if (!isAboveAvail)
+          {
+            srcY += srcStrideY << chromaScaleY;
+            srcU += srcStrideU;
+            srcV += srcStrideV;
+            org += orgStride;
+            dst += dstStride;
+          }
+          for (y = startY; y < endY; y++)
+          {
+            for (x = 0; x < width; x++)
+            {
+              if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, 0, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+              {
+                continue;
+              }
+
+              const Pel *colY = srcY + (x << chromaScaleX);
+              const Pel *colU = srcU + x;
+              const Pel *colV = srcV + x;
+              const Pel *col[MAX_NUM_COMPONENT] = { colY, colU, colV };
+              const Pel *colE = col[edgeCmp];
+              const Pel *colA = colE + srcStrideE * edgePosYA + edgePosXA;
+              const Pel *colB = colE + srcStrideE * edgePosYB + edgePosXB;
+
+              for (int edgeIdc = 0; edgeIdc < edgeIdcNum; edgeIdc++)
+              {
+                const int edgeNum    = g_ccSaoEdgeNum[edgeIdc][0];
+                const int edgeNumUni = g_ccSaoEdgeNum[edgeIdc][1];
+                for (int edgeThr = 0; edgeThr < MAX_CCSAO_EDGE_THR; edgeThr++)
+                {
+                  const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr];
+                  const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
+                  const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
+                  const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
+                  for (int bandIdc = 0; bandIdc < MAX_CCSAO_BAND_IDC; bandIdc++)
+                  {
+                    const int bandCmp = g_ccSaoBandTab[bandIdc][0];
+                    const int bandNum = g_ccSaoBandTab[bandIdc][1];
+                    if (bandNum * edgeNum > MAX_CCSAO_CLASS_NUM)
+                    {
+                      continue;
+                    }
+
+                    const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
+                    const int classIdx = bandIdx * edgeNum + edgeIdx;
+
+                    int idx = getCcSaoEdgeStatIdx(ctuRsAddr, bandIdc
+                                                , edgeCmp, edgeIdc
+                                                , edgeDir, edgeThr
+                                                );
+
+                    blkStatsEdge[idx].diff [classIdx] += org[x] - dst[x];
+                    blkStatsEdge[idx].count[classIdx]++;
+                  }
+                }
+              }
+            }
+            srcY += srcStrideY << chromaScaleY;
+            srcU += srcStrideU;
+            srcV += srcStrideV;
+            org += orgStride;
+            dst += dstStride;
+          }
+        }
+        break;
+        case SAO_TYPE_EO_135:
+        {
+          startX = isLeftAvail ? 0 : 1;
+          endX   = isRightAvail ? width : (width - 1);
+
+          // 1st line
+          firstLineStartX = isAboveLeftAvail ? 0 : 1;
+          firstLineEndX   = isAboveAvail ? endX : 1;
+          for (x = firstLineStartX; x < firstLineEndX; x++)
+          {
+            if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, 0, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+            {
+              continue;
+            }
+
+            const Pel *colY = srcY + (x << chromaScaleX);
+            const Pel *colU = srcU + x;
+            const Pel *colV = srcV + x;
+            const Pel *col[MAX_NUM_COMPONENT] = { colY, colU, colV };
+            const Pel *colE = col[edgeCmp];
+            const Pel *colA = colE + srcStrideE * edgePosYA + edgePosXA;
+            const Pel *colB = colE + srcStrideE * edgePosYB + edgePosXB;
+
+            for (int edgeIdc = 0; edgeIdc < edgeIdcNum; edgeIdc++)
+            {
+              const int edgeNum    = g_ccSaoEdgeNum[edgeIdc][0];
+              const int edgeNumUni = g_ccSaoEdgeNum[edgeIdc][1];
+              for (int edgeThr = 0; edgeThr < MAX_CCSAO_EDGE_THR; edgeThr++)
+              {
+                const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr];
+                const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
+                const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
+                const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
+                for (int bandIdc = 0; bandIdc < MAX_CCSAO_BAND_IDC; bandIdc++)
+                {
+                  const int bandCmp = g_ccSaoBandTab[bandIdc][0];
+                  const int bandNum = g_ccSaoBandTab[bandIdc][1];
+                  if (bandNum * edgeNum > MAX_CCSAO_CLASS_NUM)
+                  {
+                    continue;
+                  }
+
+                  const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
+                  const int classIdx = bandIdx * edgeNum + edgeIdx;
+
+                  int idx = getCcSaoEdgeStatIdx(ctuRsAddr, bandIdc
+                                              , edgeCmp, edgeIdc
+                                              , edgeDir, edgeThr
+                                              );
+
+                  blkStatsEdge[idx].diff [classIdx] += org[x] - dst[x];
+                  blkStatsEdge[idx].count[classIdx]++;
+                }
+              }
+            }
+          }
+          srcY += srcStrideY << chromaScaleY;
+          srcU += srcStrideU;
+          srcV += srcStrideV;
+          org += orgStride;
+          dst += dstStride;
+
+          // middle lines
+          for (y = 1; y < height - 1; y++)
+          {
+            for (x = startX; x < endX; x++)
+            {
+              if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+              {
+                continue;
+              }
+
+              const Pel *colY = srcY + (x << chromaScaleX);
+              const Pel *colU = srcU + x;
+              const Pel *colV = srcV + x;
+              const Pel *col[MAX_NUM_COMPONENT] = { colY, colU, colV };
+              const Pel *colE = col[edgeCmp];
+              const Pel *colA = colE + srcStrideE * edgePosYA + edgePosXA;
+              const Pel *colB = colE + srcStrideE * edgePosYB + edgePosXB;
+
+              for (int edgeIdc = 0; edgeIdc < edgeIdcNum; edgeIdc++)
+              {
+                const int edgeNum    = g_ccSaoEdgeNum[edgeIdc][0];
+                const int edgeNumUni = g_ccSaoEdgeNum[edgeIdc][1];
+                for (int edgeThr = 0; edgeThr < MAX_CCSAO_EDGE_THR; edgeThr++)
+                {
+                  const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr];
+                  const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
+                  const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
+                  const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
+                  for (int bandIdc = 0; bandIdc < MAX_CCSAO_BAND_IDC; bandIdc++)
+                  {
+                    const int bandCmp = g_ccSaoBandTab[bandIdc][0];
+                    const int bandNum = g_ccSaoBandTab[bandIdc][1];
+                    if (bandNum * edgeNum > MAX_CCSAO_CLASS_NUM)
+                    {
+                      continue;
+                    }
+
+                    const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
+                    const int classIdx = bandIdx * edgeNum + edgeIdx;
+
+                    int idx = getCcSaoEdgeStatIdx(ctuRsAddr, bandIdc
+                                                , edgeCmp, edgeIdc
+                                                , edgeDir, edgeThr
+                                                );
+
+                    blkStatsEdge[idx].diff [classIdx] += org[x] - dst[x];
+                    blkStatsEdge[idx].count[classIdx]++;
+                  }
+                }
+              }
+            }
+            srcY += srcStrideY << chromaScaleY;
+            srcU += srcStrideU;
+            srcV += srcStrideV;
+            org += orgStride;
+            dst += dstStride;
+          }
+        }
+        break;
+        case SAO_TYPE_EO_45:
+        {
+          startX = isLeftAvail ? 0 : 1;
+          endX   = isRightAvail ? width : (width - 1);
+
+          // first line
+          firstLineStartX = isAboveAvail ? startX : (width - 1);
+          firstLineEndX   = isAboveRightAvail ? width : (width - 1);
+          for (x = firstLineStartX; x < firstLineEndX; x++)
+          {
+            if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, 0, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+            {
+              continue;
+            }
+
+            const Pel *colY = srcY + (x << chromaScaleX);
+            const Pel *colU = srcU + x;
+            const Pel *colV = srcV + x;
+            const Pel *col[MAX_NUM_COMPONENT] = { colY, colU, colV };
+            const Pel *colE = col[edgeCmp];
+            const Pel *colA = colE + srcStrideE * edgePosYA + edgePosXA;
+            const Pel *colB = colE + srcStrideE * edgePosYB + edgePosXB;
+
+            for (int edgeIdc = 0; edgeIdc < edgeIdcNum; edgeIdc++)
+            {
+              const int edgeNum    = g_ccSaoEdgeNum[edgeIdc][0];
+              const int edgeNumUni = g_ccSaoEdgeNum[edgeIdc][1];
+              for (int edgeThr = 0; edgeThr < MAX_CCSAO_EDGE_THR; edgeThr++)
+              {
+                const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr];
+                const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
+                const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
+                const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
+                for (int bandIdc = 0; bandIdc < MAX_CCSAO_BAND_IDC; bandIdc++)
+                {
+                  const int bandCmp = g_ccSaoBandTab[bandIdc][0];
+                  const int bandNum = g_ccSaoBandTab[bandIdc][1];
+                  if (bandNum * edgeNum > MAX_CCSAO_CLASS_NUM)
+                  {
+                    continue;
+                  }
+
+                  const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
+                  const int classIdx = bandIdx * edgeNum + edgeIdx;
+
+                  int idx = getCcSaoEdgeStatIdx(ctuRsAddr, bandIdc
+                                              , edgeCmp, edgeIdc
+                                              , edgeDir, edgeThr
+                                              );
+
+                  blkStatsEdge[idx].diff [classIdx] += org[x] - dst[x];
+                  blkStatsEdge[idx].count[classIdx]++;
+                }
+              }
+            }
+          }
+          srcY += srcStrideY << chromaScaleY;
+          srcU += srcStrideU;
+          srcV += srcStrideV;
+          org += orgStride;
+          dst += dstStride;
+
+          // middle lines
+          for (y = 1; y < height - 1; y++)
+          {
+            for (x = startX; x < endX; x++)
+            {
+              if (isCtuCrossedByVirtualBoundaries && isProcessDisabled(x, y, numVerVirBndry, numHorVirBndry, verVirBndryPos, horVirBndryPos))
+              {
+                continue;
+              }
+
+              const Pel *colY = srcY + (x << chromaScaleX);
+              const Pel *colU = srcU + x;
+              const Pel *colV = srcV + x;
+              const Pel *col[MAX_NUM_COMPONENT] = { colY, colU, colV };
+              const Pel *colE = col[edgeCmp];
+              const Pel *colA = colE + srcStrideE * edgePosYA + edgePosXA;
+              const Pel *colB = colE + srcStrideE * edgePosYB + edgePosXB;
+
+              for (int edgeIdc = 0; edgeIdc < edgeIdcNum; edgeIdc++)
+              {
+                const int edgeNum    = g_ccSaoEdgeNum[edgeIdc][0];
+                const int edgeNumUni = g_ccSaoEdgeNum[edgeIdc][1];
+                for (int edgeThr = 0; edgeThr < MAX_CCSAO_EDGE_THR; edgeThr++)
+                {
+                  const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr];
+                  const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
+                  const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
+                  const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
+
+                  for (int bandIdc = 0; bandIdc < MAX_CCSAO_BAND_IDC; bandIdc++)
+                  {
+                    const int bandCmp = g_ccSaoBandTab[bandIdc][0];
+                    const int bandNum = g_ccSaoBandTab[bandIdc][1];
+                    if (bandNum * edgeNum > MAX_CCSAO_CLASS_NUM)
+                    {
+                      continue;
+                    }
+
+                    const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
+                    const int classIdx = bandIdx * edgeNum + edgeIdx;
+
+                    int idx = getCcSaoEdgeStatIdx(ctuRsAddr, bandIdc
+                                                , edgeCmp, edgeIdc
+                                                , edgeDir, edgeThr
+                                                );
+
+                    blkStatsEdge[idx].diff [classIdx] += org[x] - dst[x];
+                    blkStatsEdge[idx].count[classIdx]++;
+                  }
+                }
+              }
+            }
+            srcY += srcStrideY << chromaScaleY;
+            srcU += srcStrideU;
+            srcV += srcStrideV;
+            org += orgStride;
+            dst += dstStride;
+          }
+        }
+        break;
+        }
+      }
+    }
+#else
     for (int type = 0; type < CCSAO_EDGE_TYPE; type++)
     {
       srcY = srcYT;
@@ -4405,6 +5533,7 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
 
       }   // switch (type)
     }     // for(type =0; type < CCSAO_EDGE_TYPE; type ++)
+#endif
     break;
   }   // case COMPONENT_Cb COMPONENT_Cr
   default:
@@ -4421,8 +5550,27 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
     {
       for (int x = 0; x < width; x++)
       {
-        for (int type = 0; type < CCSAO_EDGE_TYPE; type++)
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+        for (int edgeCmp = COMPONENT_Y; edgeCmp < edgeCmpNum; edgeCmp++)
         {
+          const int srcStrideE = srcStrideTab[edgeCmp];
+          for (int edgeDir = 0; edgeDir < MAX_CCSAO_EDGE_DIR; edgeDir++)
+#else
+        for (int type = 0; type < CCSAO_EDGE_TYPE; type++)
+#endif
+        {
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+          int edgePosXA = g_ccSaoEdgePosX[edgeDir][0], edgePosYA = g_ccSaoEdgePosY[edgeDir][0];
+          int edgePosXB = g_ccSaoEdgePosX[edgeDir][1], edgePosYB = g_ccSaoEdgePosY[edgeDir][1];
+     
+          const Pel *colY = srcY + x;
+          const Pel *colU = srcU + (x >> chromaScaleX);
+          const Pel *colV = srcV + (x >> chromaScaleX);
+          const Pel *col[MAX_NUM_COMPONENT] = { colY, colU, colV };
+          const Pel *colE = col[edgeCmp];
+          const Pel *colA = colE + srcStrideE * edgePosYA + edgePosXA;
+          const Pel *colB = colE + srcStrideE * edgePosYB + edgePosXB;
+#else
           int candPosYXA = g_ccSaoEdgeTypeX[type][0];
           int candPosYYA = g_ccSaoEdgeTypeY[type][0];
           int candPosYXB = g_ccSaoEdgeTypeX[type][1];
@@ -4433,7 +5581,43 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
           const Pel *colB = srcY + x + srcStrideY * candPosYYB + candPosYXB;
           const Pel *colU = srcU + (x >> chromaScaleX);
           const Pel *colV = srcV + (x >> chromaScaleX);
+#endif
 
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+          for (int edgeIdc = 0; edgeIdc < edgeIdcNum; edgeIdc++)
+          {
+            const int edgeNum    = g_ccSaoEdgeNum[edgeIdc][0];
+            const int edgeNumUni = g_ccSaoEdgeNum[edgeIdc][1];
+            for (int edgeThr = 0; edgeThr < MAX_CCSAO_EDGE_THR; edgeThr++)
+            {
+              const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr];
+              const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
+              const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
+              const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
+
+              for (int bandIdc = 0; bandIdc < MAX_CCSAO_BAND_IDC; bandIdc++)
+              {
+                const int bandCmp = g_ccSaoBandTab[bandIdc][0];
+                const int bandNum = g_ccSaoBandTab[bandIdc][1];
+                if (bandNum * edgeNum > MAX_CCSAO_CLASS_NUM)
+                {
+                  continue;
+                }
+
+                const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
+                const int classIdx = bandIdx * edgeNum + edgeIdx;
+
+                int idx = getCcSaoEdgeStatIdx(ctuRsAddr, bandIdc
+                                            , edgeCmp, edgeIdc
+                                            , edgeDir, edgeThr
+                                             );
+
+                blkStatsEdge[idx].diff [classIdx] += org[x] - dst[x];
+                blkStatsEdge[idx].count[classIdx]++;
+              }
+            }
+          }
+#else
           for (int th = 0; th < CCSAO_QUAN_NUM; th++)
           {
             signa = calcDiffRangeEnc(*colY, *colA, th);
@@ -4468,8 +5652,13 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
 
             }   // mode
           }     // th
+#endif
         }       // edge_type
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+        }
+#endif
       }         // x
+      
       srcY += srcStrideY;
       srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
       srcV += srcStrideV * ((y & 0x1) | chromaScaleYM1);
@@ -4485,8 +5674,61 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
     {
       for (int x = 0; x < width; x++)
       {
-        for (int type = 0; type < CCSAO_EDGE_TYPE; type++)
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+        for (int edgeCmp = COMPONENT_Y; edgeCmp < edgeCmpNum; edgeCmp++)
         {
+          const int srcStrideE = srcStrideTab[edgeCmp];
+          for (int edgeDir = 0; edgeDir < MAX_CCSAO_EDGE_DIR; edgeDir++)
+#else
+        for (int type = 0; type < CCSAO_EDGE_TYPE; type++)
+#endif
+        {
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+          int edgePosXA = g_ccSaoEdgePosX[edgeDir][0], edgePosYA = g_ccSaoEdgePosY[edgeDir][0];
+          int edgePosXB = g_ccSaoEdgePosX[edgeDir][1], edgePosYB = g_ccSaoEdgePosY[edgeDir][1];
+
+          const Pel *colY = srcY + (x << chromaScaleX);
+          const Pel *colU = srcU + x;
+          const Pel *colV = srcV + x;
+          const Pel *col[MAX_NUM_COMPONENT] = { colY, colU, colV };
+          const Pel *colE = col[edgeCmp];
+          const Pel *colA = colE + srcStrideE * edgePosYA + edgePosXA;
+          const Pel *colB = colE + srcStrideE * edgePosYB + edgePosXB;
+
+          for (int edgeIdc = 0; edgeIdc < edgeIdcNum; edgeIdc++)
+          {
+            const int edgeNum    = g_ccSaoEdgeNum[edgeIdc][0];
+            const int edgeNumUni = g_ccSaoEdgeNum[edgeIdc][1];
+            for (int edgeThr = 0; edgeThr < MAX_CCSAO_EDGE_THR; edgeThr++)
+            {
+              const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr];
+              const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
+              const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
+              const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
+
+              for (int bandIdc = 0; bandIdc < MAX_CCSAO_BAND_IDC; bandIdc++)
+              {
+                const int bandCmp = g_ccSaoBandTab[bandIdc][0];
+                const int bandNum = g_ccSaoBandTab[bandIdc][1];
+                if (bandNum * edgeNum > MAX_CCSAO_CLASS_NUM)
+                {
+                  continue;
+                }
+
+                const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
+                const int classIdx = bandIdx * edgeNum + edgeIdx;
+
+                int idx = getCcSaoEdgeStatIdx(ctuRsAddr, bandIdc
+                                            , edgeCmp, edgeIdc
+                                            , edgeDir, edgeThr
+                                             );
+
+                blkStatsEdge[idx].diff [classIdx] += org[x] - dst[x];
+                blkStatsEdge[idx].count[classIdx]++;
+              }
+            }
+          }
+#else
           int candPosYXA = g_ccSaoEdgeTypeX[type][0];
           int candPosYYA = g_ccSaoEdgeTypeY[type][0];
           int candPosYXB = g_ccSaoEdgeTypeX[type][1];
@@ -4535,8 +5777,13 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(
               blkStatsEdge[compID][index].count[band]++;
             }
           }
+#endif
         }
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+        }
+#endif
       }
+
       srcY += srcStrideY << chromaScaleY;
       srcU += srcStrideU;
       srcV += srcStrideV;
@@ -4557,14 +5804,15 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
                                              , const int setIdx, CcSaoStatData* blkStats[MAX_CCSAO_SET_NUM], const int ctuRsAddr
                                              , const uint16_t candPosY
                                              , const uint16_t bandNumY, const uint16_t bandNumU, const uint16_t bandNumV
-                                             , const Pel* srcY, const Pel* srcU, const Pel* srcV, const Pel* org, const Pel* dst
+                                             , const Pel* srcY, const Pel* srcU, const Pel* srcV
+                                             , const Pel* org, const Pel* dst
                                              , const int srcStrideY, const int srcStrideU, const int srcStrideV, const int orgStride, const int dstStride
                                              , const int width, const int height
                                              , bool isLeftAvail, bool isRightAvail, bool isAboveAvail, bool isBelowAvail, bool isAboveLeftAvail, bool isAboveRightAvail
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
                                              , bool isCtuCrossedByVirtualBoundaries, int horVirBndryPos[], int verVirBndryPos[], int numHorVirBndry, int numVerVirBndry
 #endif
-                                             )
+                                              )
 {
   const int candPosYX = g_ccSaoCandPosX[COMPONENT_Y][candPosY];
   const int candPosYY = g_ccSaoCandPosY[COMPONENT_Y][candPosY];
@@ -5354,7 +6602,7 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
         const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
         const int classIdx = bandIdx;
 
-        blkStats[setIdx][ctuRsAddr].diff[classIdx] += org[x] - dst[x];
+        blkStats[setIdx][ctuRsAddr].diff [classIdx] += org[x] - dst[x];
         blkStats[setIdx][ctuRsAddr].count[classIdx]++;
       }
 
@@ -5383,7 +6631,7 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
         const int bandIdx  = bandY * bandNumU * bandNumV + bandU * bandNumV + bandV;
         const int classIdx = bandIdx;
 
-        blkStats[setIdx][ctuRsAddr].diff[classIdx] += org[x] - dst[x];
+        blkStats[setIdx][ctuRsAddr].diff [classIdx] += org[x] - dst[x];
         blkStats[setIdx][ctuRsAddr].count[classIdx]++;
       }
 
@@ -5404,13 +6652,14 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStats(const ComponentID compID, const C
 }
 
 void EncSampleAdaptiveOffset::getCcSaoFrameStats(const ComponentID compID, const int setIdx, const uint8_t* ccSaoControl
-                                               , CcSaoStatData* blkStats[MAX_CCSAO_SET_NUM], CcSaoStatData frameStats[MAX_CCSAO_SET_NUM]
+                                               , CcSaoStatData* blkStats    [MAX_CCSAO_SET_NUM], CcSaoStatData frameStats    [MAX_CCSAO_SET_NUM]
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
-  , CcSaoStatData* blkStatsEdge[MAX_CCSAO_SET_NUM], CcSaoStatData frameStatsEdge[MAX_CCSAO_SET_NUM], const uint8_t setType
+                                               , CcSaoStatData* blkStatsEdge[MAX_CCSAO_SET_NUM], CcSaoStatData frameStatsEdge[MAX_CCSAO_SET_NUM]
+                                               , const uint8_t setType
 #endif
 )
 {
-  frameStats[setIdx].reset();
+  frameStats    [setIdx].reset();
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
   frameStatsEdge[setIdx].reset();
 #endif
@@ -5421,14 +6670,19 @@ void EncSampleAdaptiveOffset::getCcSaoFrameStats(const ComponentID compID, const
     if (ccSaoControl[ctbIdx] == setIdc)
     {
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+      if (setType == CCSAO_SET_TYPE_BAND) { frameStats    [setIdx] += blkStats    [setIdx][ctbIdx]; }
+      else         /*CCSAO_SET_TYPE_EDGE*/{ frameStatsEdge[setIdx] += blkStatsEdge[setIdx][ctbIdx]; }
+#else
       if (setType == 0) /* band offset */
       {
         frameStats[setIdx] += blkStats[setIdx][ctbIdx];
       }
-      else /* Edge offset */
+      else
       {
         frameStatsEdge[setIdx] += blkStatsEdge[setIdx][ctbIdx];
       }
+#endif
 #else
       frameStats[setIdx] += blkStats[setIdx][ctbIdx];
 #endif
@@ -5516,7 +6770,7 @@ void EncSampleAdaptiveOffset::getCcSaoDistortion(const ComponentID compID, const
     }
   }
 }
-#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER && !JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
 void EncSampleAdaptiveOffset::getCcSaoDistortionEdge(const ComponentID compID, const int setIdx,
                                                      CcSaoStatData *blkStatsEdge[MAX_CCSAO_SET_NUM],
                                                      short          offset[MAX_CCSAO_SET_NUM][MAX_CCSAO_CLASS_NUM],
@@ -5610,6 +6864,10 @@ void EncSampleAdaptiveOffset::determineCcSaoControlIdc(CodingStructure& cs, cons
     }
   }
 
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+  if (!ccSaoParam.reusePrv)
+  {
+#endif
   std::copy_n(setEnabled, MAX_CCSAO_SET_NUM, ccSaoParam.setEnabled);
 
   std::stable_sort(setIdxCount, setIdxCount + MAX_CCSAO_SET_NUM, compareSetIdxCount);
@@ -5645,6 +6903,9 @@ void EncSampleAdaptiveOffset::determineCcSaoControlIdc(CodingStructure& cs, cons
     }
   }
   curTotalRate += FRAC_BITS_SCALE*m_CABACEstimator->getEstFracBits();
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+  }
+#endif
 
   // restore for next iteration
   m_CABACEstimator->getCtx() = ctxInitial;
@@ -5670,7 +6931,7 @@ int EncSampleAdaptiveOffset::getCcSaoParamRate(const ComponentID compID, const C
 {
   int bits = 0;
 
-  if (ccSaoParam.setNum > 0 )
+  if (ccSaoParam.setNum > 0)
   {
     bits += lengthUvlc(ccSaoParam.setNum - 1);
 
@@ -5680,6 +6941,24 @@ int EncSampleAdaptiveOffset::getCcSaoParamRate(const ComponentID compID, const C
       if (ccSaoParam.setEnabled[setIdx])
       {
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+        bits += 1;
+        if (ccSaoParam.setType[setIdx] == CCSAO_SET_TYPE_EDGE)
+        {
+          bits += m_extChroma ? MAX_CCSAO_EDGE_CMP_BITS : 0;
+          bits += MAX_CCSAO_EDGE_IDC_BITS;
+          bits += MAX_CCSAO_EDGE_DIR_BITS;
+          bits += MAX_CCSAO_EDGE_THR_BITS;
+          bits += MAX_CCSAO_BAND_IDC_BITS;
+        }
+        else
+        {
+          bits += MAX_CCSAO_CAND_POS_Y_BITS;
+          bits += MAX_CCSAO_BAND_NUM_Y_BITS;
+          bits += MAX_CCSAO_BAND_NUM_U_BITS;
+          bits += MAX_CCSAO_BAND_NUM_V_BITS;
+        }
+#else
         {
           bits += 1; /* Edge or Band classifier */
           if (ccSaoParam.setType[setIdx] == 1)
@@ -5696,6 +6975,7 @@ int EncSampleAdaptiveOffset::getCcSaoParamRate(const ComponentID compID, const C
             bits += MAX_CCSAO_BAND_NUM_V_BITS;
           }
         }
+#endif
 #else
         bits += MAX_CCSAO_CAND_POS_Y_BITS;
         bits += MAX_CCSAO_BAND_NUM_Y_BITS;
@@ -5703,11 +6983,15 @@ int EncSampleAdaptiveOffset::getCcSaoParamRate(const ComponentID compID, const C
         bits += MAX_CCSAO_BAND_NUM_V_BITS;
 #endif
 
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+        int classNum = getCcSaoClassNumEnc(setIdx, ccSaoParam);
+#else
         int classNum = ccSaoParam.bandNum[setIdx][COMPONENT_Y ]
                      * ccSaoParam.bandNum[setIdx][COMPONENT_Cb]
                      * ccSaoParam.bandNum[setIdx][COMPONENT_Cr];
+#endif
 
-#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
+#if JVET_Y0106_CCSAO_EDGE_CLASSIFIER && !JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
         if (ccSaoParam.setType[setIdx] == 1)
         {
           if (ccSaoParam.bandNum[setIdx][COMPONENT_Y] < CCSAO_EDGE_COMPARE_VALUE + CCSAO_EDGE_COMPARE_VALUE)
@@ -5739,10 +7023,32 @@ int EncSampleAdaptiveOffset::getCcSaoParamRate(const ComponentID compID, const C
   return bits;
 }
 
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+int EncSampleAdaptiveOffset::getCcSaoClassNumEnc(const int setIdx, const CcSaoEncParam& ccSaoParam)
+{
+  int classNum = 0;
+
+  if (ccSaoParam.setType[setIdx] == CCSAO_SET_TYPE_EDGE)
+  {
+    int bandIdc = ccSaoParam.bandNum[setIdx][COMPONENT_Y ], bandNum = g_ccSaoBandTab[bandIdc][1];
+    int edgeIdc = ccSaoParam.bandNum[setIdx][COMPONENT_Cr], edgeNum = g_ccSaoEdgeNum[edgeIdc][0];
+    classNum = bandNum * edgeNum;
+  }
+  else
+  {
+    classNum = ccSaoParam.bandNum[setIdx][COMPONENT_Y ]
+             * ccSaoParam.bandNum[setIdx][COMPONENT_Cb]
+             * ccSaoParam.bandNum[setIdx][COMPONENT_Cr];
+  }
+  
+  return classNum;
+}
+#endif
+
 void EncSampleAdaptiveOffset::deriveCcSaoRDO(CodingStructure& cs, const ComponentID compID, int64_t* trainingDistortion[MAX_CCSAO_SET_NUM]
-                                           , CcSaoStatData* blkStats[MAX_CCSAO_SET_NUM], CcSaoStatData frameStats[MAX_CCSAO_SET_NUM]
+                                           , CcSaoStatData* blkStats    [MAX_CCSAO_SET_NUM], CcSaoStatData frameStats    [MAX_CCSAO_SET_NUM]
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
-  ,  CcSaoStatData *blkStatsEdge[MAX_CCSAO_SET_NUM], CcSaoStatData frameStatsEdge[MAX_CCSAO_SET_NUM]
+                                           , CcSaoStatData *blkStatsEdge[MAX_CCSAO_SET_NUM], CcSaoStatData frameStatsEdge[MAX_CCSAO_SET_NUM]
 #endif
                                            , CcSaoEncParam& bestCcSaoParam, CcSaoEncParam& tempCcSaoParam
                                            , uint8_t* bestCcSaoControl, uint8_t* tempCcSaoControl
@@ -5770,28 +7076,43 @@ void EncSampleAdaptiveOffset::deriveCcSaoRDO(CodingStructure& cs, const Componen
     {
       if (tempCcSaoParam.setEnabled[setIdx])
       {
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+        if (tempCcSaoParam.reusePrv)
+        {
+          getCcSaoDistortion(compID, setIdx
+                           , tempCcSaoParam.setType[setIdx] == CCSAO_SET_TYPE_BAND ? blkStats : blkStatsEdge
+                           , tempCcSaoParam.offset, trainingDistortion);
+        }
+        else
+        {
+#endif
         getCcSaoFrameStats(compID, setIdx, tempCcSaoControl, blkStats, frameStats
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
-          , blkStatsEdge, frameStatsEdge, tempCcSaoParam.setType[setIdx]
+                         , blkStatsEdge, frameStatsEdge, tempCcSaoParam.setType[setIdx]
 #endif
         );
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER
-        if (tempCcSaoParam.setType[setIdx] == 0)
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+        if (tempCcSaoParam.setType[setIdx] == CCSAO_SET_TYPE_BAND)
+#else
+        if (tempCcSaoParam.setType[setIdx]== 0)
+#endif
         {
-          deriveCcSaoOffsets(compID, cs.sps->getBitDepth(toChannelType(compID)), setIdx, frameStats,
-                             tempCcSaoParam.offset);
+          deriveCcSaoOffsets(compID, cs.sps->getBitDepth(toChannelType(compID)), setIdx, frameStats, tempCcSaoParam.offset);
           getCcSaoDistortion(compID, setIdx, blkStats, tempCcSaoParam.offset, trainingDistortion);
         }
         else
         {
-          deriveCcSaoOffsets(compID, cs.sps->getBitDepth(toChannelType(compID)), setIdx, frameStatsEdge,
-                             tempCcSaoParam.offset);
+          deriveCcSaoOffsets(compID, cs.sps->getBitDepth(toChannelType(compID)), setIdx, frameStatsEdge, tempCcSaoParam.offset);
           getCcSaoDistortion(compID, setIdx, blkStatsEdge, tempCcSaoParam.offset, trainingDistortion);
         }
 #else
         deriveCcSaoOffsets(compID, cs.sps->getBitDepth(toChannelType(compID)), setIdx, frameStats,
                            tempCcSaoParam.offset);
         getCcSaoDistortion(compID, setIdx, blkStats, tempCcSaoParam.offset, trainingDistortion);
+#endif
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+        }
 #endif
       }
     }
@@ -5806,7 +7127,14 @@ void EncSampleAdaptiveOffset::deriveCcSaoRDO(CodingStructure& cs, const Componen
 
     if (tempCcSaoParam.setNum > 0)
     {
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+      curTotalRate += !cs.slice->isIntra() ? 1 : 0;  // +1 reusePrv flag 
+      curTotalRate += tempCcSaoParam.reusePrv 
+                    ? MAX_CCSAO_PRV_NUM_BITS 
+                    : getCcSaoParamRate(compID, tempCcSaoParam);
+#else
       curTotalRate += getCcSaoParamRate(compID, tempCcSaoParam);
+#endif
       tempCost = curTotalRate * m_lambda[compID] + curTotalDist;
 
       if (tempCost < prevCost)
@@ -5824,12 +7152,43 @@ void EncSampleAdaptiveOffset::deriveCcSaoRDO(CodingStructure& cs, const Componen
     }
 
     trainingIter++;
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+    if (!improved || trainingIter > maxTrainingIter || tempCcSaoParam.reusePrv)
+#else
     if (!improved || trainingIter > maxTrainingIter)
+#endif
     {
       keepTraining = false;
     }
   }
 }
+
+#if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
+void EncSampleAdaptiveOffset::setupCcSaoPrv(CodingStructure &cs)
+{
+  for (int compIdx = 0; compIdx < MAX_NUM_COMPONENT; compIdx++)
+  {
+    if (m_ccSaoComParam.enabled[compIdx] && !m_ccSaoComParam.reusePrv[compIdx])
+    {
+      if (g_ccSaoPrvParam[compIdx].size() == MAX_CCSAO_PRV_NUM)
+      {
+        g_ccSaoPrvParam[compIdx].pop_back();
+      }
+
+      CcSaoPrvParam prvParam;
+      prvParam.temporalId = cs.slice->getTLayer();
+      prvParam.setNum     = m_ccSaoComParam.setNum[compIdx];
+      std::memcpy( prvParam.setEnabled, m_ccSaoComParam.setEnabled[compIdx], sizeof( prvParam.setEnabled ) );
+      std::memcpy( prvParam.setType,    m_ccSaoComParam.setType   [compIdx], sizeof( prvParam.setType    ) );
+      std::memcpy( prvParam.candPos,    m_ccSaoComParam.candPos   [compIdx], sizeof( prvParam.candPos    ) );
+      std::memcpy( prvParam.bandNum,    m_ccSaoComParam.bandNum   [compIdx], sizeof( prvParam.bandNum    ) );
+      std::memcpy( prvParam.offset,     m_ccSaoComParam.offset    [compIdx], sizeof( prvParam.offset     ) );
+      
+      g_ccSaoPrvParam[compIdx].insert(g_ccSaoPrvParam[compIdx].begin(), prvParam);
+    }
+  }
+}
+#endif
 #endif
 
 void EncSampleAdaptiveOffset::deriveLoopFilterBoundaryAvailibility(CodingStructure& cs, const Position &pos, bool& isLeftAvail, bool& isAboveAvail, bool& isAboveLeftAvail) const

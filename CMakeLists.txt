@@ -29,6 +29,7 @@ endif()
 
 set( EXTENSION_360_VIDEO OFF CACHE BOOL "If EXTENSION_360_VIDEO is on, 360Lib will be added" )
 set( EXTENSION_HDRTOOLS OFF CACHE BOOL "If EXTENSION_HDRTOOLS is on, HDRLib will be added" )
+set( EXTENSION_CABAC_TRAINING OFF CACHE BOOL "If EXTENSION_CABAC_TRAINING is on, boost will be added" )
 
 if (DEFINED ENABLE_TRACING)
   set( ENABLE_TRACING OFF CACHE BOOL "ENABLE_TRACING will be set to this value" )
@@ -85,7 +86,7 @@ endif()
 bb_enable_warnings( msvc warnings-as-errors "/wd4996" )
 
 # enable sse4.1 build for all source files for gcc and clang
-if( UNIX OR MINGW )
+if( (UNIX OR MINGW) AND NOT (CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64") )
   add_compile_options( "-msse4.1" )
 endif()
 
@@ -120,6 +121,9 @@ if( XCODE )
 endif()
 
 # add needed subdirectories
+if ( EXTENSION_CABAC_TRAINING )
+  add_subdirectory( "source/Lib/boost" )
+endif()
 add_subdirectory( "source/Lib/CommonLib" )
 add_subdirectory( "source/Lib/CommonAnalyserLib" )
 if( EXTENSION_360_VIDEO )
@@ -141,6 +145,10 @@ add_subdirectory( "source/App/SEIRemovalApp" )
 add_subdirectory( "source/App/Parcat" )
 add_subdirectory( "source/App/StreamMergeApp" )
 add_subdirectory( "source/App/BitstreamExtractorApp" )
+add_subdirectory( "source/App/CabacTraining" )
+if ( EXTENSION_CABAC_TRAINING )
+  add_subdirectory( "source/App/RateEstimator" )
+endif()
 if( EXTENSION_360_VIDEO )
   add_subdirectory( "source/App/utils/360ConvertApp" )
 endif()

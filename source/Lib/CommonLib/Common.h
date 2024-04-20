@@ -67,10 +67,9 @@ struct Position
 #if JVET_Y0141_SIGN_PRED_IMPROVE
 struct PositionWithLevel
 {
-  PosType x;
-  PosType y;
-  TCoeff level;
-  PositionWithLevel(const PosType _x, const PosType _y, const TCoeff _level) : x(_x), y(_y), level(_level) { }
+  uint16_t x;
+  uint16_t y;
+  TCoeff   level;
 };
 #endif
 struct Size
@@ -307,14 +306,17 @@ enum CCPType
   CCP_TYPE_GLCCCM  = (1 << 5),
   CCP_TYPE_NSCCCM  = (1 << 6),
   CCP_TYPE_MDFCCCM = (1 << 7),
+#if JVET_AF0073_INTER_CCP_MERGE
+  CCP_TYPE_INTER_CCCM = (1 << 8),
+#endif
   NUM_CCP_TYPE
 };
 
 struct CCPModelCandidate
 {
-  int64_t params[2][NUM_CCP_PARAMS] = { 0 };
+  int64_t params[2][NUM_CCP_PARAMS] = { { 0 } };
 #if MMLM
-  int64_t params2[2][NUM_CCP_PARAMS] = { 0 };
+  int64_t params2[2][NUM_CCP_PARAMS] = { { 0 } };
   int     shift2[2] = { 0 };
   int     yThres = 0;
 #endif
@@ -334,6 +336,9 @@ struct CCPModelCandidate
 #endif
 #if JVET_AA0126_GLM
   int8_t  glmIdc = 0;
+#endif
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+  int ccInsideFilter = 0;
 #endif
 
   template<int NUM>
@@ -540,6 +545,36 @@ struct CCPModelCandidate
       return false;
     }
 #endif
+#if JVET_AF0073_INTER_CCP_MERGE
+    else if (type & CCP_TYPE_INTER_CCCM)
+    {
+#if JVET_AB0174_CCCM_DIV_FREE
+      if (lumaOffset != cand.lumaOffset)
+      {
+        return false;
+      }
+#endif
+      if (type & CCP_TYPE_MMLM)
+      {
+        if (yThres != cand.yThres)
+        {
+          return false;
+        }
+        if (isTheSameParams<INTER_CCCM_NUM_PARAMS>(cand) && isTheSameParams2<INTER_CCCM_NUM_PARAMS>(cand))
+        {
+          return true;
+        }
+      }
+      else
+      {
+        if (isTheSameParams<INTER_CCCM_NUM_PARAMS>(cand))
+        {
+          return true;
+        }
+      }
+      return false;
+    }
+#endif
     else
     {
       THROW("Wrong Type");
@@ -559,5 +594,95 @@ struct LutCCP
   // Postions for future extensions
 };
 #endif
+#if JVET_AG0058_EIP
+struct EipModelCandidate
+{
+  int64_t params[EIP_FILTER_TAP] = { 0 };
+  int     filterShape            = 0;
+  int     eipDimdMode            = PLANAR_IDX;
 
+  inline bool isTheSameParams(const EipModelCandidate& p) const
+  {
+    if (filterShape != p.filterShape) 
+    {
+      return false;
+    }
+    for (int i = 0; i < EIP_FILTER_TAP; ++i)
+    {
+      if (params[i] != p.params[i])
+      {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool operator==(const EipModelCandidate &cand) const 
+  { 
+    if (isTheSameParams(cand))
+    {
+      return true;
+    }
+    return false;
+  }
+};
+
+#if JVET_AG0058_EIP
+struct LutEIP
+{
+#if JVET_Z0118_GDR  
+  static_vector<EipModelCandidate, MAX_NUM_HEIP_CANDS> lutEip0;
+  static_vector<EipModelCandidate, MAX_NUM_HEIP_CANDS> lutEip1;
+#else
+  static_vector<CccmModel, MAX_NUM_HEIP_CANDS> lutEip;
+#endif
+  // Postions for future extensions
+};
+#endif
+#endif
+
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+struct DecoderDerivedCcpCandidate
+{
+  CCPModelCandidate ddccpCand;
+  int    cost;           // TM cost 
+  int    lmIndex;        // LM_CHROMA_IDX, MMLM_CHROMA_IDX, MDLM_L_IDX, MDLM_T_IDX, MMLM_L_IDX, MMLM_T_IDX
+  int    isCccm;         // 1: LM_CHROMA_IDX, MMLM_CHROMA_IDX; 2:MDLM_L_IDX, MMLM_L_IDX; 3: MDLM_T_IDX, MMLM_T_IDX
+  int    isGlcccm;       // 1: if glCccmFlag true
+  int    isInsideFilter; // 1: if LBCCP true
+  bool   isFusion;       // enable two CCP fusion
+};
+#endif
+
+#if JVET_AG0276_NLIC
+struct AltLMInterUnit
+{
+  int scale[MAX_NUM_COMPONENT];
+  int offset[MAX_NUM_COMPONENT];
+
+  void resetAltLinearModel()
+  {
+    for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
+    {
+      scale[comp] = 32;
+      offset[comp] = 0;
+    }
+  }
+
+  AltLMInterUnit()
+  {
+    resetAltLinearModel();
+  }
+
+  AltLMInterUnit &operator=(const AltLMInterUnit &other)
+  {
+    for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
+    {
+      scale[comp] = other.scale[comp];
+      offset[comp] = other.offset[comp];
+    }
+    return *this;
+  }
+};
+#endif
 #endif

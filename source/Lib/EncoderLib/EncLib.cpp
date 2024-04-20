@@ -239,7 +239,6 @@ void EncLib::destroy ()
   {
     m_cEncALF.destroy();
   }
-  m_cEncSAO.            destroyEncData();
   m_cEncSAO.            destroy();
   m_cLoopFilter.        destroy();
   m_cRateCtrl.          destroy();
@@ -364,8 +363,8 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
     for (int idx = 0; idx < m_numQPOffset; idx++)
     {
       sps0.setQPOffsets(idx, m_qpOffsetList[idx]);
-      sps0.setLambdaVal(idx, (uint32_t)LAMBDA_DEC_SIDE[26 + pps0.getPicInitQPMinus26() + m_qpOffsetList[idx] - 4 * ((int)m_isRA)]);
-      uint32_t lambda = (uint32_t)LAMBDA_DEC_SIDE[26 + pps0.getPicInitQPMinus26() + m_qpOffsetList[idx] - 4 * ((int)m_isRA)];
+      const uint32_t lambda = (uint32_t)LAMBDA_DEC_SIDE[min(max(26 + pps0.getPicInitQPMinus26() + m_qpOffsetList[idx] - 4 * ((int)m_isRA), 0), MAX_QP)];
+      sps0.setLambdaVal(idx, lambda);
       for (int shift = 0; shift < 16; shift++)
         if (lambda >> shift == 0)
         {
@@ -461,7 +460,11 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
     }
   }
 #if JVET_AC0096
+#if JVET_AG0116
+  if (m_resChangeInClvsEnabled && (m_rprFunctionalityTestingEnabledFlag || m_gopBasedRPREnabledFlag))
+#else
   if (m_resChangeInClvsEnabled && m_rprFunctionalityTestingEnabledFlag)
+#endif
   {
     // allocate PPS that can be used
     double scalingRatioHor = m_scalingRatioHor2;
@@ -546,7 +549,11 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
       pps.setWrapAroundOffset(0);
     }
   }
+#if JVET_AG0116
+  if (m_resChangeInClvsEnabled && (m_rprFunctionalityTestingEnabledFlag || m_gopBasedRPREnabledFlag))
+#else
   if (m_resChangeInClvsEnabled && m_rprFunctionalityTestingEnabledFlag)
+#endif
   {
     // allocate PPS that can be used
     double scalingRatioHor = m_scalingRatioHor3;
@@ -751,6 +758,9 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
   m_cInterSearch.setTempBuffers( m_cIntraSearch.getSplitCSBuf(), m_cIntraSearch.getFullCSBuf(), m_cIntraSearch.getSaveCSBuf() );
 #endif // ENABLE_SPLIT_PARALLELISM || ENABLE_WPP_PARALLELISM
 
+#if JVET_AE0159_FIBC || JVET_AE0059_INTER_CCCM || JVET_AE0078_IBC_LIC_EXTENSION || JVET_AF0073_INTER_CCP_MERGE
+  m_cInterSearch.setIntraPrediction(&m_cIntraSearch);
+#endif
   m_iMaxRefPicNum = 0;
 
 #if ER_CHROMA_QP_WCG_PPS
@@ -773,13 +783,16 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
   if (getUseCompositeRef())
   {
     Picture *picBg = new Picture;
+
+    picBg->create(
+      sps0.getRprEnabledFlag(),
 #if JVET_Z0118_GDR
-    picBg->create(sps0.getGDREnabledFlag(), sps0.getChromaFormatIdc(), Size(pps0.getPicWidthInLumaSamples(), pps0.getPicHeightInLumaSamples()),
-                   sps0.getMaxCUWidth(), sps0.getMaxCUWidth() + EXT_PICTURE_SIZE, false, m_layerId, getGopBasedTemporalFilterEnabled());
-#else
-    picBg->create( sps0.getChromaFormatIdc(), Size( pps0.getPicWidthInLumaSamples(), pps0.getPicHeightInLumaSamples() ),
-                   sps0.getMaxCUWidth(), sps0.getMaxCUWidth() + EXT_PICTURE_SIZE, false, m_layerId, getGopBasedTemporalFilterEnabled() );
+      sps0.getGDREnabledFlag(),
 #endif
+      sps0.getWrapAroundEnabledFlag(), sps0.getChromaFormatIdc(),
+      Size(pps0.getPicWidthInLumaSamples(), pps0.getPicHeightInLumaSamples()), sps0.getMaxCUWidth(),
+      sps0.getMaxCUWidth() + EXT_PICTURE_SIZE, false, m_layerId, getGopBasedTemporalFilterEnabled());
+
     picBg->getRecoBuf().fill(0);
 
     picBg->finalInit( m_vps, sps0, pps0, &m_picHeader, m_apss, m_lmcsAPS, m_scalinglistAPS );
@@ -789,13 +802,16 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
     picBg->createSpliceIdx(pps0.pcv->sizeInCtus);
     m_cGOPEncoder.setPicBg(picBg);
     Picture *picOrig = new Picture;
+
+    picOrig->create(
+      sps0.getRprEnabledFlag(),
 #if JVET_Z0118_GDR
-    picOrig->create(sps0.getGDREnabledFlag(), sps0.getChromaFormatIdc(), Size(pps0.getPicWidthInLumaSamples(), pps0.getPicHeightInLumaSamples()),
-      sps0.getMaxCUWidth(), sps0.getMaxCUWidth() + EXT_PICTURE_SIZE, false, m_layerId, getGopBasedTemporalFilterEnabled());
-#else
-    picOrig->create( sps0.getChromaFormatIdc(), Size( pps0.getPicWidthInLumaSamples(), pps0.getPicHeightInLumaSamples() ),
-                     sps0.getMaxCUWidth(), sps0.getMaxCUWidth() + EXT_PICTURE_SIZE, false, m_layerId, getGopBasedTemporalFilterEnabled() );
+      sps0.getGDREnabledFlag(),
 #endif
+      sps0.getWrapAroundEnabledFlag(), sps0.getChromaFormatIdc(),
+      Size(pps0.getPicWidthInLumaSamples(), pps0.getPicHeightInLumaSamples()), sps0.getMaxCUWidth(),
+      sps0.getMaxCUWidth() + EXT_PICTURE_SIZE, false, m_layerId, getGopBasedTemporalFilterEnabled());
+
     picOrig->getOrigBuf().fill(0);
     m_cGOPEncoder.setPicOrig(picOrig);
   }
@@ -912,7 +928,11 @@ void EncLib::deletePicBuffer()
   m_cListPic.clear();
 }
 
-bool EncLib::encodePrep( bool flush, PelStorage* pcPicYuvOrg, PelStorage* cPicYuvTrueOrg, PelStorage* pcPicYuvFilteredOrg, const InputColourSpaceConversion snrCSC, std::list<PelUnitBuf*>& rcListPicYuvRecOut, int& iNumEncoded )
+bool EncLib::encodePrep(bool flush, PelStorage* pcPicYuvOrg, const InputColourSpaceConversion snrCSC, std::list<PelUnitBuf*>& rcListPicYuvRecOut, int& iNumEncoded
+#if JVET_AG0116
+    , PelStorage** ppcPicYuvRPR
+#endif
+)
 {
   if( m_compositeRefEnabled && m_cGOPEncoder.getPicBg()->getSpliceFull() && m_iPOCLast >= 10 && m_iNumPicRcvd == 0 && m_cGOPEncoder.getEncodedLTRef() == false )
   {
@@ -1002,6 +1022,82 @@ bool EncLib::encodePrep( bool flush, PelStorage* pcPicYuvOrg, PelStorage* cPicYu
           ppsID = m_gopRprPpsId;
         }
       }
+#if JVET_AG0116
+      else if (m_resChangeInClvsEnabled && m_gopBasedRPREnabledFlag && (m_iQP >= getGOPBasedRPRQPThreshold()))
+      {
+        double upscaledPSNR = 0.0;
+        if (poc % getGOPSize() == 0)
+        {
+          int xScale = 32768;
+          int yScale = 32768;
+          std::pair<int, int> downScalingRatio = std::pair<int, int>(xScale, yScale);
+          xScale = 8192;
+          yScale = 8192;
+          std::pair<int, int> upScalingRatio = std::pair<int, int>(xScale, yScale);
+
+          const PPS* orgPPS = m_ppsMap.getPS(0);
+          const SPS* orgSPS = m_spsMap.getPS(orgPPS->getSPSId());
+          const ChromaFormat chFormatIdc = orgSPS->getChromaFormatIdc();
+
+          const PPS* pTempPPS = m_ppsMap.getPS(ENC_PPS_ID_RPR);
+          Picture::rescalePicture(downScalingRatio, *pcPicYuvOrg, orgPPS->getScalingWindow(), *ppcPicYuvRPR[1], pTempPPS->getScalingWindow(), chFormatIdc, orgSPS->getBitDepths(), true, true,
+            orgSPS->getHorCollocatedChromaFlag(), orgSPS->getVerCollocatedChromaFlag());
+          Picture::rescalePicture(upScalingRatio, *ppcPicYuvRPR[1], orgPPS->getScalingWindow(), *ppcPicYuvRPR[0], pTempPPS->getScalingWindow(), chFormatIdc, orgSPS->getBitDepths(), true, false,
+            orgSPS->getHorCollocatedChromaFlag(), orgSPS->getVerCollocatedChromaFlag());
+          // Calculate PSNR
+          const  Pel* pSrc0 = pcPicYuvOrg->get(COMPONENT_Y).bufAt(0, 0);
+          const  Pel* pSrc1 = ppcPicYuvRPR[0]->get(COMPONENT_Y).bufAt(0, 0);
+
+          uint64_t totalDiff = 0;
+          for (int y = 0; y < pcPicYuvOrg->get(COMPONENT_Y).height; y++)
+          {
+            for (int x = 0; x < pcPicYuvOrg->get(COMPONENT_Y).width; x++)
+            {
+              int diff = pSrc0[x] - pSrc1[x];
+              totalDiff += uint64_t(diff) * uint64_t(diff);
+            }
+            pSrc0 += pcPicYuvOrg->get(COMPONENT_Y).stride;
+            pSrc1 += ppcPicYuvRPR[0]->get(COMPONENT_Y).stride;
+          }
+
+          const uint32_t maxval = 255 << (orgSPS->getBitDepth(CHANNEL_TYPE_LUMA) - 8);
+          upscaledPSNR = totalDiff ? 10.0 * log10((double)maxval * maxval * orgPPS->getPicWidthInLumaSamples() * orgPPS->getPicHeightInLumaSamples() / (double)totalDiff) : 999.99;
+        }
+
+        if (poc % getGOPSize() == 0)
+        {
+          const int qpBias = 37;
+          if ((m_psnrThresholdRPR - (m_iQP - qpBias) * 0.5) < upscaledPSNR)
+          {
+            ppsID = ENC_PPS_ID_RPR;
+          }
+          else
+          {
+            if ((m_psnrThresholdRPR2 - (m_iQP - qpBias) * 0.5) < upscaledPSNR)
+            {
+              ppsID = ENC_PPS_ID_RPR2;
+            }
+            else
+            {
+              if ((m_psnrThresholdRPR3 - (m_iQP - qpBias) * 0.5) < upscaledPSNR)
+              {
+                ppsID = ENC_PPS_ID_RPR3;
+              }
+              else
+              {
+                ppsID = 0;
+              }
+            }
+          }
+          m_gopRprPpsId = ppsID;
+        }
+        else
+        {
+          ppsID = m_gopRprPpsId;
+        }
+
+      }
+#endif
       else
       {
         bApplyRpr |= (m_switchPocPeriod < 0);                                   // RPR applied for all pictures
@@ -1021,7 +1117,11 @@ bool EncLib::encodePrep( bool flush, PelStorage* pcPicYuvOrg, PelStorage* cPicYu
       else
       {
 #if JVET_AC0096
+#if JVET_AG0116
+        if (!(m_resChangeInClvsEnabled && (m_rprFunctionalityTestingEnabledFlag || (m_gopBasedRPREnabledFlag && (m_iQP >= getGOPBasedRPRQPThreshold())))))
+#else
         if (!(m_resChangeInClvsEnabled && m_rprFunctionalityTestingEnabledFlag))
+#endif
         {
           ppsID = 0;
         }
@@ -1047,17 +1147,6 @@ bool EncLib::encodePrep( bool flush, PelStorage* pcPicYuvOrg, PelStorage* cPicYu
       pcPicCurr->M_BUFS( 0, PIC_ORIGINAL_INPUT ).getBuf( COMPONENT_Cb ).copyFrom( pcPicYuvOrg->getBuf( COMPONENT_Cb ) );
       pcPicCurr->M_BUFS( 0, PIC_ORIGINAL_INPUT ).getBuf( COMPONENT_Cr ).copyFrom( pcPicYuvOrg->getBuf( COMPONENT_Cr ) );
 
-      pcPicCurr->M_BUFS( 0, PIC_TRUE_ORIGINAL_INPUT ).getBuf( COMPONENT_Y ).copyFrom( cPicYuvTrueOrg->getBuf( COMPONENT_Y ) );
-      pcPicCurr->M_BUFS( 0, PIC_TRUE_ORIGINAL_INPUT ).getBuf( COMPONENT_Cb ).copyFrom( cPicYuvTrueOrg->getBuf( COMPONENT_Cb ) );
-      pcPicCurr->M_BUFS( 0, PIC_TRUE_ORIGINAL_INPUT ).getBuf( COMPONENT_Cr ).copyFrom( cPicYuvTrueOrg->getBuf( COMPONENT_Cr ) );
-
-      if( getGopBasedTemporalFilterEnabled() )
-      {
-        pcPicCurr->M_BUFS( 0, PIC_FILTERED_ORIGINAL_INPUT ).getBuf( COMPONENT_Y ).copyFrom( pcPicYuvFilteredOrg->getBuf( COMPONENT_Y ) );
-        pcPicCurr->M_BUFS( 0, PIC_FILTERED_ORIGINAL_INPUT ).getBuf( COMPONENT_Cb ).copyFrom( pcPicYuvFilteredOrg->getBuf( COMPONENT_Cb ) );
-        pcPicCurr->M_BUFS( 0, PIC_FILTERED_ORIGINAL_INPUT ).getBuf( COMPONENT_Cr ).copyFrom( pcPicYuvFilteredOrg->getBuf( COMPONENT_Cr ) );
-      }
-
       const ChromaFormat chromaFormatIDC = pSPS->getChromaFormatIdc();
 
       const PPS *refPPS = m_ppsMap.getPS( 0 );
@@ -1075,26 +1164,10 @@ bool EncLib::encodePrep( bool flush, PelStorage* pcPicYuvOrg, PelStorage* cPicYu
 
       Picture::rescalePicture( scalingRatio, *pcPicYuvOrg, refPPS->getScalingWindow(), pcPicCurr->getOrigBuf(), pPPS->getScalingWindow(), chromaFormatIDC, pSPS->getBitDepths(), true, true,
         pSPS->getHorCollocatedChromaFlag(), pSPS->getVerCollocatedChromaFlag() );
-      Picture::rescalePicture( scalingRatio, *cPicYuvTrueOrg, refPPS->getScalingWindow(), pcPicCurr->getTrueOrigBuf(), pPPS->getScalingWindow(), chromaFormatIDC, pSPS->getBitDepths(), true, true,
-        pSPS->getHorCollocatedChromaFlag(), pSPS->getVerCollocatedChromaFlag() );
-
-      if( getGopBasedTemporalFilterEnabled() )
-      {
-        Picture::rescalePicture( scalingRatio, *pcPicYuvFilteredOrg, refPPS->getScalingWindow(), pcPicCurr->getFilteredOrigBuf(), pPPS->getScalingWindow(), chromaFormatIDC, pSPS->getBitDepths(), true, true,
-                                 pSPS->getHorCollocatedChromaFlag(), pSPS->getVerCollocatedChromaFlag() );
-      }
-
     }
     else
     {
       pcPicCurr->M_BUFS( 0, PIC_ORIGINAL ).swap( *pcPicYuvOrg );
-      pcPicCurr->M_BUFS( 0, PIC_TRUE_ORIGINAL ).swap( *cPicYuvTrueOrg );
-
-      if( getGopBasedTemporalFilterEnabled() )
-      {
-        pcPicCurr->M_BUFS( 0, PIC_FILTERED_ORIGINAL ).swap( *pcPicYuvFilteredOrg );
-      }
-
     }
 
     pcPicCurr->finalInit( m_vps, *pSPS, *pPPS, &m_picHeader, m_apss, m_lmcsAPS, m_scalinglistAPS );
@@ -1201,8 +1274,8 @@ void separateFields(Pel* org, Pel* dstField, uint32_t stride, uint32_t width, ui
 
 }
 
-bool EncLib::encodePrep( bool flush, PelStorage* pcPicYuvOrg, PelStorage* pcPicYuvTrueOrg, PelStorage* pcPicYuvFilteredOrg, const InputColourSpaceConversion snrCSC, std::list<PelUnitBuf*>& rcListPicYuvRecOut,
-                         int& iNumEncoded, bool isTff )
+bool EncLib::encodePrep(bool flush, PelStorage* pcPicYuvOrg, const InputColourSpaceConversion snrCSC, std::list<PelUnitBuf*>& rcListPicYuvRecOut,
+  int& iNumEncoded, bool isTff)
 {
   iNumEncoded = 0;
   bool keepDoing = true;
@@ -1228,25 +1301,6 @@ bool EncLib::encodePrep( bool flush, PelStorage* pcPicYuvOrg, PelStorage* pcPicY
             compBuf.width,
             compBuf.height,
             isTopField );
-          // to get fields of true original buffer to avoid wrong PSNR calculation in summary
-          compBuf = pcPicYuvTrueOrg->get( compID );
-          separateFields( compBuf.buf,
-            pcField->getTrueOrigBuf().get(compID).buf,
-            compBuf.stride,
-            compBuf.width,
-            compBuf.height,
-            isTopField);
-
-          if( getGopBasedTemporalFilterEnabled() )
-          {
-            compBuf = pcPicYuvFilteredOrg->get( compID );
-            separateFields( compBuf.buf,
-                            pcField->getTrueOrigBuf().get( compID ).buf,
-                            compBuf.stride,
-                            compBuf.width,
-                            compBuf.height,
-                            isTopField );
-          }
         }
       }
 
@@ -1381,25 +1435,21 @@ void EncLib::xGetNewPicBuffer ( std::list<PelUnitBuf*>& rcListPicYuvRecOut, Pict
   if (rpcPic==0)
   {
     rpcPic = new Picture;
+
+    rpcPic->create(
+      isRprEnabled(),
 #if JVET_Z0118_GDR
-    rpcPic->create( getGdrEnabled(), sps.getChromaFormatIdc(), Size( pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples() ),
-                    sps.getMaxCUWidth(), sps.getMaxCUWidth() + EXT_PICTURE_SIZE, false, m_layerId, getGopBasedTemporalFilterEnabled());
-#else
-    rpcPic->create( sps.getChromaFormatIdc(), Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()),
-      sps.getMaxCUWidth(), sps.getMaxCUWidth() + EXT_PICTURE_SIZE, false, m_layerId, getGopBasedTemporalFilterEnabled());
+      getGdrEnabled(),
 #endif
+      sps.getWrapAroundEnabledFlag(), sps.getChromaFormatIdc(),
+      Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(),
+      sps.getMaxCUWidth() + EXT_PICTURE_SIZE, false, m_layerId, getGopBasedTemporalFilterEnabled());
 
 
     if (m_resChangeInClvsEnabled)
     {
       const PPS &pps0 = *m_ppsMap.getPS(0);
       rpcPic->M_BUFS(0, PIC_ORIGINAL_INPUT).create(sps.getChromaFormatIdc(), Area(Position(), Size(pps0.getPicWidthInLumaSamples(), pps0.getPicHeightInLumaSamples())));
-      rpcPic->M_BUFS(0, PIC_TRUE_ORIGINAL_INPUT).create(sps.getChromaFormatIdc(), Area(Position(), Size(pps0.getPicWidthInLumaSamples(), pps0.getPicHeightInLumaSamples())));
-
-      if( getGopBasedTemporalFilterEnabled() )
-      {
-        rpcPic->M_BUFS( 0, PIC_FILTERED_ORIGINAL_INPUT ).create( sps.getChromaFormatIdc(), Area( Position(), Size( pps0.getPicWidthInLumaSamples(), pps0.getPicHeightInLumaSamples() ) ) );
-      }
     }
     if ( getUseAdaptiveQP() )
     {
@@ -1639,6 +1689,9 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_AD0082_TMRL_CONFIG
   cinfo->setNoTmrlConstraintFlag(m_noTmrlConstraintFlag);
 #endif
+#if JVET_AG0058_EIP
+  cinfo->setNoEipConstraintFlag(m_noEipConstraintFlag);
+#endif
 #if ENABLE_OBMC
   cinfo->setNoObmcConstraintFlag(m_noObmcConstraintFlag);
 #endif
@@ -1706,7 +1759,11 @@ void EncLib::xInitSPS( SPS& sps )
     int maxPicHeight = std::max(m_iSourceHeight, (int)((double)m_iSourceHeight / m_scalingRatioVer + 0.5));
 #endif
 #if JVET_AC0096
+#if JVET_AG0116
+    if (m_rprFunctionalityTestingEnabledFlag || m_gopBasedRPREnabledFlag)
+#else
     if (m_rprFunctionalityTestingEnabledFlag)
+#endif
     {
       maxPicWidth = std::max(maxPicWidth, (int)((double)m_sourceWidth / m_scalingRatioHor2 + 0.5));
       maxPicHeight = std::max(maxPicHeight, (int)((double)m_sourceHeight / m_scalingRatioVer2 + 0.5));
@@ -1755,6 +1812,15 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setBDOFEnabledFlag                    ( m_BIO );
 #if JVET_W0090_ARMC_TM
   sps.setUseAML                             ( m_AML );
+#if JVET_AG0276_NLIC
+  sps.setUseAltLM                           ( m_altLM );
+  sps.setUseAffAltLM                        ( m_affAltLM );
+#endif
+#endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  sps.setUseMergeOppositeLic                ( m_mergeOppositeLic );
+  sps.setUseTMMergeOppositeLic              ( m_mergeTMOppositeLic );
+  sps.setUseAffMergeOppositeLic             ( m_mergeAffOppositeLic );
 #endif
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
   sps.setUseFastSubTmvp                     ((m_sourceWidth * m_sourceHeight) > (m_intraPeriod == -1 ? 0 : 832 * 480));
@@ -1763,17 +1829,69 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setUseArmcRefinedMotion               ( m_armcRefinedMotion );
 #endif
   sps.setMaxNumMergeCand(getMaxNumMergeCand());
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  sps.setMaxNumOppositeLicMergeCand( getMaxNumOppositeLicMergeCand() );
+#endif
 #if JVET_X0049_ADAPT_DMVR
   sps.setMaxNumBMMergeCand(getMaxNumBMMergeCand());
 #endif
   sps.setMaxNumAffineMergeCand(getMaxNumAffineMergeCand());
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  sps.setMaxNumAffineOppositeLicMergeCand( getMaxNumAffineOppositeLicMergeCand() );
+  if (getIntraPeriod() < 0 && getBaseQP() > 32 )
+  {
+    sps.setUseMergeOppositeLic(false);
+    sps.setUseTMMergeOppositeLic(false);
+    sps.setUseAffMergeOppositeLic(false);
+  }
+#endif
   sps.setMaxNumIBCMergeCand(getMaxNumIBCMergeCand());
   sps.setMaxNumGeoCand(getMaxNumGeoCand());
+#if JVET_AG0164_AFFINE_GPM
+  sps.setMaxNumGpmAffCand      (((m_sourceWidth * m_sourceHeight) > (m_intraPeriod == -1 ? 1280 * 720 : 0)) ? getMaxNumGpmAffCand() : 0);
+#endif
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
   sps.setMaxNumMHPCand(getMaxNumMHPCand());
 #endif
   sps.setUseAffine             ( m_Affine );
   sps.setUseAffineType         ( m_AffineType );
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+  sps.setUseAffineTM           ( m_useAffineTM );
+#if JVET_AG0276_NLIC
+  sps.setUseAffAltLMTM         ( m_useAffAltLMTM );
+  if (getIntraPeriod() > 0)
+  {
+    if ((getSourceWidth() * getSourceHeight()) > (832 * 480) && ((getSourceWidth() * getSourceHeight()) < (3840 * 2160)))
+    {
+      sps.setUseAffAltLMTM(false);
+    }
+    if (getBaseQP() > 32)
+    {
+      sps.setUseAltLM(false);
+      sps.setUseAffAltLM(false);
+      sps.setUseAffAltLMTM(false);
+    }
+    else if (getBaseQP() < 27)
+    {
+      sps.setUseAltLM(false);
+      sps.setUseAffAltLM(true);
+      sps.setUseAffAltLMTM(true);
+    }
+  }
+  else
+  {
+    sps.setUseAffAltLM(false);
+    sps.setUseAffAltLMTM(false);
+    if (getBaseQP() < 27)
+    {
+      sps.setUseAltLM(false);
+    }
+  }
+#endif
+#endif
+#if JVET_AG0135_AFFINE_CIIP
+  sps.setUseCiipAffine         (((m_sourceWidth * m_sourceHeight) > (m_intraPeriod == -1 ? 832 * 480 : 0)) ? m_useCiipAffine : false);
+#endif
 #if AFFINE_MMVD
   sps.setUseAffineMmvdMode     ( m_AffineMmvdMode );
 #endif
@@ -1816,6 +1934,9 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setUseBcw                ( m_bcw );
 #if INTER_LIC
   sps.setLicEnabledFlag        ( m_lic );
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+  sps.setLicSlopeAdjustEnabledFlag( m_licSlopeAdjust );
+#endif
 #endif
 #if LUMA_ADAPTIVE_DEBLOCKING_FILTER_QP_OFFSET
   sps.setLadfEnabled           ( m_LadfEnabled );
@@ -1848,6 +1969,12 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_AD0082_TMRL_CONFIG
   sps.setUseTmrl            ( m_tmrl );
 #endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  sps.setTMnoninterToolsEnableFlag            ( m_tmNoninterToolsEnableFlag );
+#endif
+#if JVET_AG0058_EIP
+  sps.setUseEip             ( m_eip );
+#endif
 #if JVET_AD0085_MPM_SORTING
   sps.setUseMpmSorting      ( m_mpmSorting );
 #endif
@@ -1856,6 +1983,9 @@ void EncLib::xInitSPS( SPS& sps )
 #endif
 #if JVET_AD0188_CCP_MERGE
   sps.setUseCcpMerge        ( m_ccpMerge );
+#endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  sps.setUseDdCcpFusion     ( m_ddCcpFusion );
 #endif
 #if ENABLE_OBMC
   sps.setUseOBMC            ( m_OBMC );
@@ -1886,6 +2016,9 @@ void EncLib::xInitSPS( SPS& sps )
   }
 #endif
   sps.setUseGeo                ( m_Geo );
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  sps.setUseGeoBlend           ( true );
+#endif
   sps.setUseMMVD               ( m_MMVD );
   sps.setFpelMmvdEnabledFlag   (( m_MMVD ) ? m_allowDisFracMMVD : false);
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION
@@ -1922,6 +2055,9 @@ void EncLib::xInitSPS( SPS& sps )
 #endif
 #if JVET_AA0061_IBC_MBVD
   sps.setUseIbcMbvd                         ( m_ibcMbvd );
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  sps.setUseIbcMbvdAdSearch                 ( m_ibcMbvdAdSearch );
+#endif
 #endif
 #if JVET_AC0112_IBC_CIIP
   sps.setUseIbcCiip                         ( m_ibcCiip );
@@ -1931,6 +2067,16 @@ void EncLib::xInitSPS( SPS& sps )
 #endif
 #if JVET_AC0112_IBC_LIC
   sps.setUseIbcLic                          ( m_ibcLic );
+#endif
+#if JVET_AE0159_FIBC
+  sps.setUseIbcFilter                       ( m_ibcFilter );
+#endif
+#if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
+  sps.setUseIbcNonAdjCand                   ( m_ibcNonAdjCand );
+#endif
+#if JVET_AG0136_INTRA_TMP_LIC
+  sps.setItmpLicExtension                   ( m_itmpLicExtension );
+  sps.setItmpLicMode                        ( m_itmpLicMode );
 #endif
   sps.setWrapAroundEnabledFlag                      ( m_wrapAround );
 #if MULTI_HYP_PRED
@@ -1942,8 +2088,17 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setUseIntraTMP(m_intraTMP);
   sps.setIntraTMPMaxSize(m_intraTmpMaxSize);
 #endif
+#if JVET_AE0100_BVGCCCM
+  sps.setUseBvgCccm(m_bvgCccm);
+#endif
 #if JVET_AC0071_DBV
   sps.setUseIntraDBV(m_intraDBV);
+#endif
+#if JVET_AE0059_INTER_CCCM
+  sps.setUseInterCccm(m_interCccm);
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  sps.setUseInterCcpMerge(m_interCcpMerge);
 #endif
   // ADD_NEW_TOOL : (encoder lib) set tool enabling flags and associated parameters here
   sps.setUseISP                             ( m_ISP );
@@ -1979,6 +2134,9 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setSAOEnabledFlag( m_bUseSAO );
 #if JVET_W0066_CCSAO
   sps.setCCSAOEnabledFlag( m_CCSAO );
+#endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  sps.setAlfPrecisionFlag( m_alfPrecision );
 #endif
   sps.setJointCbCrEnabledFlag( m_JointCbCrMode );
   sps.setMaxTLayers( m_maxTempLayer );
@@ -2359,7 +2517,11 @@ void EncLib::xInitPPS(PPS &pps, const SPS &sps)
     pps.setSliceChromaQpFlag(m_chromaCbQpOffsetDualTree != 0 || m_chromaCrQpOffsetDualTree != 0 || m_chromaCbCrQpOffsetDualTree != 0);
   }
 #if JVET_AC0096
+#if JVET_AG0116
+  if (m_rprFunctionalityTestingEnabledFlag || m_gopBasedRPREnabledFlag)
+#else
   if (m_rprFunctionalityTestingEnabledFlag)
+#endif
   {
     if (pps.getPPSId() == ENC_PPS_ID_RPR || pps.getPPSId() == ENC_PPS_ID_RPR2 || pps.getPPSId() == ENC_PPS_ID_RPR3)
     {
@@ -2602,6 +2764,9 @@ void EncLib::xInitPicHeader(PicHeader &picHeader, const SPS &sps, const PPS &pps
 
   // merge list sizes
   picHeader.setMaxNumAffineMergeCand(getMaxNumAffineMergeCand());
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  picHeader.setMaxNumAffineOppositeLicMergeCand( getMaxNumAffineOppositeLicMergeCand() );
+#endif
   // copy partitioning constraints from SPS
   picHeader.setSplitConsOverrideFlag(false);
   picHeader.setMinQTSizes( sps.getMinQTSizes() );
@@ -3118,6 +3283,23 @@ int EncCfg::getQPForPicture(const uint32_t gopIndex, const Slice *pSlice) const
       int currPoc = pSlice->getPOC() + EncCfg::m_FrameSkip;
       int rprSegment = EncCfg::getRprSwitchingSegment(currPoc);
       qp += EncCfg::m_rprSwitchingQPOffsetOrderList[rprSegment];
+  }
+#endif
+#if JVET_AG0116
+    if (m_gopBasedRPREnabledFlag)
+    {
+      if (pSlice->getPPS()->getPPSId() == ENC_PPS_ID_RPR)
+      {
+        qp += EncCfg::m_qpOffsetRPR;
+      }
+      if (pSlice->getPPS()->getPPSId() == ENC_PPS_ID_RPR2)
+      {
+        qp += EncCfg::m_qpOffsetRPR2;
+      }
+      if (pSlice->getPPS()->getPPSId() == ENC_PPS_ID_RPR3)
+      {
+        qp += EncCfg::m_qpOffsetRPR3;
+      }
   }
 #endif
 #if !QP_SWITCHING_FOR_PARALLEL

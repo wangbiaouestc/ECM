@@ -52,12 +52,24 @@ namespace CS
 #if !MULTI_PASS_DMVR
   void   setRefinedMotionField(CodingStructure &cs);
 #endif
+#if JVET_AE0043_CCP_MERGE_TEMPORAL
+  void   saveTemporalCcpModel(CodingStructure &cs); 
+#endif
+#if JVET_AG0058_EIP
+  void   saveTemporalEipModel(CodingStructure &cs); 
+#endif
 }
 
 
 // CU tools
 namespace CU
 {
+#if JVET_AG0276_NLIC
+  bool isSecLicParaNeeded             (const CodingUnit &cu);
+  bool isPredRefined                  (const CodingUnit &cu);
+  bool isAllowSecLicPara              (const CodingUnit &cu);
+  bool isTLCond                       (const CodingUnit &cu);
+#endif
   bool isIntra                        (const CodingUnit &cu);
   bool isInter                        (const CodingUnit &cu);
   bool isIBC                          (const CodingUnit &cu);
@@ -70,6 +82,9 @@ namespace CU
   bool isSameSubPic                   (const CodingUnit &cu, const CodingUnit &cu2);
   bool isLastSubCUOfCtu               (const CodingUnit &cu);
   uint32_t getCtuAddr                     (const CodingUnit &cu);
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+  bool isOnCtuBottom                  (const CodingUnit& cu);
+#endif
 #if JVET_V0130_INTRA_TMP
   Position getCtuXYAddr               (const CodingUnit& cu);
 #endif
@@ -81,6 +96,12 @@ namespace CU
   void saveMotionInHMVP               (const CodingUnit& cu, const bool isToBeDone );
 #if JVET_AD0188_CCP_MERGE
   void saveModelsInHCCP               (const CodingUnit &cu);
+#endif
+#if JVET_AG0058_EIP
+  void saveModelsInHEIP               (const CodingUnit &cu);
+#endif
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+  void saveCcInsideFilterFlagInCCP    (CodingUnit& cu);
 #endif
 
   PartSplit getSplitAtDepth           (const CodingUnit& cu, const unsigned depth);
@@ -98,8 +119,15 @@ namespace CU
   uint8_t deriveBcwIdx                (uint8_t bcwLO, uint8_t bcwL1);
   bool bdpcmAllowed                   (const CodingUnit& cu, const ComponentID compID);
   bool isMTSAllowed                   (const CodingUnit& cu, const ComponentID compID);
+#if JVET_AG0061_INTER_LFNST_NSPT
+  bool isLfnstAllowed                 (const CodingUnit &cu, const ComponentID compID);
+#endif
 #if INTER_LIC
   bool isLICFlagPresent               (const CodingUnit& cu);
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+  bool isLicSlopeAllowed              (const CodingUnit& cu);
+  bool licSlopeSizeTlCond             (const int bw, const int bh, const int layerId);
+#endif
 #endif
 #if JVET_AC0130_NSPT
   bool  isNSPTAllowed                 ( const TransformUnit& tu, const ComponentID compID, int width, int height, bool isIntra );
@@ -153,10 +181,26 @@ namespace CU
 #if JVET_AC0105_DIRECTIONAL_PLANAR
   bool isDirectionalPlanarAvailable(const CodingUnit &cu);
 #endif
+#if JVET_AE0059_INTER_CCCM
+  bool interCccmSearchAllowed(const CodingUnit& cu);
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  void saveProCcpInfo                 (CodingUnit &cu);
+  void saveProCcpInfoInter            (CodingUnit &cu, TransformUnit &tu);
+  bool interCcpMergeSearchAllowed     (const CodingUnit& cu);
+#endif
+#if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
+  bool isGeoBlendAvailable(const CodingUnit& cu);
+#endif
 }
 // PU tools
 namespace PU
 {
+#if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
+  int  getItmpMergeCandidate      (const PredictionUnit& pu, std::vector<Mv>& pBvs);
+  bool validItmpBv                (const PredictionUnit& pu, int tmpXdisp, int tmpYdisp);
+  bool checkValidIntraTmpMergeCand(const PredictionUnit& pu, Mv Bv);
+#endif
 #if JVET_AD0184_REMOVAL_OF_DIVISION_OPERATIONS
   int getMeanValue(int sum, int div);
 #endif
@@ -186,6 +230,9 @@ namespace PU
   bool          isMIP                 (const PredictionUnit &pu, const ChannelType &chType = CHANNEL_TYPE_LUMA);
 #if JVET_V0130_INTRA_TMP
   bool          isTmp(const PredictionUnit& pu, const ChannelType& chType = CHANNEL_TYPE_LUMA);
+#endif
+#if JVET_AG0058_EIP
+  bool isEIP(const PredictionUnit& pu, const ChannelType& chType = CHANNEL_TYPE_LUMA);
 #endif
   bool          isDMChromaMIP         (const PredictionUnit &pu);
 #if JVET_AB0155_SGPM
@@ -227,7 +274,11 @@ namespace PU
   bool dbvModeAvail(const PredictionUnit &pu);
   void deriveChromaBv(PredictionUnit &pu);
 #if JVET_AA0070_RRIBC
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  Mv adjustChromaBv(const PredictionUnit &lumaPU, const CompArea &lumaArea, RefPicList list = REF_PIC_LIST_0);
+#else
   Mv adjustChromaBv(const PredictionUnit &lumaPU, const CompArea &lumaArea);
+#endif
 #endif
   bool xCheckSimilarChromaBv(std::vector<Mv> &chromaBvList, const Mv chromaBv);
   bool checkIsChromaBvCandidateValid(const PredictionUnit &pu
@@ -246,6 +297,9 @@ namespace PU
 #if TM_MRG || TM_AMVP || JVET_Z0084_IBC_TM
   uint32_t getTMMvdThreshold          (const PredictionUnit &pu);
 #endif
+#if JVET_AE0046_BI_GPM
+  uint32_t getBiGpmThreshold(const PredictionUnit& pu);
+#endif
 #if TM_MRG
   int      reorderInterMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, int numCand, uint32_t mvdSimilarityThresh );
 #endif
@@ -256,7 +310,20 @@ namespace PU
     , MergeCtx* mvpMrgCtx1 = NULL
     , MergeCtx* mvpMrgCtx2 = NULL
 #endif
+#if JVET_AE0046_BI_GPM
+    , bool enableTh4Gpm = false
+#endif
   );
+#if JVET_AG0276_NLIC
+  void     getAltMergeCandidates    (const PredictionUnit &pu, AltLMMergeCtx& cMrgCtx);
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  void     getAltBRMergeCandidates  (const PredictionUnit &pu, AltLMMergeCtx& cMrgCtx);
+  bool     isValidAltMergeCandidate (const PredictionUnit &pu, bool isBRCand = false);
+#else
+  bool     isValidAltMergeCandidate (const PredictionUnit &pu);
+#endif
+  uint32_t getAltMergeMvdThreshold  (const PredictionUnit &pu);
+#endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   void getNonAdjacentMergeCandSubTMVP(const PredictionUnit &pu, MergeCtx& mvpMrgCtx, int col);
@@ -285,11 +352,17 @@ namespace PU
   );
 #endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  bool checkIsIBCCandidateValidBi(const PredictionUnit &pu, MotionInfo miNeighbor);
+#endif
   uint32_t checkValidBvPU (const PredictionUnit& pu, ComponentID compID,                                Mv mv, bool ignoreFracMv = false, int filterIdx = 0);
   uint32_t checkValidBv   (const PredictionUnit& pu, ComponentID compID, int compWidth, int compHeight, Mv mv, bool ignoreFracMv = false, int filterIdx = 0
                          , bool isFinalMC = false // this flag is for non-normative SW speedup
                          , bool checkAllRefValid = false
   );
+#endif
+#if JVET_AE0159_FIBC
+  bool checkIsIBCFilterCandidateValid(const PredictionUnit &pu, const MotionInfo miNeighbor, int  filterIdx = 0, bool isRefTemplate = false, bool isRefAbove = false);
 #endif
 #if JVET_Y0058_IBC_LIST_MODIFY || JVET_Z0084_IBC_TM || JVET_AA0061_IBC_MBVD || JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   bool searchBv(const PredictionUnit& pu, int xPos, int yPos, int width, int height, int picWidth, int picHeight, int xBv, int yBv, int ctuSize
@@ -300,7 +373,14 @@ namespace PU
 #endif
 #if JVET_AA0061_IBC_MBVD
   void getIbcMbvdMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, int numValidBv);
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  void getIbcAdaptiveMbvdMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, int numValidBv);
+#endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  int32_t getIbcMbvdEstBits      (const PredictionUnit &pu, int mmvdMergeCand, int mmvdMergeCand1 = -1);
+#else
   int32_t getIbcMbvdEstBits      (const PredictionUnit &pu, unsigned int mmvdMergeCand);
+#endif
 #endif
   void getInterMMVDMergeCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx, const int& mrgCandIdx = -1);
   int getDistScaleFactor(const int &currPOC, const int &currRefPOC, const int &colPOC, const int &colRefPOC);
@@ -341,7 +421,11 @@ namespace PU
 #endif
   );
 #if (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  void fillIBCMvpCand                 (      PredictionUnit &pu, AMVPInfo &amvpInfo, MergeCtx& mergeCtx, InterPrediction* pcInter);
+#else
   void fillIBCMvpCand                 (      PredictionUnit &pu, AMVPInfo &amvpInfo, InterPrediction* pcInter);
+#endif
 #else
   void fillIBCMvpCand                 (PredictionUnit &pu, AMVPInfo &amvpInfo);
 #endif
@@ -364,7 +448,14 @@ namespace PU
     , const MvpDir &eDir
 #endif
   );
-  void getRMVFAffineGuideCand(const PredictionUnit &pu, const PredictionUnit &abovePU, AffineMergeCtx &affMrgCtx, std::vector<RMVFInfo> mvp[NUM_REF_PIC_LIST_01][MAX_NUM_REF], int mrgCandIdx = -1);
+  void getRMVFAffineGuideCand(const PredictionUnit &pu, const PredictionUnit &abovePU, AffineMergeCtx &affMrgCtx, std::vector<RMVFInfo> mvp[NUM_REF_PIC_LIST_01][MAX_NUM_REF], int mrgCandIdx = -1
+#if JVET_AG0276_NLIC
+    , AltLMAffineMergeCtx* altAffineMergeCtx = NULL
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+    , AltLMAffineMergeCtx* altBRAffineMergeCtx = NULL
+#endif
+#endif
+  );
   Position convertNonAdjAffineBlkPos(const Position &pos, int curCtuX, int curCtuY);
   void collectNeiMotionInfo(std::vector<RMVFInfo> mvpInfoVec[NUM_REF_PIC_LIST_01][MAX_NUM_REF], const PredictionUnit &pu);
 #endif
@@ -383,7 +474,7 @@ namespace PU
     , const int amvpPoc = 0
 #endif
 #endif
-#if TM_MRG || (JVET_Z0084_IBC_TM && !JVET_Z0075_IBC_HMVP_ENLARGE)
+#if TM_MRG || (JVET_Z0084_IBC_TM && !JVET_Z0075_IBC_HMVP_ENLARGE) || JVET_AE0046_BI_GPM
     , const uint32_t mvdSimilarityThresh = 1
 #endif
   );
@@ -431,7 +522,7 @@ namespace PU
   bool addSpatialAffineAMVPHMVPCand(PredictionUnit& pu, const RefPicList& eRefPicList, const int& refIdx, AffineAMVPInfo& affiAMVPInfo, static_vector<AffineMotionInfo, MAX_NUM_AFF_HMVP_CANDS>* lutAff, int iHMVPlistIdx,
     int neiIdx[], int iNeiNum, int aiNeibeInherited[], bool bFoundOne);
   bool addMergeHMVPCandFromAffModel(const PredictionUnit& pu, MergeCtx& mrgCtx, const int& mrgCandIdx, int& cnt
-#if TM_MRG
+#if TM_MRG || JVET_AE0046_BI_GPM
     ,const uint32_t mvdSimilarityThresh = 1
 #endif
   );
@@ -440,7 +531,7 @@ namespace PU
 #if INTER_LIC
     , bool bICflag
 #endif
-#if TM_MRG
+#if TM_MRG || JVET_AE0046_BI_GPM
     , const uint32_t mvdSimilarityThresh = 1
 #endif
   );
@@ -459,8 +550,14 @@ namespace PU
 #if JVET_Z0139_HIST_AFF
     , int aiNeibeInherited[5]
 #endif
+#if JVET_AG0164_AFFINE_GPM
+    , int checkAffGPM = 0
+#endif
   );
   bool isBipredRestriction            (const PredictionUnit &pu);
+#if JVET_AE0046_BI_GPM
+  void spanPuMv2DmvrBuffer            (const PredictionUnit &pu, Mv* bdmvrSubPuMv0, Mv* bdmvrSubPuMv1 );
+#endif
 #if MULTI_PASS_DMVR
   void spanMotionInfo                 (      PredictionUnit &pu, const MergeCtx &mrgCtx = MergeCtx(), 
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
@@ -529,10 +626,27 @@ namespace PU
 #if JVET_Z0139_NA_AFF && JVET_W0090_ARMC_TM
                          , bool isZeroCandIdx = false 
 #endif
+#if JVET_AG0164_AFFINE_GPM
+                          , bool noSbTMVP = false
+#endif
   );
+#if JVET_AG0276_NLIC
+  void getAltLMAffineMergeCand(const PredictionUnit &pu, AltLMAffineMergeCtx& altLMAffMrgCtx);
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  void getAltLMBRAffineMergeCand(const PredictionUnit &pu, AltLMAffineMergeCtx& altLMAffMrgCtx);
+#endif
+#endif
 #if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
   bool isAffBMMergeFlagCoded(const PredictionUnit& pu);
-  void getRMVFAffineCand(const PredictionUnit &pu, AffineMergeCtx& affineMergeRMVFCtx, AffineMergeCtx& affineMergeRMVFOriCtx, InterPrediction* m_pcInterSearch, uint16_t &numCand);
+  void getRMVFAffineCand(const PredictionUnit &pu, AffineMergeCtx& affineMergeRMVFCtx, AffineMergeCtx& affineMergeRMVFOriCtx, InterPrediction* m_pcInterSearch
+  , uint16_t &numCand
+#if JVET_AG0276_NLIC
+    , AltLMAffineMergeCtx& altAffineMergeRMVFCtx
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+    , AltLMAffineMergeCtx& altBRAffineMergeRMVFCtx
+#endif
+#endif
+  );
   void getBMAffineMergeCand(const PredictionUnit &pu, AffineMergeCtx& affineBMMergeCtx, AffineMergeCtx affineMergeRMVFCtx, int mrgCandIdx = -1);
   bool getBMNonAdjCstMergeCand(const PredictionUnit &pu, AffineMergeCtx &affMrgCtx, const int mrgCandIdx = -1);
 #endif
@@ -543,7 +657,14 @@ namespace PU
 #endif
   void setAllAffineMvField            (      PredictionUnit &pu, MvField *mvField, RefPicList eRefList );
   void setAllAffineMv                 (      PredictionUnit &pu, Mv affLT, Mv affRT, Mv affLB, RefPicList eRefList, bool clipCPMVs = false );
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+  void setAffineBdofRefinedMotion     (      PredictionUnit &pu, Mv* mvBufDecAffineBDOF);
+  bool checkDoAffineBdofRefine        (const PredictionUnit &pu, InterPrediction *interPred);
+#endif
   bool getInterMergeSubPuMvpCand      (const PredictionUnit &pu, MergeCtx& mrgCtx, bool& LICFlag, const int count
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION && JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+    , bool isRefined
+#endif
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
     , int subIdx, MergeCtx mergeCtxIn
     , int col = 0
@@ -553,6 +674,11 @@ namespace PU
   );
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
   void getTMVPCandOpt(const PredictionUnit &pu, RefPicList refList, int refIdx, MergeCtx &mrgCtx, MergeCtx mergeCtx, int col = 0);
+#endif
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+  void getAmvpSbTmvp(PredictionUnit &pu, MergeCtx& mrgCtx, const Mv mvShift, const bool useAmvpSbTmvpBuf = false, const Position bufTL = Position(0, 0), bool* tmvpBufValid = nullptr, MotionInfo* tmvpMotionBuf = nullptr);
+  void clipColPos(int& posX, int& posY, const PredictionUnit& pu);
+  void scalePositionInRef(PredictionUnit& pu, const PPS& pps, RefPicList refList, int refIdx, Position& PosY);
 #endif
 #if JVET_Y0128_NON_CTC
   bool isBiRefScaled(const CodingStructure& cs, const int refIdx0, const int refIdx1);
@@ -584,6 +710,9 @@ namespace PU
 #endif
   bool getInterMergeSubPuRecurCand(const PredictionUnit &pu, MergeCtx &mrgCtx, const int count);
   bool isBiPredFromDifferentDirEqDistPoc(const PredictionUnit &pu);
+#if JVET_AG0067_DMVR_EXTENSIONS
+  bool isBiPredFromDifferentDirGenDistPoc(const PredictionUnit &pu);
+#endif
   void restrictBiPredMergeCandsOne    (PredictionUnit &pu);
 #if ENABLE_OBMC
   unsigned int getSameNeigMotion(PredictionUnit &pu, MotionInfo& mi, Position off, int  iDir, int& iLength, int iMaxLength);
@@ -600,41 +729,95 @@ namespace PU
   bool isArmcRefinedMotionEnabled(const PredictionUnit &pu, unsigned mode);
 #endif
 
+#if JVET_AE0046_BI_GPM
+  void setGpmDirMode(PredictionUnit& pu);
+#endif
+
+#if JVET_AG0164_AFFINE_GPM
+  void getGeoAffMergeCandidates(PredictionUnit& pu, AffineMergeCtx& gpmAffMrgCtx, InterPrediction* pcInterPred, AffineMergeCtx* affMergeCtx = NULL);
+  bool isAffineGPMValid(const PredictionUnit& pu);
+  bool isAffineGPMSizeValid(const PredictionUnit& pu);
+
+  int  getAffGPMCtxOffset(const PredictionUnit& pu);
+#endif
 #if JVET_W0097_GPM_MMVD_TM
 #if TM_MRG
+#if JVET_AE0046_BI_GPM
+  void getGeoMergeCandidates(PredictionUnit& pu, MergeCtx& GeoMrgCtx, MergeCtx* mergeCtx = NULL, bool is4GPM = false);
+#else
   void getGeoMergeCandidates(PredictionUnit &pu, MergeCtx &GeoMrgCtx, MergeCtx* mergeCtx = NULL);
+#endif
+#else
+#if JVET_AE0046_BI_GPM
+  void getGeoMergeCandidates(const PredictionUnit& pu, MergeCtx& GeoMrgCtx, MergeCtx* mergeCtx = NULL, bool is4GPM = false);
 #else
   void getGeoMergeCandidates(const PredictionUnit &pu, MergeCtx &GeoMrgCtx, MergeCtx* mergeCtx = NULL);
+#endif
 #endif
 #else
   void getGeoMergeCandidates          (const PredictionUnit &pu, MergeCtx &GeoMrgCtx);
 #endif
-  void spanGeoMotionInfo              (      PredictionUnit &pu, MergeCtx &GeoMrgCtx, const uint8_t splitDir, const uint8_t candIdx0, const uint8_t candIdx1);
+  void spanGeoMotionInfo              (      PredictionUnit &pu, MergeCtx &GeoMrgCtx, const uint8_t splitDir, const uint8_t candIdx0, const uint8_t candIdx1, const uint8_t* intraMPM
+#if JVET_AG0164_AFFINE_GPM
+    , AffineMergeCtx& geoAffMrgCtx
+#endif
+  );
 #if JVET_W0097_GPM_MMVD_TM
 #if TM_MRG
 #if JVET_AA0058_GPM_ADAPTIVE_BLENDING
-  void spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &geoMrgCtx, MergeCtx &geoTmMrgCtx0, MergeCtx &geoTmMrgCtx1, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool tmFlag0, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool tmFlag1, const bool mmvdFlag1, const uint8_t mmvdIdx1, const uint8_t bldIdx);
+#if JVET_AE0046_BI_GPM
+  void spanGeoMMVDMotionInfo(PredictionUnit& pu, MergeCtx& geoMrgCtx 
+#if JVET_AG0164_AFFINE_GPM
+     , AffineMergeCtx& geoAffMrgCtx
+#endif
+    , MergeCtx& geoTmMrgCtx0, MergeCtx& geoTmMrgCtx1, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool tmFlag0, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool tmFlag1, const bool mmvdFlag1, const uint8_t mmvdIdx1, const uint8_t bldIdx,const uint8_t *intraMPM,
+    const bool dmvrPart0 = false, const bool dmvrPart1 = false, Mv* bdofSubPuMvOffsetPart0 = nullptr, Mv* bdofSubPuMvOffsetPart1 = nullptr);
+#else
+  void spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &geoMrgCtx, MergeCtx &geoTmMrgCtx0, MergeCtx &geoTmMrgCtx1, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool tmFlag0, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool tmFlag1, const bool mmvdFlag1, const uint8_t mmvdIdx1, const uint8_t bldIdx, const uint8_t *intraMPM);
+#endif
 #else
   void spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &geoMrgCtx, MergeCtx &geoTmMrgCtx0, MergeCtx &geoTmMrgCtx1, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool tmFlag0, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool tmFlag1, const bool mmvdFlag1, const uint8_t mmvdIdx1);
 #endif
 #else
 #if JVET_AA0058_GPM_ADAPTIVE_BLENDING
+#if JVET_AE0046_BI_GPM
+  void spanGeoMMVDMotionInfo(PredictionUnit& pu, MergeCtx& GeoMrgCtx, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool mmvdFlag1, const uint8_t mmvdIdx1, const uint8_t bldIdx,
+    const bool dmvrPart0 = false, const bool dmvrPart1 = false, Mv* bdofSubPuMvOffsetPart0 = nullptr, Mv* bdofSubPuMvOffsetPart1 = nullptr);
+#else
   void spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &GeoMrgCtx, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool mmvdFlag1, const uint8_t mmvdIdx1, const uint8_t bldIdx);
+#endif
 #else
   void spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &GeoMrgCtx, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool mmvdFlag1, const uint8_t mmvdIdx1);
 #endif
 #endif
 #endif
+#if JVET_AE0169_GPM_IBC_IBC
+  void spanGeoIBCMotionInfo(PredictionUnit &pu, MergeCtx &geoMrgCtx);
+#endif
   bool isAddNeighborMv  (const Mv& currMv, Mv* neighborMvs, int numNeighborMv);
   void getIbcMVPsEncOnly(PredictionUnit &pu, Mv* mvPred, int& nbPred);
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  bool getDerivedBV(PredictionUnit &pu, const Mv& currentMv, Mv& derivedMv, Mv& derivedMvL1);
+#else
   bool getDerivedBV(PredictionUnit &pu, const Mv& currentMv, Mv& derivedMv);
+#endif
   bool checkDMVRCondition(const PredictionUnit& pu);
 #if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
   bool checkBDMVR4Affine(const PredictionUnit& pu);
   bool checkBDMVRCpmvRefinementPuUsage(const PredictionUnit& pu);
 #endif
 #if MULTI_PASS_DMVR
+#if JVET_AE0046_BI_GPM
+#if JVET_AG0135_AFFINE_CIIP
+  bool checkBDMVRConditionCIIPAffine(const PredictionUnit& pu, bool disgardGpmFlag = false);
+#endif
+  bool checkBDMVRCondition(const PredictionUnit& pu, bool disgardGpmFlag = false);
+#else
   bool checkBDMVRCondition(const PredictionUnit& pu);
+#endif
+#if JVET_AG0276_LIC_BDOF_BDMVR
+  bool checkBDMVRCondition4Aff(const PredictionUnit& pu);
+#endif
 #endif
 #if INTER_LIC && RPR_ENABLE
   bool checkRprLicCondition(const PredictionUnit& pu);
@@ -643,9 +826,14 @@ namespace PU
   bool checkTmEnableCondition(const SPS* sps, const PPS* pps, const Picture* refPic);
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+#if JVET_AG0164_AFFINE_GPM
+  bool checkRprRefExistingInGpm(const PredictionUnit& pu, const MergeCtx& geoMrgCtx0, uint8_t candIdx0, const MergeCtx& geoMrgCtx1, uint8_t candIdx1, const AffineMergeCtx& affMergeCtx);
+#endif
   bool checkRprRefExistingInGpm(const PredictionUnit& pu, const MergeCtx& geoMrgCtx0, uint8_t candIdx0, const MergeCtx& geoMrgCtx1, uint8_t candIdx1);
 #endif
-
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+  bool checkAffineTMCondition(const PredictionUnit& pu);
+#endif
 #if INTER_LIC
   void spanLicFlags(PredictionUnit &pu, const bool LICFlag);
 #endif
@@ -686,6 +874,9 @@ namespace PU
   bool hasCcInsideFilterFlag(const PredictionUnit &pu, int intraMode);
   bool isModetobeFiltered(int intraMode);
 #endif
+#if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+  bool hasCCPMergeFusionFlag(const PredictionUnit& pu);
+#endif
 #if JVET_AC0071_DBV
   bool hasChromaBvFlag(const PredictionUnit &pu);
 #endif
@@ -695,7 +886,10 @@ namespace PU
 #if JVET_AD0085_MPM_SORTING
   bool allowMPMSorted(const PredictionUnit& pu);
 #endif
-#if JVET_AD0188_CCP_MERGE
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  bool  hasDecoderDerivedCCP(const PredictionUnit &pu);
+#endif
+#if JVET_AD0188_CCP_MERGE || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
   void ccpParamsToCclmModel(const ComponentID compID, const CCPModelCandidate& params, CclmModel& cclmModel);
   void cclmModelToCcpParams(const ComponentID compId, CCPModelCandidate& params, const CclmModel& cclmModel);
 
@@ -706,6 +900,15 @@ namespace PU
 #endif
   void ccpParamsToCccmModel(const CCPModelCandidate& params, CccmModel cccmModelCb[2], CccmModel cccmModelCr[2]);
 
+#if JVET_AF0073_INTER_CCP_MERGE
+#if JVET_AB0174_CCCM_DIV_FREE
+  void cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel& cccmModelCb, const CccmModel& cccmModelCr, const int cccmLumaOffset = 0);
+#else
+  void cccmModelToCcpParams(CCPModelCandidate& params, const CccmModel& cccmModelCb, const CccmModel& cccmModelCr);
+#endif
+  void ccpParamsToCccmModel(const CCPModelCandidate& params, CccmModel& cccmModelCb, CccmModel& cccmModelCr);
+#endif
+
 #if JVET_AB0092_GLM_WITH_LUMA
 #if JVET_AB0174_CCCM_DIV_FREE
   void glmModelToCcpParams(const ComponentID compId, CCPModelCandidate& params, const CccmModel& glmModel, const int lumaOffset);
@@ -714,10 +917,26 @@ namespace PU
 #endif
   void ccpParamsToGlmModel(const ComponentID compId, const CCPModelCandidate& params, CccmModel& glmModel);
 #endif
-
   const PredictionUnit *getPUFromPos(const PredictionUnit &pu, const ChannelType &chType, const Position &refPos);
   bool  hasNonLocalCCP(const PredictionUnit &pu);
+#if JVET_AF0073_INTER_CCP_MERGE
+  int   getCCPModelCandidateList(const PredictionUnit &pu, CCPModelCandidate candList[], bool isInterCcp = false, int validNum = 0, CCPModelCandidate interCcpMergeList[] = NULL, int selIdx = -1);
+#else
   int   getCCPModelCandidateList(const PredictionUnit &pu, CCPModelCandidate candList[], int selIdx = -1);
+#endif
+#endif
+
+#if JVET_AE0100_BVGCCCM
+  bool hasBvgCccmFlag(const PredictionUnit &pu);
+  bool bvgCccmModeAvail(const PredictionUnit &pu);
+  bool bvgCccmMultiModeAvail(const PredictionUnit& pu, int intraMode);
+  void getBvgCccmCands(PredictionUnit &pu, bool &validBv);
+  bool isBvgCccmCand(const PredictionUnit &pu, Mv &chromaBv, int& rrIbcType, int candIdx = 0);
+  bool checkIsChromaBvCandidateValid(const PredictionUnit &pu, const Mv chromaBv, int &iWidth, int &iHeight, bool isRefTemplate = false, bool isRefAbove = false);
+#endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  bool isOppositeLIC(const PredictionUnit &pu);
+  bool hasOppositeLICFlag(const PredictionUnit &pu);
 #endif
 }
 
@@ -739,9 +958,15 @@ namespace TU
 #if SIGN_PREDICTION
   bool getDelayedSignCoding(const TransformUnit &tu, const ComponentID compID);
   bool getUseSignPred(const TransformUnit &tu, const ComponentID compID);
-  void predBorderResi(const Position blkPos, const CPelBuf &recoBuf, const CPelBuf &predBuf, const ComponentID compID,
-                      const uint32_t uiWidth,    const uint32_t uiHeight,   Pel *predResiBorder,   const Pel defaultPel);
+  void     predBorderResi(const Position blkPos, const CPelBuf &recoBuf, const CPelBuf &predBuf, ComponentID compID,
+                          uint32_t width, uint32_t height, Pel *predResiBorder, const Pel defaultVal);
   Position posSignHidingFirstCG(const TransformUnit &tu, ComponentID compID);
+#endif
+#if JVET_AE0059_INTER_CCCM
+  bool interCccmAllowed(const TransformUnit& tu);
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  bool interCcpMergeAllowed(const TransformUnit& tu);
 #endif
 }
 
@@ -751,6 +976,9 @@ int getMipSizeId      (const Size& block);
 bool allowLfnstWithMip(const Size& block);
 #if JVET_V0130_INTRA_TMP
 bool allowLfnstWithTmp();
+#endif
+#if JVET_AE0078_IBC_LIC_EXTENSION
+int getLicDimBit      (const CodingUnit& cu, const ComponentID compID);
 #endif
 
 template<typename T, size_t N>
@@ -1130,4 +1358,14 @@ int getSpatialIpm(const PredictionUnit& pu, uint8_t* spatialIpm, const int maxCa
 void fillMPMList(const PredictionUnit& pu, uint8_t* mpm, const int numToFill, const int numCand, bool extPrecision = false);
 void fillNonMPMList(uint8_t* mpm, uint8_t* non_mpm);
 #endif
+
+#if JVET_AG0058_EIP
+Position getRecoLinesEIP(const CodingUnit& cu, const ComponentID compId);
+bool     getAllowedEipMerge(const CodingUnit &cu, const ComponentID compId);
+bool     getAllowedEip(const CodingUnit &cu, const ComponentID compId);
+int getAllowedCurEip(const CodingUnit& cu, const ComponentID compId, static_vector<EIPInfo, NUM_DERIVED_EIP>& eipInfoList);
+#endif
+#endif
+#if JVET_AG0061_INTER_LFNST_NSPT
+int buildHistogram(const Pel *pReco, int iStride, uint32_t uiHeight, uint32_t uiWidth, int *piHistogram, int direction, int bw, int bh);
 #endif

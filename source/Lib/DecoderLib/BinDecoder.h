@@ -49,6 +49,9 @@ class CodingStatisticsClassType;
 
 
 class BinDecoderBase : public Ctx
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+, public BinBufferer
+#endif
 {
 protected:
   template <class BinProbModel>
@@ -96,6 +99,9 @@ public:
   TBinDecoder ();
   ~TBinDecoder() {}
   unsigned decodeBin ( unsigned ctxId );
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+  void updateCtxs    ( BinStoreVector *bb ) { m_ctx.updateCtxs(bb); };
+#endif
 private:
   CtxStore<BinProbModel>& m_ctx;
 };

@@ -246,6 +246,9 @@ struct ComprCUCtx
     , ispLfnstIdx   ( 0 )
     , stopNonDCT2Transforms
                     ( false )
+#if JVET_AG0058_EIP
+    , eipFlag      ( false )
+#endif
   {
     getAreaIdx( cs.area.Y(), *cs.pcv, cuX, cuY, cuW, cuH );
     partIdx = ( ( cuX << 8 ) | cuY );
@@ -299,6 +302,9 @@ struct ComprCUCtx
   uint8_t                           ispMode;
   uint8_t                           ispLfnstIdx;
   bool                              stopNonDCT2Transforms;
+#if JVET_AG0058_EIP
+  bool                              eipFlag;
+#endif
 
   template<typename T> T    get( int ft )       const { return typeid(T) == typeid(double) ? (T&)extraFeaturesd[ft] : T(extraFeatures[ft]); }
   template<typename T> void set( int ft, T val )      { extraFeatures [ft] = int64_t( val ); }
@@ -335,6 +341,9 @@ protected:
   InterSearch*          m_pcInterSearch;
 
   bool                  m_doPlt;
+#if JVET_AE0057_MTT_ET
+  double                m_noSplitIntraRdCost;   
+#endif
 
 public:
 
@@ -372,7 +381,9 @@ public:
   bool         getIsHashPerfectMatch() { return m_ComprCUCtxList.back().isHashPerfectMatch; }
   virtual void setBest              ( CodingStructure& cs );
   bool         anyMode              () const;
-
+#if JVET_AE0057_MTT_ET
+  void         setNoSplitIntraCost  (double cost) { m_noSplitIntraRdCost = cost; }
+#endif
   const ComprCUCtx& getComprCUCtx   () { CHECK( m_ComprCUCtxList.empty(), "Accessing empty list!"); return m_ComprCUCtxList.back(); }
 
 #if SHARP_LUMA_DELTA_QP
@@ -413,6 +424,9 @@ public:
   void   setBestISPIntraModeRelCU     ( uint8_t val )           { m_ComprCUCtxList.back().bestISPIntraMode = val; }
 #if JVET_V0130_INTRA_TMP
   void   setTPMFlagISPPass            (bool val)                { m_ComprCUCtxList.back().tmpFlag = val; }
+#endif
+#if JVET_AG0058_EIP
+  void   setAeipFlagISPPass           (bool val)                { m_ComprCUCtxList.back().eipFlag = val; }
 #endif
   void   setMIPFlagISPPass            ( bool val )              { m_ComprCUCtxList.back().mipFlag = val; }
   void   setISPMode                   ( uint8_t val )           { m_ComprCUCtxList.back().ispMode = val; }
@@ -933,7 +947,8 @@ public:
 #if ENABLE_SPLIT_PARALLELISM
 protected:
 #endif
-  void create();
+  int m_maxCuSize;
+  void create(const int maxCuSize);
   void destroy();
 
 private:
@@ -962,10 +977,19 @@ struct CodedCUInfo
 #if JVET_W0097_GPM_MMVD_TM
   bool     skipGPM;
   char     isGPMTested;
+
+#if JVET_AG0164_AFFINE_GPM
+  int      geoDirCandList[GEO_MAX_TRY_WEIGHTED_SATD + 3];
+  int      numGeoDirCand;
+  int      geoMrgIdx0List[GEO_MAX_TRY_WEIGHTED_SATD + 3];
+  int      geoMrgIdx1List[GEO_MAX_TRY_WEIGHTED_SATD + 3];
+#else
   int      geoDirCandList[GEO_MAX_TRY_WEIGHTED_SATD];
   int      numGeoDirCand;
   int      geoMrgIdx0List[GEO_MAX_TRY_WEIGHTED_SATD];
   int      geoMrgIdx1List[GEO_MAX_TRY_WEIGHTED_SATD];
+#endif
+
 #endif
 #if JVET_AD0213_LIC_IMP
   bool    skipLIC;
@@ -1012,7 +1036,8 @@ private:
 
 protected:
 
-  void create   ();
+  int m_maxCuSize;
+  void create   (const int maxCuSize);
   void destroy  ();
 #if ENABLE_SPLIT_PARALLELISM
 public:
@@ -1057,14 +1082,12 @@ struct BestEncodingInfo
   PredictionUnit pu;
 #if CONVERT_NUM_TU_SPLITS_TO_CFG
   std::vector<TransformUnit> tus;
-  size_t         numTus;
 #elif REUSE_CU_RESULTS_WITH_MULTIPLE_TUS
   TransformUnit  tus[MAX_NUM_TUS];
   size_t         numTus;
 #else
   TransformUnit  tu;
 #endif
-  EncTestMode    testMode;
 
   int            poc;
 
@@ -1082,7 +1105,7 @@ private:
   BestEncodingInfo ***m_bestEncInfo[MAX_CU_SIZE >> MIN_CU_LOG2][MAX_CU_SIZE >> MIN_CU_LOG2];
   TCoeff             *m_pCoeff;
 #if SIGN_PREDICTION
-  TCoeff             *m_pCoeffSign;
+  SIGN_PRED_TYPE *m_pCoeffSign;
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   unsigned           *m_pCoeffSignScanIdx;
 #endif
@@ -1101,7 +1124,8 @@ private:
 protected:
 
 #if CONVERT_NUM_TU_SPLITS_TO_CFG
-  void create   ( const ChromaFormat chFmt, const int maxNumTUs );
+  int m_maxCuSize;
+  void create(const ChromaFormat chFmt, const int maxNumTUs, const int maxCuSize);
 #else
   void create   ( const ChromaFormat chFmt );
 #endif

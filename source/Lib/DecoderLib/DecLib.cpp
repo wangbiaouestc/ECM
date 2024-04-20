@@ -58,6 +58,13 @@
 #include "CommonLib/CodingStatistics.h"
 #endif
 
+#if JVET_AG0196_CABAC_RETRAIN
+namespace CabacRetrain
+{
+  extern void endFrame(int poc,int qp,bool switchBp,SliceType st);
+}
+#endif
+
 bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::string& bitstreamFileName, ParameterSetMap<APS> *apsMap, bool bDecodeUntilPocFound /* = false */, int debugCTU /* = -1*/, int debugPOC /* = -1*/ )
 {
   int      poc;
@@ -157,22 +164,50 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
 
                 if( debugCTU < 0 || poc != debugPOC )
                 {
-                for( int i = 0; i < pic->slices.size(); i++ )
-                {
-                  if( pcEncPic->slices.size() <= i )
+                  for (int i = 0; i < pic->slices.size(); i++)
                   {
-                    pcEncPic->slices.push_back( new Slice );
-                    pcEncPic->slices.back()->initSlice();
-                    pcEncPic->slices.back()->setPPS( pcEncPic->slices[0]->getPPS() );
-                    pcEncPic->slices.back()->setSPS( pcEncPic->slices[0]->getSPS() );
-                    pcEncPic->slices.back()->setVPS( pcEncPic->slices[0]->getVPS() );
-                    pcEncPic->slices.back()->setPic( pcEncPic->slices[0]->getPic() );
+                    if (pcEncPic->slices.size() <= i)
+                    {
+                      pcEncPic->slices.push_back(new Slice);
+                      pcEncPic->slices.back()->initSlice();
+                      pcEncPic->slices.back()->setPPS(pcEncPic->slices[0]->getPPS());
+                      pcEncPic->slices.back()->setSPS(pcEncPic->slices[0]->getSPS());
+                      pcEncPic->slices.back()->setVPS(pcEncPic->slices[0]->getVPS());
+                      pcEncPic->slices.back()->setPic(pcEncPic->slices[0]->getPic());
+                    }
+
+                    // copy decoded PPS and SPS to the encoder
+                    auto& pps = *const_cast<PPS*>(pcEncPic->slices[i]->getPPS());
+                    auto* pcv = pcEncPic->slices[i]->getPPS()->pcv;
+                    pps = *(pic->slices[i]->getPPS());
+                    pps.pcv = pcv;
+
+                    // RPL is not initizlized after parsing at decoder, so we save the encoder RPL and copy it to the decoded SPS
+                    auto& sps = *const_cast<SPS*>(pcEncPic->slices[i]->getSPS());
+                    auto rplList0 = *sps.getRPLList0();
+                    auto rplList1 = *sps.getRPLList1();
+                    bool isAllEntriesinRPLHasSameSignFlag = sps.getAllActiveRplEntriesHasSameSignFlag();
+                    sps = *(pic->slices[i]->getSPS());
+                    *(sps.getRPLList0()) = rplList0;
+                    *(sps.getRPLList1()) = rplList1;
+                    sps.setAllActiveRplEntriesHasSameSignFlag(isAllEntriesinRPLHasSameSignFlag);
+                    
+                    pcEncPic->slices[i]->copySliceInfo(pic->slices[i], false);
                   }
-                  pcEncPic->slices[i]->copySliceInfo( pic->slices[i], false );
-                }
                 }
 
+                pcEncPic->cs->pps   = pcEncPic->slices.back()->getPPS();
+                pcEncPic->cs->sps   = pcEncPic->slices.back()->getSPS();
                 pcEncPic->cs->slice = pcEncPic->slices.back();
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+                pcEncPic->cs->slice->setLumaPelMin(pic->cs->slice->getLumaPelMin());
+                pcEncPic->cs->slice->setLumaPelMax(pic->cs->slice->getLumaPelMax());
+                pcEncPic->cs->slice->setAdaptiveClipQuant(pic->cs->slice->getAdaptiveClipQuant());
+                pcEncPic->lumaClpRng.min = pic->cs->slice->getLumaPelMin();
+                pcEncPic->lumaClpRng.max = pic->cs->slice->getLumaPelMax();
+                pcEncPic->lumaClpRngforQuant.min = pic->cs->slice->getLumaPelMin();
+                pcEncPic->lumaClpRngforQuant.max = pic->cs->slice->getLumaPelMax();
+#endif
 
                 if( debugCTU >= 0 && poc == debugPOC )
                 {
@@ -209,6 +244,10 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
 #endif
                 {
                   pcEncPic->copySAO( *pic, 0 );
+
+#if JVET_V0094_BILATERAL_FILTER
+                  pcEncPic->copyBIF( *pic );
+#endif
                 }
 
 #if JVET_W0066_CCSAO
@@ -246,7 +285,13 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
                     pcEncPic->slices[i]->setAlfAPSs(pic->slices[i]->getAlfAPSs());
                     pcEncPic->slices[i]->setTileGroupApsIdChroma(pic->slices[i]->getTileGroupApsIdChroma());
 #if ALF_IMPROVEMENT 
+#if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
+                    pcEncPic->slices[i]->setTileGroupAlfFixedFilterSetIdx(COMPONENT_Y, pic->slices[i]->getTileGroupAlfFixedFilterSetIdx(COMPONENT_Y));
+                    pcEncPic->slices[i]->setTileGroupAlfFixedFilterSetIdx(COMPONENT_Cb, pic->slices[i]->getTileGroupAlfFixedFilterSetIdx(COMPONENT_Cb));
+                    pcEncPic->slices[i]->setTileGroupAlfFixedFilterSetIdx(COMPONENT_Cr, pic->slices[i]->getTileGroupAlfFixedFilterSetIdx(COMPONENT_Cr));
+#else
                     pcEncPic->slices[i]->setTileGroupAlfFixedFilterSetIdx(pic->slices[i]->getTileGroupAlfFixedFilterSetIdx());
+#endif
 #endif
                     pcEncPic->slices[i]->setTileGroupAlfEnabledFlag(COMPONENT_Y,  pic->slices[i]->getTileGroupAlfEnabledFlag(COMPONENT_Y));
                     pcEncPic->slices[i]->setTileGroupAlfEnabledFlag(COMPONENT_Cb, pic->slices[i]->getTileGroupAlfEnabledFlag(COMPONENT_Cb));
@@ -259,6 +304,9 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
                 }
 
                 pcDecLib->executeLoopFilters();
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+                pcDecLib->adaptiveClipToRealRange();
+#endif
 #if JVET_V0094_BILATERAL_FILTER
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
                 if ( pic->cs->sps->getSAOEnabledFlag() || pic->cs->pps->getUseBIF() || pic->cs->pps->getUseChromaBIF())
@@ -277,7 +325,7 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
                 {
                   pcEncPic->copySAO( *pic, 1 );
                 }
-
+                pcEncPic->cs->initStructData();
                 pcEncPic->cs->copyStructure( *pic->cs, CH_L, true, true );
 
                 if( CS::isDualITree( *pcEncPic->cs ) )
@@ -295,6 +343,9 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
           if (!bRet)
           {
             pcDecLib->executeLoopFilters();
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+            pcDecLib->adaptiveClipToRealRange();
+#endif
           }
 
           pcDecLib->finishPicture( poc, pcListPic, DETAILS );
@@ -625,11 +676,15 @@ Picture* DecLib::xGetNewPicBuffer( const SPS &sps, const PPS &pps, const uint32_
   {
     pcPic = new Picture();
 
+
+    pcPic->create(
+      sps.getRprEnabledFlag(),
 #if JVET_Z0118_GDR
-    pcPic->create( sps.getGDREnabledFlag(), sps.getChromaFormatIdc(), Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(), sps.getMaxCUWidth() + EXT_PICTURE_SIZE, true, layerId);
-#else
-    pcPic->create( sps.getChromaFormatIdc(), Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(), sps.getMaxCUWidth() + EXT_PICTURE_SIZE, true, layerId);
+      sps.getGDREnabledFlag(),
 #endif
+      sps.getWrapAroundEnabledFlag(), sps.getChromaFormatIdc(),
+      Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(),
+      sps.getMaxCUWidth() + EXT_PICTURE_SIZE, true, layerId);
 
     m_cListPic.push_back( pcPic );
 
@@ -665,23 +720,32 @@ Picture* DecLib::xGetNewPicBuffer( const SPS &sps, const PPS &pps, const uint32_
 
     m_cListPic.push_back( pcPic );
 
+
+    pcPic->create(
+      sps.getRprEnabledFlag(),
 #if JVET_Z0118_GDR
-    pcPic->create( sps.getGDREnabledFlag(), sps.getChromaFormatIdc(), Size( pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples() ), sps.getMaxCUWidth(), sps.getMaxCUWidth() + EXT_PICTURE_SIZE, true, layerId );
-#else
-    pcPic->create( sps.getChromaFormatIdc(), Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(), sps.getMaxCUWidth() + EXT_PICTURE_SIZE, true, layerId);
+      sps.getGDREnabledFlag(),
 #endif
+      sps.getWrapAroundEnabledFlag(), sps.getChromaFormatIdc(),
+      Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(),
+      sps.getMaxCUWidth() + EXT_PICTURE_SIZE, true, layerId);
   }
   else
   {
     if( !pcPic->Y().Size::operator==( Size( pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples() ) ) || pps.pcv->maxCUWidth != sps.getMaxCUWidth() || pps.pcv->maxCUHeight != sps.getMaxCUHeight() || pcPic->layerId != layerId )
     {
       pcPic->destroy();
-#if JVET_Z0118_GDR
-      pcPic->create( sps.getGDREnabledFlag(), sps.getChromaFormatIdc(), Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(), sps.getMaxCUWidth() + EXT_PICTURE_SIZE, true, layerId);
-#else
-      pcPic->create( sps.getChromaFormatIdc(), Size( pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples() ), sps.getMaxCUWidth(), sps.getMaxCUWidth() + EXT_PICTURE_SIZE, true, layerId );
+
+      pcPic->create( 
+        sps.getRprEnabledFlag(),
+#if JVET_Z0118_GDR        
+        sps.getGDREnabledFlag(),
 #endif
+        sps.getWrapAroundEnabledFlag(), sps.getChromaFormatIdc(),
+        Size(pps.getPicWidthInLumaSamples(), pps.getPicHeightInLumaSamples()), sps.getMaxCUWidth(),
+        sps.getMaxCUWidth() + EXT_PICTURE_SIZE, true, layerId);
     }
+
 #if JVET_Z0118_GDR // picHeader should be deleted in case pcPic slot gets reused
     if (pcPic && pcPic->cs && pcPic->cs->isGdrEnabled() && pcPic->cs->picHeader)
     {          
@@ -780,6 +844,18 @@ void DecLib::executeLoopFilters()
   CS::setRefinedMotionField(cs);
 #endif
 
+#if JVET_AE0043_CCP_MERGE_TEMPORAL
+  if ((cs.picture->temporalId == 0) || (cs.picture->temporalId < cs.slice->getSPS()->getMaxTLayers() - 1))
+  {
+    CS::saveTemporalCcpModel(cs);
+  }
+#endif
+#if JVET_AG0058_EIP
+  if ((cs.picture->temporalId == 0) || (cs.picture->temporalId < cs.slice->getSPS()->getMaxTLayers() - 1))
+  {
+    CS::saveTemporalEipModel(cs);
+  }
+#endif
 #if JVET_W0066_CCSAO
   if (cs.sps->getCCSAOEnabledFlag())
   {
@@ -860,6 +936,30 @@ void DecLib::finishPictureLight(int& poc, PicList*& rpcListPic )
   m_puCounter++;
 }
 
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+void DecLib::adaptiveClipToRealRange()
+{
+  ClpRng clpRng;
+  clpRng.min = m_pcPic->cs->slice->getLumaPelMin();
+  clpRng.max = m_pcPic->cs->slice->getLumaPelMax();
+  m_pcPic->lumaClpRng.max = clpRng.max;
+  m_pcPic->lumaClpRng.min = clpRng.min;
+  int compIdx = 0;
+  ComponentID compID = ComponentID(compIdx);
+  int width = m_pcPic->cs->pps->getPicWidthInLumaSamples();
+  int height = m_pcPic->cs->pps->getPicHeightInLumaSamples();
+  Pel* reconPel = m_pcPic->getRecoBuf().get(compID).buf;
+  int stride = m_pcPic->getRecoBuf().get(compID).stride;
+  for (uint32_t yPos = 0; yPos < height; yPos++)
+  {
+    for (uint32_t xPos = 0; xPos < width; xPos++)
+    {
+      reconPel[yPos * stride + xPos] = ClipPel(reconPel[yPos * stride + xPos], clpRng);
+    }
+  }
+}
+#endif
+
 #if JVET_R0270
 void DecLib::finishPicture(int &poc, PicList *&rpcListPic, MsgLevel msgl, bool associatedWithNewClvs)
 #else
@@ -885,7 +985,9 @@ void DecLib::finishPicture(int& poc, PicList*& rpcListPic, MsgLevel msgl )
   {
     c += 32;  // tolower
   }
-
+#if JVET_AG0196_CABAC_RETRAIN
+  CabacRetrain::endFrame(pcSlice->getPOC(),pcSlice->getSliceQp(),pcSlice->getCabacInitFlag(),pcSlice->isIntra()?I_SLICE:pcSlice->isInterP()?P_SLICE:B_SLICE);
+#endif
   if (pcSlice->isDRAP()) c = 'D';
 
   //-- For time output for each slice
@@ -988,8 +1090,7 @@ void DecLib::finishPicture(int& poc, PicList*& rpcListPic, MsgLevel msgl )
   m_maxDecSliceAddrInSubPic = -1;
 
   m_pcPic->destroyTempBuffers();
-  m_pcPic->cs->destroyCoeffs();
-  m_pcPic->cs->releaseIntermediateData();
+  m_pcPic->cs->destroyTemporaryCsData();
 #if JVET_AA0096_MC_BOUNDARY_PADDING
   m_cFrameMcPadPrediction.init(&m_cRdCost, pcSlice->getSPS()->getChromaFormatIdc(), pcSlice->getSPS()->getMaxCUHeight(),
                                NULL, m_pcPic->getPicWidthInLumaSamples());
@@ -1795,8 +1896,9 @@ void DecLib::xActivateParameterSets( const InputNALUnit nalu )
     m_apcSlicePilot->setPicHeader(m_pcPic->cs->picHeader);
 #endif
 
-    m_pcPic->createTempBuffers( m_pcPic->cs->pps->pcv->maxCUWidth );
-    m_pcPic->cs->createCoeffs((bool)m_pcPic->cs->sps->getPLTMode());
+    m_pcPic->createTempBuffers( m_pcPic->cs->pps->pcv->maxCUWidth, false, false, true);
+    m_pcPic->cs->createTemporaryCsData((bool)m_pcPic->cs->sps->getPLTMode());
+    m_pcPic->cs->initStructData();
 
     m_pcPic->allocateNewSlice();
     // make the slice-pilot a real slice, and set up the slice-pilot for the next slice
@@ -1901,7 +2003,11 @@ void DecLib::xActivateParameterSets( const InputNALUnit nalu )
     // RdCost
     m_cRdCost.setCostMode ( COST_STANDARD_LOSSY ); // not used in decoder side RdCost stuff -> set to default
 
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+    m_cSliceDecoder.create(pps->getPicWidthInLumaSamples(), sps->getMaxCUWidth());
+#else
     m_cSliceDecoder.create();
+#endif
 
     if( sps->getALFEnabledFlag() )
     {
@@ -2554,6 +2660,21 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
     }
   }
 
+  if (m_apsMapEnc) // saving ALF APS for debug bitstream mode
+  {
+    const auto& apsMap = m_parameterSetManager.getApsMap();
+    for (int psId = ALF_APS; psId < (ALF_CTB_MAX_NUM_APS<<NUM_APS_TYPE_LEN) + ALF_APS; psId += (1<<NUM_APS_TYPE_LEN))
+    {
+      APS* aps = apsMap->getPS(psId);
+      if (aps && apsMap->getChangedFlag(psId))
+      {
+        APS* apsEnc = new APS();
+        *apsEnc = *aps;
+        m_apsMapEnc->storePS(psId, apsEnc);
+      }
+    }
+  }
+
   //Reset POC MSB when CRA or GDR has NoOutputBeforeRecoveryFlag equal to 1
   if (!pps->getMixedNaluTypesInPicFlag() && (m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_CRA || m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_GDR) && m_lastNoOutputBeforeRecoveryFlag[nalu.m_nuhLayerId])
   {
@@ -2885,10 +3006,73 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
       }
 
       pcSlice->setCheckLDC(bLowDelay);
+#if JVET_AF0128_LIC_MERGE_TM
+      bool bLowDelayB = false;
+      if (pcSlice->isInterB() && bLowDelay)
+      {
+        int min = MAX_INT;
+        for (int k = 0; k < NUM_REF_PIC_LIST_01; k++)
+        {
+          for (iRefIdx = 0; iRefIdx < pcSlice->getNumRefIdx((RefPicList)k); iRefIdx++)
+          {
+            if (pcSlice->getPOC() - pcSlice->getRefPic((RefPicList)k, iRefIdx)->getPOC() < min)
+            {
+              min = pcSlice->getPOC() - pcSlice->getRefPic((RefPicList)k, iRefIdx)->getPOC();
+            }
+          }
+        }
+        if (min == 1)
+        {
+          bLowDelayB = true;
+        }
+      }
+      pcSlice->setCheckLDB(bLowDelayB);
+#endif
     }
 #if JVET_Y0128_NON_CTC
     //---------------
     pcSlice->setRefPOCList();
+#endif
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+    int clipDeltaShift = 0;
+    if (pcSlice->getAdaptiveClipQuant())
+    {
+      clipDeltaShift = ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_1;
+    }
+    else
+    {
+      clipDeltaShift = ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_0;
+    }
+    if (pcSlice->getSliceType() != I_SLICE)
+    {
+      int deltaMax = pcSlice->getLumaPelMax();
+      if (deltaMax > 0)
+      {
+        deltaMax = (deltaMax << clipDeltaShift);
+      }
+      else if (deltaMax < 0)
+      {
+        deltaMax = -((-deltaMax) << clipDeltaShift);
+      }
+      int deltaMin = pcSlice->getLumaPelMin();
+      if (deltaMin > 0)
+      {
+        deltaMin = (deltaMin << clipDeltaShift);
+      }
+      else if (deltaMin < 0)
+      {
+        deltaMin = -((-deltaMin) << clipDeltaShift);
+      }
+      const Picture* const pColPic = pcSlice->getRefPic(RefPicList(1 - pcSlice->getColFromL0Flag()), pcSlice->getColRefIdx());
+      ClpRng colLumaClpRng = pColPic->getLumaClpRng();
+      int lumaPelMax = std::min(deltaMax + colLumaClpRng.max, (1 << pcSlice->getSPS()->getBitDepth(toChannelType(COMPONENT_Y))) - 1);
+      int lumaPelMin = std::max(0, deltaMin + colLumaClpRng.min);
+      CHECK(lumaPelMax > (1 << pcSlice->getSPS()->getBitDepth(toChannelType(COMPONENT_Y))) - 1, "this is not possible");
+      CHECK(lumaPelMin < 0, "this is not possible");
+      CHECK(lumaPelMin > lumaPelMax, "this is not possible");
+      pcSlice->setLumaPelMax(lumaPelMax);
+      pcSlice->setLumaPelMin(lumaPelMin);
+    }
 #endif
 
     if (pcSlice->getSPS()->getUseSMVD() && pcSlice->getCheckLDC() == false
@@ -2992,6 +3176,9 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
       pcSlice->generateCombinedList();
       pcSlice->generateRefPicPairList();
     }
+#endif
+#if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
+    pcSlice->generateEqualPocDist();
 #endif
 
     NalUnitInfo naluInfo;

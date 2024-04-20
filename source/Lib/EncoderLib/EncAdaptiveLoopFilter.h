@@ -49,107 +49,172 @@ struct AlfCovariance
   static constexpr int MaxAlfNumClippingValues = AdaptiveLoopFilter::MaxAlfNumClippingValues;
 
 #if JVET_X0071_LONGER_CCALF && !JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF && !JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
+#if JVET_AF0177_ALF_COV_FLOAT
+  using TE = float[MAX_NUM_CC_ALF_CHROMA_COEFF][MAX_NUM_CC_ALF_CHROMA_COEFF];
+  using Ty = float[MAX_NUM_CC_ALF_CHROMA_COEFF];
+#else
   using TE = double[MAX_NUM_CC_ALF_CHROMA_COEFF][MAX_NUM_CC_ALF_CHROMA_COEFF];
   using Ty = double[MAX_NUM_CC_ALF_CHROMA_COEFF];
+#endif
+#else
+#if JVET_AF0177_ALF_COV_FLOAT
+  using TE = float[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF];
+  using Ty = float[MAX_NUM_ALF_LUMA_COEFF];
+  using DTy = double[MAX_NUM_ALF_LUMA_COEFF];
 #else
   using TE = double[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF];
   using Ty = double[MAX_NUM_ALF_LUMA_COEFF];
 #endif
+#endif
 
+#if JVET_AF0177_ALF_COV_FLOAT
+  std::vector<float> data;
+#else
+  std::vector<double> data;
+#endif
 
-  using TKE = TE[AdaptiveLoopFilter::MaxAlfNumClippingValues][AdaptiveLoopFilter::MaxAlfNumClippingValues];
-  using TKy = Ty[AdaptiveLoopFilter::MaxAlfNumClippingValues];
+  ptrdiff_t                offsetE;
+  ptrdiff_t                stridey;
 
+  size_t sizeY() const { return offsetE; }
+  size_t sizeE() const { return data.size() - offsetE; }
+
+  ptrdiff_t getOffsetY(ptrdiff_t i, ptrdiff_t j) const { return stridey * i + j; }
+
+  ptrdiff_t getOffsetEfast(ptrdiff_t i, ptrdiff_t j, ptrdiff_t k, ptrdiff_t l) const
+  {
+    const ptrdiff_t v0 = getOffsetY(i, k);
+    const ptrdiff_t v1 = getOffsetY(j, l);
+
+    assert(v1 <= v0);
+
+    return offsetE + (v0 * (v0 + 1) >> 1) + v1;
+  }
+
+  ptrdiff_t getOffsetE(ptrdiff_t i, ptrdiff_t j, ptrdiff_t k, ptrdiff_t l) const
+  {
+    const ptrdiff_t v0 = getOffsetY(i, k);
+    const ptrdiff_t v1 = getOffsetY(j, l);
+
+    return offsetE + (v1 <= v0 ? (v0 * (v0 + 1) >> 1) + v1 : (v1 * (v1 + 1) >> 1) + v0);
+  }
+#if JVET_AF0177_ALF_COV_FLOAT
+  float       &y(ptrdiff_t i, ptrdiff_t j) { return data[getOffsetY(i, j)]; }
+  const float &y(ptrdiff_t i, ptrdiff_t j) const { return data[getOffsetY(i, j)]; }
+
+  float       &E(ptrdiff_t i, ptrdiff_t j, ptrdiff_t k, ptrdiff_t l) { return data[getOffsetE(i, j, k, l)]; }
+  const float &E(ptrdiff_t i, ptrdiff_t j, ptrdiff_t k, ptrdiff_t l) const { return data[getOffsetE(i, j, k, l)]; }
+#else
+  double       &y(ptrdiff_t i, ptrdiff_t j) { return data[getOffsetY(i, j)]; }
+  const double &y(ptrdiff_t i, ptrdiff_t j) const { return data[getOffsetY(i, j)]; }
+
+  double       &E(ptrdiff_t i, ptrdiff_t j, ptrdiff_t k, ptrdiff_t l) { return data[getOffsetE(i, j, k, l)]; }
+  const double &E(ptrdiff_t i, ptrdiff_t j, ptrdiff_t k, ptrdiff_t l) const { return data[getOffsetE(i, j, k, l)]; }
+#endif
   int numCoeff;
   int numBins;
-  TKy y;
-  TKE E;
+#if JVET_AF0177_ALF_COV_FLOAT
+  float pixAcc;
+#else
   double pixAcc;
+#endif
 
   AlfCovariance() {}
   ~AlfCovariance() {}
 
-  void create( int size, int num_bins = MaxAlfNumClippingValues )
+  void create(int size, int _numBins)
   {
     numCoeff = size;
-    numBins = num_bins;
-    std::memset( y, 0, sizeof( y ) );
-    std::memset( E, 0, sizeof( E ) );
+    numBins  = _numBins;
+    const int numCols = numCoeff * numBins;
+    stridey    = numCoeff;
+    offsetE    = stridey * numBins;
+    data.resize(offsetE + (numCols * (numCols + 1) >> 1));
+#if JVET_AF0177_ALF_COV_FLOAT
+    std::fill(data.begin(), data.end(), 0.0f);
+#else
+    std::fill(data.begin(), data.end(), 0.0);
+#endif
   }
 
   void destroy()
   {
   }
 
-  void reset( int num_bins = -1 )
+  void reset()
   {
-    if ( num_bins > 0 )
-      numBins = num_bins;
     pixAcc = 0;
-    std::memset( y, 0, sizeof( y ) );
-    std::memset( E, 0, sizeof( E ) );
+#if JVET_AF0177_ALF_COV_FLOAT
+    std::fill(data.begin(), data.end(), 0.0f);
+#else
+    std::fill(data.begin(), data.end(), 0.0);
+#endif
+  }
+
+  void reset(int _numBins)
+  {
+    numBins = _numBins;
+    reset();
   }
 
   const AlfCovariance& operator=( const AlfCovariance& src )
   {
     numCoeff = src.numCoeff;
     numBins = src.numBins;
-    std::memcpy( E, src.E, sizeof( E ) );
-    std::memcpy( y, src.y, sizeof( y ) );
+    data     = src.data;
+    stridey  = src.stridey;
+    offsetE  = src.offsetE;
     pixAcc = src.pixAcc;
 
     return *this;
   }
 
+  bool sameSizeAs(const AlfCovariance &x) { return x.numCoeff == numCoeff && x.numBins == numBins; }
+
   void add( const AlfCovariance& lhs, const AlfCovariance& rhs )
   {
     numCoeff = lhs.numCoeff;
     numBins = lhs.numBins;
-    for( int b0 = 0; b0 < numBins; b0++ )
+    CHECK(!sameSizeAs(lhs), "AlfCovariance size mismatch");
+    CHECK(!sameSizeAs(rhs), "AlfCovariance size mismatch");
+
+    for (ptrdiff_t i = 0; i < data.size(); i++)
     {
-      for( int b1 = 0; b1 < numBins; b1++ )
-      {
-        for( int j = 0; j < numCoeff; j++ )
-        {
-          for( int i = 0; i < numCoeff; i++ )
-          {
-            E[b0][b1][j][i] = lhs.E[b0][b1][j][i] + rhs.E[b0][b1][j][i];
-          }
-        }
-      }
-    }
-    for( int b = 0; b < numBins; b++ )
-    {
-      for( int j = 0; j < numCoeff; j++ )
-      {
-        y[b][j] = lhs.y[b][j] + rhs.y[b][j];
-      }
+      data[i] = lhs.data[i] + rhs.data[i];
     }
     pixAcc = lhs.pixAcc + rhs.pixAcc;
   }
 
   const AlfCovariance& operator+= ( const AlfCovariance& src )
   {
-    for( int b0 = 0; b0 < numBins; b0++ )
+    CHECK(src.numCoeff != numCoeff, "AlfCovariance size mismatch");
+    // There may be a case where we accumulate only bin #0
+    CHECK(src.numBins != numBins && numBins != 1, "AlfCovariance size mismatch");
+
+    for (ptrdiff_t i = 0; i < sizeY(); i++)
     {
-      for( int b1 = 0; b1 < numBins; b1++ )
+      data[i] += src.data[i];
+    }
+
+    if (src.numBins != numBins)
+    {
+      // numBins == 1 (see CHECK above)
+      for (ptrdiff_t i = 0; i < numCoeff; i++)
       {
-        for( int j = 0; j < numCoeff; j++ )
+        for (ptrdiff_t j = 0; j <= i; j++)
         {
-          for( int i = 0; i < numCoeff; i++ )
-          {
-            E[b0][b1][j][i] += src.E[b0][b1][j][i];
-          }
+          data[getOffsetEfast(0, 0, i, j)] += src.data[src.getOffsetEfast(0, 0, i, j)];
         }
       }
     }
-    for( int b = 0; b < numBins; b++ )
+    else
     {
-      for( int j = 0; j < numCoeff; j++ )
+      for (ptrdiff_t i = 0; i < sizeE(); i++)
       {
-        y[b][j] += src.y[b][j];
+        data[offsetE + i] += src.data[src.offsetE + i];
       }
     }
+
     pixAcc += src.pixAcc;
 
     return *this;
@@ -157,26 +222,33 @@ struct AlfCovariance
 
   const AlfCovariance& operator-= ( const AlfCovariance& src )
   {
-    for( int b0 = 0; b0 < numBins; b0++ )
+    CHECK(src.numCoeff != numCoeff, "AlfCovariance size mismatch");
+    // There may be a case where we accumulate only bin #0
+    CHECK(src.numBins != numBins && numBins != 1, "AlfCovariance size mismatch");
+
+    for (ptrdiff_t i = 0; i < sizeY(); i++)
     {
-      for( int b1 = 0; b1 < numBins; b1++ )
+      data[i] -= src.data[i];
+    }
+    if (src.numBins != numBins)
+    {
+      // numBins == 1 (see CHECK above)
+      for (ptrdiff_t i = 0; i < numCoeff; i++)
       {
-        for( int j = 0; j < numCoeff; j++ )
+        for (ptrdiff_t j = 0; j <= i; j++)
         {
-          for( int i = 0; i < numCoeff; i++ )
-          {
-            E[b0][b1][j][i] -= src.E[b0][b1][j][i];
-          }
+          data[getOffsetEfast(0, 0, i, j)] -= src.data[src.getOffsetEfast(0, 0, i, j)];
         }
       }
     }
-    for( int b = 0; b < numBins; b++ )
+    else
     {
-      for( int j = 0; j < numCoeff; j++ )
+      for (ptrdiff_t i = 0; i < sizeE(); i++)
       {
-        y[b][j] -= src.y[b][j];
+        data[offsetE + i] -= src.data[src.offsetE + i];
       }
     }
+
     pixAcc -= src.pixAcc;
 
     return *this;
@@ -184,24 +256,34 @@ struct AlfCovariance
 
   void setEyFromClip(const int* clip, TE _E, Ty _y, int size) const
   {
-    for (int k=0; k<size; k++)
+    CHECK(size != numCoeff, "AlfCovariance size mismatch");
+
+    for (ptrdiff_t k = 0; k < size; k++)
     {
-      _y[k] = y[clip[k]][k];
-      for (int l=0; l<size; l++)
+      _y[k] = y(clip[k], k);
+      // Upper triangular
+      for (ptrdiff_t l = k; l < size; l++)
       {
-        _E[k][l] = E[clip[k]][clip[l]][k][l];
+        _E[k][l] = E(clip[k], clip[l], k, l);
       }
     }
   }
-
+#if JVET_AF0177_ALF_COV_FLOAT
+  double optimizeFilter(const int* clip, Ty f, int size) const
+#else
   double optimizeFilter(const int* clip, double *f, int size) const
+#endif
   {
     gnsSolveByChol( clip, f, size );
     return calculateError( clip, f );
   }
 
 #if JVET_AD0222_ALF_RESI_CLASS
+#if JVET_AF0177_ALF_COV_FLOAT
+  double optimizeFilter(const AlfFilterShape& alfShape, int* clip, Ty f, bool optimize_clip, bool enableLessClip) const;
+#else
   double optimizeFilter(const AlfFilterShape& alfShape, int* clip, double *f, bool optimize_clip, bool enableLessClip) const;
+#endif
   double optimizeFilterClip(const AlfFilterShape& alfShape, int* clip, bool enableLessClip) const
   {
     Ty f;
@@ -217,22 +299,39 @@ struct AlfCovariance
 #endif
 
   double calculateError( const int *clip ) const;
+#if JVET_AF0177_ALF_COV_FLOAT
+  double calculateError( const int *clip, const Ty coeff ) const { return calculateError(clip, coeff, numCoeff); }
+  double calculateError( const int *clip, const Ty coeff, const int numCoeff ) const;
+#else
   double calculateError( const int *clip, const double *coeff ) const { return calculateError(clip, coeff, numCoeff); }
   double calculateError( const int *clip, const double *coeff, const int numCoeff ) const;
+#endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  void calcInitErrorForCoeffs(double *cAc, double *cA, double *bc, const int *clip, const int *coeff, const int numCoeff, const int bitDepth) const;
+  void updateErrorForCoeffsDelta(double *cAc, double *cA, double *bc, const int *clip, const int *coeff, const int numCoeff, const int bitDepth, double delta, int modInd) const;
+  double calcErrorForCoeffsDelta(double cAc, double *cA, double bc, const int *clip, const int *coeff, const int numCoeff, const int bitDepth, double delta, int modInd) const;
+#endif
   double calcErrorForCoeffs( const int *clip, const int *coeff, const int numCoeff, const int bitDepth ) const;
   double calcErrorForCcAlfCoeffs(const int16_t *coeff, const int numCoeff, const int bitDepth) const;
 
   void getClipMax(const AlfFilterShape& alfShape, int *clip_max) const;
   void reduceClipCost(const AlfFilterShape& alfShape, int *clip) const;
-
+#if JVET_AF0177_ALF_COV_FLOAT
+  int  gnsSolveByChol( TE LHS, Ty rhs, Ty x, int numEq ) const;
+#else
   int  gnsSolveByChol( TE LHS, double* rhs, double *x, int numEq ) const;
-
+#endif
 private:
   // Cholesky decomposition
-
+#if JVET_AF0177_ALF_COV_FLOAT
+  int  gnsSolveByChol( const int *clip, Ty x, int numEq ) const;
+  void gnsTransposeBacksubstitution( TE U, Ty rhs, Ty x, int order ) const;
+  void gnsBacksubstitution( TE R, Ty z, int size, Ty A ) const;
+#else
   int  gnsSolveByChol( const int *clip, double *x, int numEq ) const;
   void gnsBacksubstitution( TE R, double* z, int size, double* A ) const;
   void gnsTransposeBacksubstitution( TE U, double* rhs, double* x, int order ) const;
+#endif
   int  gnsCholeskyDec( TE inpMatr, TE outMatr, int numEq ) const;
 };
 
@@ -259,8 +358,8 @@ private:
   uint8_t*               m_ctuEnableFlagTmp[MAX_NUM_COMPONENT];
   uint8_t*               m_ctuEnableFlagTmp2[MAX_NUM_COMPONENT];
   uint8_t*               m_ctuAlternativeTmp[MAX_NUM_COMPONENT];
-  AlfCovariance***       m_alfCovarianceCcAlf[2];           // [compIdx-1][shapeIdx][filterIdx][ctbAddr]
-  AlfCovariance**        m_alfCovarianceFrameCcAlf[2];      // [compIdx-1][shapeIdx][filterIdx]
+  AlfCovariance**        m_alfCovarianceCcAlf;           // [shapeIdx][filterIdx][ctbAddr]
+  AlfCovariance*         m_alfCovarianceFrameCcAlf;      // [shapeIdx][filterIdx]
 
 #if ALF_IMPROVEMENT
   bool classChanged[MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_CLASSES];
@@ -272,7 +371,12 @@ private:
   AlfParam               m_alfParamTemp;
   ParameterSetMap<APS>*  m_apsMap;
   AlfCovariance          m_alfCovarianceMerged[ALF_NUM_OF_FILTER_TYPES][MAX_NUM_ALF_CLASSES + 2];
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  static const int       m_numBitDepth = 4;
+  int                    m_alfClipMerged[ALF_NUM_OF_FILTER_TYPES][m_numBitDepth][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_LUMA_COEFF];
+#else
   int                    m_alfClipMerged[ALF_NUM_OF_FILTER_TYPES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_LUMA_COEFF];
+#endif
   CABACWriter*           m_CABACEstimator;
   CtxCache*              m_ctxCache;
   double                 m_lambda[MAX_NUM_COMPONENT];
@@ -298,6 +402,9 @@ private:
 #if JVET_AD0222_ALF_RESI_CLASS
   bool                   m_enableLessClip;
 #endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  bool                   m_alfPrecisonFlag;
+#endif
   std::vector<short>     m_alfCtbFilterSetIndexTmp;
   AlfParam               m_alfParamTempNL;
   int                    m_filterTmp[MAX_NUM_ALF_LUMA_COEFF];
@@ -318,6 +425,11 @@ private:
   uint8_t*               m_bestFilterControl;     // best saved filter control
   int                    m_reuseApsId[2];
   bool                   m_limitCcAlf;
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+  bool                   m_isLumaSignalNewAps;
+  bool                   m_isLowDelayConfig;
+  double                 m_chromaFactor;
+#endif
 
 public:
   EncAdaptiveLoopFilter( int& apsIdStart );
@@ -350,8 +462,8 @@ public:
   void getDistNewFilter( AlfParam& alfParam );
   int getNewCcAlfApsId( CodingStructure &cs, int cIdx );
   void initCABACEstimator( CABACEncoder* cabacEncoder, CtxCache* ctxCache, Slice* pcSlice, ParameterSetMap<APS>* apsMap );
-  void create( const EncCfg* encCfg, const int picWidth, const int picHeight, const ChromaFormat chromaFormatIDC, const int maxCUWidth, const int maxCUHeight, const int maxCUDepth, const int inputBitDepth[MAX_NUM_CHANNEL_TYPE], const int internalBitDepth[MAX_NUM_CHANNEL_TYPE] );
-  void destroy();
+  void create( const EncCfg* encCfg, const int picWidth, const int picHeight, const ChromaFormat chromaFormatIDC, const int maxCUWidth, const int maxCUHeight, const int maxCUDepth, const int inputBitDepth[MAX_NUM_CHANNEL_TYPE], const int internalBitDepth[MAX_NUM_CHANNEL_TYPE], bool createEncData = false );
+  void destroy( bool destroyEncData = false );
   void setApsIdStart( int i) { m_apsIdStart = i; }
 #if ALF_IMPROVEMENT
   static int lengthGolomb(int coeffVal, int k, bool signed_coeff = true);
@@ -366,7 +478,11 @@ private:
 
   void   copyAlfParam( AlfParam& alfParamDst, AlfParam& alfParamSrc, ChannelType channel );
 #if JVET_X0071_ALF_BAND_CLASSIFIER
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  double mergeFiltersAndCost( AlfParam& alfParam, AlfFilterShape& alfShape, AlfCovariance* covFrame, AlfCovariance* covMerged, int clipMerged[m_numBitDepth][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_LUMA_COEFF], int& uiCoeffBits, int altIdx, int classifierIdx, int numFiltersLinear );
+#else
   double mergeFiltersAndCost( AlfParam& alfParam, AlfFilterShape& alfShape, AlfCovariance* covFrame, AlfCovariance* covMerged, int clipMerged[MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_LUMA_COEFF], int& uiCoeffBits, int altIdx, int classifierIdx, int numFiltersLinear );
+#endif
   void   getFrameStats( ChannelType channel, int iShapeIdx, int altIdx, int fixedFilterSetIdx, int classifierIdx );
 #else
   double mergeFiltersAndCost( AlfParam& alfParam, AlfFilterShape& alfShape, AlfCovariance* covFrame, AlfCovariance* covMerged, int clipMerged[MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_LUMA_COEFF], int& uiCoeffBits
@@ -454,21 +570,30 @@ private:
 #endif
 #endif
   template<bool alfWSSD>
-  void   deriveStatsForCcAlfFiltering(const PelUnitBuf &orgYuv, const PelUnitBuf &recYuv, const int compIdx,
-                                      const int maskStride, const uint8_t filterIdc, CodingStructure &cs);
+  void   deriveStatsForCcAlfFiltering(const PelUnitBuf &orgYuv, const PelUnitBuf &recYuv, const int compIdx, CodingStructure &cs);
   template<bool m_alfWSSD>
-  void   getBlkStatsCcAlf(AlfCovariance &alfCovariance, const AlfFilterShape &shape, const PelUnitBuf &orgYuv,
-                          const PelUnitBuf &recYuv, const UnitArea &areaDst, const UnitArea &area,
-                          const ComponentID compID, const int yPos);
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+  void   getBlkStatsCcAlf(AlfCovariance &alfCovariance, const AlfFilterShape &shape, const PelUnitBuf &orgYuv, const PelUnitBuf &recYuv, const UnitArea &areaDst, const UnitArea &area, const ComponentID compID, const int yPos, PelUnitBuf &resiYuv );
+#else
+  void   getBlkStatsCcAlf(AlfCovariance &alfCovariance, const AlfFilterShape &shape, const PelUnitBuf &orgYuv, const PelUnitBuf &recYuv, const UnitArea &areaDst, const UnitArea &area, const ComponentID compID, const int yPos);
+#endif
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
 #if ALF_IMPROVEMENT
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+  void   calcCovarianceCcAlf( Pel ELocal[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const Pel* rec, const int stride, const AlfFilterShape& shape, Pel* resiPtr, int resiStride  );
+#else
   void   calcCovarianceCcAlf( Pel ELocal[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const Pel* rec, const int stride, const AlfFilterShape& shape );
+#endif
 #else
   void   calcCovarianceCcAlf(Pel ELocal[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const Pel* rec, const int stride, const AlfFilterShape& shape, int vbDistance);
 #endif
 #else
 #if ALF_IMPROVEMENT
+#if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
+  void   calcCovarianceCcAlf( int ELocal[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const Pel* rec, const int stride, const AlfFilterShape& shape. Pel* resiPtr, int resiStride );
+#else
   void   calcCovarianceCcAlf( int ELocal[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const Pel* rec, const int stride, const AlfFilterShape& shape );
+#endif
 #else
   void   calcCovarianceCcAlf(int ELocal[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const Pel* rec, const int stride, const AlfFilterShape& shape, int vbDistance);
 #endif
@@ -489,7 +614,11 @@ private:
 #endif
     bool onlyFilterCost = false );
 #if JVET_X0071_ALF_BAND_CLASSIFIER
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  double deriveFilterCoeffs(AlfCovariance* cov, AlfCovariance* covMerged, int clipMerged[m_numBitDepth][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_LUMA_COEFF], AlfFilterShape& alfShape, short* filterIndices, int numFilters, double errorTabForce0Coeff[m_numBitDepth][MAX_NUM_ALF_CLASSES][2], AlfParam& alfParam, bool nonLinear, int classifierIdx, bool isMaxNum, int mergedPair[MAX_NUM_ALF_CLASSES][2], int mergedCoeff[m_numBitDepth][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_LUMA_COEFF], double mergedErr[m_numBitDepth][MAX_NUM_ALF_CLASSES], char coeffBits, char minCoeffBits);
+#else
   double deriveFilterCoeffs(AlfCovariance* cov, AlfCovariance* covMerged, int clipMerged[MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_LUMA_COEFF], AlfFilterShape& alfShape, short* filterIndices, int numFilters, double errorTabForce0Coeff[MAX_NUM_ALF_CLASSES][2], AlfParam& alfParam, bool nonLinear, int classifierIdx, bool isMaxNum, int mergedPair[MAX_NUM_ALF_CLASSES][2], int mergedCoeff[MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_LUMA_COEFF], double mergedErr[MAX_NUM_ALF_CLASSES]);
+#endif
 #else
   double deriveFilterCoeffs(AlfCovariance* cov, AlfCovariance* covMerged, int clipMerged[MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_LUMA_COEFF], AlfFilterShape& alfShape, short* filterIndices, int numFilters, double errorTabForce0Coeff[MAX_NUM_ALF_CLASSES][2], AlfParam& alfParam
 #if ALF_IMPROVEMENT
@@ -498,7 +627,12 @@ private:
   );
 #endif
 #if ALF_IMPROVEMENT
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  void deriveCoeffQuantMultipleBitDepths( int *filterClipp, const AlfCovariance& cov, const AlfFilterShape& shape, const int bitDepth, const bool optimizeClip, int filtIdx, double errorTabForce0Coeff[m_numBitDepth][MAX_NUM_ALF_CLASSES][2] );
+  int    deriveFilterCoefficientsPredictionMode( AlfFilterShape& alfShape, int **filterSet, int** filterCoeffDiff, const int numFilters, bool nonLinearFlag, char bitIdx );
+#else
   int    deriveFilterCoefficientsPredictionMode( AlfFilterShape& alfShape, int **filterSet, int** filterCoeffDiff, const int numFilters, bool nonLinearFlag );
+#endif
 #else
   int    deriveFilterCoefficientsPredictionMode( AlfFilterShape& alfShape, int **filterSet, int** filterCoeffDiff, const int numFilters );
 #endif
@@ -512,9 +646,13 @@ private:
                                 , int fixedFilterSetIdx
 #endif
                                 );
+#if JVET_AF0177_ALF_COV_FLOAT
+  void   roundFiltCoeff( int *filterCoeffQuant, float *filterCoeff, const int numCoeff, const int factor );
+  void   roundFiltCoeffCCALF( int16_t *filterCoeffQuant, float *filterCoeff, const int numCoeff, const int factor );
+#else
   void   roundFiltCoeff( int *filterCoeffQuant, double *filterCoeff, const int numCoeff, const int factor );
   void   roundFiltCoeffCCALF(int16_t *filterCoeffQuant, double *filterCoeff, const int numCoeff, const int factor);
-
+#endif
   double getDistCoeffForce0( bool* codedVarBins, double errorForce0CoeffTab[MAX_NUM_ALF_CLASSES][2], int* bitsVarBin, int zeroBitsVarBin, const int numFilters);
   int    lengthUvlc( int uiCode );
 #if ALF_IMPROVEMENT
@@ -523,9 +661,15 @@ private:
 #else
   int    getNonFilterCoeffRate( AlfParam& alfParam, int altIdx );
 #endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  int    getCostFilterCoeffForce0( AlfFilterShape& alfShape, int **pDiffQFilterCoeffIntPP, const int numFilters, bool* codedVarBins, int altIdx, char bitIdx);
+  double getDistForce0(AlfFilterShape& alfShape, const int numFilters, double errorTabForce0Coeff[MAX_NUM_ALF_CLASSES][2], bool* codedVarBins, int altIdx, char bitIdx);
+  double getFilteredDistortion( AlfCovariance* cov, const int numClasses, const int numFiltersMinus1, const int numCoeff, int altIdx, int coeffBits );
+#else
   int    getCostFilterCoeffForce0( AlfFilterShape& alfShape, int **pDiffQFilterCoeffIntPP, const int numFilters, bool* codedVarBins, int altIdx);
   double getDistForce0( AlfFilterShape& alfShape, const int numFilters, double errorTabForce0Coeff[MAX_NUM_ALF_CLASSES][2], bool* codedVarBins, int altIdx);
   double getFilteredDistortion( AlfCovariance* cov, const int numClasses, const int numFiltersMinus1, const int numCoeff, int altIdx );
+#endif
   void initCtuAlternativeLuma( uint8_t* ctuAlts[MAX_NUM_COMPONENT] );
 #else
   int    getNonFilterCoeffRate( AlfParam& alfParam );
@@ -533,9 +677,15 @@ private:
   double getDistForce0( AlfFilterShape& alfShape, const int numFilters, double errorTabForce0Coeff[MAX_NUM_ALF_CLASSES][2], bool* codedVarBins );
   double getFilteredDistortion( AlfCovariance* cov, const int numClasses, const int numFiltersMinus1, const int numCoeff );
 #endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  int    getCostFilterCoeff( AlfFilterShape& alfShape, int **pDiffQFilterCoeffIntPP, const int numFilters, char bitIdx );
+  int    getCostFilterClipp( AlfFilterShape& alfShape, int **pDiffQFilterCoeffIntPP, const int numFilters, char bitIdx );
+  int    lengthFilterCoeffs( AlfFilterShape& alfShape, const int numFilters, int **FilterCoeff, char bitIdx ); 
+#else
   int    getCostFilterCoeff( AlfFilterShape& alfShape, int **pDiffQFilterCoeffIntPP, const int numFilters );
   int    getCostFilterClipp( AlfFilterShape& alfShape, int **pDiffQFilterCoeffIntPP, const int numFilters );
-  int    lengthFilterCoeffs( AlfFilterShape& alfShape, const int numFilters, int **FilterCoeff );  
+  int    lengthFilterCoeffs( AlfFilterShape& alfShape, const int numFilters, int **FilterCoeff ); 
+#endif
   int    getChromaCoeffRate( AlfParam& alfParam, int altIdx );
   double getUnfilteredDistortion( AlfCovariance* cov, ChannelType channel );
   double getUnfilteredDistortion( AlfCovariance* cov, const int numClasses );
@@ -566,7 +716,7 @@ private:
   void countLumaSwingGreaterThanThreshold(const Pel* luma, int lumaStride, int height, int width, int log2BlockWidth, int log2BlockHeight, uint64_t* lumaSwingGreaterThanThresholdCount, int lumaCountStride);
   void countChromaSampleValueNearMidPoint(const Pel* chroma, int chromaStride, int height, int width, int log2BlockWidth, int log2BlockHeight, uint64_t* chromaSampleCountNearMidPoint, int chromaSampleCountNearMidPointStride);
   void getFrameStatsCcalf(ComponentID compIdx, int filterIdc);
-  void initDistortionCcalf();
+  void initDistortionCcalf(int comp);
 };
 
 #endif

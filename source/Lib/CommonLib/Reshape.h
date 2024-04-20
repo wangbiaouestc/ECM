@@ -117,6 +117,25 @@ public:
 #endif
   void setChromaScale (int chromaScale) { m_chromaScale = chromaScale; }
   int  getChromaScale() { return m_chromaScale; }
+
+  static Pel scalePel(Pel val, const int16_t scale, const Pel maxVal)
+  {
+    Pel sign    = val >> (8 * sizeof(Pel) - 1);
+    val         = Clip3<Pel>(~maxVal, maxVal, val);
+    val         = (val ^ sign) - sign;   // abs
+    int32_t tmp = (val * scale + (1 << CSCALE_FP_PREC >> 1)) >> CSCALE_FP_PREC;
+    tmp         = (tmp ^ sign) - sign;   // restore sign
+    if (sizeof(Pel) == 2)
+    {
+      // avoid overflow when storing data
+      val = Clip3<int>(std::numeric_limits<Pel>::min(), std::numeric_limits<Pel>::max(), tmp);
+    }
+    else
+    {
+      val = tmp;
+    }
+    return val;
+  }
 };// END CLASS DEFINITION Reshape
 
 //! \}

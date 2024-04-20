@@ -214,6 +214,9 @@ protected:
 #if JVET_AD0082_TMRL_CONFIG
   bool      m_noTmrlConstraintFlag;
 #endif
+#if JVET_AG0058_EIP
+  bool      m_noEipConstraintFlag;
+#endif
 #if ENABLE_OBMC
   bool      m_noObmcConstraintFlag;
 #endif
@@ -394,6 +397,15 @@ protected:
   bool      m_sbTmvpEnableFlag;
   bool      m_Affine;
   bool      m_AffineType;
+#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+  bool      m_useAffineTM;
+#if JVET_AG0276_NLIC
+  bool      m_useAffAltLMTM;
+#endif
+#endif
+#if JVET_AG0135_AFFINE_CIIP
+  bool      m_useCiipAffine;
+#endif
 #if AFFINE_MMVD
   bool      m_AffineMmvdMode;
 #endif
@@ -431,6 +443,15 @@ protected:
   bool      m_BIO;
 #if JVET_W0090_ARMC_TM
   bool      m_AML;
+#if JVET_AG0276_NLIC
+  bool      m_altLM;
+  bool      m_affAltLM;
+#endif
+#endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  bool      m_mergeOppositeLic;
+  bool      m_mergeTMOppositeLic;
+  bool      m_mergeAffOppositeLic;
 #endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   bool      m_armcRefinedMotion;
@@ -472,6 +493,12 @@ protected:
 #if JVET_AD0082_TMRL_CONFIG
   bool      m_tmrl;
 #endif
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  bool      m_tmNoninterToolsEnableFlag;
+#endif
+#if JVET_AG0058_EIP
+  bool      m_eip;
+#endif
 #if JVET_AD0085_MPM_SORTING
   bool      m_mpmSorting;
 #endif
@@ -480,6 +507,9 @@ protected:
 #endif
 #if JVET_AD0188_CCP_MERGE
   bool      m_ccpMerge;
+#endif
+#if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
+  bool      m_ddCcpFusion;
 #endif
 #if ENABLE_OBMC
   bool      m_OBMC;
@@ -527,8 +557,16 @@ protected:
   unsigned  m_IBCHashSearchMaxCand;
   unsigned  m_IBCHashSearchRange4SmallBlk;
   unsigned  m_IBCFastMethod;
+#if JVET_AF0057
+  bool      m_dmvrEncSelect;
+  int       m_dmvrEncSelectBaseQpTh;
+  bool      m_dmvrEncSelectDisableHighestTemporalLayer;
+#endif
 #if JVET_AA0061_IBC_MBVD
   bool      m_ibcMbvd;
+#if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+  bool      m_ibcMbvdAdSearch;
+#endif
 #endif
 #if JVET_AC0112_IBC_CIIP
   bool     m_ibcCiip;
@@ -538,6 +576,19 @@ protected:
 #endif
 #if JVET_AC0112_IBC_LIC
   bool      m_ibcLic;
+#endif
+#if JVET_AE0159_FIBC
+  bool      m_ibcFilter;
+#endif
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  bool      m_ibcBiPred;
+#endif
+#if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
+  bool      m_ibcNonAdjCand;
+#endif
+#if JVET_AG0136_INTRA_TMP_LIC
+  bool      m_itmpLicExtension;
+  bool      m_itmpLicMode;
 #endif
 
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
@@ -564,6 +615,16 @@ protected:
 #endif
 #if JVET_AC0071_DBV
   bool m_intraDBV; ///< Direct Block Vector
+#endif
+#if JVET_AE0059_INTER_CCCM
+  bool m_interCccm; ///< CCCM for inter prediction
+#endif
+#if JVET_AF0073_INTER_CCP_MERGE
+  bool m_interCcpMerge; ///< Cross-component prediction merge for inter prediction
+  int  m_interCcpMergeFastMode;
+#endif
+#if JVET_AE0100_BVGCCCM
+  bool m_bvgCccm; ///< Block vector guided CCCM
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   bool      m_BIF;                                            ///< bilateral filter
@@ -598,6 +659,9 @@ protected:
   unsigned  m_uiMaxCUWidth;                                   ///< max. CU width in pixel
   unsigned  m_uiMaxCUHeight;                                  ///< max. CU height in pixel
   unsigned m_log2MinCuSize;                                   ///< min. CU size log2
+#if JVET_AE0057_MTT_ET
+  bool m_useMttSkip;
+#endif
 
   bool      m_useFastLCTU;
   bool      m_usePbIntraFast;
@@ -641,6 +705,9 @@ protected:
   bool      m_bUseSAO;
 #if JVET_W0066_CCSAO
   bool      m_CCSAO;
+#endif
+#if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
+  bool      m_alfPrecision;
 #endif
   bool      m_bTestSAODisableAtPictureLevel;
   double    m_saoEncodingRate;                                ///< When >0 SAO early picture termination is enabled for luma and chroma
@@ -858,11 +925,18 @@ protected:
 
   uint32_t      m_log2ParallelMergeLevel;                         ///< Parallel merge estimation region
   uint32_t      m_maxNumMergeCand;                                ///< Max number of merge candidates
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+  uint32_t      m_maxNumOppositeLicMergeCand;                     ///< Max number of merge candidates with opposite LIC flag
+  uint32_t      m_maxNumAffineOppositeLicMergeCand;               ///< Max number of affine merge candidates with opposite LIC flag
+#endif
 #if JVET_X0049_ADAPT_DMVR
   uint32_t      m_maxNumBMMergeCand;                                ///< Max number of BM merge candidates
 #endif
   uint32_t      m_maxNumAffineMergeCand;                          ///< Max number of affine merge candidates
   uint32_t      m_maxNumGeoCand;
+#if JVET_AG0164_AFFINE_GPM
+  uint32_t      m_maxNumGpmAffCand;
+#endif
   uint32_t      m_maxNumIBCMergeCand;                             ///< Max number of IBC merge candidates
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
   uint32_t      m_maxNumMHPCand;
@@ -955,6 +1029,9 @@ protected:
 #if INTER_LIC
   bool        m_lic;
   bool        m_fastPicLevelLIC;
+#if JVET_AG0276_LIC_SLOPE_ADJUST
+  bool        m_licSlopeAdjust;
+#endif
 #endif
 
   double      m_scalingRatioHor;
@@ -975,6 +1052,19 @@ protected:
   double      m_scalingRatioVer2;
   double      m_scalingRatioHor3;
   double      m_scalingRatioVer3;
+#endif
+#if JVET_AG0116
+  bool        m_gopBasedRPREnabledFlag;
+  int         m_gopBasedRPRQPThreshold;
+  double      m_psnrThresholdRPR;
+  double      m_psnrThresholdRPR2;
+  double      m_psnrThresholdRPR3;
+  int         m_qpOffsetRPR;
+  int         m_qpOffsetRPR2;
+  int         m_qpOffsetRPR3;
+  int         m_qpOffsetChromaRPR;
+  int         m_qpOffsetChromaRPR2;
+  int         m_qpOffsetChromaRPR3;
 #endif
 #if JVET_AB0082
   int         m_upscaleFilterForDisplay;

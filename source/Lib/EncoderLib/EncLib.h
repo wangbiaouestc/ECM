@@ -45,6 +45,7 @@
 #if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
 #include "CommonLib/BilateralFilter.h"
 #endif
+#include "EncoderLib/EncTemporalFilter.h"
 
 #include "Utilities/VideoIOYuv.h"
 
@@ -169,13 +170,13 @@ private:
   int                       m_picIdInGOP;
 
   VPS*                      m_vps;
-
+  EncTemporalFilter         m_temporalFilter;
 public:
   SPS*                      getSPS( int spsId ) { return m_spsMap.getPS( spsId ); };
   APS**                     getApss() { return m_apss; }
   Ctx                       m_entropyCodingSyncContextState;      ///< leave in addition to vector for compatibility
   PLTBuf                    m_palettePredictorSyncState;
-#if JVET_AC0096
+#if JVET_AC0096 || JVET_AG0116
   int                       m_gopRprPpsId;
 #endif
 protected:
@@ -275,6 +276,8 @@ public:
 
   ParameterSetMap<APS>*  getApsMap() { return &m_apsMap; }
 
+  EncTemporalFilter&     getTemporalFilter()                    { return m_temporalFilter; }
+
   bool                   getPltEnc()                      const { return   m_doPlt; }
   void                   checkPltStats( Picture* pic );
 #if JVET_O0756_CALCULATE_HDRMETRICS
@@ -287,11 +290,13 @@ public:
   /// encode several number of pictures until end-of-sequence
   bool encodePrep( bool bEos,
                PelStorage* pcPicYuvOrg,
-               PelStorage* pcPicYuvTrueOrg,
-               PelStorage* pcPicYuvFilteredOrg,
                const InputColourSpaceConversion snrCSC, // used for SNR calculations. Picture in original colour space.
                std::list<PelUnitBuf*>& rcListPicYuvRecOut,
-               int& iNumEncoded );
+               int& iNumEncoded
+#if JVET_AG0116
+    , PelStorage** ppcPicYuvRPR
+#endif
+  );
 
   bool encode( const InputColourSpaceConversion snrCSC, // used for SNR calculations. Picture in original colour space.
                std::list<PelUnitBuf*>& rcListPicYuvRecOut,
@@ -299,8 +304,6 @@ public:
 
   bool encodePrep( bool bEos,
                PelStorage* pcPicYuvOrg,
-               PelStorage* pcPicYuvTrueOrg,
-               PelStorage* pcPicYuvFilteredOrg,
                const InputColourSpaceConversion snrCSC, // used for SNR calculations. Picture in original colour space.
                std::list<PelUnitBuf*>& rcListPicYuvRecOut,
                int& iNumEncoded, bool isTff );

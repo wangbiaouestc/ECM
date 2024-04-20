@@ -388,6 +388,11 @@ void TBinEncoder<BinProbModel>::encodeBin( unsigned bin, unsigned ctxId )
   }
   rcProbModel.update( bin );
   BinEncoderBase::m_BinStore.addBin( bin, ctxId );
+
+#if JVET_AG0117_CABAC_SPATIAL_TUNING
+  m_binBuffer.addBin(bin, ctxId);
+#endif
+
 }
 
 template <class BinProbModel>

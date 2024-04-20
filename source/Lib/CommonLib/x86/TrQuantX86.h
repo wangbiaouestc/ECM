@@ -343,189 +343,7 @@ void TrQuant::fastInverseTransform_SIMD( const TCoeff *coeff, TCoeff *block, int
 }
 #endif
 
-#if ENABLE_SIMD_SIGN_PREDICTION
-template< X86_VEXT vext >
-uint32_t computeSAD_SIMD( const Pel* ref, const Pel* cur, const int size )
-{
-  uint32_t dist = 0;
-
-  if( vext >= AVX2 && ( size & 15 ) == 0 )
-  {
-#ifdef USE_AVX2
-    // Do for width that multiple of 16
-    __m256i vzero = _mm256_setzero_si256();
-    __m256i vsum16 = vzero;
-
-    for( int i = 0; i < size; i += 16 )
-    {
-      __m256i vsrc1 = _mm256_lddqu_si256( ( __m256i* )( &ref[i] ) );
-      __m256i vsrc2 = _mm256_lddqu_si256( ( __m256i* )( &cur[i] ) );
-      vsum16 = _mm256_add_epi16( vsum16, _mm256_abs_epi16( _mm256_sub_epi16( vsrc1, vsrc2 ) ) );
-    }
-    __m256i vsum32 = _mm256_add_epi32( _mm256_unpacklo_epi16( vsum16, vzero ), _mm256_unpackhi_epi16( vsum16, vzero ) );
-
-    vsum32 = _mm256_hadd_epi32( vsum32, vzero );
-    vsum32 = _mm256_hadd_epi32( vsum32, vzero );
-    dist = _mm_cvtsi128_si32( _mm256_castsi256_si128( vsum32 ) ) + _mm_cvtsi128_si32( _mm256_castsi256_si128( _mm256_permute2x128_si256( vsum32, vsum32, 0x11 ) ) );
-#endif
-  }
-  else if( ( size & 7 ) == 0 )
-  {
-    // Do with step of 8
-    __m128i vzero = _mm_setzero_si128();
-    __m128i vsum16 = vzero;
-
-    for( int i = 0; i < size; i += 8 )
-    {
-      __m128i vsrc1 = _mm_loadu_si128( ( const __m128i* )( &ref[i] ) );
-      __m128i vsrc2 = _mm_lddqu_si128( ( const __m128i* )( &cur[i] ) );
-      vsum16 = _mm_add_epi16( vsum16, _mm_abs_epi16( _mm_sub_epi16( vsrc1, vsrc2 ) ) );
-    }
-    __m128i vsum32 = _mm_add_epi32( _mm_unpacklo_epi16( vsum16, vzero ), _mm_unpackhi_epi16( vsum16, vzero ) );
-
-    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
-    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
-    dist = _mm_cvtsi128_si32( vsum32 );
-  }
-  else
-  {
-    __m128i vzero = _mm_setzero_si128();
-    __m128i vsum16 = vzero;
-
-    CHECK( ( size & 3 ) != 0, "Not divisible by 4: " << size );
-
-    for( int i = 0; i < size; i += 4 )
-    {
-      __m128i vsrc1 = _mm_loadl_epi64( ( const __m128i* )&ref[i] );
-      __m128i vsrc2 = _mm_loadl_epi64( ( const __m128i* )&cur[i] );
-      vsum16 = _mm_add_epi16( vsum16, _mm_abs_epi16( _mm_sub_epi16( vsrc1, vsrc2 ) ) );
-    }
-    __m128i vsum32 = _mm_add_epi32( _mm_unpacklo_epi16( vsum16, vzero ), _mm_unpackhi_epi16( vsum16, vzero ) );
-
-    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0x4e));   // 01001110
-    vsum32 = _mm_add_epi32(vsum32, _mm_shuffle_epi32(vsum32, 0xb1));   // 10110001
-    dist = _mm_cvtsi128_si32( vsum32 );
-  }
-  return dist;
-}
-#endif
-#if JVET_Y0141_SIGN_PRED_IMPROVE
-
-template< X86_VEXT vext >
-uint32_t computeHypSampleInt8_SIMD(const int dequant, const int8_t* templateNormalizedBuf, Pel* templ, const uint32_t uiWidth, const uint32_t uiHeight)
-{
-  const __m128i vzeros32 = _mm_setzero_si128();
-  const __m128i voffset32 = _mm_set1_epi32(SIGN_PRED_OFFSET);
-  const __m128i vmask32 = _mm_set_epi32(-1, -1, -1, 0);
-  __m128i vdequant = _mm_set1_epi32(dequant);
-  __m128i vsum = _mm_setzero_si128();
-  __m128i vnorm;
-
-  for (uint32_t i = 0; i < uiHeight; i += 4)
-  {
-    //vnorm = _mm_cvtepi8_epi32(_mm_loadu_si32(&templateNormalizedBuf[i]));
-    vnorm = _mm_cvtepi8_epi32(_mm_cvtsi32_si128(*(unsigned int const*)&templateNormalizedBuf[i]));
-    vnorm = _mm_srai_epi32(_mm_add_epi32(_mm_mullo_epi32(vnorm, vdequant), voffset32), SIGN_PRED_SHIFT);
-    vsum = _mm_add_epi32(vsum, _mm_abs_epi32(vnorm));
-    vnorm = _mm_packs_epi32(vnorm, vzeros32);
-    _mm_storel_epi64((__m128i *)&templ[i], vnorm);
-  }
-
-  templateNormalizedBuf += (uiHeight - 1);
-  templ += (uiHeight - 1);
-
-  //vnorm = _mm_cvtepi8_epi32(_mm_loadu_si32(templateNormalizedBuf));
-  vnorm = _mm_cvtepi8_epi32(_mm_cvtsi32_si128(*(unsigned int const*)templateNormalizedBuf));
-  vnorm = _mm_srai_epi32(_mm_add_epi32(_mm_mullo_epi32(vnorm, vdequant), voffset32), SIGN_PRED_SHIFT);
-  __m128i vabs = _mm_and_si128(_mm_abs_epi32(vnorm), vmask32);
-  vsum = _mm_add_epi32(vsum, vabs);
-  vnorm = _mm_packs_epi32(vnorm, vzeros32);
-  _mm_storel_epi64((__m128i *)templ, vnorm);
-
-  for (uint32_t i = 4; i < uiWidth; i += 4)
-  {
-    //vnorm = _mm_cvtepi8_epi32(_mm_loadu_si32(&templateNormalizedBuf[i]));
-    vnorm = _mm_cvtepi8_epi32(_mm_cvtsi32_si128(*(unsigned int const*)&templateNormalizedBuf[i]));
-    vnorm = _mm_srai_epi32(_mm_add_epi32(_mm_mullo_epi32(vnorm, vdequant), voffset32), SIGN_PRED_SHIFT);
-    vsum = _mm_add_epi32(vsum, _mm_abs_epi32(vnorm));
-    vnorm = _mm_packs_epi32(vnorm, vzeros32);
-    _mm_storel_epi64((__m128i *)&templ[i], vnorm);
-  }
-
-  vsum = _mm_hadd_epi32(vsum, vzeros32);
-  vsum = _mm_hadd_epi32(vsum, vzeros32);
-  // uint32_t energy = _mm_cvtsi128_si32(vsum);
-
-  //  return energy;
-  return 0;
-}
-
-template< X86_VEXT vext >
-void computeSynSample_SIMD(const Pel* templ, Pel* resiBuf, const uint32_t uiWidth, const uint32_t uiHeight, const bool signModifyTo)
-{
- 
-  const __m128i vscale0 = _mm_set1_epi16(-2);
-  const __m128i vscale1 = _mm_set1_epi16(2);
-  const __m128i vmask16 = _mm_set_epi16(-1, -1, -1, -1, -1, -1, -1, 0);
-  __m128i vtemp, vdst;
-
-  if (signModifyTo)
-  {
-    for (uint32_t i = 0; i < uiHeight; i += 4)
-    {
-      vtemp = _mm_loadl_epi64((const __m128i*)(&templ[i]));
-      vdst = _mm_loadl_epi64((const __m128i*)(&resiBuf[i]));
-      vdst = _mm_add_epi16(vdst, _mm_mullo_epi16(vtemp, vscale0));
-      _mm_storel_epi64((__m128i *)&resiBuf[i], vdst);
-    }
-
-    templ += (uiHeight - 1);
-    resiBuf += (uiHeight - 1);
-
-    vtemp = _mm_loadl_epi64((const __m128i*)templ);
-    vdst = _mm_loadl_epi64((const __m128i*)resiBuf);
-    vtemp = _mm_and_si128(_mm_mullo_epi16(vtemp, vscale0), vmask16);
-    vdst = _mm_add_epi16(vdst, vtemp);
-    _mm_storel_epi64((__m128i *)resiBuf, vdst);
-
-    for (uint32_t i = 4; i < uiWidth; i += 4)
-    {
-      vtemp = _mm_loadl_epi64((const __m128i*)(&templ[i]));
-      vdst = _mm_loadl_epi64((const __m128i*)(&resiBuf[i]));
-      vdst = _mm_add_epi16(vdst, _mm_mullo_epi16(vtemp, vscale0));
-      _mm_storel_epi64((__m128i *)&resiBuf[i], vdst);
-      }
-  }
-  else
-  {
-    for (uint32_t i = 0; i < uiHeight; i += 4)
-    {
-      vtemp = _mm_loadl_epi64((const __m128i*)(&templ[i]));
-      vdst = _mm_loadl_epi64((const __m128i*)(&resiBuf[i]));
-      vdst = _mm_add_epi16(vdst, _mm_mullo_epi16(vtemp, vscale1));
-      _mm_storel_epi64((__m128i *)&resiBuf[i], vdst);
-    }
-
-    templ += (uiHeight - 1);
-    resiBuf += (uiHeight - 1);
-
-    vtemp = _mm_loadl_epi64((const __m128i*)templ);
-    vdst = _mm_loadl_epi64((const __m128i*)resiBuf);
-    vtemp = _mm_and_si128(_mm_mullo_epi16(vtemp, vscale1), vmask16);
-    vdst = _mm_add_epi16(vdst, vtemp);
-    _mm_storel_epi64((__m128i *)resiBuf, vdst);
-
-    for (uint32_t i = 4; i < uiWidth; i += 4)
-    {
-      vtemp = _mm_loadl_epi64((const __m128i*)(&templ[i]));
-      vdst = _mm_loadl_epi64((const __m128i*)(&resiBuf[i]));
-      vdst = _mm_add_epi16(vdst, _mm_mullo_epi16(vtemp, vscale1));
-      _mm_storel_epi64((__m128i *)&resiBuf[i], vdst);
-    }
-  }
-}
-#endif
-#if INTRA_TRANS_ENC_OPT 
+#if INTRA_TRANS_ENC_OPT
 template< X86_VEXT vext >
 void forwardLfnst_SIMD(TCoeff* src, TCoeff*& dst, const int8_t*& trMat, const int trSize, const int zeroOutSize)
 {
@@ -652,6 +470,24 @@ void computeFwdNspt_SIMD( int* src, int* dst, const uint32_t mode, const uint32_
   {
     trMat = g_nspt16x8[ mode ][ nsptIdx ][ 0 ];
   }
+#if JVET_AE0086_LARGE_NSPT
+  else if( width == 4 && height == 32 )
+  {
+    trMat = g_nspt4x32[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 32 && height == 4 )
+  {
+    trMat = g_nspt32x4[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 8 && height == 32 )
+  {
+    trMat = g_nspt8x32[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 32 && height == 8 )
+  {
+    trMat = g_nspt32x8[ mode ][ nsptIdx ][ 0 ];
+  }
+#endif
 
   int shift = shift_1st + shift_2nd - 7;
   int rnd = 1 << ( shift - 1 );
@@ -737,6 +573,24 @@ void TrQuant::computeInvNspt( int* src, int* dst, const uint32_t mode, const uin
   {
     trMat = g_nspt16x8[ mode ][ nsptIdx ][ 0 ];
   }
+#if JVET_AE0086_LARGE_NSPT
+  else if( width == 4 && height == 32 )
+  {
+    trMat = g_nspt4x32[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 32 && height == 4 )
+  {
+    trMat = g_nspt32x4[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 8 && height == 32 )
+  {
+    trMat = g_nspt8x32[ mode ][ nsptIdx ][ 0 ];
+  }
+  else if( width == 32 && height == 8 )
+  {
+    trMat = g_nspt32x8[ mode ][ nsptIdx ][ 0 ];
+  }
+#endif
 
   int shift = shift_1st + shift_2nd - 7;
   int rnd = 1 << ( shift - 1 );
@@ -781,17 +635,10 @@ void TrQuant::computeInvNspt( int* src, int* dst, const uint32_t mode, const uin
   }
 }
 #endif
-#if ENABLE_SIMD_SIGN_PREDICTION || TRANSFORM_SIMD_OPT
+#if TRANSFORM_SIMD_OPT
 template <X86_VEXT vext>
 void TrQuant::_initTrQuantX86()
 {
-#if ENABLE_SIMD_SIGN_PREDICTION
-  m_computeSAD = computeSAD_SIMD<vext>;
-#if JVET_Y0141_SIGN_PRED_IMPROVE
-  m_computeHypSampleInt8 = computeHypSampleInt8_SIMD<vext>;
-  m_computeSynSample = computeSynSample_SIMD<vext>;
-#endif
-#endif
 #if INTRA_TRANS_ENC_OPT 
   m_fwdLfnst = forwardLfnst_SIMD<vext>;
   m_invLfnst = inverseLfnst_SIMD<vext>;
