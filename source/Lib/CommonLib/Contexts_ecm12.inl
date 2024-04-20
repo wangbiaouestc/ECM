@@ -1335,12 +1335,10 @@ const CtxSet ContextSetCfg::LicDelta = ContextSetCfg::addCtxSet
   {  DWE, DWE, },
   {  DWO, DWO, },
   {  DWO, DWO, },
-  {  119, 119, },
-  {  119, 119, },
-  {  119, 119, },
-  {  119, 119, },
-  {  119, 119, },
-  {  119, 119, }
+  {  DWO, DWO, },
+  {  DWO, DWO, },
+  {  DWO, DWO, },
+  {  DWO, DWO, },
   });
 #endif
 
