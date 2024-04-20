@@ -2602,7 +2602,7 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   for (int i = 0; i < (int) m_sMaxMTTHierarchyDepthByTid.size(); i++)
   {
     CHECK(i >= MAX_TLAYER, "Index exceeds MAX_TLAYER");
-    m_maxMTTHierarchyDepthByTid[i] = std::stoul(m_sMaxMTTHierarchyDepthByTid.substr(i, 1));
+    m_maxMTTHierarchyDepthByTid[i] = (unsigned int)std::stoul(m_sMaxMTTHierarchyDepthByTid.substr(i, 1));
   }
 
   for (int i = (int) m_sMaxMTTHierarchyDepthByTid.size(); i < MAX_TLAYER; i++)
