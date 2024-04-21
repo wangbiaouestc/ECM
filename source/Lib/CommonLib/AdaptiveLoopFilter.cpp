@@ -406,8 +406,6 @@ void AdaptiveLoopFilter::applyCcAlfFilter(CodingStructure &cs, ComponentID compI
   PelUnitBuf tmpYuvResi = m_tempBufResi.getBuf(UnitArea(CHROMA_400, Area(cs.area.blocks[COMPONENT_Y])));
 #endif
 
-  int ctuIdx = 0;
-
   const int chromaScaleX = getComponentScaleX( compID, m_chromaFormat );
   const int chromaScaleY = getComponentScaleY( compID, m_chromaFormat );
 
@@ -529,7 +527,6 @@ void AdaptiveLoopFilter::applyCcAlfFilter(CodingStructure &cs, ComponentID compI
 #endif
         }
       }
-      ctuIdx++;
     }
   }
 }

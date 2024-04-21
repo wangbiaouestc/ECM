@@ -2216,7 +2216,7 @@ void CodingStructure::rebindPicBufs()
   }
   if( pcv->isEncoder )
   {
-    if (!picture->M_BUFS(0, PIC_RESIDUAL).bufs.empty())
+    if (!picture->M_BUFS(0, PIC_ORG_RESI).bufs.empty())
     {
       m_orgr.create(area.chromaFormat, area.blocks[0], pcv->maxCUWidth);
     }

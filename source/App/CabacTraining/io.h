@@ -24,19 +24,22 @@ static std::array<ModelParameters, 3> readModelParameters( std::istream &in )
     in >> prms[k].adaptweight;
   }
   in >> prms[0].rateoffset[0] >> prms[0].rateoffset[1];
-
+#if JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE
+  in >> prms[1].rateoffset[0] >> prms[1].rateoffset[1];
+  in >> prms[2].rateoffset[0] >> prms[2].rateoffset[1];
+#else
   for( int k = 1; k < 3; ++k )
   {
     prms[k].rateoffset[0] = prms[0].rateoffset[0];
     prms[k].rateoffset[1] = prms[0].rateoffset[1];
   }
+#endif
   in.ignore( 1024, '\n' );
   return prms;
 }
 
 static DataDb addDataFrame( istream &in, DataDb &db )
 {
-  int64_t tot = 0;
   char c = ( char ) in.peek();
 
   while( in&&c == 'c' )
@@ -89,7 +92,11 @@ static DataDb addDataFrame( istream &in, DataDb &db )
     DataFrame d;
     char slicetype;
     char reportslice;
-    while( c != 'c' && in >> d.poc >> slicetype >> d.qp >> d.switchBp >> d.report >> reportslice >> d.p0 >> d.p1 >> d.rate >> d.weight )
+    while( c != 'c' && in >> d.poc >> slicetype >> d.qp >> d.switchBp >> d.report >> reportslice >> d.p0 >> d.p1 >> d.rate >> d.weight
+#if JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE
+            >> d.drate0>>d.drate1
+#endif
+           )
     { 
       // loop frames
       switch( slicetype )
@@ -131,7 +138,6 @@ static DataDb addDataFrame( istream &in, DataDb &db )
         std::string s;
         in >> s;
         d.bins.resize( s.size() );
-        tot += s.size();
         for( int k = 0; k < ( int ) s.size(); ++k )
         {
           d.bins[k] = (s[k] == '1');

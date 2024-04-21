@@ -3195,10 +3195,6 @@ private:
   bool                        m_picColFromL0Flag2nd;                                    //!< syntax element collocated_from_l0_flag
   uint32_t                    m_colRefIdx2nd;
 #endif
-#if JVET_AG0098_AMVP_WITH_SBTMVP
-  uint8_t                     m_amvpSbTmvpNumOffset;
-  uint8_t                     m_amvpSbTmvpNumDir;
-#endif
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
   uint32_t                    m_costForARMC;                                            //!< Cost for diversity criterion
 #endif

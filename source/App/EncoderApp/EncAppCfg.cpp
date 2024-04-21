@@ -4119,8 +4119,14 @@ bool EncAppCfg::xCheckParameter()
     m_maxNumAffineMergeCand = m_sbTmvpEnableFlag ? 1 : 0;
     if (m_PROF) msg(WARNING, "PROF is forcefully disabled when Affine is off \n");
     m_PROF = false;
+#if JVET_AG0276_NLIC
+    if (m_affAltLM) msg(WARNING, "Affine AltLM is forcefully disabled when Affine is off \n");
+    m_affAltLM = false;
+#endif
 #if JVET_AG0276_LIC_FLAG_SIGNALING
     m_maxNumAffineOppositeLicMergeCand = 0;
+    if (m_mergeAffOppositeLic) msg(WARNING, "MergeAffOppositeLic is forcefully disabled when Affine is off \n");
+    m_mergeAffOppositeLic = false;
 #endif
   }
 #if MULTI_PASS_DMVR

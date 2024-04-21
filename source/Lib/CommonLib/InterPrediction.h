@@ -1660,7 +1660,7 @@ public:
 #else
       int& scale = cu.altLMParaUnit.scale[compID];
       int& offset = cu.altLMParaUnit.offset[compID];
-      cntShift = (dimShift << 1); CHECK(!cntShift, "cntShift == 0");
+      int cntShift = (dimShift << 1); CHECK(!cntShift, "cntShift == 0");
 #endif
       const int cropShift = std::max(0, bitDepth - precShift + cntShift - 15);
       const int xzOffset = (xx >> m_LICRegShift);

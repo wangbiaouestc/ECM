@@ -8272,7 +8272,6 @@ void IntraPrediction::ibcCiipBlending(Pel *pDst, int strideDst, const Pel *pSrc0
 #if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
 int IntraPrediction::deriveDimdIntraTmpModePred(const CodingUnit cu, CPelBuf predBuf)
 {
-  int sigcnt = 0;
   const Pel* pPred = predBuf.buf;
   const int iStride = predBuf.stride;
   int height = predBuf.height;
@@ -8281,7 +8280,7 @@ int IntraPrediction::deriveDimdIntraTmpModePred(const CodingUnit cu, CPelBuf pre
   int piHistogramClean[NUM_LUMA_MODE] = { 0 };
 
   pPred = pPred + iStride + 1;
-  sigcnt += buildHistogram(pPred, iStride, height - 2, width - 2, piHistogramClean, 0, width - 2, height - 2);
+  buildHistogram(pPred, iStride, height - 2, width - 2, piHistogramClean, 0, width - 2, height - 2);
 
   int firstAmp = 0, curAmp = 0;
   int firstMode = 0, curMode = 0;
@@ -13164,6 +13163,7 @@ int IntraPrediction::xCalTMPFusionNumber(const int maxNum, const int numIdx
   int offset       = maxNum * numIdx;
 #if JVET_AG0136_INTRA_TMP_LIC
   const static_vector<uint64_t, MTMP_NUM>& mtmpCostList = useMR ? m_mtmpCostListUseMR : m_mtmpCostList;
+  CHECK(offset >= mtmpCostList.size(), "Wrong offset for mtmpCostList");
   const int threshold = numIdx ? int(mtmpCostList[offset] * 1.2) : int(mtmpCostList[offset] * 2);
 #else
   int threshold    = numIdx ? int(m_mtmpCostList[offset] * 1.2) : int(m_mtmpCostList[offset] * 2);
@@ -13399,7 +13399,6 @@ void IntraPrediction::xTMPFusionCalcParams(CodingUnit *cu, CompArea area, CccmMo
       ptrOffsetsFusionUseMR[i] = ClipPel(rightShift(ptrLicInd[1] * refPointTemplate[i][refPosY * picStride + refPosX], ptrLicInd[0]) + ptrLicInd[2], cu->cs->slice->clpRng(COMPONENT_Y));
     }
   }
-  Pel arrayTemp[TMP_FUSION_NUM][(MAX_CU_SIZE + TMP_TEMPLATE_SIZE) * (MAX_CU_SIZE + TMP_TEMPLATE_SIZE)];
   if (useMR)
   {
     for (int i = 0; i < foundCandiNum; i++)
@@ -13878,7 +13877,6 @@ void IntraPrediction::xTMPFusionApplyModel(PelBuf &piPred, unsigned int uiBlkWid
   memset( samples, 0, sizeof( Pel ) * TMP_FUSION_PARAMS);
 
 #if JVET_AG0136_INTRA_TMP_LIC
-  Pel arrayTemp[TMP_FUSION_NUM][MAX_CU_SIZE * MAX_CU_SIZE];
   if (useMR)
   {
     const Pel* const ptrOffsetsFusionUseMR = m_memOffsetsFusionUseMR[cu->tmpIdx - 3];
@@ -14327,7 +14325,6 @@ bool IntraPrediction::generateTMPrediction(Pel *piPred, unsigned int uiStride, i
 #endif
     Pel *refTarget[TMP_FUSION_NUM];
 #if JVET_AG0136_INTRA_TMP_LIC
-    Pel arrayTemp[TMP_FUSION_NUM][MAX_CU_SIZE * MAX_CU_SIZE];
     if (useMR)
     {
       for (int i = 0; i < tmpFusionNum; i++)
@@ -15277,7 +15274,7 @@ void IntraPrediction::xGlmApplyModelOffset(const PredictionUnit &pu, const Compo
 
 void IntraPrediction::xCccmApplyModelOffset(const PredictionUnit &pu, const ComponentID compId,
                                             CccmModel& cccmModel, int modelId, int modelThr,
-                                            PelBuf &piPred, int lumaOffset, int chromaOffset[], int type, int refSizeX, int refSizeY)
+                                            PelBuf &piPred, int lumaOffset, int chromaOffset[2], int type, int refSizeX, int refSizeY)
 {
   const ClpRng &clpRng(pu.cu->cs->slice->clpRng(compId));
   Pel* samples = m_samples;
@@ -23102,8 +23099,8 @@ void IntraPrediction::getNeiEipCands(const PredictionUnit& pu, static_vector<Eip
   if (!slice.isIntra() && compId == COMPONENT_Y)
   {
     const Picture* const pColPic = slice.getRefPic(RefPicList(slice.isInterB() ? 1 - slice.getColFromL0Flag() : 0), slice.getColRefIdx()); 
-
-    if(pColPic)
+    bool isRefScaled = pColPic->isRefScaled(slice.getPPS());
+    if(pColPic && !isRefScaled)
     {
       const PreCalcValues& pcv = *cs.pcv;
       bool c0Avail;
@@ -23275,8 +23272,9 @@ void IntraPrediction::getNeiEipCands(const PredictionUnit& pu, static_vector<Eip
   if (!slice.isIntra() && compId == COMPONENT_Y)
   {
     const Picture* const pColPic = slice.getRefPic(RefPicList(slice.isInterB() ? 1 - slice.getColFromL0Flag() : 0), slice.getColRefIdx()); 
+    bool isRefScaled = pColPic->isRefScaled(slice.getPPS());
 
-    if(pColPic)
+    if (pColPic && !isRefScaled)
     {
       const PreCalcValues& pcv = *cs.pcv;
 

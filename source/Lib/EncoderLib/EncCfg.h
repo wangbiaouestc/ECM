@@ -1653,18 +1653,13 @@ public:
   bool      getAML()                                   const { return m_AML; }
 #if JVET_AG0276_NLIC
   void      setAltLM(bool b)                                 { m_altLM = b; }
-  bool      getAltLM()                                 const { return m_altLM; }
   void      setAffAltLM(bool b)                              { m_affAltLM = b; }
-  bool      getAffAltLM()                              const { return m_affAltLM; }
 #endif
 #endif
 #if JVET_AG0276_LIC_FLAG_SIGNALING
   void      setMergeOppositeLic( bool b )                    { m_mergeOppositeLic = b; }
-  bool      setMergeOppositeLic()                      const { return m_mergeOppositeLic; }
   void      setMergeTMOppositeLic( bool b )                  { m_mergeTMOppositeLic = b; }
-  bool      setMergeTMOppositeLic()                    const { return m_mergeTMOppositeLic; }
   void      setMergeAffOppositeLic( bool b )                 { m_mergeAffOppositeLic = b; }
-  bool      setMergeAffOppositeLic()                   const { return m_mergeAffOppositeLic; }
 #endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   void      setArmcRefinedMotion(bool b)                     { m_armcRefinedMotion = b; }

@@ -105,6 +105,9 @@ Slice::Slice()
 , m_pcPicHeader                   ( NULL )
 , m_colFromL0Flag                 ( true )
 , m_colRefIdx                     ( 0 )
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+, m_amvpSbTmvpAmvrEnabledFlag     (false)
+#endif
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
 , m_costForARMC                   ( MAX_UINT )
 #endif
@@ -3724,6 +3727,7 @@ SPS::SPS()
 #endif
 #if JVET_AG0136_INTRA_TMP_LIC
   , m_itmpLicExtension        ( false )
+  , m_itmpLicMode             ( false )
 #endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
  , m_DMVDMode                 ( false )

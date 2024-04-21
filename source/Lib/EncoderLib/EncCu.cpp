@@ -3867,6 +3867,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #if JVET_AG0276_LIC_FLAG_SIGNALING
   MergeCtx tmMrgCtxOppositeLic;
   tmMrgCtxOppositeLic.numValidMergeCand = 0;
+#if JVET_X0049_ADAPT_DMVR || JVET_Z0102_NO_ARMC_FOR_ZERO_CAND
+  tmMrgCtxOppositeLic.numCandToTestEnc = 0;
+#endif
 #endif
 #if JVET_X0141_CIIP_TIMD_TM
   MergeCtx ciipTmMrgCtx;
@@ -5296,7 +5299,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #else
         m_pcInterSearch->adjustAffineMergeCandidates(pu, affineMergeCtx);
 #if JVET_AG0276_LIC_FLAG_SIGNALING
-        if (hasOppolicAff && pu.cs->sps->getUseAffMergeOppositeLic())
+        if (hasOppositelicAff && pu.cs->sps->getUseAffMergeOppositeLic())
         {
           m_pcInterSearch->adjustAffineMergeCandidates(pu, affineMergeCtxOppositeLic);
         }
@@ -5312,13 +5315,13 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
           m_pcInterSearch->adjustAffineMergeCandidates(pu, affineBMMergeCtx);
         }
 #endif
-#if JVET_AG0276_LIC_FLAG_SIGNALING
-        if (hasOppositelicAff && pu.cs->sps->getUseAffMergeOppositeLic())
-        {
-          affineMergeCtxOppositeLic.numValidMergeCand = slice.getPicHeader()->getMaxNumAffineOppositeLicMergeCand();
-          affineMergeCtxOppositeLic.maxNumMergeCand = slice.getPicHeader()->getMaxNumAffineOppositeLicMergeCand();
-        }
+      }
 #endif
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+      if (hasOppositelicAff && pu.cs->sps->getUseAffMergeOppositeLic())
+      {
+        affineMergeCtxOppositeLic.numValidMergeCand = slice.getPicHeader()->getMaxNumAffineOppositeLicMergeCand();
+        affineMergeCtxOppositeLic.maxNumMergeCand = slice.getPicHeader()->getMaxNumAffineOppositeLicMergeCand();
       }
 #endif
 #if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
@@ -5977,7 +5980,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #if JVET_AG0276_NLIC
             if ((validNumOppositeLic + cntOppositeLic) < affineMergeCtxOppositeLic.maxNumMergeCand && !affineMergeCtxOppositeLic.altLMFlag[uiAffMergeCand])
 #else
-            if ((validNumOppoLic + cntOppoLic) < affineMergeCtxOppoLic.maxNumMergeCand)
+            if ((validNumOppositeLic + cntOppositeLic) < affineMergeCtxOppositeLic.maxNumMergeCand)
 #endif
             {
               index = validNumOppositeLic + cntOppositeLic;
@@ -19966,7 +19969,10 @@ void EncCu::xCheckRDCostIBCMode(CodingStructure *&tempCS, CodingStructure *&best
 #endif
           DTRACE_MODE_COST(*tempCS, m_pcRdCost->getLambda());
           xCheckBestMode(tempCS, bestCS, partitioner, encTestMode);
-
+          if (m_bestModeUpdated)
+          {
+            xCalDebCost(*bestCS, partitioner);
+          }
         }
 
       } // bValid
@@ -20721,6 +20727,10 @@ bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bes
   }
   else
   {
+    if (m_bestModeUpdated && bestCS->cost != MAX_DOUBLE)
+    {
+      xCalDebCost(*bestCS, partitioner);
+    }
     return false;
   }
 
@@ -20770,12 +20780,7 @@ bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bes
 
   if ( !CU::hasSubCUNonZeroMVd( cu ) && !CU::hasSubCUNonZeroAffineMVd( cu ) )
   {
-    if (m_modeCtrl->useModeResult(encTestModeBase, tempCS, partitioner))
-    {
-      std::swap(tempCS, bestCS);
-      // store temp best CI for next CU coding
-      m_CurrCtx->best = m_CABACEstimator->getCtx();
-    }
+    xCheckBestMode(tempCS, bestCS, partitioner, encTestModeBase);
     if ( affineAmvrEanbledFlag )
     {
       tempCS->initStructData( encTestMode.qp );
@@ -20783,6 +20788,10 @@ bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bes
     }
     else
     {
+      if (m_bestModeUpdated && bestCS->cost != MAX_DOUBLE)
+      {
+        xCalDebCost(*bestCS, partitioner);
+      }
       return false;
     }
   }
@@ -22498,6 +22507,7 @@ void EncCu::xCheckRDCostInterMultiHyp2Nx2N(CodingStructure *&tempCS, CodingStruc
       return; // only check necessary 2Nx2N Inter in fast deltaqp mode
     }
   }
+  m_bestModeUpdated = tempCS->useDbCost = bestCS->useDbCost = false;
 
   MEResultVec mhResults;
   const auto RDCostComp = [](const MEResult &x, const MEResult &y) { return x.cost < y.cost; };
@@ -22825,6 +22835,10 @@ void EncCu::xCheckRDCostInterMultiHyp2Nx2N(CodingStructure *&tempCS, CodingStruc
 #endif
 #endif
   }
+  if (m_bestModeUpdated)
+  {
+    xCalDebCost(*bestCS, partitioner);
+  }
 }
 #endif
 #if ENABLE_OBMC
@@ -22873,6 +22887,8 @@ void EncCu::xCheckRDCostInterWoOBMC(CodingStructure *&tempCS, CodingStructure *&
     return;
   }
 
+  m_bestModeUpdated = tempCS->useDbCost = bestCS->useDbCost = false;
+
   const Distortion uiSADOBMCOff = m_pcRdCost->getDistPart(tempCS->getOrgBuf(cu->Y()), m_pPredBufWoOBMC[wIdx][hIdx].Y(),
     sps.getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, DF_SAD_FULL_NBIT);
   const Distortion uiSADOBMCOn = m_pcRdCost->getDistPart(tempCS->getOrgBuf(cu->Y()), CSWoOBMC->getPredBuf(cu->Y()),
@@ -22900,6 +22916,10 @@ void EncCu::xCheckRDCostInterWoOBMC(CodingStructure *&tempCS, CodingStructure *&
   cu->obmcFlag = false;
   //
   xEncodeInterResidual(tempCS, bestCS, partitioner, encTestMode, 0);
+  if (m_bestModeUpdated && bestCS->cost != MAX_DOUBLE)
+  {
+    xCalDebCost(*bestCS, partitioner);
+  }
 }
 #endif
 

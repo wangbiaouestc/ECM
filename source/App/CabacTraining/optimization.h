@@ -56,7 +56,6 @@ inline std::array<int,2> getBestGreedyDrate(const DataDb &db,const std::array<bo
   constexpr int kMaxRate = 12; // theoritcal is PROB_BITS=15
   int bestdrate[4] = { 7,7,7,7 };
   double bestc = std::numeric_limits<double>::max();
-  int loopDrate = 0;
 
   for( int drate00 = drateStartIdx; drate00 <= drateEndIdx; drate00++ )
   {
@@ -135,8 +134,6 @@ inline std::array<int,2> getBestGreedyDrate(const DataDb &db,const std::array<bo
             bestdrate[2] = drate10;
             bestdrate[3] = drate11;
           }
-
-          loopDrate++;
         }
       }
     }
