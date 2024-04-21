@@ -4921,7 +4921,7 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
       }
 #endif
 #if JVET_AA0058_GPM_ADAPTIVE_BLENDING
-#if TEST_3_4
+#if JVET_AH0314_ADAPTIVE_GPM_BLENDING_IMPROV
       int blkSizeSmall = pu.lwidth() < pu.lheight() ? pu.lwidth() : pu.lheight();
       if (blkSizeSmall < GPM_BLENDING_SIZE_THRESHOLD)
       {
@@ -5856,7 +5856,7 @@ uint64_t CABACWriter::geo_affFlag_est(const TempCtx& ctxStart, const int flag, i
 
 
 #if JVET_AA0058_GPM_ADAPTIVE_BLENDING
-#if TEST_3_4
+#if JVET_AH0314_ADAPTIVE_GPM_BLENDING_IMPROV
 uint64_t CABACWriter::geoBldFlagEst(const PredictionUnit& pu, const TempCtx& ctxStart, const int flag)
 #else
 uint64_t CABACWriter::geoBldFlagEst(const TempCtx& ctxStart, const int flag)
@@ -5864,7 +5864,7 @@ uint64_t CABACWriter::geoBldFlagEst(const TempCtx& ctxStart, const int flag)
 {
   getCtx() = ctxStart;
   resetBits();
-#if TEST_3_4
+#if JVET_AH0314_ADAPTIVE_GPM_BLENDING_IMPROV
   int blkSizeSmall = pu.lwidth() < pu.lheight() ? pu.lwidth() : pu.lheight();
   if (blkSizeSmall < GPM_BLENDING_SIZE_THRESHOLD)
   {
@@ -5879,13 +5879,13 @@ uint64_t CABACWriter::geoBldFlagEst(const TempCtx& ctxStart, const int flag)
   return getEstFracBits();
 }
 
-#if TEST_3_4
+#if JVET_AH0314_ADAPTIVE_GPM_BLENDING_IMPROV
 void CABACWriter::geoAdaptiveBlendingIdx(const PredictionUnit& pu, const int idx)
 #else
 void CABACWriter::geoAdaptiveBlendingIdx(const int idx)
 #endif
 {
-#if TEST_3_4
+#if JVET_AH0314_ADAPTIVE_GPM_BLENDING_IMPROV
   int blkSizeSmall = pu.lwidth() < pu.lheight() ? pu.lwidth() : pu.lheight();
   int offset = (blkSizeSmall < GPM_BLENDING_SIZE_THRESHOLD) ? 0 : 4;
   if (idx == 2)

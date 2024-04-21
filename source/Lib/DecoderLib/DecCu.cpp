@@ -1970,7 +1970,7 @@ void DecCu::xReconInter(CodingUnit &cu)
               cu.licOffset[list][comp] = 0;
             }
             else
-#if LIC_INHERIT_PARA
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
             if (!cu.licInheritPara)
 #endif
             {
@@ -1996,7 +1996,7 @@ void DecCu::xReconInter(CodingUnit &cu)
 #if INTER_LIC
             bool orgLicFlag = cu.licFlag;
             cu.licFlag = false;
-#if LIC_INHERIT_PARA
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
             bool orgLicInheritedFlag = cu.licInheritPara;
             cu.licInheritPara = false;
 #endif
@@ -2006,7 +2006,7 @@ void DecCu::xReconInter(CodingUnit &cu)
             m_pcInterPred->xPredWoRefinement(*cu.firstPU, predBeforeMCAdjBuffer);
 #if INTER_LIC
             cu.licFlag = orgLicFlag;
-#if LIC_INHERIT_PARA
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
             cu.licInheritPara = orgLicInheritedFlag;
 #endif
 #endif
@@ -2244,13 +2244,13 @@ void DecCu::xReconInter(CodingUnit &cu)
     }
     else
     {
-#if LIC_INHERIT_PARA
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
       cu.secAltLMParaUnit.resetAltLinearModel();
 #else
       cu.secAltLMParaUnit = cu.altLMParaUnit;
 #endif
     }
-#if LIC_INHERIT_PARA
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
     cu.altLMParaUnit.resetAltLinearModel();
 #endif
     if (CU::isSecLicParaNeeded(cu) && CU::isAllowSecLicPara(cu))
@@ -2790,8 +2790,8 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
 #endif
 #if INTER_LIC
             m_geoTmMrgCtx0.licFlags[pu.geoMergeIdx0] = false;
-#if LIC_INHERIT_PARA
-#if LIC_INHERIT_PARA
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
             m_geoTmMrgCtx0.copyLICParamFromCtx(pu.geoMergeIdx0, m_geoMrgCtx, pu.geoMergeIdx0);
             m_geoTmMrgCtx0.licFlags[pu.geoMergeIdx0] = m_geoTmMrgCtx0.licInheritPara[pu.geoMergeIdx0];
 #else
@@ -2856,8 +2856,8 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
 #endif
 #if INTER_LIC
             m_geoTmMrgCtx1.licFlags[pu.geoMergeIdx1] = false;
-#if LIC_INHERIT_PARA
-#if LIC_INHERIT_PARA
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
             m_geoTmMrgCtx1.copyLICParamFromCtx(pu.geoMergeIdx1, m_geoMrgCtx, pu.geoMergeIdx1);
             m_geoTmMrgCtx1.licFlags[pu.geoMergeIdx1] = m_geoTmMrgCtx1.licInheritPara[pu.geoMergeIdx1];
 #else
@@ -3076,7 +3076,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
 #endif
 #if INTER_LIC                                                   
                   affineMergeCtx.licFlags[cnt] = !affineRMVFCtxOppositeLic.licFlags[i];
-#if LIC_INHERIT_PARA
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
                   affineMergeCtx.licInheritPara[cnt] = false;
 #endif
 #endif
@@ -3117,7 +3117,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
 #endif
 #if INTER_LIC
             pu.cu->licFlag = affineMergeCtx.licFlags[pu.mergeIdx];
-#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG && JVET_AG0164_AFFINE_GPM
             affineMergeCtx.setLICParamToPu(pu, pu.mergeIdx, pu.cu->licFlag);
 #endif
 #endif
@@ -3358,7 +3358,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
 #endif
 #if INTER_LIC
           pu.cu->licFlag = affineMergeCtx.licFlags[pu.mergeIdx];
-#if LIC_INHERIT_PARA && JVET_AG0164_AFFINE_GPM
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG && JVET_AG0164_AFFINE_GPM
           affineMergeCtx.setLICParamToPu(pu, pu.mergeIdx, pu.cu->licFlag);
 #endif
 #endif
@@ -3866,7 +3866,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                       pu.cu->bcwIdx = mrgCtx.bcwIdx[candIdx];
 #if JVET_AD0213_LIC_IMP
                       pu.cu->licFlag = mrgCtx.licFlags[candIdx];
-#if LIC_INHERIT_PARA
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
                       mrgCtx.setLICParamToPu(pu, candIdx, mrgCtx.licInheritPara[candIdx]);
 #endif
 #endif
@@ -3952,7 +3952,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                       pu.cu->bcwIdx = mrgCtx.bcwIdx[candIdx];
 #if JVET_AD0213_LIC_IMP
                       pu.cu->licFlag = mrgCtx.licFlags[candIdx];
-#if LIC_INHERIT_PARA
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
                       mrgCtx.setLICParamToPu(pu, candIdx, mrgCtx.licInheritPara[candIdx]);
 #endif
 #endif
@@ -4076,7 +4076,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                   for (int i = 0; i < mrgCtx.numValidMergeCand; i++)
                   {
                     mrgCtx.licFlags[i] = !mrgCtx.licFlags[i];
-#if LIC_INHERIT_PARA
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
                     mrgCtx.licInheritPara[i] = false;
 #endif
                   }
@@ -4109,7 +4109,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                     for (int i = 0; i < mrgCtx.numValidMergeCand; i++)
                     {
                       mrgCtx.licFlags[i] = !mrgCtx.licFlags[i];
-#if LIC_INHERIT_PARA
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
                       mrgCtx.licInheritPara[i] = false;
 #endif
                     }
@@ -4157,7 +4157,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
 #endif
 #if INTER_LIC
                     mrgCtx.licFlags[ui] = false;
-#if LIC_INHERIT_PARA
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
                     mrgCtx.setDefaultLICParamToCtx(ui);
 #endif
 #endif
@@ -4227,13 +4227,13 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                   for (int i = 0; i < mrgCtx.numValidMergeCand; i++)
                   {
                     mrgCtx.licFlags[i] = !mrgCtx.licFlags[i];
-#if LIC_INHERIT_PARA
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
                     mrgCtx.licInheritPara[i] = false;
 #endif
                   }
                 }
 #endif
-#if JVET_AG0276_NLIC || LIC_INHERIT_PARA_ARMC_STAGE
+#if JVET_AG0276_NLIC || JVET_AH0314_LIC_INHERITANCE_FOR_MRG
                 if (pu.tmMergeFlag || pu.ciipFlag)
                 {
 #endif
@@ -4258,12 +4258,12 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
 #endif
                     AltLMMergeCtx altLMMrgCtx;
                     PU::getAltMergeCandidates(pu, altLMMrgCtx);
-#if LIC_INHERIT_PARA_ARMC_STAGE
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
                     AltLMMergeCtx mrgCtxInherited;
                     PU::getAltMergeCandidates(pu, mrgCtxInherited, true);
 #endif
                     m_pcInterPred->adjustMergeCandidates(pu, mrgCtx
-#if LIC_INHERIT_PARA_ARMC_STAGE
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
                                                        , &altLMMrgCtx
                                                        , &mrgCtxInherited
 #else
@@ -4277,7 +4277,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                     AltLMMergeCtx altLMBRMrgCtx;
                     PU::getAltBRMergeCandidates(pu, altLMBRMrgCtx);
                     m_pcInterPred->adjustMergeCandidates(pu, mrgCtx
-#if LIC_INHERIT_PARA_ARMC_STAGE
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
                                                        , &altLMBRMrgCtx
                                                        , nullptr
 #else
@@ -4289,7 +4289,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                   }
                   else
                   {
-#if LIC_INHERIT_PARA_ARMC_STAGE
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
 #if JVET_AG0276_LIC_FLAG_SIGNALING
                     if (!PU::isOppositeLIC(pu))
 #else
@@ -4316,12 +4316,12 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
 #else
                     m_pcInterPred->adjustMergeCandidatesInOneCandidateGroup(pu, mrgCtx, pu.mergeIdx + 1, pu.mergeIdx);
 #endif
-#if LIC_INHERIT_PARA_ARMC_STAGE
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
                     }
 #endif
                   }
                 }
-#elif LIC_INHERIT_PARA_ARMC_STAGE
+#elif JVET_AH0314_LIC_INHERITANCE_FOR_MRG
                 }
                 else
                 {
@@ -4375,7 +4375,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                   for (int i = 0; i < mrgCtx.numValidMergeCand; i++)
                   {
                     mrgCtx.licFlags[i] = !mrgCtx.licFlags[i];
-#if LIC_INHERIT_PARA
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
                     mrgCtx.licInheritPara[i] = false;
 #endif
                   }
@@ -4402,7 +4402,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
 #endif
 #if INTER_LIC
                   mrgCtx.licFlags[ui] = false;
-#if LIC_INHERIT_PARA
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
                   mrgCtx.setDefaultLICParamToCtx(ui);
 #endif
 #endif
@@ -4472,7 +4472,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                   for (int i = 0; i < mrgCtx.numValidMergeCand; i++)
                   {
                     mrgCtx.licFlags[i] = !mrgCtx.licFlags[i];
-#if LIC_INHERIT_PARA
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
                     mrgCtx.licInheritPara[i] = false;
 #endif
                   }

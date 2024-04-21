@@ -249,7 +249,7 @@ public:
   uint64_t    geo_affFlag_est(const TempCtx& ctxStart, const int flag, int ctxOffset);
 #endif
 #if JVET_AA0058_GPM_ADAPTIVE_BLENDING
-#if TEST_3_4
+#if JVET_AH0314_ADAPTIVE_GPM_BLENDING_IMPROV
   uint64_t    geoBldFlagEst             (const PredictionUnit& pu, const TempCtx& ctxStart, const int flag);
   void        geoAdaptiveBlendingIdx    (const PredictionUnit& pu, const int idx);
 #else

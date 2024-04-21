@@ -1153,9 +1153,9 @@ public:
 #if JVET_Z0102_NO_ARMC_FOR_ZERO_CAND
   void adjustMergeCandidates(PredictionUnit& pu, MergeCtx& smvpMergeCandCtx, int numRetrievedMergeCand);
 #endif
-#if JVET_AG0276_NLIC || LIC_INHERIT_PARA_ARMC_STAGE
+#if JVET_AG0276_NLIC || JVET_AH0314_LIC_INHERITANCE_FOR_MRG
   void adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMergeCandCtx
-#if LIC_INHERIT_PARA_ARMC_STAGE
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
                            , AltLMMergeCtx* pMrgCtxAlt
                            , AltLMMergeCtx* pMrgCtxInherit
 #else
@@ -1172,7 +1172,7 @@ public:
 #if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
   Distortion  deriveBcwBlending( PredictionUnit& pu, bool bUniDir[2] );
   Distortion  deriveBcwBlendingBiDir( PredictionUnit& pu, MvField mvfld0[2], MvField mvfld1[2] 
-#if LIC_INHERIT_PARA
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
                                     , bool isLicA, bool isLicB
                                     , int scaleA[2], int scaleB[2]
                                     , int offsetA[2], int offsetB[2]
@@ -1186,9 +1186,9 @@ public:
   void    updateCandInTwoCandidateGroups(MergeCtx& mrgCtx, uint32_t* rdCandList, int numCandInCategory, MergeCtx mrgCtx2);
 #endif
 #endif
-#if JVET_AG0276_NLIC || LIC_INHERIT_PARA_ARMC_STAGE
+#if JVET_AG0276_NLIC || JVET_AH0314_LIC_INHERITANCE_FOR_MRG
   void    updateCandList(uint32_t uiCand, uint32_t uiCandGrp, Distortion uiCost, uint32_t uiMrgCandNum, uint32_t* rdCandList, uint32_t* rdCandGrpList, Distortion* candCostList);
-#if LIC_INHERIT_PARA_ARMC_STAGE
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
   void    updateCandInMultiCandidateGroups(uint32_t* rdCandList, uint32_t* rdCandGrpList, int numCandInCategory, MergeCtx& mrgCtx, const MergeCtx** mrgCtx2toN = nullptr, int N = 1);
 #else
   void    updateCandInThreeCandidateGroups(MergeCtx& mrgCtx, MergeCtx mrgCtx2, MergeCtx mrgCtx3, uint32_t* rdCandList, uint32_t* rdCandGrpList, int numCandInCategory);
@@ -1816,7 +1816,7 @@ public:
   Distortion getMinCost            () { return m_minCost; }
   Mv         getFinalMv            () { return m_mvFinal; }
   static int getDeltaMean          (const PelBuf& bufCur, const PelBuf& bufRef, const int rowSubShift, const int bd);
-#if LIC_INHERIT_PARA
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
   void       inverseCurTemplateLIC (int shift, int scale, int offset);
 #endif
 

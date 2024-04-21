@@ -51,17 +51,6 @@
 #include <cassert>
 #include <cstdint>
 
-#define TEST_3_4                                          1
-#define EE2_TEST_3_5                                      1 // 1 for Test-3.5a 
-                                                            // 2 for Test 3.5b
-                                                            // 3 for Test 3.5c
-#if EE2_TEST_3_5
-#define LIC_INHERIT_PARA                                  1
-#define LIC_INHERIT_PARA_SWAP_STAGE                       ((EE2_TEST_3_5) == 2 && (LIC_INHERIT_PARA))
-#define LIC_INHERIT_PARA_ARMC_STAGE                       ((EE2_TEST_3_5) == 3 && (LIC_INHERIT_PARA))
-#define BUGFIX_LIC_INHERIT_PARA                           1
-#endif
-
 
 #define BASE_ENCODER                                      1
 #define BASE_NORMATIVE                                    1
@@ -269,6 +258,7 @@
 #define JVET_AG0276_LIC_FLAG_SIGNALING                    1 // JVET-AG0276: signal LIC flag for merge mode
 #define JVET_AG0276_LIC_BDOF_BDMVR                        1 // JVET-AG0276: LIC BDOF and BDMVR
 #define JVET_AG0276_LIC_SLOPE_ADJUST                      1 // JVET-AG0276: LIC with slope adjustment
+#define JVET_AH0314_LIC_INHERITANCE_FOR_MRG               1 // JVET-AH0314: LIC model inheritance for merge modes (regular merge and GPM)
 #endif
 #define NON_ADJACENT_MRG_CAND                             1 // Add non-adjacent merge candidates
 #define MULTI_HYP_PRED                                    1 // Multiple hypothesis prediction
@@ -338,6 +328,7 @@
 #define JVET_AG0164_AFFINE_GPM                            1 // JVET-AG0164: GPM with affine prediction
 #define JVET_AG0098_AMVP_WITH_SBTMVP                      1 // JVET-AG0098: AMVP with SbTMVP mode
 #define JVET_AG0067_DMVR_EXTENSIONS                       1 // JVET-AG0067: On DMVR Extensions
+#define JVET_AH0314_ADAPTIVE_GPM_BLENDING_IMPROV          1 // JVET-AH0314: Adaptive GPM blending
 
 // Inter template matching tools
 #define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction

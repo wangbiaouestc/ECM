@@ -6026,7 +6026,7 @@ void CABACReader::geo_merge_idx1(PredictionUnit& pu)
 #if JVET_AA0058_GPM_ADAPTIVE_BLENDING
 void CABACReader::geoAdaptiveBlendingIdx( PredictionUnit& pu )
 {
-#if TEST_3_4
+#if JVET_AH0314_ADAPTIVE_GPM_BLENDING_IMPROV
   int blkSizeSmall = pu.lwidth() < pu.lheight() ? pu.lwidth() : pu.lheight();
   int offset = (blkSizeSmall < GPM_BLENDING_SIZE_THRESHOLD) ? 0 : 4;
   int bin0 = m_BinDecoder.decodeBin(Ctx::GeoBldFlag(0 + offset));
@@ -6097,7 +6097,7 @@ void CABACReader::geoAdaptiveBlendingIdx( PredictionUnit& pu )
     }
   }
 #endif
-#if TEST_3_4
+#if JVET_AH0314_ADAPTIVE_GPM_BLENDING_IMPROV
   if (blkSizeSmall >= GPM_BLENDING_SIZE_THRESHOLD)
   {
     pu.geoBldIdx++;

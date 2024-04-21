@@ -314,22 +314,22 @@ namespace PU
     , bool enableTh4Gpm = false
 #endif
   );
-#if JVET_AG0276_NLIC || LIC_INHERIT_PARA_ARMC_STAGE
+#if JVET_AG0276_NLIC || JVET_AH0314_LIC_INHERITANCE_FOR_MRG
   void     getAltMergeCandidates    (const PredictionUnit &pu, AltLMMergeCtx& cMrgCtx
-#if LIC_INHERIT_PARA_ARMC_STAGE
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
                                    , bool isLicInheritCand = false
 #endif
   );
 #if JVET_AG0276_LIC_FLAG_SIGNALING
   void     getAltBRMergeCandidates  (const PredictionUnit &pu, AltLMMergeCtx& cMrgCtx);
   bool     isValidAltMergeCandidate (const PredictionUnit &pu, bool isBRCand = false
-#if LIC_INHERIT_PARA_ARMC_STAGE
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
                                    , bool isLicInheritCand = false
 #endif
   );
 #else
   bool     isValidAltMergeCandidate (const PredictionUnit &pu
-#if LIC_INHERIT_PARA_ARMC_STAGE
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
                                    , bool isLicInheritCand = false
 #endif
   );
@@ -746,7 +746,7 @@ namespace PU
 
 #if JVET_AG0164_AFFINE_GPM
   void getGeoAffMergeCandidates(PredictionUnit& pu, AffineMergeCtx& gpmAffMrgCtx, InterPrediction* pcInterPred
-#if !LIC_INHERIT_PARA
+#if !JVET_AH0314_LIC_INHERITANCE_FOR_MRG
                               , AffineMergeCtx* affMergeCtx = NULL
 #endif
   );

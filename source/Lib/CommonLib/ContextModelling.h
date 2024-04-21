@@ -775,7 +775,7 @@ public:
   uint8_t       bcwIdx[NUM_MERGE_CANDS];
 #if INTER_LIC
   bool          licFlags[NUM_MERGE_CANDS];
-#if LIC_INHERIT_PARA
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
   bool          licInheritPara[NUM_MERGE_CANDS];
   int16_t       licScale[NUM_MERGE_CANDS][2][3];
   int16_t       licOffset[NUM_MERGE_CANDS][2][3];
@@ -810,7 +810,7 @@ public:
   uint8_t       bcwIdx            [ MRG_MAX_NUM_CANDS      ];
 #if INTER_LIC
   bool          licFlags          [ MRG_MAX_NUM_CANDS      ];
-#if LIC_INHERIT_PARA
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
   bool          licInheritPara[MRG_MAX_NUM_CANDS];
   int16_t       licScale[MRG_MAX_NUM_CANDS][2][3];
   int16_t       licOffset[MRG_MAX_NUM_CANDS][2][3];
@@ -879,7 +879,7 @@ public:
   void saveMergeInfo(PredictionUnit& puTmp, PredictionUnit pu);
 #endif
   void setMergeInfo( PredictionUnit& pu, int candIdx );
-#if LIC_INHERIT_PARA
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
   template <typename MergeCtxType> static void setLICParamToPu         (const MergeCtxType& src,       PredictionUnit& pu, int candIdx, bool hasLIC);
   template <typename MergeCtxType> static void loadLICParamFromPu      (      MergeCtxType& dst, const PredictionUnit* pu, int candIdx, bool allowAltModel, bool hasLIC);
   template <typename MergeCtxType> static void loadLICParamFromMotInfo (      MergeCtxType& dst, const MotionInfo*     mi, int candIdx, bool allowAltModel, bool hasLIC);
@@ -902,7 +902,7 @@ public:
 #endif
 #if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
   int8_t getDir( Slice* slice, int candIdx, MvField* mvField 
-#if LIC_INHERIT_PARA
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
                , int* scale, int* offset
 #endif
   );
@@ -973,7 +973,7 @@ public:
 #endif
 #if INTER_LIC
   bool          licFlags[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
-#if LIC_INHERIT_PARA
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
   bool          licInheritPara[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
   int16_t       licScale[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE][2][3];
   int16_t       licOffset[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE][2][3];
@@ -1003,7 +1003,7 @@ public:
 #if JVET_AG0276_NLIC
   bool          xCheckSimilarMotion1(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1, bool isAltLM = false) const;
 #endif
-#if LIC_INHERIT_PARA
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
   void          setLICParamToPu         (      PredictionUnit& pu, int candIdx, bool hasLIC);
   void          setLICParamToPu         (      PredictionUnit& pu, int candIdx, bool hasLIC) const;
   void          loadLICParamFromPu      (const PredictionUnit* pu, int candIdx, bool allowAltModel, bool hasLIC);
@@ -1028,7 +1028,7 @@ public:
   EAffineModel  affineType[AFFINE_MRG_MAX_NUM_CANDS];
 #if INTER_LIC
   bool          licFlags[AFFINE_MRG_MAX_NUM_CANDS];
-#if LIC_INHERIT_PARA
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
   bool          licInheritPara[AFFINE_MRG_MAX_NUM_CANDS];
   int16_t       licScale[AFFINE_MRG_MAX_NUM_CANDS][2][3];
   int16_t       licOffset[AFFINE_MRG_MAX_NUM_CANDS][2][3];
@@ -1046,7 +1046,7 @@ public:
 #if JVET_AB0112_AFFINE_DMVR
   bool          xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1) const;
 #endif
-#if LIC_INHERIT_PARA
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
   void          setLICParamToPu         (      PredictionUnit& pu, int candIdx, bool hasLIC);
   void          loadLICParamFromPu      (const PredictionUnit* pu, int candIdx, bool allowAltModel, bool hasLIC);
   void          loadLICParamFromMotInfo (const MotionInfo*     mi, int candIdx, bool allowAltModel, bool hasLIC);
@@ -1062,13 +1062,13 @@ public:
 
 #if JVET_AG0276_NLIC
 class AltLMMergeCtx
-#if LIC_INHERIT_PARA_ARMC_STAGE
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
 : public MergeCtx
 #endif
 {
 public:
   AltLMInterUnit altLMParaNeighbours[ALT_MRG_MAX_NUM_CANDS];
-#if !LIC_INHERIT_PARA_ARMC_STAGE
+#if !JVET_AH0314_LIC_INHERITANCE_FOR_MRG
   MvField        mvFieldNeighbours[ALT_MRG_MAX_NUM_CANDS << 1];
   uint8_t        bcwIdx[ALT_MRG_MAX_NUM_CANDS];
   unsigned char  interDirNeighbours[ALT_MRG_MAX_NUM_CANDS];

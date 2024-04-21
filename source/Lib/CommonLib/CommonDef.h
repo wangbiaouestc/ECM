@@ -1164,7 +1164,7 @@ static const int ADAPTIVE_SUB_GROUP_SIZE_MMVD_AFF = AF_MMVD_MAX_REFINE_NUM;
 #endif
 
 #if JVET_AG0276_NLIC
-#if LIC_INHERIT_PARA_ARMC_STAGE
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
 static const int CFG_ALT_MRG_MAX_NUM_CANDS = 16;
 #if (JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM) || JVET_Z0075_IBC_HMVP_ENLARGE
 static const int ALT_MRG_MAX_NUM_CANDS = std::min(CFG_ALT_MRG_MAX_NUM_CANDS, NUM_MERGE_CANDS);
@@ -1176,11 +1176,8 @@ static const int ALT_MRG_MAX_NUM_CANDS     = 16;
 #endif
 static const int ALT_AFF_MRG_MAX_NUM_CANDS = 6;
 #endif
-#if LIC_INHERIT_PARA_ARMC_STAGE
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
 static const int LIC_INHERIT_ALT_MRG_MAX_NUM_CANDS = 10;
-#endif
-#if LIC_INHERIT_PARA_SWAP_STAGE
-static const int LIC_INHERIT_PARA_SWAP_STAGE_MAX_SIZE = 256;
 #endif
 #if JVET_AG0276_LIC_SLOPE_ADJUST
 static const int LIC_SLOPE_MAX_NUM_DELTA  = 2;
@@ -1437,7 +1434,7 @@ static const int TOTAL_GEO_BLENDING_NUM =                           6; // GPM 0~
 #define GET_SGPM_BLD_IDX(a, b)                                                                                           \
   (std::min(a, b) <= 4 ? 1 : std::min(a, b) <= 8 ? 2 : std::min(a, b) <= 16 ? 3 : std::min(a, b) <= 32 ? 4 : 5)
 #endif
-#if TEST_3_4
+#if JVET_AH0314_ADAPTIVE_GPM_BLENDING_IMPROV
 static const int GPM_BLENDING_SIZE_THRESHOLD = 32;
 #endif
 #if ENABLE_OBMC

@@ -468,7 +468,7 @@ const CtxSet ContextSetCfg::GeoMmvdStepMvpIdx = ContextSetCfg::addCtxSet({
 
 const CtxSet ContextSetCfg::GeoBldFlag = ContextSetCfg::addCtxSet({
 // ctx 67 to 70
-#if TEST_3_4
+#if JVET_AH0314_ADAPTIVE_GPM_BLENDING_IMPROV
 // ctx 67 to 70
  { 58, 22, 52, 21, 58, 22, 52, 21 },
  { 60, 51, 59, 44, 60, 51, 59, 44,},
