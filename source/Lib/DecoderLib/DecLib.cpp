@@ -3033,6 +3033,12 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
     //---------------
     pcSlice->setRefPOCList();
 #endif
+#if JVET_AH0069_CMVP
+    if (pcSlice->getPicHeader()->getEnableTMVPFlag())
+    {
+      pcSlice->setRefRefIdxList();
+    }
+#endif
 #if JVET_AG0145_ADAPTIVE_CLIPPING
     int clipDeltaShift = 0;
     if (pcSlice->getAdaptiveClipQuant())
