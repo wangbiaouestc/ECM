@@ -1330,7 +1330,11 @@ void CABACWriter::extend_ref_line(const PredictionUnit& pu)
   {
     return;
   }
+#if JVET_AH0065_RELAX_LINE_BUFFER
+  bool isFirstLineOfCtu = cu.block(COMPONENT_Y).y == 0;
+#else
   bool isFirstLineOfCtu = (((cu.block(COMPONENT_Y).y)&((cu.cs->sps)->getMaxCUWidth() - 1)) == 0);
+#endif
   if (isFirstLineOfCtu)
   {
     return;
@@ -1413,7 +1417,11 @@ void CABACWriter::extend_ref_line(const CodingUnit& cu)
 
   for (int k = 0; k < numBlocks; k++)
   {
+#if JVET_AH0065_RELAX_LINE_BUFFER
+    bool isFirstLineOfCtu = cu.block(COMPONENT_Y).y == 0;
+#else
     bool isFirstLineOfCtu = (((cu.block(COMPONENT_Y).y)&((cu.cs->sps)->getMaxCUWidth() - 1)) == 0);
+#endif
     if (isFirstLineOfCtu)
     {
       return;

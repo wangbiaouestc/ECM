@@ -28031,7 +28031,11 @@ bool CU::allowTmrl(const CodingUnit& cu)
     bReorder = false;
   }
 
+#if JVET_AH0065_RELAX_LINE_BUFFER
+ bool isFirstLineOfCtu = cu.block(COMPONENT_Y).y == 0;
+#else
   bool isFirstLineOfCtu = (((cu.block(COMPONENT_Y).y) & ((cu.cs->sps)->getMaxCUWidth() - 1)) == 0);
+#endif
   if (isFirstLineOfCtu)
   {
     bReorder = false;
