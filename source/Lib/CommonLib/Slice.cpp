@@ -792,6 +792,43 @@ void Slice::setRefPOCList       ()
 #endif
 }
 
+#if JVET_AH0069_CMVP
+void Slice::setRefRefIdxList()
+{
+  memset(m_aiRefRefIdxList, -1, sizeof(int)*NUM_REF_PIC_LIST_01*MAX_NUM_REF*NUM_REF_PIC_LIST_01*(MAX_NUM_REF+1)*NUM_REF_PIC_LIST_01);
+  for (int iDir = 0; iDir < NUM_REF_PIC_LIST_01; iDir++)
+  {
+    for (int iNumRefIdx = 0; iNumRefIdx < m_aiNumRefIdx[iDir]; iNumRefIdx++)
+    {
+      const Picture* const refPic = getRefPic(RefPicList(iDir), iNumRefIdx);
+      const Slice* const refSlice = refPic->slices[0];
+      for (int iRefDir = 0; iRefDir < NUM_REF_PIC_LIST_01; iRefDir++)
+      {
+        for (int iNumRefRefIdx = 0; iNumRefRefIdx < refSlice->getNumRefIdx(RefPicList(iRefDir)) + (refSlice->getUseIBC() ? 1 : 0); iNumRefRefIdx++)
+        {
+          if (iNumRefRefIdx == refSlice->getNumRefIdx(RefPicList(iRefDir)))
+          {
+            iNumRefRefIdx = MAX_NUM_REF;
+          }
+          int refRefPOC = refSlice->getRefPOC(RefPicList(iRefDir), iNumRefRefIdx);
+          for (int iCurrDir = 0; iCurrDir < NUM_REF_PIC_LIST_01; iCurrDir++)
+          {
+            for (int iCurrRefIdx = 0; iCurrRefIdx < m_aiNumRefIdx[iCurrDir]; iCurrRefIdx++)
+            {
+              if (refRefPOC == getRefPOC(RefPicList(iCurrDir), iCurrRefIdx))
+              {
+                m_aiRefRefIdxList[iDir][iNumRefIdx][iRefDir][iNumRefRefIdx][iCurrDir] = iCurrRefIdx;
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+#endif
+
 void Slice::setList1IdxToList0Idx()
 {
   int idxL0, idxL1;
