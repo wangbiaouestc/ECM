@@ -9932,6 +9932,196 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
     {
       return;
     }
+
+#if JVET_AH0069_CMVP
+    if (slice.getPicHeader()->getEnableTMVPFlag())
+    {
+      const unsigned scale = 4 * std::max<int>(1, 4 * AMVP_DECIMATION_FACTOR / 4);
+      const unsigned mask = ~(scale - 1);
+      const Position basePos[5] = { pu.Y().center(), pu.Y().topLeft(), pu.Y().topRight(), pu.Y().bottomLeft(), pu.Y().bottomRight() };
+      const SubPic &curSubPic = pu.cs->pps->getSubPicFromPos(pu.lumaPos());
+      int checkNum = cnt;
+      for (int mergeIndex = 0; mergeIndex < checkNum && cnt < maxNumMergeCandMin1; mergeIndex++)
+      {
+        for (int list = 0; list < NUM_REF_PIC_LIST_01 && cnt < maxNumMergeCandMin1; list++)
+        {
+          if (!(mrgCtx.interDirNeighbours[mergeIndex]&(1<<list)))
+          {
+            continue;
+          }
+
+          MvField& mvField = mrgCtx.mvFieldNeighbours[(mergeIndex<<1)+list];
+          Mv cMv = mvField.mv;
+          cMv.changePrecision(MV_PRECISION_SIXTEENTH, MV_PRECISION_INT);
+          const Picture* const pColPic = slice.getRefPic(RefPicList(list), mvField.refIdx);
+
+          if (!pColPic || pColPic->isRefScaled(pu.cs->pps))
+          {
+            continue;
+          }
+
+          for (const auto& pos : basePos)
+          {
+            Position posCand(pos.x + cMv.getHor(), pos.y + cMv.getVer());
+            posCand.x = Clip3(0, (int)pColPic->getPicWidthInLumaSamples()-1, posCand.x);
+            posCand.y = Clip3(0, (int)pColPic->getPicHeightInLumaSamples()-1, posCand.y);
+            posCand.x = posCand.x & mask;
+            posCand.y = posCand.y & mask;
+
+            // Check the position of colocated block is within a subpicture
+            if (curSubPic.getTreatedAsPicFlag())
+            {
+              if (!curSubPic.isContainingPos(posCand))
+              {
+                continue;
+              }
+            }
+
+            const MotionInfo& miCascaded = pColPic->cs->getMotionInfo( posCand );
+            if (!miCascaded.isInter || (miCascaded.isIBCmot && miCascaded.rribcFlipType))
+            {
+              continue;
+            }
+            int interDir = 0;
+            int8_t chainedRefIdx[NUM_REF_PIC_LIST_01] = {-1, -1};
+            Mv chainedMv[NUM_REF_PIC_LIST_01];
+            chainedMv[REF_PIC_LIST_0].setZero();
+            chainedMv[REF_PIC_LIST_1].setZero();
+
+            const Slice *pColSlice = nullptr;
+            for( const auto s : pColPic->slices )
+            {
+              if( s->getIndependentSliceIdx() == miCascaded.sliceIdx )
+              {
+                pColSlice = s;
+                break;
+              }
+            }
+            CHECK( pColSlice == nullptr, "Slice segment not found" );
+
+            for (int colList = 0; colList < 2; colList++)
+            {
+              if (miCascaded.interDir&(1<<colList))
+              {
+                const int* refRefIdxList = slice.getRefRefIdx(RefPicList(list), mvField.refIdx, RefPicList(colList), miCascaded.refIdx[colList]);
+                int curList = -1;
+                int8_t curRefIdx = -1;
+                if (miCascaded.isIBCmot)
+                {
+                  if (chainedRefIdx[list] < 0)
+                  {
+                    curList = list;
+                    curRefIdx = mvField.refIdx;
+                  }
+                  else // BiPredictive IBC
+                  {
+                    int l = 1-list;
+                    curList = l;
+                    curRefIdx = refRefIdxList[l];
+                  }
+                }
+                else
+                {
+                  for (int l = 0; l < (slice.isInterB() ? 2 : 1) && curRefIdx < 0; l++)
+                  {
+                    if (interDir&(1<<l))
+                    {
+                      continue;
+                    }
+                    curList = l;
+                    curRefIdx = refRefIdxList[l];
+                  }
+                }
+                if (curRefIdx >= 0)
+                {
+                  CHECK(interDir&(1<<curList), "Already use list");
+                  interDir |= 1<<curList;
+                  chainedRefIdx[curList] = curRefIdx;
+                  chainedMv[curList] = mvField.mv + miCascaded.mv[colList];
+                  if (!slice.isInterB())
+                  {
+                    break;
+                  }
+                }
+              }
+            }
+            if (interDir == 0)
+            {
+              continue;
+            }
+
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+#if JVET_Y0128_NON_CTC
+            bool isValidAmMode = checkIsValidMergeMvCand(pu, chainedRefIdx);
+#else
+            bool isValidAmMode = checkIsValidMergeMvCand(cs, pu, curPoc, amvpPoc, miNeighbor.refIdx);
+#endif
+            if (isValidAmMode)
+            {
+#endif
+            mrgCtx.interDirNeighbours[cnt] = interDir;
+            mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(chainedMv[0], chainedRefIdx[0]);
+            if (slice.isInterB())
+            {
+              mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(chainedMv[1], chainedRefIdx[1]);
+#if MULTI_HYP_PRED
+              mrgCtx.addHypNeighbours[cnt].clear();
+#endif
+            }
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+            if (pu.amvpMergeModeFlag[0] || pu.amvpMergeModeFlag[1])
+            {
+              mrgCtx.interDirNeighbours[cnt] = pu.amvpMergeModeFlag[0] ? 1 : 2;
+              mrgCtx.mvFieldNeighbours[(cnt << 1) + (pu.amvpMergeModeFlag[0] ? 1 : 0)].setMvField(Mv(), -1);
+            }
+#endif
+            mrgCtx.useAltHpelIf      [cnt] = false;
+#if INTER_LIC
+            mrgCtx.licFlags          [cnt] = false;
+#endif
+            mrgCtx.bcwIdx            [cnt] = BCW_DEFAULT;
+#if JVET_AA0070_RRIBC
+            mrgCtx.rribcFlipTypes    [cnt] = 0;
+#endif
+#if JVET_AC0112_IBC_LIC
+            mrgCtx.ibcLicFlags       [cnt] = false;
+#endif
+#if JVET_AE0159_FIBC
+            mrgCtx.ibcFilterFlags    [cnt] = false;
+#endif
+
+#if NON_ADJACENT_MRG_CAND || TM_MRG || JVET_AE0046_BI_GPM
+            if( !mrgCtx.xCheckSimilarMotion(cnt
+#if TM_MRG || JVET_AE0046_BI_GPM
+                                    , mvdSimilarityThresh
+#endif
+            ) )
+#endif
+            {
+              if (mrgCandIdx == cnt)
+              {
+                return;
+              }
+              cnt++;
+              if (cnt == maxNumMergeCandMin1)
+              {
+                break;
+              }
+            }
+#if JVET_AD0213_LIC_IMP
+            else
+            {
+              mrgCtx.initMrgCand(cnt);
+            }
+#endif
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+            }
+#endif
+          }
+        }
+      }
+    }
+#endif
   }
 
 #if !JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC)
@@ -28488,7 +28678,11 @@ bool CU::allowTmrl(const CodingUnit& cu)
     bReorder = false;
   }
 
+#if JVET_AH0065_RELAX_LINE_BUFFER
+ bool isFirstLineOfCtu = cu.block(COMPONENT_Y).y == 0;
+#else
   bool isFirstLineOfCtu = (((cu.block(COMPONENT_Y).y) & ((cu.cs->sps)->getMaxCUWidth() - 1)) == 0);
+#endif
   if (isFirstLineOfCtu)
   {
     bReorder = false;

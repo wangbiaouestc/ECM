@@ -1443,6 +1443,8 @@ void TrQuant::xT( const TransformUnit &tu, const ComponentID &compID, const CPel
     }
   }
 
+  dstCoeff.fill( 0 );
+
   if( width > 1 && height > 1 ) // 2-D transform
   {
     const int      shift_1st              = ((floorLog2(width )) + bitDepth + TRANSFORM_MATRIX_SHIFT) - maxLog2TrDynamicRange + COM16_C806_TRANS_PREC;

@@ -13449,34 +13449,36 @@ void EncCu::xCheckRDCostMergeGeo2Nx2N(CodingStructure *&tempCS, CodingStructure 
 #endif
 
 #if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
-      {
-        int targetMergeIdx = pu.geoMergeIdx1;
+      int targetMergeIdx = pu.geoMergeIdx1;
 #if JVET_AG0164_AFFINE_GPM
-        bool isAffine      = pu.affineGPM[1];
+      bool isAffine      = pu.affineGPM[1];
 #endif
 #if JVET_Y0065_GPM_INTRA
 #if JVET_AG0164_AFFINE_GPM
-        if (targetMergeIdx >= GEO_MAX_ALL_INTER_UNI_CANDS)
+      if (targetMergeIdx >= GEO_MAX_ALL_INTER_UNI_CANDS)
 #else
-        if (targetMergeIdx >= GEO_MAX_NUM_UNI_CANDS)
+      if (targetMergeIdx >= GEO_MAX_NUM_UNI_CANDS)
 #endif
-        {
-          targetMergeIdx = pu.geoMergeIdx0;
+      {
+        targetMergeIdx = pu.geoMergeIdx0;
 #if JVET_AG0164_AFFINE_GPM
-          isAffine       = pu.affineGPM[0];
+        isAffine       = pu.affineGPM[0];
 #endif
-        }
-#endif
-#if JVET_AG0164_AFFINE_GPM
-        if (isAffine)
-        {
-          affMergeCtx.setAffMergeInfo(pu, targetMergeIdx);
-          pu.cu->affine = false;
-        }
-        else
-#endif
-        mergeCtxRegular.setMergeInfo(pu, targetMergeIdx);
       }
+#endif
+#if JVET_AG0164_AFFINE_GPM
+      if (isAffine)
+      {
+        affMergeCtx.setAffMergeInfo(pu, targetMergeIdx);
+        pu.cu->affine = false;
+      }
+      else
+      {
+#endif
+      mergeCtxRegular.setMergeInfo(pu, targetMergeIdx);
+#if JVET_AG0164_AFFINE_GPM
+      }
+#endif
 #endif
       PU::spanGeoMotionInfo(pu, mergeCtx, pu.geoSplitDir, pu.geoMergeIdx0, pu.geoMergeIdx1);
       tempCS->getPredBuf().copyFrom(geoCombinations[candidateIdx]);

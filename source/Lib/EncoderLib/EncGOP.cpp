@@ -2936,6 +2936,12 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
       {
         picHeader->setEnableTMVPFlag(0);
       }
+#if JVET_AH0069_CMVP
+      if (picHeader->getEnableTMVPFlag())
+      {
+        pcSlice->setRefRefIdxList();
+      }
+#endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
       if (picHeader->getEnableTMVPFlag())
       {
@@ -3855,6 +3861,7 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
         if (minPoc > 4)
         {
           pcSlice->setAmvpSbTmvpEnabledFlag(false);
+          pcSlice->setAmvpSbTmvpAmvrEnabledFlag(false);
         }
         else
         {

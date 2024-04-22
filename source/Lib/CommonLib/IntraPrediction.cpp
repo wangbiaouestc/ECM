@@ -4681,7 +4681,11 @@ void IntraPrediction::initIntraPatternChType(const CodingUnit &cu, const CompAre
   m_ipaParam.fetchRef2nd   = area.compID == COMPONENT_Y;
   m_ipaParam.fetchRef2nd  &= area.width * area.height >= SIZE_CONSTRAINT;
   m_ipaParam.fetchRef2nd  &= !(cu.dimd && cu.dimdBlending);
+#if JVET_AH0065_RELAX_LINE_BUFFER
+  m_ipaParam.fetchRef2nd  &= !(mrlIndex2D == MULTI_REF_LINE_IDX[MRL_NUM_REF_LINES - 1] && (cu.block(COMPONENT_Y).y <= MULTI_REF_LINE_IDX[MRL_NUM_REF_LINES - 1]));
+#else
   m_ipaParam.fetchRef2nd  &= !(mrlIndex2D == MULTI_REF_LINE_IDX[MRL_NUM_REF_LINES - 1] && ((cu.block(COMPONENT_Y).y) % ((cu.cs->sps)->getMaxCUWidth()) <= MULTI_REF_LINE_IDX[MRL_NUM_REF_LINES - 1]));
+#endif
   m_ipaParam.fetchRef2nd  &= !(mrlIndex2D == 0 && ((cu.block(COMPONENT_Y).y) % ((cu.cs->sps)->getMaxCUWidth()) == 0));
 #if JVET_AC0112_IBC_CIIP
   m_ipaParam.fetchRef2nd &= !cu.firstPU->ibcCiipFlag;
@@ -22326,7 +22330,11 @@ void IntraPrediction::initTmrlIntraParams(const PredictionUnit& pu, const CompAr
 void IntraPrediction::getTmrlSearchRange(const PredictionUnit& pu, int8_t* tmrlRefList, uint8_t* tmrlIntraList, uint8_t& sizeRef, uint8_t& sizeMode)
 {
   CodingUnit& cu = *pu.cu;
+#if JVET_AH0065_RELAX_LINE_BUFFER
+  int aboveLines = cu.block(COMPONENT_Y).y;
+#else
   int aboveLines = (cu.block(COMPONENT_Y).y) % ((cu.cs->sps)->getMaxCUWidth());
+#endif
   sizeRef = 0;
 
   for (; sizeRef < 5; sizeRef++)

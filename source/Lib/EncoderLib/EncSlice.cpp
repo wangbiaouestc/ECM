@@ -1668,6 +1668,7 @@ void EncSlice::compressSlice( Picture* pcPic, const bool bCompressEntireSlice, c
     if (minPoc > 4)
     {
       pcSlice->setAmvpSbTmvpEnabledFlag(false);
+      pcSlice->setAmvpSbTmvpAmvrEnabledFlag(false);
     }
     else
     {
