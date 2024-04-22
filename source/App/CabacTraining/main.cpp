@@ -20,11 +20,17 @@ int main( int argc, char **argv )
   bool        keepModel = false;
   std::string outfile;
   std::string inputFile = "";
+#if JVET_AH0176_LOW_DELAY_B_CTX
+  std::string sliceToTrain;
+#endif
   po::Options opts;
   // clang-format off
   opts.addOptions()
     ( "help", doHelp, false, "optimize cabac contexts. Usage:\ncat *.cabac_xxx | cabacTrain --output fileout.txt" )
     ( "keepModel", keepModel, false, "if no bin, keep old parameters instead of putting default parameters" )
+#if JVET_AH0176_LOW_DELAY_B_CTX
+    ("sliceToTrain", sliceToTrain, std::string("all"), "all or B/P/I/L")
+#endif
     ( "output", outfile, std::string( "cabac_prm.txt" ), "filename of the resulting parameters" )
     ( "input", inputFile, std::string( "" ), "filename of the input bins" )
     ;
@@ -49,6 +55,34 @@ int main( int argc, char **argv )
     return -1;
   }
 
+#if JVET_AH0176_LOW_DELAY_B_CTX
+  SliceType to_train = NUMBER_OF_SLICE_TYPES;
+  if (sliceToTrain == "B") 
+  {
+    to_train = B_SLICE;
+  }
+  else if (sliceToTrain == "P")
+  {
+    to_train = P_SLICE;
+  }
+  else if (sliceToTrain == "I") 
+  {
+    to_train = I_SLICE;
+  }
+  else if (sliceToTrain == "all") 
+  {
+    to_train = NUMBER_OF_SLICE_TYPES;
+  }
+  else if (sliceToTrain == "L") 
+  {
+    to_train = L_SLICE;
+  }
+  else 
+  {
+    std::cerr << "[ERROR] unknown slice to train" << endl;
+  }
+#endif
+
   DataDb db;
 
   if( inputFile != "" )
@@ -61,8 +95,13 @@ int main( int argc, char **argv )
     db = loadDataFrame();
   }
 
+#if JVET_AH0176_LOW_DELAY_B_CTX
+  std::vector<SliceType> toOpt = { B_SLICE, P_SLICE, I_SLICE, L_SLICE };
+  std::array<bool, kNbModels>    sliceActivation = {};
+#else
   std::vector<SliceType> toOpt = { B_SLICE, P_SLICE, I_SLICE };
   std::array<bool, 3>    sliceActivation = {};
+#endif
   if( db.ctxidx < 0 )
   {
     std::cout << "[ERROR] no context to train found" << std::endl;
@@ -77,7 +116,11 @@ int main( int argc, char **argv )
     hasBin = true;
   }
 
+#if JVET_AH0176_LOW_DELAY_B_CTX
+  Models modelsgreedy = db.modelsBPI;
+#else
   std::array<ModelParameters, 3> modelsgreedy = db.modelsBPI;
+#endif
   std::cout << "Before:\n";
   print( db.modelsBPI );
   std::cout << std::endl;
@@ -88,6 +131,10 @@ int main( int argc, char **argv )
       SliceType st = toOpt[k];
       if( sliceActivation[k] )
       {
+#if JVET_AH0176_LOW_DELAY_B_CTX
+        if (to_train == NUMBER_OF_SLICE_TYPES || k == to_train)
+        {
+#endif
         std::cout << "Optimized parameter slice type " << k << std::endl;
         modelsgreedy[(int)st] = getBestGreedy( db, st );
         db.modelsBPI[(int)st] = modelsgreedy[(int)st];
@@ -100,6 +147,9 @@ int main( int argc, char **argv )
         db.modelsBPI[k].rateoffset[1] = drate[1];
         modelsgreedy[k].rateoffset[0] = drate[0];
         modelsgreedy[k].rateoffset[1] = drate[1];
+#endif
+#if JVET_AH0176_LOW_DELAY_B_CTX
+        }
 #endif
       }
       else
@@ -143,7 +193,11 @@ int main( int argc, char **argv )
     else
     {
       std::cout << "Default model (no bin)" << std::endl;
+#if JVET_AH0176_LOW_DELAY_B_CTX
+      for (int k = 0; k < kNbModels; ++k)
+#else
       for( int k = 0; k < 3; ++k )
+#endif
       {
         modelsgreedy[k].initId = CNU;
         modelsgreedy[k].log2windowsize = DWS;
@@ -159,6 +213,31 @@ int main( int argc, char **argv )
   if( !outfile.empty() )
   {
     ofstream file( outfile, ios::binary );
+#if JVET_AH0176_LOW_DELAY_B_CTX
+    file << db.ctxidx << " A ";
+    for (int i = 0; i < kNbModels; ++i)
+    {
+      file << modelsgreedy[i].initId << ' ';
+    }
+    for (int i = 0; i < kNbModels; ++i) 
+    {
+      file << modelsgreedy[i].log2windowsize << ' ';
+    }
+    for (int i = 0; i < kNbModels; ++i)
+    {
+      file << modelsgreedy[i].adaptweight << ' ';
+    }
+#if JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE
+    const int nbRateOffset = kNbModels;
+#else
+    const int nbRateOffset = 1;
+#endif
+    for (int i = 0; i < nbRateOffset; ++i) 
+    {
+      file << modelsgreedy[i].rateoffset[0] << ' ' << modelsgreedy[i].rateoffset[1] << ' ';
+    }
+    file << std::endl;
+#else
     file << db.ctxidx << " A "
          << modelsgreedy[0].initId << ' '         << modelsgreedy[1].initId << ' '         << modelsgreedy[2].initId << ' '
          << modelsgreedy[0].log2windowsize << ' ' << modelsgreedy[1].log2windowsize << ' ' << modelsgreedy[2].log2windowsize << ' '
@@ -169,5 +248,6 @@ int main( int argc, char **argv )
          << ' ' << modelsgreedy[2].rateoffset[0] << ' ' << modelsgreedy[2].rateoffset[1]
 #endif
       << std::endl;
+#endif
   }
 }

@@ -65,6 +65,13 @@ void CABACWriter::initCtxModels( const Slice& slice )
     sliceType = encCABACTableIdx;
   }
 
+#if JVET_AH0176_LOW_DELAY_B_CTX
+  if (sliceType == B_SLICE && slice.getCheckLDC())
+  {
+    sliceType = L_SLICE;
+  }
+#endif
+
 #if JVET_AG0196_CABAC_RETRAIN
     slice.setCabacInitSliceType( sliceType );
 #endif
@@ -95,7 +102,18 @@ SliceType xGetCtxInitId( const Slice& slice, const BinEncIf& binEncoder, Ctx& ct
     {
       uint64_t  curCost           = 0;
       SliceType curSliceType      = aSliceTypeChoices[idx];
+#if JVET_AH0176_LOW_DELAY_B_CTX
+      if (curSliceType == B_SLICE && slice.getCheckLDC())
+      {
+        ctxTest.init(qp, (int)L_SLICE);
+      }
+      else
+      {
+        ctxTest.init(qp, (int)curSliceType);
+      }
+#else
       ctxTest.init(qp, (int)curSliceType);
+#endif
       for( int k = 0; k < Ctx::NumberOfContexts; k++ )
       {
         if( binEncoder.getNumBins(k) > 0 )

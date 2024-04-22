@@ -16,6 +16,11 @@ struct ModelParameters
   int rateoffset[2];
 };
 
+#if JVET_AH0176_LOW_DELAY_B_CTX
+constexpr int kNbModels = 4;
+using Models = std::array<ModelParameters, kNbModels>;
+#endif
+
 struct DataFrame
 {
   Bins bins;
@@ -47,7 +52,11 @@ using DataSequences = std::vector<DataSequence>;
 struct DataDb
 {
   int ctxidx = -1;
+#if JVET_AH0176_LOW_DELAY_B_CTX
+  Models modelsBPI;
+#else
   std::array<ModelParameters, 3> modelsBPI;
+#endif
   DataSequences v;
 };
 

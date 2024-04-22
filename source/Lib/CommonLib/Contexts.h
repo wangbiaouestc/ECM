@@ -1236,10 +1236,18 @@ public:
 
   void storeCtx( const Slice* slice, const Ctx& ctx )
   {
+#if JVET_AH0176_LOW_DELAY_B_CTX
+    SliceType s = slice->getSliceType();
+
+    if (s != I_SLICE)
+    {
+      int t = (s == P_SLICE ? 1 : 0);
+#else
     SliceType t = slice->getSliceType();
 
     if( t != I_SLICE )
     {
+#endif
       CtxStateArray* ctxStateArray = nullptr;
       std::pair<int, int> entry( slice->getTLayer(), slice->getSliceQp() );
 
@@ -1273,10 +1281,18 @@ public:
   bool loadCtx( const Slice* slice, Ctx& ctx )
 #endif
   {
+#if JVET_AH0176_LOW_DELAY_B_CTX
+    SliceType s = slice->getSliceType();
+
+    if (s != I_SLICE)
+    {
+      int t = (s == P_SLICE ? 1 : 0);
+#else
     SliceType t = slice->getSliceType();
 
     if( t != I_SLICE )
     {
+#endif
       std::pair<int, int> entry( slice->getTLayer(), slice->getSliceQp() );
 
       if( m_stateBuf[t].find( entry ) != m_stateBuf[t].end() )
