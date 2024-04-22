@@ -923,7 +923,11 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
         // this should always be true
         CHECK(!pu.Y().valid(), "PU is not valid");
 #if !JVET_AB0157_TMRL || JVET_AD0082_TMRL_CONFIG
+#if JVET_AH0065_RELAX_LINE_BUFFER
+        bool isFirstLineOfCtu = pu.block(COMPONENT_Y).y == 0;
+#else
         bool isFirstLineOfCtu     = (((pu.block(COMPONENT_Y).y) & ((pu.cs->sps)->getMaxCUWidth() - 1)) == 0);
+#endif
 #if JVET_Y0116_EXTENDED_MRL_LIST
         int  numOfPassesExtendRef = MRL_NUM_REF_LINES;
         if (!sps.getUseMRL() || isFirstLineOfCtu) 
@@ -935,9 +939,13 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
           bool checkLineOutsideCtu[MRL_NUM_REF_LINES - 1];
           for (int mrlIdx = 1; mrlIdx < MRL_NUM_REF_LINES; mrlIdx++)
           {
+#if JVET_AH0065_RELAX_LINE_BUFFER
+            bool isLineOutsideCtu = (cu.block(COMPONENT_Y).y <= MULTI_REF_LINE_IDX[mrlIdx]) ? true : false;
+#else
             bool isLineOutsideCtu =
               ((cu.block(COMPONENT_Y).y) % ((cu.cs->sps)->getMaxCUWidth()) <= MULTI_REF_LINE_IDX[mrlIdx]) ? true
-                                                                                                          : false;
+                                                                                                      : false;
+#endif
             checkLineOutsideCtu[mrlIdx-1] = isLineOutsideCtu;
           }
           if (checkLineOutsideCtu[0]) 
@@ -2329,6 +2337,10 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
       numNonISPModes++;
       if (lfnstIdx == 0 && !cu.mtsFlag)
       {
+#if JVET_AH0065_RELAX_LINE_BUFFER
+        bool isFirstLineOfCtu = pu.block(COMPONENT_Y).y == 0;
+        int  numOfPassesExtendRef = ((!sps.getUseMRL() || isFirstLineOfCtu) ? 1 : 3);
+#else
         bool isFirstLineOfCtu     = (((pu.block(COMPONENT_Y).y) & ((pu.cs->sps)->getMaxCUWidth() - 1)) == 0);
 #if JVET_Y0116_EXTENDED_MRL_LIST
         int  numOfPassesExtendRef = 3;
@@ -2360,6 +2372,7 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
         }
 #else
         int  numOfPassesExtendRef = ((!sps.getUseMRL() || isFirstLineOfCtu) ? 1 : MRL_NUM_REF_LINES);
+#endif
 #endif
         for (int mRefNum = 1; mRefNum < numOfPassesExtendRef; mRefNum++)
         {
