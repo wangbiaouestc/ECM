@@ -403,6 +403,7 @@
 #define JVET_AG0196_CABAC_RETRAIN                         1 // JVET-AG0196 5.1 bin dumper
 #define JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE             1 // JVET-AG0196 5.2: window offsets per slice type
 #define JVET_AG0117_CABAC_SPATIAL_TUNING                  1 // JVET-AG0117 5.3: spatial CABAC tuning
+#define JVET_AH0176_LOW_DELAY_B_CTX                       1 // JVET-AH0176 6.1: context initialization for B-slice
 
 // Loop filters
 #define ALF_IMPROVEMENT                                   1 // ALF improvement
@@ -967,7 +968,12 @@ enum SliceType
   B_SLICE               = 0,
   P_SLICE               = 1,
   I_SLICE               = 2,
+#if JVET_AH0176_LOW_DELAY_B_CTX
+  L_SLICE               = 3,
+  NUMBER_OF_SLICE_TYPES = 4
+#else
   NUMBER_OF_SLICE_TYPES = 3
+#endif
 };
 
 /// chroma formats (according to how the monochrome or the color planes are intended to be coded)

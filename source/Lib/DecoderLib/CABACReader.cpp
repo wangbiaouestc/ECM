@@ -87,6 +87,14 @@ void CABACReader::initCtxModels( Slice& slice )
       break;
     }
   }
+
+#if JVET_AH0176_LOW_DELAY_B_CTX
+  if (sliceType == B_SLICE && slice.getCheckLDC())
+  {
+    sliceType = L_SLICE;
+  }
+#endif
+
   m_BinDecoder.reset(qp, (int)sliceType);
 
 #if JVET_AG0196_CABAC_RETRAIN
