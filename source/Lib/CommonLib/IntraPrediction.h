@@ -272,6 +272,11 @@ protected:
   bool       bSrcBufFilled[NUM_EIP_SHAPE * NUM_EIP_BASE_RECOTYPE];
   bool       bDstBufFilled[NUM_EIP_BASE_RECOTYPE];
   int        numSamplesBuf[NUM_EIP_BASE_RECOTYPE];
+#if JVET_AH0086_EIP_BIAS_AND_CLIP
+  Pel        m_eipBias;
+  int        m_eipClipMin;
+  int        m_eipClipMax;
+#endif
 #endif
 private:
 #if JVET_AG0136_INTRA_TMP_LIC
@@ -849,6 +854,9 @@ public:
 
   void getNeiEipCands(const PredictionUnit &pu, static_vector<EipModelCandidate, MAX_MERGE_EIP> &candList, const ComponentID compId = COMPONENT_Y);
   void reorderEipCands(const PredictionUnit &pu, static_vector<EipModelCandidate, MAX_MERGE_EIP> &candList, const ComponentID compId = COMPONENT_Y);
+#if JVET_AH0086_EIP_BIAS_AND_CLIP
+  void setInputsVec(Pel *inputs, PelBuf &reco, int w, int h, int filterShape);
+#endif
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING && JVET_Y0065_GPM_INTRA
 protected:

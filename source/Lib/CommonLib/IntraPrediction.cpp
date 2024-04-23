@@ -22829,15 +22829,56 @@ void IntraPrediction::initEipParams(const PredictionUnit& pu, const ComponentID 
   CPelBuf recoLeft(piReco + refPosPicX + (refPosPicY + refSizeY) * picStride, picStride, refSizeX, refHeight - refSizeY);
   PelBuf refLeft(m_eipBuffer + refWidth * refSizeY, refWidth, refSizeX, refHeight - refSizeY);
   refLeft.copyFrom(recoLeft);
+
+#if JVET_AH0086_EIP_BIAS_AND_CLIP
+  int min = MAX_INT;
+  int max = 0;
+  int startY = refPosPicY < 0 ? -refPosPicY : 0;
+  const int startX = refPosPicX < 0 ? -refPosPicX : 0;
+  for(int y=startY;y<refTopAndTopLeft.height;y++)
+  {
+    for(int x=startX;x<refTopAndTopLeft.width;x++)
+    {
+      int sample = refTopAndTopLeft.at(x,y);
+      min = sample < min ? sample : min;
+      max = sample > max ? sample : max;
+    }
+  }
+  startY = (refPosPicY + refSizeY) < 0 ? -(refPosPicY + refSizeY) : 0;
+  for(int y=startY;y<refLeft.height;y++)
+  {
+    for(int x=startX;x<refLeft.width;x++)
+    {
+      int sample = refLeft.at(x,y);
+      min = sample < min ? sample : min;
+      max = sample > max ? sample : max;
+    }
+  }
+  m_eipClipMin = min;
+  m_eipClipMax = max;
+  m_eipBias    = 1 << (pu.cu->slice->getSPS()->getBitDepth(chType) - 1);
+#endif
 }
 
-void setInputsVec(Pel *inputs, PelBuf &reco, int w, int h, int filterShape) 
+#if JVET_AH0086_EIP_BIAS_AND_CLIP
+void IntraPrediction::setInputsVec(Pel *inputs, PelBuf &reco, int w, int h, int filterShape)
+{
+  inputs[EIP_FILTER_TAP - 1] = m_eipBias;
+  
+  for(int idx = 0; idx < EIP_FILTER_TAP - 1; idx++)
+  {
+    inputs[idx] = reco.at(w + g_eipFilter[filterShape][idx].x, h + g_eipFilter[filterShape][idx].y);
+  }
+}
+#else
+void setInputsVec(Pel *inputs, PelBuf &reco, int w, int h, int filterShape)
 {
   for(int idx = 0; idx < EIP_FILTER_TAP; idx++)
   {
     inputs[idx] = reco.at(w + g_eipFilter[filterShape][idx].x, h + g_eipFilter[filterShape][idx].y);
   }
 }
+#endif
 
 void IntraPrediction::getCurEipCands(const PredictionUnit& pu, static_vector<EipModelCandidate, NUM_DERIVED_EIP>& candList, const ComponentID compId, const bool fastTest)
 {
@@ -22933,7 +22974,13 @@ void IntraPrediction::getCurEipCands(const PredictionUnit& pu, static_vector<Eip
         {
           for (int x = startX; x < endX; x++)
           {
+#if JVET_AH0086_EIP_BIAS_AND_CLIP
+            m_a[numInputs - 1][numSamples] = m_eipBias;
+            
+            for (int inputIdx = 0; inputIdx < numInputs - 1; inputIdx++)
+#else
             for (int inputIdx = 0; inputIdx < numInputs; inputIdx++)
+#endif
             {
               m_a[inputIdx][numSamples] = refBuf.at(x + g_eipFilter[filterShape][inputIdx].x, y + g_eipFilter[filterShape][inputIdx].y);
             }
@@ -23019,7 +23066,13 @@ void IntraPrediction::eipPred(const PredictionUnit& pu, PelBuf& piPred, const Co
   const ScanElement* scan = g_scanOrder[SCAN_UNGROUPED][SCAN_DIAG][gp_sizeIdxInfo->idxFrom(blockWidth)][gp_sizeIdxInfo->idxFrom(blockHeight)];
   const int num = blockWidth * blockHeight;
   Pel inputs[EIP_FILTER_TAP];
+#if JVET_AH0086_EIP_BIAS_AND_CLIP
+  ClpRng clipRng = pu.cu->slice->clpRngs().comp[compId];
+  clipRng.min = std::max( clipRng.min, m_eipClipMin);
+  clipRng.max = std::min( clipRng.max, m_eipClipMax);
+#else
   const ClpRng clipRng = pu.cu->slice->clpRngs().comp[compId];
+#endif
   for (int scanIdx = 0; scanIdx < num; scanIdx++)
   {
     setInputsVec(inputs, predBuf, scan[scanIdx].x, scan[scanIdx].y, model.filterShape);
@@ -23510,7 +23563,13 @@ void IntraPrediction::reorderEipCands(const PredictionUnit& pu, static_vector<Ei
   static_vector<EipModelCandidate, MAX_MERGE_EIP> tmpCandList;
   Pel inputs[EIP_FILTER_TAP];
   const ChannelType chType = toChannelType(compId);
+#if JVET_AH0086_EIP_BIAS_AND_CLIP
+  ClpRng clipRng = pu.cu->slice->clpRngs().comp[compId];
+  clipRng.min = std::max( clipRng.min, m_eipClipMin);
+  clipRng.max = std::min( clipRng.max, m_eipClipMax);
+#else
   const ClpRng clipRng = pu.cu->slice->clpRngs().comp[compId];
+#endif
   for(auto model: candList)
   {
     CccmModel cand(EIP_FILTER_TAP, pu.cu->slice->getSPS()->getBitDepth(toChannelType(compId)));

@@ -4266,14 +4266,23 @@ const uint8_t g_aucTrSet[80][4] =
 #endif
 
 #if JVET_AG0058_EIP
+#if JVET_AH0086_EIP_BIAS_AND_CLIP
+// Note: Positions here are identical to the definition in the #else branch, just omitting the last position from each array
+const Position g_eipFilter[NUM_EIP_SHAPE][EIP_FILTER_TAP - 1] =
+{
+  { Position(-1,  0), Position(-2,  0), Position(-3,  0), Position( 0, -1), Position(-1, -1), Position(-2, -1), Position(-3, -1), Position( 0, -2), Position(-1, -2), Position(-2, -2), Position(-3, -2), Position( 0, -3), Position(-1, -3), Position(-2, -3) },
+  { Position(-1,  0), Position( 0, -1), Position(-1, -1), Position( 0, -2), Position(-1, -2), Position( 0, -3), Position(-1, -3), Position( 0, -4), Position(-1, -4), Position( 0, -5), Position(-1, -5), Position( 0, -6), Position(-1, -6), Position( 0, -7) },
+  { Position( 0, -1), Position(-1,  0), Position(-1, -1), Position(-2,  0), Position(-2, -1), Position(-3,  0), Position(-3, -1), Position(-4,  0), Position(-4, -1), Position(-5,  0), Position(-5, -1), Position(-6,  0), Position(-6, -1), Position(-7,  0) },
+};
+#else
 const Position g_eipFilter[NUM_EIP_SHAPE][EIP_FILTER_TAP] =
 {
   { Position(-1,  0), Position(-2,  0), Position(-3,  0), Position( 0, -1), Position(-1, -1), Position(-2, -1), Position(-3, -1), Position( 0, -2), Position(-1, -2), Position(-2, -2), Position(-3, -2), Position( 0, -3), Position(-1, -3), Position(-2, -3), Position(-3, -3) },
   { Position(-1,  0), Position( 0, -1), Position(-1, -1), Position( 0, -2), Position(-1, -2), Position( 0, -3), Position(-1, -3), Position( 0, -4), Position(-1, -4), Position( 0, -5), Position(-1, -5), Position( 0, -6), Position(-1, -6), Position( 0, -7), Position(-1, -7) },
   { Position( 0, -1), Position(-1,  0), Position(-1, -1), Position(-2,  0), Position(-2, -1), Position(-3,  0), Position(-3, -1), Position(-4,  0), Position(-4, -1), Position(-5,  0), Position(-5, -1), Position(-6,  0), Position(-6, -1), Position(-7,  0), Position(-7, -1) },
 };
-
-const EIPInfo g_eipInfoLut[4][4][9] = 
+#endif
+const EIPInfo g_eipInfoLut[4][4][9] =
 {
   {
     { EIPInfo(EIP_AL_A_L, EIP_FILTER_S), EIPInfo(EIP_AL_A_L, EIP_FILTER_V), EIPInfo(EIP_AL_A_L, EIP_FILTER_H), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo() }, // 4x4, 3modes
