@@ -938,6 +938,10 @@ namespace PU
   bool isOppositeLIC(const PredictionUnit &pu);
   bool hasOppositeLICFlag(const PredictionUnit &pu);
 #endif
+#if JVET_AH0076_OBIC
+  bool isObicAvail(const PredictionUnit &pu);
+  bool checkAvailBlocks(const PredictionUnit &pu);
+#endif
 }
 
 // TU tools

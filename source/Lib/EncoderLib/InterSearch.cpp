@@ -13673,7 +13673,7 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
 #endif
             }
 #if JVET_AG0061_INTER_LFNST_NSPT
-            else
+            else if (isLuma(compID) && tu.mtsIdx[COMPONENT_Y] != MTS_SKIP && cu.lfnstIdx != 0 )
             {
               CoeffCodingContext cctx(tu, COMPONENT_Y, false);
               int                scanPosLast = -1;

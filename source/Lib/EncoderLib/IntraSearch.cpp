@@ -98,6 +98,10 @@ IntraSearch::IntraSearch()
     m_eipMergePredBuf[i] = nullptr;
   }
 #endif
+#if JVET_AH0076_OBIC
+  m_dimdPredBuf = nullptr;
+  m_obicPredBuf = nullptr;
+#endif
   m_truncBinBits = nullptr;
   m_escapeNumBins = nullptr;
   m_minErrorIndexMap = nullptr;
@@ -277,6 +281,12 @@ void IntraSearch::destroy()
     m_eipMergePredBuf[i] = nullptr;
   }
 #endif
+#if JVET_AH0076_OBIC
+  delete[] m_dimdPredBuf;
+  m_dimdPredBuf = nullptr;
+  delete[] m_obicPredBuf;
+  m_obicPredBuf = nullptr;
+#endif
   m_isInitialized = false;
   if (m_truncBinBits != nullptr)
   {
@@ -403,14 +413,18 @@ void IntraSearch::init( EncCfg*        pcEncCfg,
     m_ddCcpFusionStorage[i].create(UnitArea(cform, Area(0, 0, maxCUWidth, maxCUHeight)));
   }
 #endif
-#if JVET_AB0155_SGPM
+#if JVET_AB0155_SGPM || JVET_AH0076_OBIC
 #if JVET_AG0152_SGPM_ITMP_IBC
   for (int i = 0; i < NUM_LUMA_MODE + SGPM_NUM_BVS; i++)
 #else
   for (int i = 0; i < NUM_LUMA_MODE; i++)
 #endif
   {
+#if JVET_AH0076_OBIC
+    m_intraPredBuf[i] = new Pel[(MAX_CU_SIZE>>1) * (MAX_CU_SIZE>>1)];
+#else
     m_intraPredBuf[i] = new Pel[GEO_MAX_CU_SIZE_EX * GEO_MAX_CU_SIZE_EX];
+#endif
   }
   for (int i = 0; i < SGPM_NUM; i++)
   {
@@ -426,6 +440,10 @@ void IntraSearch::init( EncCfg*        pcEncCfg,
   {
     m_eipMergePredBuf[i] = new Pel[MAX_EIP_SIZE * MAX_EIP_SIZE];
   }
+#endif
+#if JVET_AH0076_OBIC
+  m_dimdPredBuf = new Pel[(MAX_CU_SIZE>>1) * (MAX_CU_SIZE>>1)];
+  m_obicPredBuf = new Pel[(MAX_CU_SIZE>>1) * (MAX_CU_SIZE>>1)];
 #endif
   for( uint32_t ch = 0; ch < MAX_NUM_TBLOCKS; ch++ )
   {
@@ -555,6 +573,10 @@ void IntraSearch::init( EncCfg*        pcEncCfg,
   }
 #if INTRA_TRANS_ENC_OPT
   m_skipTimdLfnstMtsPass = false;
+#endif
+#if JVET_AH0076_OBIC
+  m_skipObicLfnstMtsPass = false;
+  m_skipDimdLfnstMtsPass = false;
 #endif
 }
 
@@ -729,7 +751,12 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 #if JVET_AB0155_SGPM
   bool SGPMSaveFlag = (cu.lfnstIdx == 0 && cu.mtsFlag == 0);
 #endif
-
+#if JVET_AH0076_OBIC
+  bool testDimd = isLuma(partitioner.chType) && cu.slice->getSPS()->getUseDimd();
+  bool testObic = testDimd && (PU::isObicAvail(*cu.firstPU) && cu.obicMode[0] >= 0);
+  bool obicSaveFlag = testObic && (cu.lfnstIdx == 0 && cu.mtsFlag == 0);
+  bool dimdSaveFlag = testDimd && (cu.lfnstIdx == 0 && cu.mtsFlag == 0);
+#endif
   const uint32_t lfnstIdx = cu.lfnstIdx;
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   double costInterCU = findInterCUCost( cu );
@@ -831,6 +858,10 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
   bool setSkipTimdControl = (m_pcEncCfg->getIntraPeriod() == 1) && !cu.lfnstIdx && !cu.mtsFlag;
   double timdAngCost = MAX_DOUBLE;
 #endif
+#if JVET_AH0076_OBIC
+  double obicAngCost = MAX_DOUBLE, dimdAngCost = MAX_DOUBLE;
+  bool setSkipDimdControl = (m_pcEncCfg->getIntraPeriod() == 1) && !cu.lfnstIdx && !cu.mtsFlag;
+#endif
   const bool testBDPCM = sps.getBDPCMEnabledFlag() && CU::bdpcmAllowed(cu, ComponentID(partitioner.chType)) && cu.mtsFlag == 0 && cu.lfnstIdx == 0;
   static_vector<ModeInfo, FAST_UDI_MAX_RDMODE_NUM> uiHadModeList;
   static_vector<double, FAST_UDI_MAX_RDMODE_NUM> candCostList;
@@ -873,6 +904,10 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 #if ENABLE_DIMD
     bool bestDimdMode = false;
 #endif
+#if JVET_AH0076_OBIC
+    bool bestObicMode = false;
+    int bestMipDimd = 0;
+#endif
 #if JVET_W0123_TIMD_FUSION
     bool bestTimdMode = false;
 #endif
@@ -908,7 +943,11 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
       if (mtsUsageFlag != 2)
       {
 #if JVET_AB0155_SGPM
+#if JVET_AH0076_OBIC
+        if ((testSgpm && SGPMSaveFlag) || obicSaveFlag || dimdSaveFlag)
+#else
         if (testSgpm && SGPMSaveFlag)
+#endif
         {
 #if JVET_AG0152_SGPM_ITMP_IBC
           for (int i = 0; i < NUM_LUMA_MODE + SGPM_NUM_BVS; i++)
@@ -923,7 +962,11 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
         // this should always be true
         CHECK(!pu.Y().valid(), "PU is not valid");
 #if !JVET_AB0157_TMRL || JVET_AD0082_TMRL_CONFIG
+#if JVET_AH0065_RELAX_LINE_BUFFER
+        bool isFirstLineOfCtu = pu.block(COMPONENT_Y).y == 0;
+#else
         bool isFirstLineOfCtu     = (((pu.block(COMPONENT_Y).y) & ((pu.cs->sps)->getMaxCUWidth() - 1)) == 0);
+#endif
 #if JVET_Y0116_EXTENDED_MRL_LIST
         int  numOfPassesExtendRef = MRL_NUM_REF_LINES;
         if (!sps.getUseMRL() || isFirstLineOfCtu) 
@@ -935,9 +978,13 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
           bool checkLineOutsideCtu[MRL_NUM_REF_LINES - 1];
           for (int mrlIdx = 1; mrlIdx < MRL_NUM_REF_LINES; mrlIdx++)
           {
+#if JVET_AH0065_RELAX_LINE_BUFFER
+            bool isLineOutsideCtu = (cu.block(COMPONENT_Y).y <= MULTI_REF_LINE_IDX[mrlIdx]) ? true : false;
+#else
             bool isLineOutsideCtu =
               ((cu.block(COMPONENT_Y).y) % ((cu.cs->sps)->getMaxCUWidth()) <= MULTI_REF_LINE_IDX[mrlIdx]) ? true
-                                                                                                          : false;
+                                                                                                      : false;
+#endif
             checkLineOutsideCtu[mrlIdx-1] = isLineOutsideCtu;
           }
           if (checkLineOutsideCtu[0]) 
@@ -1051,6 +1098,38 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
           }
 #endif
 
+#if JVET_AH0076_OBIC
+          int dimdNeededMode[NUM_LUMA_MODE] = {0};
+          if (obicSaveFlag)
+          {
+            for (int idx = 0; idx < OBIC_FUSION_NUM; idx++)
+            {
+              int iMode = cu.obicMode[idx];
+              if (iMode < 0)
+              {
+                continue;
+              }
+              dimdNeededMode[iMode] = 1;
+            }
+          }
+          if (dimdSaveFlag)
+          {
+            if (cu.dimdBlending)
+            {
+              for (int dimdIdx = 0; dimdIdx < DIMD_FUSION_NUM - 1; dimdIdx++)
+              {
+                int dimdMode = (dimdIdx == 0 ? cu.dimdMode : cu.dimdBlendMode[dimdIdx-1]);
+                if (dimdMode <= 0)
+                {
+                  break;
+                }
+                dimdNeededMode[dimdMode] = 1;
+              }
+              dimdNeededMode[PLANAR_IDX] = 1;
+            }
+          }
+#endif
+          
 #if JVET_AB0157_TMRL
           double tmrlCostList[MRL_LIST_SIZE]{ MAX_DOUBLE };
 #endif
@@ -1097,6 +1176,14 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 #endif
 #if JVET_AB0155_SGPM
               if (testSgpm && SGPMSaveFlag && sgpmNeededMode[uiMode])
+              {
+                PelBuf   predBuf(m_intraPredBuf[uiMode], tmpArea);
+                predBuf.copyFrom(piPred);
+                m_intraModeReady[uiMode] = 1;
+              }
+#endif
+#if JVET_AH0076_OBIC
+              if ((obicSaveFlag || dimdSaveFlag) && dimdNeededMode[uiMode] && !m_intraModeReady[uiMode])
               {
                 PelBuf   predBuf(m_intraPredBuf[uiMode], tmpArea);
                 predBuf.copyFrom(piPred);
@@ -1223,6 +1310,14 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 #endif
 #if JVET_AB0155_SGPM
                     if (testSgpm && SGPMSaveFlag && sgpmNeededMode[mode])
+                    {
+                      PelBuf   predBuf(m_intraPredBuf[mode], tmpArea);
+                      predBuf.copyFrom(piPred);
+                      m_intraModeReady[mode] = 1;
+                    }
+#endif
+#if JVET_AH0076_OBIC
+                    if ((obicSaveFlag || dimdSaveFlag) && dimdNeededMode[mode] && !m_intraModeReady[mode])
                     {
                       PelBuf   predBuf(m_intraPredBuf[mode], tmpArea);
                       predBuf.copyFrom(piPred);
@@ -1817,6 +1912,86 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 #endif
               );
             }
+#if JVET_AH0076_OBIC
+            if (obicSaveFlag || dimdSaveFlag)
+            {
+              cu.dimd = false;
+              cu.timd = false;
+              cu.mipFlag = false;
+              pu.multiRefIdx = 0;
+#if JVET_V0130_INTRA_TMP
+              cu.tmpFlag = false;
+#endif
+              cu.sgpm = false;
+#if JVET_AB0157_INTRA_FUSION
+              initIntraPatternChType(cu, pu.Y(), true, 0, false);
+#else
+              initIntraPatternChType(cu, pu.Y(), true);
+#endif
+              if (obicSaveFlag)
+              {
+                for (int idx = 0; idx < OBIC_FUSION_NUM; idx++)
+                {
+                  int iMode = cu.obicMode[idx];
+                  if (iMode < 0)
+                  {
+                    continue;
+                  }
+                  if (dimdNeededMode[iMode] && !m_intraModeReady[iMode])
+                  {
+                    pu.intraDir[0] = iMode;
+                    initPredIntraParams(pu, pu.Y(), sps);
+#if JVET_AB0157_INTRA_FUSION
+                    predIntraAng(COMPONENT_Y, piPred, pu, false);
+#else
+                    predIntraAng(COMPONENT_Y, piPred, pu);
+#endif
+                    PelBuf predBuf(m_intraPredBuf[iMode], tmpArea);
+                    predBuf.copyFrom(piPred);
+                    m_intraModeReady[iMode] = 1;
+                  }
+                }
+              }
+              if (dimdSaveFlag)
+              {
+                if (dimdNeededMode[PLANAR_IDX] && !m_intraModeReady[PLANAR_IDX])
+                {
+                  pu.intraDir[0] = PLANAR_IDX;
+                  initPredIntraParams(pu, pu.Y(), sps);
+#if JVET_AB0157_INTRA_FUSION
+                  predIntraAng(COMPONENT_Y, piPred, pu, false);
+#else
+                  predIntraAng(COMPONENT_Y, piPred, pu);
+#endif
+                  PelBuf predBuf(m_intraPredBuf[PLANAR_IDX], tmpArea);
+                  predBuf.copyFrom(piPred);
+                  m_intraModeReady[PLANAR_IDX] = 1;
+                }
+              }
+              for (int dimdIdx = 0; dimdIdx < DIMD_FUSION_NUM - 1; dimdIdx++)
+              {
+                int      dimdMode = (dimdIdx == 0 ? cu.dimdMode : cu.dimdBlendMode[dimdIdx-1]);
+                if (dimdMode <= 0)
+                {
+                  break;
+                }
+
+                if (dimdNeededMode[dimdMode] && !m_intraModeReady[dimdMode])
+                {
+                  pu.intraDir[0] = dimdMode;
+                  initPredIntraParams(pu, pu.Y(), sps);
+#if JVET_AB0157_INTRA_FUSION
+                  predIntraAng(COMPONENT_Y, piPred, pu, false);
+#else
+                  predIntraAng(COMPONENT_Y, piPred, pu);
+#endif
+                  PelBuf predBuf(m_intraPredBuf[dimdMode], tmpArea);
+                  predBuf.copyFrom(piPred);
+                  m_intraModeReady[dimdMode] = 1;
+                }
+              }
+            }
+#endif
             if (sps.getUseMIP() && LFNSTSaveFlag)
             {
               // save found best modes
@@ -1839,7 +2014,93 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
             uiHadModeList = m_uiSavedHadModeListLFNST;
             CandHadList   = m_dSavedHadListLFNST;
           }
-
+#if JVET_AH0076_OBIC
+          if (obicSaveFlag || dimdSaveFlag)
+          {
+            cu.dimd = true;
+            cu.obicFlag = false;
+            cu.timd = false;
+            cu.mipFlag = false;
+            cu.tmpFlag = false;
+            cu.tmrlFlag = false;
+            cu.firstPU->multiRefIdx = 0;
+            cu.ispMode = NOT_INTRA_SUBPARTITIONS;
+            int iWidth = cu.lwidth();
+            int iHeight = cu.lheight();
+            if (obicSaveFlag)
+            {
+              cu.obicFlag = true;
+              int obicMode = cu.obicMode[0];
+              pu.intraDir[CHANNEL_TYPE_LUMA] = obicMode;
+              bool blendModes[OBIC_FUSION_NUM - 1] = {false};
+              PelBuf predFusion[OBIC_FUSION_NUM - 1];
+              CHECK(!m_intraModeReady[obicMode], "OBIC mode is not ready!");
+              const UnitArea localUnitArea( pu.chromaFormat, Area( 0, 0, iWidth, iHeight ) );
+              PelBuf predBuf(m_intraPredBuf[obicMode], pu.Y());
+              piPred.copyFrom(predBuf);
+              int planarIdx = 0;
+              for (int idx = 0; idx < OBIC_FUSION_NUM - 1; idx++)
+              {
+                blendModes[idx] = false;
+                predFusion[idx] = m_tempBuffer[idx].getBuf( localUnitArea.Y() );
+                int iMode = cu.obicMode[idx + 1];
+                if (iMode >= 0)
+                {
+                  blendModes[idx] = true;
+                  CHECK(!m_intraModeReady[iMode], "OBIC mode is not ready!");
+                  PelBuf predBufTmp(m_intraPredBuf[iMode], pu.Y());
+                  predFusion[idx].copyFrom(predBufTmp);
+                  if (iMode == PLANAR_IDX)
+                  {
+                    planarIdx = idx;
+                  }
+                }
+                else
+                {
+                  PelBuf planarBuf(m_intraPredBuf[PLANAR_IDX], pu.Y());
+                  predFusion[idx].copyFrom(planarBuf);
+                }
+              }
+              if (cu.obicIsBlended)
+              {
+                generateObicBlending(piPred, pu, predFusion, blendModes, planarIdx);
+              }
+              else
+              {
+                initIntraPatternChType(cu, pu.Y(), false);
+                predIntraAng(COMPONENT_Y, piPred, pu);
+              }
+              PelBuf obicSaveBuf(m_obicPredBuf, pu.Y());
+              obicSaveBuf.copyFrom(piPred);
+            }
+            if (dimdSaveFlag)
+            {
+              cu.obicFlag = false;
+              int dimdMode = cu.dimdMode;
+              pu.intraDir[CHANNEL_TYPE_LUMA] = dimdMode;
+              if (cu.dimdBlending)
+              {
+                PelBuf predBuf(m_intraPredBuf[dimdMode], tmpArea);
+                piPred.copyFrom(predBuf);
+                PelBuf blendBuf0((m_intraPredBuf[cu.dimdBlendMode[0] > 0 ?cu.dimdBlendMode[0] : PLANAR_IDX]), tmpArea);
+                PelBuf blendBuf1((m_intraPredBuf[cu.dimdBlendMode[1] > 0 ?cu.dimdBlendMode[1] : PLANAR_IDX]), tmpArea);
+                PelBuf blendBuf2((m_intraPredBuf[cu.dimdBlendMode[2] > 0 ?cu.dimdBlendMode[2] : PLANAR_IDX]), tmpArea);
+                PelBuf blendBuf3((m_intraPredBuf[cu.dimdBlendMode[3] > 0 ?cu.dimdBlendMode[3] : PLANAR_IDX]), tmpArea);
+                PelBuf planarBuf(m_intraPredBuf[PLANAR_IDX], tmpArea);
+                generateDimdBlending(piPred, pu, blendBuf0, blendBuf1, blendBuf2, blendBuf3, planarBuf);
+              }
+              else
+              {
+                initIntraPatternChType(cu, pu.Y(), false);
+                predIntraAng(COMPONENT_Y, piPred, pu);
+              }
+              PelBuf dimdSaveBuf(m_dimdPredBuf, pu.Y());
+              dimdSaveBuf.copyFrom(piPred);
+            }
+          }
+          cu.dimd = false;
+          cu.obicFlag = false;
+#endif
 #if JVET_AB0155_SGPM
           if (testSgpm)
           {
@@ -2249,6 +2510,14 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
       CHECK(numModesForFullRD != uiRdModeList.size(), "Inconsistent state!");
 #endif
 
+#if JVET_AH0076_OBIC
+      cu.obicFlag = false;
+      if (testObic)
+      {
+        ModeInfo m = ModeInfo( false, false, 0, NOT_INTRA_SUBPARTITIONS, OBIC_IDX );
+        uiRdModeList.push_back(m);
+      }
+#endif
       // after this point, don't use numModesForFullRD
       // PBINTRA fast
       if (m_pcEncCfg->getUsePbIntraFast() && !cs.slice->isIntra() && uiRdModeList.size() < numModesAvailable
@@ -2329,6 +2598,10 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
       numNonISPModes++;
       if (lfnstIdx == 0 && !cu.mtsFlag)
       {
+#if JVET_AH0065_RELAX_LINE_BUFFER
+        bool isFirstLineOfCtu = pu.block(COMPONENT_Y).y == 0;
+        int  numOfPassesExtendRef = ((!sps.getUseMRL() || isFirstLineOfCtu) ? 1 : 3);
+#else
         bool isFirstLineOfCtu     = (((pu.block(COMPONENT_Y).y) & ((pu.cs->sps)->getMaxCUWidth() - 1)) == 0);
 #if JVET_Y0116_EXTENDED_MRL_LIST
         int  numOfPassesExtendRef = 3;
@@ -2360,6 +2633,7 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
         }
 #else
         int  numOfPassesExtendRef = ((!sps.getUseMRL() || isFirstLineOfCtu) ? 1 : MRL_NUM_REF_LINES);
+#endif
 #endif
         for (int mRefNum = 1; mRefNum < numOfPassesExtendRef; mRefNum++)
         {
@@ -2479,7 +2753,11 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
         uiOrgMode   = uiRdModeList[mode];
       }
 #if ENABLE_DIMD && INTRA_TRANS_ENC_OPT
-      if ((m_pcEncCfg->getIntraPeriod() == 1) && cu.slice->getSPS()->getUseDimd() && mode >= 0 && !cu.dimdBlending && uiOrgMode.ispMod == 0 && uiOrgMode.mRefId == 0 && uiOrgMode.modeId != TIMD_IDX && uiOrgMode.modeId != DIMD_IDX)
+      if ((m_pcEncCfg->getIntraPeriod() == 1) && cu.slice->getSPS()->getUseDimd() && mode >= 0 && !cu.dimdBlending && uiOrgMode.ispMod == 0 && uiOrgMode.mRefId == 0 && uiOrgMode.modeId != TIMD_IDX && uiOrgMode.modeId != DIMD_IDX
+#if JVET_AH0076_OBIC
+        && uiOrgMode.modeId != OBIC_IDX
+#endif
+          )
       {
         bool modeDuplicated = (uiOrgMode.modeId == cu.dimdMode);
         if (modeDuplicated)
@@ -2493,8 +2771,31 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
       cu.dimd = false;
       if( mode >= 0 && uiOrgMode.modeId == DIMD_IDX ) /*to check*/
       {
+#if JVET_AH0076_OBIC
+        if (m_skipDimdLfnstMtsPass)
+        {
+          CHECK(!cu.lfnstIdx && !cu.mtsFlag, "invalid logic");
+          continue;
+        }
+#endif
         uiOrgMode.modeId = cu.dimdMode;
         cu.dimd = true;
+      }
+#endif
+#if JVET_AH0076_OBIC
+      cu.obicFlag = false;
+      if( mode >= 0 && uiOrgMode.modeId == OBIC_IDX) /*to check*/
+      {
+        if (m_skipObicLfnstMtsPass)
+        {
+          CHECK(!cu.lfnstIdx && !cu.mtsFlag, "invalid logic");
+          continue;
+        }
+        cu.obicFlag = true;
+        cu.dimd = true;
+        uiOrgMode.modeId = cu.obicMode[0];
+        pu.intraDir[CHANNEL_TYPE_LUMA] = uiOrgMode.modeId;
+        pu.multiRefIdx = 0;
       }
 #endif
 #if JVET_AC0105_DIRECTIONAL_PLANAR
@@ -2849,6 +3150,25 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 #endif
         }
 #endif
+#if JVET_AH0076_OBIC
+        if (setSkipDimdControl && cu.dimd)
+        {
+          if (cu.obicFlag)
+          {
+            if (csTemp->cost < obicAngCost)
+            {
+              obicAngCost = csTemp->cost;
+            }
+          }
+          else
+          {
+            if (csTemp->cost < dimdAngCost)
+            {
+              dimdAngCost = csTemp->cost;
+            }
+          }
+        }
+#endif
         // check r-d cost
         if( csTemp->cost < csBest->cost )
         {
@@ -2858,6 +3178,9 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
           bestBDPCMMode = cu.bdpcmMode;
 #if ENABLE_DIMD
           bestDimdMode = cu.dimd;
+#endif
+#if JVET_AH0076_OBIC
+          bestObicMode = cu.obicFlag;
 #endif
 #if JVET_W0123_TIMD_FUSION
           bestTimdMode = cu.timd;
@@ -2875,6 +3198,13 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
             intraTmpDimdMode = curCu->intraTmpDimdMode;
           }
 #endif 
+#if JVET_AH0076_OBIC
+          if (cu.mipFlag)
+          {
+            CodingUnit* curCu = csBest->getCU(partitioner.currArea().lumaPos(), partitioner.chType);
+            bestMipDimd = curCu->mipDimdMode;
+          }
+#endif
 
           if( sps.getUseLFNST() && mtsUsageFlag == 1 && !cu.ispMode )
           {
@@ -2949,6 +3279,19 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
       }
     }
 #endif
+#if JVET_AH0076_OBIC
+    if (setSkipDimdControl)
+    {
+      if (regAngCost != MAX_DOUBLE && dimdAngCost != MAX_DOUBLE && regAngCost * 1.5 < dimdAngCost)
+      {
+        m_skipDimdLfnstMtsPass = true;
+      }
+      if (regAngCost != MAX_DOUBLE && obicAngCost != MAX_DOUBLE && regAngCost * 1.5 < obicAngCost)
+      {
+        m_skipObicLfnstMtsPass = true;
+      }
+    }
+#endif
     cu.ispMode = uiBestPUMode.ispMod;
     cu.lfnstIdx = bestLfnstIdx;
 
@@ -3001,6 +3344,15 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
       if (cu.dimd)
       {
         CHECK(pu.multiRefIdx > 0, "use of DIMD");
+      }
+#endif
+#if JVET_AH0076_OBIC
+      cu.obicFlag = bestObicMode;
+      cu.mipDimdMode = bestMipDimd;
+      if (cu.obicFlag)
+      {
+        pu.intraDir[ CHANNEL_TYPE_LUMA ] = cu.obicMode[0];
+        cu.dimd = true;
       }
 #endif
       cu.bdpcmMode = bestBDPCMMode;
@@ -8301,13 +8653,24 @@ void IntraSearch::xSelectAMTForFullRD(TransformUnit &tu
   else if (PU::isMIP(pu, chType))
   {
     initIntraMip(pu, area);
+#if JVET_AH0076_OBIC
+    predIntraMip(COMPONENT_Y, piPred, pu, true);
+#else
     predIntraMip(COMPONENT_Y, piPred, pu);
+#endif
   }
 #if JVET_AG0058_EIP
   else if (PU::isEIP(pu, chType))
   {
     const CPelBuf eipSaveBuf(pu.cu->eipMerge ? m_eipMergePredBuf[pu.intraDir[0]] : m_eipPredBuf[pu.intraDir[0]], pu.Y());
     piPred.copyFrom(eipSaveBuf);
+  }
+#endif
+#if JVET_AH0076_OBIC
+  else if (pu.cu->dimd && chType == CHANNEL_TYPE_LUMA && pu.cu->ispMode == NOT_INTRA_SUBPARTITIONS)
+  {
+    const CPelBuf dimdSaveBuf(pu.cu->obicFlag ? m_obicPredBuf : m_dimdPredBuf, pu.Y());
+    piPred.copyFrom(dimdSaveBuf);
   }
 #endif
   else
@@ -8619,7 +8982,11 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
         {
           initIntraMip( pu, area );
 #if JVET_AB0067_MIP_DIMD_LFNST
+#if JVET_AH0076_OBIC
+          predIntraMip( compID, piPred, pu, true);
+#else
           predIntraMip( compID, piPred, pu, pu.cu->lfnstIdx > 0 ? true : false);
+#endif
 #else
           predIntraMip( compID, piPred, pu );
 #endif
@@ -8629,6 +8996,13 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
         {
           const CPelBuf eipSaveBuf(pu.cu->eipMerge ? m_eipMergePredBuf[pu.intraDir[0]] : m_eipPredBuf[pu.intraDir[0]], pu.Y());
           piPred.copyFrom(eipSaveBuf);
+        }
+#endif
+#if JVET_AH0076_OBIC
+        else if (pu.cu->dimd && compID == COMPONENT_Y && pu.cu->ispMode == NOT_INTRA_SUBPARTITIONS)
+        {
+          const CPelBuf dimdSaveBuf(pu.cu->obicFlag ? m_obicPredBuf : m_dimdPredBuf, pu.Y());
+          piPred.copyFrom(dimdSaveBuf);
         }
 #endif
         else
@@ -10308,7 +10682,11 @@ bool IntraSearch::xRecurIntraCodingACTQT(CodingStructure &cs, Partitioner &parti
       {
         initIntraMip(pu, area);
 #if JVET_AB0067_MIP_DIMD_LFNST
+#if JVET_AH0076_OBIC
+        predIntraMip(compID, piPred, pu, true);
+#else
         predIntraMip(compID, piPred, pu, pu.cu->lfnstIdx > 0 ? true : false);
+#endif
 #else
         predIntraMip(compID, piPred, pu);
 #endif

@@ -986,7 +986,11 @@ void DecLib::finishPicture(int& poc, PicList*& rpcListPic, MsgLevel msgl )
     c += 32;  // tolower
   }
 #if JVET_AG0196_CABAC_RETRAIN
+#if JVET_AH0176_LOW_DELAY_B_CTX
+  CabacRetrain::endFrame(pcSlice->getPOC(), pcSlice->getSliceQp(), pcSlice->getCabacInitFlag(), pcSlice->isIntra() ? I_SLICE : pcSlice->isInterP() ? P_SLICE : pcSlice->isInterB() && pcSlice->getCheckLDC() ? L_SLICE : B_SLICE);
+#else
   CabacRetrain::endFrame(pcSlice->getPOC(),pcSlice->getSliceQp(),pcSlice->getCabacInitFlag(),pcSlice->isIntra()?I_SLICE:pcSlice->isInterP()?P_SLICE:B_SLICE);
+#endif
 #endif
   if (pcSlice->isDRAP()) c = 'D';
 
@@ -3032,6 +3036,12 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
 #if JVET_Y0128_NON_CTC
     //---------------
     pcSlice->setRefPOCList();
+#endif
+#if JVET_AH0069_CMVP
+    if (pcSlice->getPicHeader()->getEnableTMVPFlag())
+    {
+      pcSlice->setRefRefIdxList();
+    }
 #endif
 #if JVET_AG0145_ADAPTIVE_CLIPPING
     int clipDeltaShift = 0;

@@ -447,7 +447,11 @@ extern const int8_t g_amvpSbTmvp_mvd_offset[6];
 extern uint32_t g_picAmvpSbTmvpEnabledArea;
 #endif
 #if JVET_AG0058_EIP
+#if JVET_AH0086_EIP_BIAS_AND_CLIP
+extern const Position g_eipFilter[NUM_EIP_SHAPE][EIP_FILTER_TAP - 1];
+#else
 extern const Position g_eipFilter[NUM_EIP_SHAPE][EIP_FILTER_TAP];
+#endif
 extern const EIPInfo  g_eipInfoLut[4][4][9];
 #endif
 #if JVET_AG0276_LIC_SLOPE_ADJUST

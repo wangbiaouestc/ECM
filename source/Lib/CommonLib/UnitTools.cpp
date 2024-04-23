@@ -4574,6 +4574,211 @@ bool PU::isDMChromaSgpm(const PredictionUnit &pu)
 }
 #endif
 
+#if JVET_AH0076_OBIC
+bool PU::isObicAvail(const PredictionUnit &pu)
+{
+  if (!pu.lumaPos().x && !pu.lumaPos().y)
+  {
+    return false;
+  }
+  if (!pu.Y().valid() || pu.cu->predMode != MODE_INTRA || !isLuma(pu.cu->chType) || !pu.cu->slice->getSPS()->getUseDimd() || pu.Y().area() <= 32)
+  {
+    return false;
+  }
+  if (!PU::checkAvailBlocks(pu))
+  {
+    return false;
+  }
+  return true;
+}
+bool PU::checkAvailBlocks(const PredictionUnit &pu)
+{
+  const int step = 4;
+  const CodingUnit& cu = *pu.cu;
+  const CompArea &area = cu.Y();
+  const int numCUs = NUM_OBIC_CUS;
+  const CodingUnit* cuNeighbours[numCUs];
+  cuNeighbours[0] = cu.cs->getCURestricted(cu.lumaPos().offset(-1, 0), cu, CH_L);
+  cuNeighbours[1] = cu.cs->getCURestricted(cu.lumaPos().offset(0, -1), cu, CH_L);
+  cuNeighbours[2] = cu.cs->getCURestricted(cu.lumaPos().offset(-1, -1), cu, CH_L);
+  
+  const CodingUnit* cuTemp;
+  for (int i = 0; i <= cu.lheight(); i += step)
+  {
+    cuTemp = cu.cs->getCURestricted(cu.lumaPos().offset(-1, i), cu, CH_L);
+    if (cuTemp && CU::isIntra(*cuTemp))
+    {
+      cuNeighbours[0] = cuTemp;
+      break;
+    }
+  }
+  for (int i = 0; i <= cu.lwidth(); i += step)
+  {
+    cuTemp = cu.cs->getCURestricted(cu.lumaPos().offset(i, -1), cu, CH_L);
+    if (cuTemp && CU::isIntra(*cuTemp))
+    {
+      cuNeighbours[1] = cuTemp;
+      break;
+    }
+  }
+  
+  const CodingUnit* cuLeft = cu.cs->getCURestricted(cu.lumaPos().offset(-1, 0), cu, CH_L);
+  const CodingUnit* cuTop  = cu.cs->getCURestricted(cu.lumaPos().offset(0, -1), cu, CH_L);
+  cuNeighbours[3] = cuLeft ? cu.cs->getCURestricted(cuLeft->lumaPos().offset(cuLeft->lwidth()-1, cuLeft->lheight()), cu, CH_L) : NULL;
+  cuNeighbours[4] = cuTop ? cu.cs->getCURestricted(cuTop->lumaPos().offset(cuTop->lwidth(), cuTop->lheight() - 1), cu, CH_L) : NULL;
+  cuNeighbours[5] = cuNeighbours[3] ? cu.cs->getCURestricted(cuNeighbours[3]->lumaPos().offset(cuNeighbours[3]->lwidth()-1, cuNeighbours[3]->lheight()), cu, CH_L) : NULL;
+  cuNeighbours[6] = cuNeighbours[4] ? cu.cs->getCURestricted(cuNeighbours[4]->lumaPos().offset(cuNeighbours[4]->lwidth(), cuNeighbours[4]->lheight() - 1), cu, CH_L) : NULL;
+  cuNeighbours[7] = cuLeft ? cu.cs->getCURestricted(cuLeft->lumaPos().offset(-1, 0), cu, CH_L) : NULL;
+  cuNeighbours[8] = cuTop ? cu.cs->getCURestricted(cuTop->lumaPos().offset(0, -1), cu, CH_L) : NULL;
+  cuNeighbours[9] = cuNeighbours[3] ? cu.cs->getCURestricted(cuNeighbours[3]->lumaPos().offset(-1, 0), cu, CH_L) : NULL;
+  cuNeighbours[10] = cuNeighbours[4] ? cu.cs->getCURestricted(cuNeighbours[4]->lumaPos().offset(0, -1), cu, CH_L) : NULL;
+  cuNeighbours[11] = cuNeighbours[5] ? cu.cs->getCURestricted(cuNeighbours[5]->lumaPos().offset(-1, 0), cu, CH_L) : NULL;
+  cuNeighbours[12] = cuNeighbours[6] ? cu.cs->getCURestricted(cuNeighbours[6]->lumaPos().offset(0, -1), cu, CH_L) : NULL;
+  
+  if ((!cuNeighbours[9]) && cuNeighbours[2])
+  {
+    cuNeighbours[9] = cu.cs->getCURestricted(cuNeighbours[2]->lumaPos().offset(-1, cuNeighbours[2]->lheight()-1), cu, CH_L);
+  }
+  if ((!cuNeighbours[10]) && cuNeighbours[2])
+  {
+    cuNeighbours[10] = cu.cs->getCURestricted(cuNeighbours[2]->lumaPos().offset(cuNeighbours[2]->lwidth()-1, -1), cu, CH_L);
+  }
+  if ((!cuNeighbours[11]) && cuLeft && cuNeighbours[7])
+  {
+    cuNeighbours[11] = cu.cs->getCURestricted(cuNeighbours[7]->lumaPos().offset(-1, 0), cu, CH_L);
+  }
+  if ((!cuNeighbours[12]) && cuTop && cuNeighbours[8])
+  {
+    cuNeighbours[12] = cu.cs->getCURestricted(cuNeighbours[8]->lumaPos().offset(0, -1), cu, CH_L);
+  }
+  
+  const Position  topLeft = area.topLeft();
+  // non-adjacent spatial candidates
+  int       offsetX           = 0;
+  int       offsetY           = 0;
+  int       cout              = 13;
+  const int numNACandidate[4] = { 3, 5, 5, 5 };
+  const int idxMap[4][5]      = { { 0, 1, 4 }, { 0, 1, 2, 3, 4 }, { 0, 1, 2, 3, 4 }, { 0, 1, 2, 3, 4 } };
+  for (int iDistanceIndex = 0; iDistanceIndex < NADISTANCE_LEVEL; iDistanceIndex++)
+  {
+    const int iNADistanceHor = cu.Y().width * (iDistanceIndex + 1);
+    const int iNADistanceVer = cu.Y().height * (iDistanceIndex + 1);
+    for (int iNASPIdx = 0; iNASPIdx < numNACandidate[iDistanceIndex]; iNASPIdx++)
+    {
+      switch (idxMap[iDistanceIndex][iNASPIdx])
+      {
+        case 0: offsetX = -iNADistanceHor - 1; offsetY = cu.Y().height + iNADistanceVer - 1; break;
+        case 1: offsetX = cu.Y().width + iNADistanceHor - 1; offsetY = -iNADistanceVer - 1; break;
+        case 2: offsetX = cu.Y().width >> 1; offsetY = -iNADistanceVer - 1; break;
+        case 3: offsetX = -iNADistanceHor - 1; offsetY = cu.Y().height >> 1; break;
+        case 4: offsetX = -iNADistanceHor - 1; offsetY = -iNADistanceVer - 1; break;
+        default: printf("error!"); exit(0); break;
+      }
+      cuNeighbours[cout++] = cu.cs->getCURestricted(topLeft.offset(offsetX, offsetY), cu, CH_L);
+    }
+  }
+  int numBlocks = 0;
+  int limitMaxNeigh = NUM_OBIC_CUS;
+  bool useNeighbour[numCUs];
+  int  neighboursInDistOrder[numCUs];
+  int  dists[numCUs];
+  for (int i = 0; i < numCUs; i++)
+  {
+    useNeighbour[i] = false;
+    neighboursInDistOrder[i] = 0;
+    dists[i] = 0;
+  }
+  for (int i = 0; i < numCUs; i++)
+  {
+    dists[i] = MAX_INT;
+  }
+  int numToMix = 0;
+  for (int i = 0; i < numCUs; i++)
+  {
+    useNeighbour[i] = (cuNeighbours[i] && CU::isIntra(*cuNeighbours[i]));
+    if (useNeighbour[i])
+    {
+      for (int j = i-1; j >= 0; j--)
+      {
+        if (!useNeighbour[j])
+        {
+          continue;
+        }
+        useNeighbour[i] &= (cuNeighbours[i]->lx() != cuNeighbours[j]->lx() || cuNeighbours[i]->ly() != cuNeighbours[j]->ly());
+      }
+    }
+    int curNeigh = i;
+    int curDist = (useNeighbour[i] ? abs( (int)(cu.lx()) - (int)(cuNeighbours[i]->lx())) + abs( (int)(cu.ly()) - (int)(cuNeighbours[i]->ly())) : 0);
+    
+    for (int j = 0; j < numCUs; j++)
+    {
+      if (curDist < dists[j])
+      {
+        for (int k = numCUs - 1; k > j; k--)
+        {
+          dists[k] = dists[k - 1];
+          neighboursInDistOrder[k] = neighboursInDistOrder[k - 1];
+        }
+        dists[j] = curDist;
+        neighboursInDistOrder[j] = curNeigh;
+        break;
+      }
+    }
+  }
+  for (int i = 0; i < numCUs; i++)
+  {
+    int j = neighboursInDistOrder[i];
+    if (limitMaxNeigh > 0 && numToMix >= limitMaxNeigh)
+    {
+      useNeighbour[j] = false;
+      continue;
+    }
+    if (useNeighbour[j])
+    {
+      numToMix ++;
+    }
+  }
+  for (int i = 0; i < numCUs; i++)
+  {
+    if (!useNeighbour[i])
+    {
+      continue;
+    }
+    if (cuNeighbours[i]->timd || cuNeighbours[i]->dimd || cuNeighbours[i]->sgpm || cuNeighbours[i]->tmrlFlag)
+    {
+      numBlocks++;
+    }
+#if JVET_AG0058_EIP
+    else if (cuNeighbours[i]->eipFlag && cu.slice->getSliceType() != I_SLICE)
+    {
+      numBlocks++;
+    }
+#endif
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+    else if (cuNeighbours[i]->tmpFlag && cu.slice->getSliceType() != I_SLICE)
+    {
+      numBlocks++;
+    }
+#endif
+#if JVET_AB0067_MIP_DIMD_LFNST
+    else if (cuNeighbours[i]->mipFlag && cu.slice->getSliceType() != I_SLICE)
+    {
+      numBlocks++;
+    }
+#endif
+    else if (CU::isIntra(*cuNeighbours[i]) && !CU::isIBC(*cuNeighbours[i]) && !cuNeighbours[i]->mipFlag && !cuNeighbours[i]->tmpFlag && !cuNeighbours[i]->eipFlag && !CU::isPLT(*cuNeighbours[i]))
+    {
+      numBlocks++;
+    }
+  }
+  if (numBlocks < 1)
+  {
+    return false;
+  }
+  return true;
+}
+#endif
+  
 #if JVET_AB0155_SGPM
 uint32_t PU::getIntraDirLuma(const PredictionUnit &pu, const int partIdx)
 {
@@ -9865,6 +10070,196 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
     {
       return;
     }
+
+#if JVET_AH0069_CMVP
+    if (slice.getPicHeader()->getEnableTMVPFlag())
+    {
+      const unsigned scale = 4 * std::max<int>(1, 4 * AMVP_DECIMATION_FACTOR / 4);
+      const unsigned mask = ~(scale - 1);
+      const Position basePos[5] = { pu.Y().center(), pu.Y().topLeft(), pu.Y().topRight(), pu.Y().bottomLeft(), pu.Y().bottomRight() };
+      const SubPic &curSubPic = pu.cs->pps->getSubPicFromPos(pu.lumaPos());
+      int checkNum = cnt;
+      for (int mergeIndex = 0; mergeIndex < checkNum && cnt < maxNumMergeCandMin1; mergeIndex++)
+      {
+        for (int list = 0; list < NUM_REF_PIC_LIST_01 && cnt < maxNumMergeCandMin1; list++)
+        {
+          if (!(mrgCtx.interDirNeighbours[mergeIndex]&(1<<list)))
+          {
+            continue;
+          }
+
+          MvField& mvField = mrgCtx.mvFieldNeighbours[(mergeIndex<<1)+list];
+          Mv cMv = mvField.mv;
+          cMv.changePrecision(MV_PRECISION_SIXTEENTH, MV_PRECISION_INT);
+          const Picture* const pColPic = slice.getRefPic(RefPicList(list), mvField.refIdx);
+
+          if (!pColPic || pColPic->isRefScaled(pu.cs->pps))
+          {
+            continue;
+          }
+
+          for (const auto& pos : basePos)
+          {
+            Position posCand(pos.x + cMv.getHor(), pos.y + cMv.getVer());
+            posCand.x = Clip3(0, (int)pColPic->getPicWidthInLumaSamples()-1, posCand.x);
+            posCand.y = Clip3(0, (int)pColPic->getPicHeightInLumaSamples()-1, posCand.y);
+            posCand.x = posCand.x & mask;
+            posCand.y = posCand.y & mask;
+
+            // Check the position of colocated block is within a subpicture
+            if (curSubPic.getTreatedAsPicFlag())
+            {
+              if (!curSubPic.isContainingPos(posCand))
+              {
+                continue;
+              }
+            }
+
+            const MotionInfo& miCascaded = pColPic->cs->getMotionInfo( posCand );
+            if (!miCascaded.isInter || (miCascaded.isIBCmot && miCascaded.rribcFlipType))
+            {
+              continue;
+            }
+            int interDir = 0;
+            int8_t chainedRefIdx[NUM_REF_PIC_LIST_01] = {-1, -1};
+            Mv chainedMv[NUM_REF_PIC_LIST_01];
+            chainedMv[REF_PIC_LIST_0].setZero();
+            chainedMv[REF_PIC_LIST_1].setZero();
+
+            const Slice *pColSlice = nullptr;
+            for( const auto s : pColPic->slices )
+            {
+              if( s->getIndependentSliceIdx() == miCascaded.sliceIdx )
+              {
+                pColSlice = s;
+                break;
+              }
+            }
+            CHECK( pColSlice == nullptr, "Slice segment not found" );
+
+            for (int colList = 0; colList < 2; colList++)
+            {
+              if (miCascaded.interDir&(1<<colList))
+              {
+                const int* refRefIdxList = slice.getRefRefIdx(RefPicList(list), mvField.refIdx, RefPicList(colList), miCascaded.refIdx[colList]);
+                int curList = -1;
+                int8_t curRefIdx = -1;
+                if (miCascaded.isIBCmot)
+                {
+                  if (chainedRefIdx[list] < 0)
+                  {
+                    curList = list;
+                    curRefIdx = mvField.refIdx;
+                  }
+                  else // BiPredictive IBC
+                  {
+                    int l = 1-list;
+                    curList = l;
+                    curRefIdx = refRefIdxList[l];
+                  }
+                }
+                else
+                {
+                  for (int l = 0; l < (slice.isInterB() ? 2 : 1) && curRefIdx < 0; l++)
+                  {
+                    if (interDir&(1<<l))
+                    {
+                      continue;
+                    }
+                    curList = l;
+                    curRefIdx = refRefIdxList[l];
+                  }
+                }
+                if (curRefIdx >= 0)
+                {
+                  CHECK(interDir&(1<<curList), "Already use list");
+                  interDir |= 1<<curList;
+                  chainedRefIdx[curList] = curRefIdx;
+                  chainedMv[curList] = mvField.mv + miCascaded.mv[colList];
+                  if (!slice.isInterB())
+                  {
+                    break;
+                  }
+                }
+              }
+            }
+            if (interDir == 0)
+            {
+              continue;
+            }
+
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+#if JVET_Y0128_NON_CTC
+            bool isValidAmMode = checkIsValidMergeMvCand(pu, chainedRefIdx);
+#else
+            bool isValidAmMode = checkIsValidMergeMvCand(cs, pu, curPoc, amvpPoc, miNeighbor.refIdx);
+#endif
+            if (isValidAmMode)
+            {
+#endif
+            mrgCtx.interDirNeighbours[cnt] = interDir;
+            mrgCtx.mvFieldNeighbours[cnt << 1].setMvField(chainedMv[0], chainedRefIdx[0]);
+            if (slice.isInterB())
+            {
+              mrgCtx.mvFieldNeighbours[(cnt << 1) + 1].setMvField(chainedMv[1], chainedRefIdx[1]);
+#if MULTI_HYP_PRED
+              mrgCtx.addHypNeighbours[cnt].clear();
+#endif
+            }
+#if JVET_Y0129_MVD_SIGNAL_AMVP_MERGE_MODE
+            if (pu.amvpMergeModeFlag[0] || pu.amvpMergeModeFlag[1])
+            {
+              mrgCtx.interDirNeighbours[cnt] = pu.amvpMergeModeFlag[0] ? 1 : 2;
+              mrgCtx.mvFieldNeighbours[(cnt << 1) + (pu.amvpMergeModeFlag[0] ? 1 : 0)].setMvField(Mv(), -1);
+            }
+#endif
+            mrgCtx.useAltHpelIf      [cnt] = false;
+#if INTER_LIC
+            mrgCtx.licFlags          [cnt] = false;
+#endif
+            mrgCtx.bcwIdx            [cnt] = BCW_DEFAULT;
+#if JVET_AA0070_RRIBC
+            mrgCtx.rribcFlipTypes    [cnt] = 0;
+#endif
+#if JVET_AC0112_IBC_LIC
+            mrgCtx.ibcLicFlags       [cnt] = false;
+#endif
+#if JVET_AE0159_FIBC
+            mrgCtx.ibcFilterFlags    [cnt] = false;
+#endif
+
+#if NON_ADJACENT_MRG_CAND || TM_MRG || JVET_AE0046_BI_GPM
+            if( !mrgCtx.xCheckSimilarMotion(cnt
+#if TM_MRG || JVET_AE0046_BI_GPM
+                                    , mvdSimilarityThresh
+#endif
+            ) )
+#endif
+            {
+              if (mrgCandIdx == cnt)
+              {
+                return;
+              }
+              cnt++;
+              if (cnt == maxNumMergeCandMin1)
+              {
+                break;
+              }
+            }
+#if JVET_AD0213_LIC_IMP
+            else
+            {
+              mrgCtx.initMrgCand(cnt);
+            }
+#endif
+#if JVET_X0083_BM_AMVP_MERGE_MODE
+            }
+#endif
+          }
+        }
+      }
+    }
+#endif
   }
 
 #if !JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC || (JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC)
@@ -27841,7 +28236,11 @@ bool CU::allowTmrl(const CodingUnit& cu)
     bReorder = false;
   }
 
+#if JVET_AH0065_RELAX_LINE_BUFFER
+ bool isFirstLineOfCtu = cu.block(COMPONENT_Y).y == 0;
+#else
   bool isFirstLineOfCtu = (((cu.block(COMPONENT_Y).y) & ((cu.cs->sps)->getMaxCUWidth() - 1)) == 0);
+#endif
   if (isFirstLineOfCtu)
   {
     bReorder = false;

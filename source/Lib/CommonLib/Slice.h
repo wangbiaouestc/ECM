@@ -3600,6 +3600,9 @@ private:
   int                        m_iSliceChromaQpDelta[MAX_NUM_COMPONENT+1];
   Picture*                   m_apcRefPicList [NUM_REF_PIC_LIST_01][MAX_NUM_REF+1];
   int                        m_aiRefPOCList  [NUM_REF_PIC_LIST_01][MAX_NUM_REF+1];
+#if JVET_AH0069_CMVP
+  int                        m_aiRefRefIdxList[NUM_REF_PIC_LIST_01][MAX_NUM_REF][NUM_REF_PIC_LIST_01][MAX_NUM_REF+1][NUM_REF_PIC_LIST_01];
+#endif
   bool                       m_bIsUsedAsLongTerm[NUM_REF_PIC_LIST_01][MAX_NUM_REF+1];
   int                        m_iDepth;
   Picture*                   m_scaledRefPicList[NUM_REF_PIC_LIST_01][MAX_NUM_REF + 1];
@@ -3809,6 +3812,9 @@ public:
         Picture*              getReferencePicture(RefPicList e, int iRefIdx)         { return m_apcRefPicList[e][iRefIdx];                           }
 #endif
   int                         getRefPOC( RefPicList e, int iRefIdx) const            { return m_aiRefPOCList[e][iRefIdx];                            }
+#if JVET_AH0069_CMVP
+  const int*                  getRefRefIdx( RefPicList e, int iRefIdx, RefPicList refe, int iRefRefIdx ) const { return m_aiRefRefIdxList[e][iRefIdx][refe][iRefRefIdx]; }
+#endif
   int                         getDepth() const                                       { return m_iDepth;                                              }
   bool                        getColFromL0Flag() const                               { return m_colFromL0Flag;                                       }
   uint32_t                    getColRefIdx() const                                   { return m_colRefIdx;                                           }
@@ -3930,6 +3936,9 @@ public:
 
   void                        constructRefPicList(PicList& rcListPic);
   void                        setRefPOCList();
+#if JVET_AH0069_CMVP
+  void                        setRefRefIdxList();
+#endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
   void                        generateCombinedList();
   int8_t                      getRefIdxOfLC(RefPicList e, int i) { return m_iRefIdxOfLC[e][i]; }

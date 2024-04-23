@@ -52,7 +52,6 @@
 #include <cstdint>
 
 
-
 #define BASE_ENCODER                                      1
 #define BASE_NORMATIVE                                    1
 #define TOOLS                                             1
@@ -152,6 +151,7 @@
 
 #if ENABLE_DIMD
 #define JVET_AC0098_LOC_DEP_DIMD                          1 // JVET-AC0098: Location-dependent Decoder-side Intra Mode Derivation
+#define JVET_AH0076_OBIC                                  1 // JVET_AH0076: OBIC
 #endif
 
 #endif
@@ -204,6 +204,8 @@
 #define JVET_AG0058_EIP                                   1 // JVET-AG0058: Extrapolation filter-based intra prediction mode
 #define JVET_AG0154_DECODER_DERIVED_CCP_FUSION            1 // JVET-AG0154: Decoder derived CCP mode with fusion candidates
 #define JVET_AG0059_CCP_MERGE_ENHANCEMENT                 1 // JVET-AG0059: Enhancements on CCP merge for chroma intra coding
+#define JVET_AH0065_RELAX_LINE_BUFFER                     1 // JVET-AH0065: Relaxing line buffer restriction
+#define JVET_AH0086_EIP_BIAS_AND_CLIP                     1 // JVET-AH0086: EIP with bias and clipping
 
 //IBC
 #define JVET_Y0058_IBC_LIST_MODIFY                        1 // JVET-Y0058: Modifications of IBC merge/AMVP list construction, ARMC-TM-IBC part is included under JVET_W0090_ARMC_TM
@@ -328,6 +330,7 @@
 #define JVET_AG0164_AFFINE_GPM                            1 // JVET-AG0164: GPM with affine prediction
 #define JVET_AG0098_AMVP_WITH_SBTMVP                      1 // JVET-AG0098: AMVP with SbTMVP mode
 #define JVET_AG0067_DMVR_EXTENSIONS                       1 // JVET-AG0067: On DMVR Extensions
+#define JVET_AH0069_CMVP                                  1 // JVET-AH0069: Chained motion vector prediction
 
 // Inter template matching tools
 #define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction
@@ -403,6 +406,7 @@
 #define JVET_AG0196_CABAC_RETRAIN                         1 // JVET-AG0196 5.1 bin dumper
 #define JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE             1 // JVET-AG0196 5.2: window offsets per slice type
 #define JVET_AG0117_CABAC_SPATIAL_TUNING                  1 // JVET-AG0117 5.3: spatial CABAC tuning
+#define JVET_AH0176_LOW_DELAY_B_CTX                       1 // JVET-AH0176 6.1: context initialization for B-slice
 
 // Loop filters
 #define ALF_IMPROVEMENT                                   1 // ALF improvement
@@ -967,7 +971,12 @@ enum SliceType
   B_SLICE               = 0,
   P_SLICE               = 1,
   I_SLICE               = 2,
+#if JVET_AH0176_LOW_DELAY_B_CTX
+  L_SLICE               = 3,
+  NUMBER_OF_SLICE_TYPES = 4
+#else
   NUMBER_OF_SLICE_TYPES = 3
+#endif
 };
 
 /// chroma formats (according to how the monochrome or the color planes are intended to be coded)

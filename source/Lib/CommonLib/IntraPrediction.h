@@ -272,6 +272,11 @@ protected:
   bool       bSrcBufFilled[NUM_EIP_SHAPE * NUM_EIP_BASE_RECOTYPE];
   bool       bDstBufFilled[NUM_EIP_BASE_RECOTYPE];
   int        numSamplesBuf[NUM_EIP_BASE_RECOTYPE];
+#if JVET_AH0086_EIP_BIAS_AND_CLIP
+  Pel        m_eipBias;
+  int        m_eipClipMin;
+  int        m_eipClipMax;
+#endif
 #endif
 private:
 #if JVET_AG0136_INTRA_TMP_LIC
@@ -776,6 +781,11 @@ public:
 #if JVET_AG0146_DIMD_ITMP_IBC
   int getBestNonAnglularMode(const CPelBuf& recoBuf, const CompArea& area, CodingUnit& cu, std::vector<Mv> BVs);
 #endif
+#if JVET_AH0076_OBIC
+  void deriveObicMode             ( const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu );
+  void generateObicBlending(PelBuf &piPred, const PredictionUnit &pu, PelBuf predFusion[OBIC_FUSION_NUM - 1], bool blendModes[OBIC_FUSION_NUM - 1], int planarIdx);
+  void generateDimdBlending(PelBuf &piPred, const PredictionUnit &pu, PelBuf &piBlock0, PelBuf &piBlock1, PelBuf &piBlock2, PelBuf &piBlock3, PelBuf &plnBlock);
+#endif
 #if JVET_AB0155_SGPM
   int deriveTimdMode              ( const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu, bool bFull = true, bool bHorVer = false );
 #else
@@ -849,6 +859,9 @@ public:
 
   void getNeiEipCands(const PredictionUnit &pu, static_vector<EipModelCandidate, MAX_MERGE_EIP> &candList, const ComponentID compId = COMPONENT_Y);
   void reorderEipCands(const PredictionUnit &pu, static_vector<EipModelCandidate, MAX_MERGE_EIP> &candList, const ComponentID compId = COMPONENT_Y);
+#if JVET_AH0086_EIP_BIAS_AND_CLIP
+  void setInputsVec(Pel *inputs, PelBuf &reco, int w, int h, int filterShape);
+#endif
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING && JVET_Y0065_GPM_INTRA
 protected:

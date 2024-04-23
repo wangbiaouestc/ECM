@@ -87,6 +87,14 @@ void CABACReader::initCtxModels( Slice& slice )
       break;
     }
   }
+
+#if JVET_AH0176_LOW_DELAY_B_CTX
+  if (sliceType == B_SLICE && slice.getCheckLDC())
+  {
+    sliceType = L_SLICE;
+  }
+#endif
+
   m_BinDecoder.reset(qp, (int)sliceType);
 
 #if JVET_AG0196_CABAC_RETRAIN
@@ -1884,7 +1892,11 @@ void CABACReader::extend_ref_line(CodingUnit& cu)
       pu = pu->next;
       continue;
     }
+#if JVET_AH0065_RELAX_LINE_BUFFER
+    bool isFirstLineOfCtu = cu.block(COMPONENT_Y).y == 0;
+#else
     bool isFirstLineOfCtu = (((cu.block(COMPONENT_Y).y)&((cu.cs->sps)->getMaxCUWidth() - 1)) == 0);
+#endif
     if (isFirstLineOfCtu)
     {
       pu->multiRefIdx = 0;
@@ -1956,7 +1968,12 @@ void CABACReader::intra_luma_pred_modes( CodingUnit &cu )
   {
     return;
   }
-
+#if JVET_AH0076_OBIC
+  if (cu.obicFlag)
+  {
+    return;
+  }
+#endif
   if( cu.bdpcmMode )
   {
     cu.firstPU->intraDir[0] = cu.bdpcmMode == 2? VER_IDX : HOR_IDX;
@@ -2223,7 +2240,26 @@ void CABACReader::cu_dimd_flag(CodingUnit& cu)
 
   unsigned ctxId = DeriveCtx::CtxDIMDFlag(cu);
   cu.dimd = m_BinDecoder.decodeBin(Ctx::DimdFlag(ctxId));
+#if JVET_AH0076_OBIC
+  cu_obic_flag(cu);
+#endif
   DTRACE(g_trace_ctx, D_SYNTAX, "cu_dimd_flag() ctx=%d pos=(%d,%d) dimd=%d\n", ctxId, cu.lumaPos().x, cu.lumaPos().y, cu.dimd);
+}
+#endif
+
+#if JVET_AH0076_OBIC
+void CABACReader::cu_obic_flag(CodingUnit& cu )
+{
+  cu.obicFlag = false;
+  if (!cu.dimd || !cu.Y().valid() || cu.predMode != MODE_INTRA || !isLuma(cu.chType))
+  {
+    return;
+  }
+  if (!PU::isObicAvail(*cu.firstPU))
+  {
+    return;
+  }
+  cu.obicFlag = m_BinDecoder.decodeBin( Ctx::obicFlag(0) );
 }
 #endif
 
