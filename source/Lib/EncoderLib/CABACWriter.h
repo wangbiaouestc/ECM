@@ -130,6 +130,9 @@ public:
 #if ENABLE_DIMD
   void        cu_dimd_flag              ( const CodingUnit&             cu );
 #endif
+#if JVET_AH0076_OBIC
+  void        cu_obic_flag              ( const CodingUnit&             cu );
+#endif
 #if JVET_W0123_TIMD_FUSION
   void        cu_timd_flag              ( const CodingUnit&             cu );
 #endif

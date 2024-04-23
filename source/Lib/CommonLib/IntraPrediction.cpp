@@ -1496,14 +1496,21 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
 
 #if ENABLE_DIMD
 #if JVET_AB0157_INTRA_FUSION
+#if JVET_AH0076_OBIC
+  if (pu.cu->dimd && pu.cu->dimdBlending && isLuma(compID) && !pu.cu->obicFlag)
+#else
   if (pu.cu->dimd && pu.cu->dimdBlending && isLuma(compID))
+#endif
   {
     int width = piPred.width;
     int height = piPred.height;
     const UnitArea localUnitArea( pu.chromaFormat, Area( 0, 0, width, height ) );
 
     PelBuf planarBuffer = m_tempBuffer[0].getBuf( localUnitArea.Y() );
-
+#if JVET_AH0076_OBIC
+    const bool applyPdpc = m_ipaParam.applyPDPC;
+    initIntraPatternChType(*pu.cu, pu.Y(), true, 0, false);
+#endif
 #if JVET_AG0146_DIMD_ITMP_IBC
     if (pu.cu->isBvDimd && pu.cu->ispMode == 0)
     {
@@ -1512,16 +1519,35 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
     else
     {
 #endif
+#if JVET_AH0076_OBIC
+      {
+        PredictionUnit puTmp = pu;
+        puTmp.intraDir[0] = PLANAR_IDX;
+        initPredIntraParams(puTmp, pu.Y(), *(pu.cs->sps));
+        const CPelBuf &srcBuf = CPelBuf(getPredictorPtr(compID), srcStride, srcHStride);
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+        xPredIntraPlanar(srcBuf, planarBuffer, 0);
+#else
+        xPredIntraPlanar(srcBuf, planarBuffer);
+#endif
+        if (m_ipaParam.applyPDPC)
+        {
+          xIntraPredPlanarDcPdpc( srcBuf, planarBuffer.buf, planarBuffer.stride, width, height, false );
+        }
+      }
+#else
 #if JVET_AC0105_DIRECTIONAL_PLANAR
     xPredIntraPlanar(srcBuf, planarBuffer, 0);
 #else
     xPredIntraPlanar(srcBuf, planarBuffer);
 #endif
+#endif
 #if JVET_AG0146_DIMD_ITMP_IBC
     }
 #endif
-
+#if !JVET_AH0076_OBIC
     const bool applyPdpc = m_ipaParam.applyPDPC;
+#endif
 
     bool blendModes[DIMD_FUSION_NUM-2] = {false};
     PelBuf predAngExtra[DIMD_FUSION_NUM-2];
@@ -1538,6 +1564,9 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
         PredictionUnit puTmp = pu;
         puTmp.intraDir[0] = pu.cu->dimdBlendMode[i];
         initPredIntraParams(puTmp, pu.Y(), *(pu.cs->sps));
+#if JVET_AH0076_OBIC
+        const CPelBuf &srcBuf = CPelBuf(getPredictorPtr(compID), srcStride, srcHStride);
+#endif
 #if JVET_W0123_TIMD_FUSION
         xPredIntraAng(srcBuf, predAngExtra[i], channelType, clpRng, false, srcBuf2nd, pu.cu->ispMode!=NOT_INTRA_SUBPARTITIONS);
 #else
@@ -1933,7 +1962,86 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
   }
 #endif
 #endif
-
+#if JVET_AH0076_OBIC
+  if (pu.cu->obicFlag && pu.cu->obicIsBlended && isLuma(compID))
+  {
+    int width = piPred.width;
+    int height = piPred.height;
+    const UnitArea localUnitArea( pu.chromaFormat, Area( 0, 0, width, height ) );
+    bool blendModes[OBIC_FUSION_NUM-1] = {false};
+    PelBuf predFusion[OBIC_FUSION_NUM-1];
+    const bool applyPdpc = m_ipaParam.applyPDPC;
+    initIntraPatternChType(*pu.cu, pu.Y(), true, 0, false);
+    PredictionUnit pu2 = pu;
+    for (int i = 0; i < OBIC_FUSION_NUM - 1; i++)
+    {
+      blendModes[i] = false;
+      predFusion[i] = m_tempBuffer[i].getBuf( localUnitArea.Y() );
+      if (pu.cu->obicMode[i + 1] >= 0)
+      {
+        blendModes[i] = true;
+        pu2.intraDir[0]  = pu.cu->obicMode[i + 1];
+        initPredIntraParams(pu2, pu.Y(), *(pu.cs->sps));
+        pu2.intraDir[0]  = pu.cu->obicMode[0];
+        const CPelBuf &srcBuf = CPelBuf(getPredictorPtr(compID), srcStride, srcHStride);
+        switch (pu.cu->obicMode[i + 1])
+        {
+#if JVET_AC0105_DIRECTIONAL_PLANAR
+          case (PLANAR_IDX): pu.cu->isBvDimd ? predUsingBv(predFusion[i].buf, predFusion[i].stride, pu.cu->bvDimd, *pu.cu) : xPredIntraPlanar(srcBuf, predFusion[i], 0); break;
+#else
+          case (PLANAR_IDX): pu.cu->isBvDimd ? predUsingBv(predFusion[i].buf, predFusion[i].stride, pu.cu->bvDimd, *pu.cu) : xPredIntraPlanar(srcBuf, predFusion[i]); break;
+#endif
+          case(DC_IDX):     xPredIntraDc(srcBuf, predFusion[i], channelType, false); break;
+#if JVET_AB0157_INTRA_FUSION
+          default:          xPredIntraAng(srcBuf, predFusion[i], channelType, clpRng, false, srcBuf2nd, pu.cu->ispMode!=NOT_INTRA_SUBPARTITIONS); break;
+#else
+          default:          xPredIntraAng(srcBuf, predFusion[i], channelType, clpRng, bExtIntraDir); break;
+#endif
+        }
+        if( (m_ipaParam.applyPDPC || pu.ciipPDPC) && (pu.cu->obicMode[i + 1] == PLANAR_IDX || pu.cu->obicMode[i + 1] == DC_IDX) )
+        {
+          if (pu.cu->obicMode[i + 1] == PLANAR_IDX && pu.cu->isBvDimd)
+          {
+            continue;
+          }
+          xIntraPredPlanarDcPdpc( srcBuf, predFusion[i].buf, predFusion[i].stride, width, height, false );
+        }
+      }
+    }
+    m_ipaParam.applyPDPC = applyPdpc;
+    const int log2WeightSum = 6;
+    Pel *pelPred = piPred.buf;
+    Pel *pelFusion[OBIC_FUSION_NUM - 1];
+    int weight[OBIC_FUSION_NUM];
+    weight[0] = pu.cu->obicFusionWeight[0];
+    for (int i = 0; i < OBIC_FUSION_NUM - 1; i++)
+    {
+      pelFusion[i] = predFusion[i].buf;
+      weight[i + 1] = pu.cu->obicFusionWeight[i + 1];
+    }
+    for( int y = 0; y < height; y++ )
+    {
+      for( int x = 0; x < width; x++ )
+      {
+        int blend = pelPred[x] * weight[0];
+        for (int i = 0; i < OBIC_FUSION_NUM - 1; i++)
+        {
+          if (blendModes[i])
+          {
+            blend += pelFusion[i][x] * weight[ i + 1];
+          }
+        }
+        pelPred[x] = (Pel)(blend >> log2WeightSum);
+      }
+      pelPred += piPred.stride;
+      for (int i = 0; i < OBIC_FUSION_NUM - 1; i++)
+      {
+        pelFusion[i] += predFusion[i].stride;
+      }
+    }
+    return;
+  }
+#endif
 #if JVET_W0123_TIMD_FUSION
   if (pu.cu->timd && pu.cu->timdIsBlended && isLuma(compID))
   {
@@ -3957,6 +4065,309 @@ void IntraPrediction::xPredIntraAng( const CPelBuf &pSrc, PelBuf &pDst, const Ch
     }
   }
 }
+#if JVET_AH0076_OBIC
+void IntraPrediction::generateObicBlending(PelBuf &piPred, const PredictionUnit &pu, PelBuf predFusion[OBIC_FUSION_NUM - 1], bool blendModes[OBIC_FUSION_NUM - 1], int planarIdx)
+{
+  const int height = piPred.height;
+  const int width = piPred.width;
+  const UnitArea localUnitArea( pu.chromaFormat, Area( 0, 0, width, height ) );
+  PelBuf predFusionBV = m_tempBuffer[7].getBuf( localUnitArea.Y() );
+  if (pu.cu->isBvDimd)
+  {
+    predUsingBv(predFusionBV.buf, predFusionBV.stride, pu.cu->bvDimd, *pu.cu);
+  }
+  const int log2WeightSum = 6;
+  Pel *pelPred = piPred.buf;
+  Pel *pelFusion[OBIC_FUSION_NUM - 1];
+  Pel *pelFusionBv = predFusionBV.buf;
+  int weight[OBIC_FUSION_NUM];
+  weight[0] = pu.cu->obicFusionWeight[0];
+  for (int i = 0; i < OBIC_FUSION_NUM - 1; i++)
+  {
+    pelFusion[i] = predFusion[i].buf;
+    weight[i + 1] = pu.cu->obicFusionWeight[i + 1];
+  }
+  for( int y = 0; y < height; y++ )
+  {
+    for( int x = 0; x < width; x++ )
+    {
+      int blend = pelPred[x] * weight[0];
+      for (int i = 0; i < OBIC_FUSION_NUM - 1; i++)
+      {
+        if (blendModes[i])
+        {
+          if (i == planarIdx && pu.cu->isBvDimd)
+          {
+            blend += pelFusionBv[x] * weight[ i + 1];
+          }
+          else
+          {
+            blend += pelFusion[i][x] * weight[ i + 1];
+          }
+        }
+      }
+      pelPred[x] = (Pel)(blend >> log2WeightSum);
+    }
+    pelPred += piPred.stride;
+    for (int i = 0; i < OBIC_FUSION_NUM - 1; i++)
+    {
+      pelFusion[i] += predFusion[i].stride;
+    }
+    pelFusionBv += predFusionBV.stride;
+  }
+  return;
+}
+void IntraPrediction::generateDimdBlending(PelBuf &piPred, const PredictionUnit &pu, PelBuf &piBlock0, PelBuf &piBlock1, PelBuf &piBlock2, PelBuf &piBlock3, PelBuf &plnBlock)
+{
+    // do blending
+    int width = piPred.width;
+    int height = piPred.height;
+    const UnitArea localUnitArea( pu.chromaFormat, Area( 0, 0, width, height ) );
+    PelBuf planarBuffer = m_tempBuffer[0].getBuf( localUnitArea.Y() );
+#if JVET_AG0146_DIMD_ITMP_IBC
+    if (pu.cu->isBvDimd && pu.cu->ispMode == 0)
+    {
+      predUsingBv(planarBuffer.buf, planarBuffer.stride, pu.cu->bvDimd, *pu.cu);
+    }
+    else
+    {
+#endif
+      planarBuffer.copyFrom(plnBlock);
+#if JVET_AG0146_DIMD_ITMP_IBC
+    }
+#endif
+
+    bool blendModes[DIMD_FUSION_NUM-2] = {false};
+    for( int i = 0; i < DIMD_FUSION_NUM-2; ++i)
+    {
+#if JVET_AC0098_LOC_DEP_DIMD
+      blendModes[i] = (pu.cu->dimdBlendMode[i] != PLANAR_IDX);
+#else
+      blendModes[i] = (i==0 || pu.cu->dimdBlendMode[i] != PLANAR_IDX);
+#endif
+
+    }
+    PelBuf predAngExtra[DIMD_FUSION_NUM-2];
+    predAngExtra[0] = m_tempBuffer[1].getBuf( localUnitArea.Y() );
+    predAngExtra[1] = m_tempBuffer[2].getBuf( localUnitArea.Y() );
+    predAngExtra[2] = m_tempBuffer[3].getBuf( localUnitArea.Y() );
+    predAngExtra[3] = m_tempBuffer[4].getBuf( localUnitArea.Y() );
+    predAngExtra[0].copyFrom(piBlock0);
+    predAngExtra[1].copyFrom(piBlock1);
+    predAngExtra[2].copyFrom(piBlock2);
+    predAngExtra[3].copyFrom(piBlock3);
+
+#if JVET_AC0098_LOC_DEP_DIMD
+    PelBuf predAngNonLocDep = m_tempBuffer[7].getBuf( localUnitArea.Y() );
+    PelBuf predAngVer       = m_tempBuffer[5].getBuf( localUnitArea.Y() );
+    PelBuf predAngHor       = m_tempBuffer[6].getBuf( localUnitArea.Y() );
+
+    Pel* pelVer = predAngVer.buf;
+    int strideVer = predAngVer.stride;
+    Pel* pelHor = predAngHor.buf;
+    int strideHor = predAngHor.stride;
+    Pel *pelNonLocDep = predAngNonLocDep.buf;
+    int strideNonLocDep = predAngNonLocDep.stride;
+
+    bool useLocDepBlending = false;
+    int weightVer = 0, weightHor = 0, weightNonLocDep = 0;
+    weightNonLocDep += pu.cu->dimdRelWeight[1];
+    for (int i = 0; i < DIMD_FUSION_NUM-1; i++)
+    {
+      if (i == 0  || blendModes[i-1])
+      {
+        if (pu.cu->dimdLocDep[i] == 1)
+        {
+          weightVer += (i == 0 ? pu.cu->dimdRelWeight[0] : pu.cu->dimdRelWeight[i+ 1]);
+        }
+        else if (pu.cu->dimdLocDep[i] == 2)
+        {
+          weightHor += (i == 0 ? pu.cu->dimdRelWeight[0] : pu.cu->dimdRelWeight[i+ 1]);
+        }
+        else
+        {
+          weightNonLocDep += (i == 0 ? pu.cu->dimdRelWeight[0] : pu.cu->dimdRelWeight[i+1]);
+        }
+      }
+    }
+
+    if(weightHor || weightVer)
+    {
+      useLocDepBlending = true;
+    }
+
+    if(!useLocDepBlending)
+    {
+      pelNonLocDep = piPred.buf;
+      strideNonLocDep = piPred.stride;
+    }
+
+    for (int locDep = 0; locDep < 3; locDep++)
+    {
+      int totWeight = (locDep == 0 ? weightNonLocDep : (locDep == 1 ? weightVer : weightHor));
+      if (totWeight == 0)
+      {
+        continue;
+      }
+
+      int weights[6] = {0};
+      weights[0] =  (pu.cu->dimdLocDep[0] == locDep) ? pu.cu->dimdRelWeight[0] : 0;
+      weights[1] =  (blendModes[0] && pu.cu->dimdLocDep[1] == locDep) ? pu.cu->dimdRelWeight[2] : 0;
+      weights[2] =  (blendModes[1] && pu.cu->dimdLocDep[2] == locDep) ? pu.cu->dimdRelWeight[3] : 0;
+      weights[3] =  (blendModes[2] && pu.cu->dimdLocDep[3] == locDep) ? pu.cu->dimdRelWeight[4] : 0;
+      weights[4] =  (blendModes[3] && pu.cu->dimdLocDep[4] == locDep) ? pu.cu->dimdRelWeight[5] : 0;
+      weights[5] =  (locDep == 0) ? pu.cu->dimdRelWeight[1] : 0;
+
+      int num2blend = 0;
+      int blendIndexes[DIMD_FUSION_NUM] = {0};
+      for (int i = 0; i < DIMD_FUSION_NUM; i++)
+      {
+        if (weights[i] != 0)
+        {
+          blendIndexes[num2blend] = i;
+          num2blend++;
+        }
+      }
+#if JVET_W0123_TIMD_FUSION
+      if( (num2blend == 1 ) || (num2blend <=3 && (totWeight == (1 << (floorLog2(totWeight))) ) ))
+      {
+        int index = blendIndexes[0];
+        if(locDep == 0)
+        {
+          pelNonLocDep = (index == 0 ? piPred.buf : (index == 5 ? planarBuffer.buf : predAngExtra[index-1].buf));
+          strideNonLocDep = (index == 0 ? piPred.stride : (index == 5 ? planarBuffer.stride : predAngExtra[index-1].stride));
+        }
+        else if(locDep == 1)
+        {
+          pelVer = (index == 0 ? piPred.buf : predAngExtra[index-1].buf);
+          strideVer = (index == 0 ? piPred.stride : predAngExtra[index-1].stride);
+        }
+        else
+        {
+          pelHor = (index == 0 ? piPred.buf : predAngExtra[index-1].buf);
+          strideHor = (index == 0 ? piPred.stride : predAngExtra[index-1].stride);
+        }
+        Pel* pCur = (locDep == 0 ? pelNonLocDep : (locDep == 1 ? pelVer : pelHor));
+        int strideCur = (locDep == 0 ? strideNonLocDep : (locDep == 1 ? strideVer : strideHor));
+
+        int factor = 64 / totWeight;
+        if (num2blend == 2)
+        {
+          int index1 = blendIndexes[1];
+          Pel* p1 = (index1 == 0 ? piPred.buf : (index1 == 5 ?  planarBuffer.buf : predAngExtra[index1-1].buf));
+          int stride1 = (index1 == 0 ? piPred.stride : (index1 == 5 ? planarBuffer.stride : predAngExtra[index1-1].stride));
+          int w0 = (weights[index]*factor);
+          int w1 = 64 - w0;
+          m_timdBlending(pCur, strideCur, p1, stride1, w0, w1,width, height);
+        }
+        else if(num2blend == 3)
+        {
+          int index1 = blendIndexes[1];
+          Pel* p1 = (index1 == 0 ? piPred.buf : (index1 == 5 ?  planarBuffer.buf : predAngExtra[index1-1].buf));
+          int stride1 = (index1 == 0 ? piPred.stride : (index1 == 5 ? planarBuffer.stride : predAngExtra[index1-1].stride));
+
+          int index2 = blendIndexes[2];
+          Pel* p2 = (index2 == 0 ? piPred.buf : (index2 == 5 ?  planarBuffer.buf : predAngExtra[index2-1].buf));
+          int stride2 = (index2 == 0 ? piPred.stride : (index2 == 5 ? planarBuffer.stride : predAngExtra[index2-1].stride));
+          int w0 = (weights[index]*factor);
+          int w1 = (weights[index1]*factor);
+          int w2 = 64  - w0 - w1;
+          m_dimdBlending(pCur, strideCur, p1, stride1, p2, stride2, w0, w1, w2, width, height);
+        }
+      }
+      else
+#endif
+      {
+        Pel* pCur = (locDep == 0 ? pelNonLocDep : (locDep == 1 ? pelVer : pelHor));
+        int strideCur = (locDep == 0 ? strideNonLocDep : (locDep == 1 ? strideVer : strideHor));
+        Pel *pelPlanar = planarBuffer.buf;
+        int stridePlanar = planarBuffer.stride;
+        Pel *pelPredAng0 = piPred.buf;
+        Pel *pelPredAng1 = predAngExtra[0].buf;
+        Pel *pelPredAng2 = predAngExtra[1].buf;
+        Pel *pelPredAng3 = predAngExtra[2].buf;
+        Pel *pelPredAng4 = predAngExtra[3].buf;
+        int stride0 = piPred.stride;
+        int stride1 = predAngExtra[0].stride;
+        int stride2 = predAngExtra[1].stride;
+        int stride3 = predAngExtra[2].stride;
+        int stride4 = predAngExtra[3].stride;
+        for( int y = 0; y < height; y++ )
+        {
+          for( int x = 0; x < width; x++ )
+          {
+            int blend = pelPredAng0[x] * weights[0];
+            blend += blendModes[0] ? pelPredAng1[x] * weights[1] : 0;
+            blend += blendModes[1] ? pelPredAng2[x] * weights[2] : 0;
+            blend += blendModes[2] ? pelPredAng3[x] * weights[3] : 0;
+            blend += blendModes[3] ? pelPredAng4[x] * weights[4] : 0;
+            blend += pelPlanar[x] * weights[5];
+            pCur[x] = (Pel)(blend / totWeight);
+          }
+          pCur += strideCur;
+          pelPredAng0 += stride0;
+          pelPredAng1 += stride1;
+          pelPredAng2 += stride2;
+          pelPredAng3 += stride3;
+          pelPredAng4 += stride4;
+          pelPlanar += stridePlanar;
+        }
+      }
+    }
+
+    if (useLocDepBlending)
+    {
+      int mode = ((weightHor > 0 && weightVer > 0) ? 0 : (weightVer > 0 ? 1 : 2));
+
+      Pel *pelDst = piPred.buf;
+      int strideDst = piPred.stride;
+#if JVET_W0123_TIMD_FUSION && JVET_AG0092_ENHANCED_TIMD_FUSION
+      xLocationdepBlending(pelDst, strideDst, pelVer, strideVer, pelHor, strideHor, pelNonLocDep, strideNonLocDep, width, height,mode, weightVer, weightHor, weightNonLocDep);
+#else
+      xDimdLocationdepBlending(pelDst, strideDst, pelVer, strideVer, pelHor, strideHor, pelNonLocDep, strideNonLocDep, width, height,mode, weightVer, weightHor, weightNonLocDep);
+#endif
+    }
+#else
+    const int log2WeightSum = 6;
+    Pel *pelPred = piPred.buf;
+    Pel *pelPlanar = planarBuffer.buf;
+    Pel *pelPredAng = predAngExtra[0].buf;
+    int  w0 = pu.cu->dimdRelWeight[0], w1 = pu.cu->dimdRelWeight[1], w2 = pu.cu->dimdRelWeight[2];
+
+    Pel *pelPredAng2 = predAngExtra[1].buf;
+    Pel *pelPredAng3 = predAngExtra[2].buf;
+    Pel *pelPredAng4 = predAngExtra[3].buf;
+    int  w3         = pu.cu->dimdRelWeight[3];
+    int  w4         = pu.cu->dimdRelWeight[4];
+    int  w5         = pu.cu->dimdRelWeight[5];
+
+    for( int y = 0; y < height; y++ )
+    {
+      for( int x = 0; x < width; x++ )
+      {
+        int blend = pelPred[x] * w0;
+        blend += pelPlanar[x] * w1;
+#if JVET_AC0098_LOC_DEP_DIMD
+        blend += blendModes[0] ? pelPredAng[x] * w2 : 0;
+#else
+        blend += pelPredAng[x] * w2;
+#endif
+        blend += blendModes[1] ? pelPredAng2[x] * w3 : 0;
+        blend += blendModes[2] ? pelPredAng3[x] * w4 : 0;
+        blend += blendModes[3] ? pelPredAng4[x] * w5 : 0;
+        pelPred[x] = (Pel)(blend >> log2WeightSum);
+      }
+
+      pelPred += piPred.stride;
+      pelPlanar += planarBuffer.stride;
+      pelPredAng += predAngExtra[0].stride;
+      pelPredAng2 += predAngExtra[1].stride;
+      pelPredAng3 += predAngExtra[2].stride;
+      pelPredAng4 += predAngExtra[3].stride;
+    }
+#endif
+}
+#endif
 
 #if JVET_Z0050_DIMD_CHROMA_FUSION
 #if JVET_AD0188_CCP_MERGE
@@ -4680,7 +5091,12 @@ void IntraPrediction::initIntraPatternChType(const CodingUnit &cu, const CompAre
   auto mrlIndex2D = cu.firstPU->multiRefIdx;
   m_ipaParam.fetchRef2nd   = area.compID == COMPONENT_Y;
   m_ipaParam.fetchRef2nd  &= area.width * area.height >= SIZE_CONSTRAINT;
+#if JVET_AH0076_OBIC
+  m_ipaParam.fetchRef2nd  &= !((cu.dimd && !cu.obicFlag && cu.dimdBlending) || (cu.dimd && cu.obicFlag && cu.obicIsBlended));
+#else
   m_ipaParam.fetchRef2nd  &= !(cu.dimd && cu.dimdBlending);
+#endif
+
 #if JVET_AH0065_RELAX_LINE_BUFFER
   m_ipaParam.fetchRef2nd  &= !(mrlIndex2D == MULTI_REF_LINE_IDX[MRL_NUM_REF_LINES - 1] && (cu.block(COMPONENT_Y).y <= MULTI_REF_LINE_IDX[MRL_NUM_REF_LINES - 1]));
 #else
@@ -6882,6 +7298,529 @@ int IntraPrediction::getBestNonAnglularMode(const CPelBuf& recoBuf, const CompAr
   return 0;
 }
 #endif
+  
+#if JVET_AH0076_OBIC
+  void IntraPrediction::deriveObicMode( const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu )
+  {
+    /* -------------------------------------------------------------------
+    Step 1: Collect adjacent neighbour cands
+    Step 2: Collect non-adjacent neighbour cands
+    Step 3: Sort neighbours by distance
+    Step 4: Build Histogram of oCcurrence (HoC) from remaining neighbours
+    Step 5: Get top 6 amplitudes from the HoC
+    Step 6: Compute the fusion weights from amplitudes and store in CU
+    ---------------------------------------------------------------------- */
+
+    cu.obicIsBlended = false;
+    for (int i = 0; i < OBIC_FUSION_NUM; i++)
+    {
+      cu.obicMode[i] = -1;
+      cu.obicFusionWeight[i] = 0;
+    }
+    
+    int histogram[NUM_LUMA_MODE];
+    for (int i = 0; i < NUM_LUMA_MODE; i++)
+    {
+      histogram[i] = 0;
+    }
+    const int step = 4;
+    const int numCUs = NUM_OBIC_CUS;
+    const CodingUnit* cuNeighbours[numCUs];
+
+    /* -----------------------------------------------------------------
+    ----------- Step 1: Collect adjacent neighbour cands ---------------
+    ----------------------------------------------------------------- */
+
+    cuNeighbours[0] = cu.cs->getCURestricted(cu.lumaPos().offset(-1, 0), cu, CH_L);
+    cuNeighbours[1] = cu.cs->getCURestricted(cu.lumaPos().offset(0, -1), cu, CH_L);
+    cuNeighbours[2] = cu.cs->getCURestricted(cu.lumaPos().offset(-1, -1), cu, CH_L);
+    
+    const CodingUnit* cuTemp;
+    for (int i = 0; i <= cu.lheight(); i += step)
+    {
+      cuTemp = cu.cs->getCURestricted(cu.lumaPos().offset(-1, i), cu, CH_L);
+      if (cuTemp && CU::isIntra(*cuTemp))
+      {
+        cuNeighbours[0] = cuTemp;
+        break;
+      }
+    }
+    for (int i = 0; i <= cu.lwidth(); i += step)
+    {
+      cuTemp = cu.cs->getCURestricted(cu.lumaPos().offset(i, -1), cu, CH_L);
+      if (cuTemp && CU::isIntra(*cuTemp))
+      {
+        cuNeighbours[1] = cuTemp;
+        break;
+      }
+    }
+    
+    const CodingUnit* cuLeft = cu.cs->getCURestricted(cu.lumaPos().offset(-1, 0), cu, CH_L);
+    const CodingUnit* cuTop  = cu.cs->getCURestricted(cu.lumaPos().offset(0, -1), cu, CH_L);
+    cuNeighbours[3] = cuLeft ? cu.cs->getCURestricted(cuLeft->lumaPos().offset(cuLeft->lwidth()-1, cuLeft->lheight()), cu, CH_L) : NULL;
+    cuNeighbours[4] = cuTop ? cu.cs->getCURestricted(cuTop->lumaPos().offset(cuTop->lwidth(), cuTop->lheight() - 1), cu, CH_L) : NULL;
+    cuNeighbours[5] = cuNeighbours[3] ? cu.cs->getCURestricted(cuNeighbours[3]->lumaPos().offset(cuNeighbours[3]->lwidth()-1, cuNeighbours[3]->lheight()), cu, CH_L) : NULL;
+    cuNeighbours[6] = cuNeighbours[4] ? cu.cs->getCURestricted(cuNeighbours[4]->lumaPos().offset(cuNeighbours[4]->lwidth(), cuNeighbours[4]->lheight() - 1), cu, CH_L) : NULL;
+    cuNeighbours[7] = cuLeft ? cu.cs->getCURestricted(cuLeft->lumaPos().offset(-1, 0), cu, CH_L) : NULL;
+    cuNeighbours[8] = cuTop ? cu.cs->getCURestricted(cuTop->lumaPos().offset(0, -1), cu, CH_L) : NULL;
+    cuNeighbours[9] = cuNeighbours[3] ? cu.cs->getCURestricted(cuNeighbours[3]->lumaPos().offset(-1, 0), cu, CH_L) : NULL;
+    cuNeighbours[10] = cuNeighbours[4] ? cu.cs->getCURestricted(cuNeighbours[4]->lumaPos().offset(0, -1), cu, CH_L) : NULL;
+    cuNeighbours[11] = cuNeighbours[5] ? cu.cs->getCURestricted(cuNeighbours[5]->lumaPos().offset(-1, 0), cu, CH_L) : NULL;
+    cuNeighbours[12] = cuNeighbours[6] ? cu.cs->getCURestricted(cuNeighbours[6]->lumaPos().offset(0, -1), cu, CH_L) : NULL;
+    
+    if ((!cuNeighbours[9]) && cuNeighbours[2])
+    {
+      cuNeighbours[9] = cu.cs->getCURestricted(cuNeighbours[2]->lumaPos().offset(-1, cuNeighbours[2]->lheight()-1), cu, CH_L);
+    }
+    if ((!cuNeighbours[10]) && cuNeighbours[2])
+    {
+      cuNeighbours[10] = cu.cs->getCURestricted(cuNeighbours[2]->lumaPos().offset(cuNeighbours[2]->lwidth()-1, -1), cu, CH_L);
+    }
+    if ((!cuNeighbours[11]) && cuLeft && cuNeighbours[7])
+    {
+      cuNeighbours[11] = cu.cs->getCURestricted(cuNeighbours[7]->lumaPos().offset(-1, 0), cu, CH_L);
+    }
+    if ((!cuNeighbours[12]) && cuTop && cuNeighbours[8])
+    {
+      cuNeighbours[12] = cu.cs->getCURestricted(cuNeighbours[8]->lumaPos().offset(0, -1), cu, CH_L);
+    }
+    
+    /* -----------------------------------------------------------------
+    ---------- Step 2: Collect non-adjacent neighbour cands-------------
+    ----------------------------------------------------------------- */
+
+    const Position  topLeft = area.topLeft();
+    int       offsetX           = 0;
+    int       offsetY           = 0;
+    int       cout              = 13;
+    const int numNACandidate[4] = { 3, 5, 5, 5 };
+    const int idxMap[4][5]      = { { 0, 1, 4 }, { 0, 1, 2, 3, 4 }, { 0, 1, 2, 3, 4 }, { 0, 1, 2, 3, 4 } };
+    for (int iDistanceIndex = 0; iDistanceIndex < NADISTANCE_LEVEL; iDistanceIndex++)
+    {
+      const int iNADistanceHor = cu.Y().width * (iDistanceIndex + 1);
+      const int iNADistanceVer = cu.Y().height * (iDistanceIndex + 1);
+      for (int iNASPIdx = 0; iNASPIdx < numNACandidate[iDistanceIndex]; iNASPIdx++)
+      {
+        switch (idxMap[iDistanceIndex][iNASPIdx])
+        {
+          case 0: offsetX = -iNADistanceHor - 1; offsetY = cu.Y().height + iNADistanceVer - 1; break;
+          case 1: offsetX = cu.Y().width + iNADistanceHor - 1; offsetY = -iNADistanceVer - 1; break;
+          case 2: offsetX = cu.Y().width >> 1; offsetY = -iNADistanceVer - 1; break;
+          case 3: offsetX = -iNADistanceHor - 1; offsetY = cu.Y().height >> 1; break;
+          case 4: offsetX = -iNADistanceHor - 1; offsetY = -iNADistanceVer - 1; break;
+          default: printf("error!"); exit(0); break;
+        }
+        cuNeighbours[cout++] = cu.cs->getCURestricted(topLeft.offset(offsetX, offsetY), cu, CH_L);
+      }
+    }
+
+    /* -----------------------------------------------------------------
+    ---------------- Step 3: Sort neighbours by distance ---------------
+    ----------------------------------------------------------------- */
+
+    int limitMaxNeigh = 20;
+    bool useNeighbour[numCUs];
+    int  neighboursInDistOrder[numCUs];
+    int  dists[numCUs];
+    for (int i = 0; i < numCUs; i++)
+    {
+      useNeighbour[i] = false;
+      neighboursInDistOrder[i] = 0;
+      dists[i] = 0;
+    }
+    for (int i = 0; i < numCUs; i++)
+    {
+      dists[i] = MAX_INT;
+    }
+    int numToMix = 0;
+    for (int i = 0; i < numCUs; i++)
+    {
+      useNeighbour[i] = (cuNeighbours[i] && CU::isIntra(*cuNeighbours[i]));
+      if (useNeighbour[i])
+      {
+        for (int j = i-1; j >= 0; j--)
+        {
+          if (!useNeighbour[j])
+          {
+            continue;
+          }
+          useNeighbour[i] &= (cuNeighbours[i]->lx() != cuNeighbours[j]->lx() || cuNeighbours[i]->ly() != cuNeighbours[j]->ly());
+        }
+      }
+      int curNeigh = i;
+      int curDist = (useNeighbour[i] ? abs( (int)(cu.lx()) - (int)(cuNeighbours[i]->lx())) + abs( (int)(cu.ly()) - (int)(cuNeighbours[i]->ly())) : 0);
+      
+      for (int j = 0; j < numCUs; j++)
+      {
+        if (curDist < dists[j])
+        {
+          for (int k = numCUs - 1; k > j; k--)
+          {
+            dists[k] = dists[k - 1];
+            neighboursInDistOrder[k] = neighboursInDistOrder[k - 1];
+          }
+          dists[j] = curDist;
+          neighboursInDistOrder[j] = curNeigh;
+          break;
+        }
+      }
+    }
+    for (int i = 0; i < numCUs; i++)
+    {
+      int j = neighboursInDistOrder[i];
+      if (limitMaxNeigh > 0 && numToMix >= limitMaxNeigh)
+      {
+        useNeighbour[j] = false;
+        continue;
+      }
+      if (useNeighbour[j])
+      {
+        numToMix ++;
+      }
+    }
+    
+
+     /* -----------------------------------------------------------------
+     --------------------------- Step 4: --------------------------------
+     ---------------- Build Histogram of oCcurrence (HoC) ---------------
+     --------------------- from remaining neighbours --------------------
+     ----------------------------------------------------------------- */
+
+
+    for (int i = 0; i < numCUs; i++)
+    {
+      if (!useNeighbour[i])
+      {
+        continue;
+      }
+      int numSamples = cuNeighbours[i]->lumaSize().width * cuNeighbours[i]->lumaSize().height;
+      if (cuNeighbours[i]->timd)
+      {
+        int m = MAP131TO67(cuNeighbours[i]->timdMode);
+        histogram[m] += numSamples;
+        if (cuNeighbours[i]->timdIsBlended && cuNeighbours[i]->timdFusionWeight[1] > 0)
+        {
+          int m = MAP131TO67(cuNeighbours[i]->timdModeSecondary);
+          histogram[m] += numSamples;
+          if (cuNeighbours[i]->timdFusionWeight[2] > 0)
+          {
+            int m = MAP131TO67(cuNeighbours[i]->timdModeNonAng);
+            histogram[m] += numSamples;
+          }
+        }
+      }
+      else if (cuNeighbours[i]->dimd && !cuNeighbours[i]->obicFlag)
+      {
+        int m = cuNeighbours[i]->dimdMode;
+        if (m >= 0 && m < NUM_LUMA_MODE)
+        {
+          histogram[m] += numSamples;
+        }
+        if (cuNeighbours[i]->dimdBlending)
+        {
+          for (int idx = 0; idx < DIMD_FUSION_NUM - 1; idx++)
+          {
+            m = cuNeighbours[i]->dimdBlendMode[idx];
+            if (m >= 0 && m < NUM_LUMA_MODE && cuNeighbours[i]->dimdRelWeight[idx + 1] > 0)
+            {
+              histogram[m] += numSamples;
+            }
+          }
+        }
+      }
+      else if (cuNeighbours[i]->dimd && cuNeighbours[i]->obicFlag)
+      {
+        int m = cuNeighbours[i]->obicMode[0];
+        histogram[m] += numSamples;
+        if (cuNeighbours[i]->obicIsBlended)
+        {
+          for (int idx = 1; idx < OBIC_FUSION_NUM; idx++)
+          {
+            m = cuNeighbours[i]->obicMode[idx];
+            if (m >= 0 && cuNeighbours[i]->obicFusionWeight[idx] > 0)
+            {
+              histogram[m] += numSamples;
+            }
+          }
+        }
+      }
+      else if (cuNeighbours[i]->sgpm)
+      {
+        int m1 = cuNeighbours[i]->sgpmMode0;
+        int m2 = cuNeighbours[i]->sgpmMode1;
+        if (m1 >= 0 && m1 < NUM_LUMA_MODE)
+        {
+          histogram[m1] += numSamples;
+        }
+        if (m2 >= 0 && m2 < NUM_LUMA_MODE)
+        {
+          histogram[m2] += numSamples;
+        }
+      }
+      else if (cuNeighbours[i]->tmrlFlag)
+      {
+        int m = MAP131TO67(cuNeighbours[i]->firstPU->intraDir[0]);
+        histogram[m] += numSamples;
+      }
+#if JVET_AG0058_EIP
+      else if (cuNeighbours[i]->eipFlag && cu.slice->getSliceType() != I_SLICE)
+      {
+        int m = cuNeighbours[i]->eipModel.eipDimdMode;
+        histogram[m] += numSamples;
+      }
+#endif
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+      else if (cuNeighbours[i]->tmpFlag && cu.slice->getSliceType() != I_SLICE)
+      {
+        int m = cuNeighbours[i]->intraTmpDimdMode;
+        histogram[m] += numSamples;
+      }
+#endif
+#if JVET_AB0067_MIP_DIMD_LFNST
+      else if (cuNeighbours[i]->mipFlag && cu.slice->getSliceType() != I_SLICE)
+      {
+        int m = cuNeighbours[i]->mipDimdMode;
+        histogram[m] += numSamples;
+      }
+#endif
+      else if (CU::isIntra(*cuNeighbours[i]) && !cuNeighbours[i]->tmpFlag && !cuNeighbours[i]->mipFlag && !cuNeighbours[i]->eipFlag && !CU::isIBC(*cuNeighbours[i]) && !CU::isPLT(*cuNeighbours[i]))
+      {
+        int m = cuNeighbours[i]->firstPU->intraDir[0];
+        histogram[m] += numSamples;
+      }
+    }
+
+    // Penalize Dimd modes to impose diversity between OBIC and DIMD
+    if (cu.dimdMode >= 0 && cu.dimdMode < NUM_LUMA_MODE)
+    {
+      histogram[cu.dimdMode] >>= 1;
+    }
+    if (cu.dimdBlending && cu.dimdBlendMode[0] >= 0 && cu.dimdBlendMode[0] < NUM_LUMA_MODE && cu.dimdRelWeight[1] > 0)
+    {
+      histogram[cu.dimdBlendMode[0]] >>= 1;
+    }
+    
+  /* -----------------------------------------------------------------
+  ------------------- Step 5: Get top 6 amplitudes -------------------
+  -------------------------- from the HoC ----------------------------
+  ----------------------------------------------------------------- */
+
+    int bestModes[OBIC_FUSION_NUM], bestAmps[OBIC_FUSION_NUM];
+    for (int i = 0; i < OBIC_FUSION_NUM; i++)
+    {
+      bestModes[i] = -1;
+      bestAmps[i] = 0;
+    }
+    for (int i = 0; i < NUM_LUMA_MODE; i++)
+    {
+      int curMode = i;
+      if (curMode == PLANAR_IDX)
+      {
+        continue;
+      }
+      if (histogram[curMode] > bestAmps[0])
+      {
+        bestAmps[5] = bestAmps[4];
+        bestAmps[4] = bestAmps[3];
+        bestAmps[3] = bestAmps[2];
+        bestAmps[2] = bestAmps[1];
+        bestAmps[1] = bestAmps[0];
+        bestAmps[0] = histogram[curMode];
+        bestModes[5] = bestModes[4];
+        bestModes[4] = bestModes[3];
+        bestModes[3] = bestModes[2];
+        bestModes[2] = bestModes[1];
+        bestModes[1] = bestModes[0];
+        bestModes[0] = curMode;
+      }
+      else if (histogram[curMode] > bestAmps[1])
+      {
+        bestAmps[5] = bestAmps[4];
+        bestAmps[4] = bestAmps[3];
+        bestAmps[3] = bestAmps[2];
+        bestAmps[2] = bestAmps[1];
+        bestAmps[1] = histogram[curMode];
+        bestModes[5] = bestModes[4];
+        bestModes[4] = bestModes[3];
+        bestModes[3] = bestModes[2];
+        bestModes[2] = bestModes[1];
+        bestModes[1] = curMode;
+      }
+      else if (histogram[curMode] > bestAmps[2])
+      {
+        bestAmps[5] = bestAmps[4];
+        bestAmps[4] = bestAmps[3];
+        bestAmps[3] = bestAmps[2];
+        bestAmps[2] = histogram[curMode];
+        bestModes[5] = bestModes[4];
+        bestModes[4] = bestModes[3];
+        bestModes[3] = bestModes[2];
+        bestModes[2] = curMode;
+      }
+      else if (histogram[curMode] > bestAmps[3])
+      {
+        bestAmps[5] = bestAmps[4];
+        bestAmps[4] = bestAmps[3];
+        bestAmps[3] = histogram[curMode];
+        bestModes[5] = bestModes[4];
+        bestModes[4] = bestModes[3];
+        bestModes[3] = curMode;
+      }
+      else if (histogram[curMode] > bestAmps[4])
+      {
+        bestAmps[5] = bestAmps[4];
+        bestAmps[4] = histogram[curMode];
+        bestModes[5] = bestModes[4];
+        bestModes[4] = curMode;
+      }
+      else if (histogram[curMode] > bestAmps[5])
+      {
+        bestAmps[5] = histogram[curMode];
+        bestModes[5] = curMode;
+      }
+    }
+    if (bestModes[0] < 0)
+    {
+      return;
+    }
+
+    int count = 0;
+    for (int i = 0; i < OBIC_FUSION_NUM; i++)
+    {
+      count += bestModes[i] >= 0 ? 1 : 0;
+    }
+
+
+    /* -----------------------------------------------------------------
+    -------------- Step 6: Compute the fusion weights ------------------
+    ---------------- from amplitudes and store in CU -------------------
+    ----------------------------------------------------------------- */
+
+    int planarWeight = count == 1 ? 21 : 64/4;
+    int log2BlendWeight = 6;
+    int sumWeight = (1 << log2BlendWeight);
+    if (bestModes[1] < 0)
+    {
+      cu.obicMode[0] = bestModes[0];
+      cu.obicIsBlended = false;
+      cu.obicFusionWeight[0] = sumWeight;
+      for (int i = 1; i < OBIC_FUSION_NUM; i++)
+      {
+        cu.obicMode[i] = -1;
+        cu.obicFusionWeight[i] = 0;
+      }
+      cu.obicIsBlended = true;
+      cu.obicMode[1] = PLANAR_IDX;
+      cu.obicFusionWeight[0] = sumWeight - planarWeight;
+      cu.obicFusionWeight[1] = planarWeight;
+    }
+    else
+    {
+      sumWeight = sumWeight - planarWeight;
+      if (count == OBIC_FUSION_NUM)
+      {
+        bestAmps[count - 1] = 0;
+      }
+      
+      int s1 = 0;
+      for (int i = 0; i < OBIC_FUSION_NUM; i++)
+      {
+        bestAmps[i] = 10 * bestAmps[i];
+      }
+      for (int i = 0; i < OBIC_FUSION_NUM; i++)
+      {
+        s1 = s1 + bestAmps[i];
+      }
+      int x = floorLog2(s1);
+      CHECK(x < 0, "floor log2 value should be no negative");
+      int normS1 = (s1 << 4 >> x) & 15;
+      int v = g_gradDivTable[normS1] | 8;
+      x += (normS1 != 0);
+      int shift = x + 3;
+      int add = (1 << (shift - 1));
+      int iRatio[OBIC_FUSION_NUM] = { 0 };
+      for (int i = 0; i < OBIC_FUSION_NUM; i++)
+      {
+        iRatio[i] = (bestAmps[i] * v * sumWeight + add) >> shift;
+        if (bestAmps[i] == 0)
+        {
+          iRatio[i] = 0;
+        }
+        if( iRatio[i] > sumWeight )
+        {
+          iRatio[i] = sumWeight;
+        }
+        CHECK( iRatio[i] > sumWeight, "Wrong ratio in OBIC" );
+      }
+      int sumTmp = 0;
+      for (int i = 0; i < OBIC_FUSION_NUM; i++)
+      {
+        sumTmp += iRatio[i];
+        cu.obicMode[i] = bestModes[i];
+        cu.obicFusionWeight[i] = iRatio[i];
+      }
+      if (sumTmp != sumWeight)
+      {
+        int d = sumTmp - sumWeight;
+        if (d > 0)
+        {
+          for (int i = OBIC_FUSION_NUM - 1; i >= 0; i--)
+          {
+            int diff = d;
+            for (int k = 0; k < diff; k++)
+            {
+              if (cu.obicFusionWeight[i] > 0)
+              {
+                cu.obicFusionWeight[i] -= 1;
+                d -= 1;
+              }
+            }
+          }
+        }
+        else
+        {
+          for (int i = 0; i < OBIC_FUSION_NUM; i++)
+          {
+            int diff = d;
+            if (cu.obicFusionWeight[i] > 0 && (cu.obicFusionWeight[i] + d) < sumWeight)
+            {
+              for (int k = 0; k < abs(diff); k++)
+              {
+                if (d == 0)
+                {
+                  break;
+                }
+                if (cu.obicFusionWeight[i] > 0)
+                {
+                  cu.obicFusionWeight[i] += 1;
+                  d += 1;
+                }
+              }
+            }
+          }
+        }
+      }
+      sumTmp = 0;
+      for (int i = 0; i < OBIC_FUSION_NUM; i++)
+      {
+        sumTmp += cu.obicFusionWeight[i];
+      }
+      CHECK( sumTmp != sumWeight, "Wrong sum!" );
+      if (count == OBIC_FUSION_NUM)
+      {
+        cu.obicMode[count - 1] = PLANAR_IDX;
+        cu.obicFusionWeight[count - 1] = planarWeight;
+      }
+      else
+      {
+        cu.obicMode[count] = PLANAR_IDX;
+        cu.obicFusionWeight[count] = planarWeight;
+      }
+      cu.obicIsBlended = true;
+    }
+  }
+#endif
+  
 #if JVET_AB0155_SGPM
 int IntraPrediction::deriveTimdMode(const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu, bool bFull, bool bHorVer)
 {
