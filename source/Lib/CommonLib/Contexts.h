@@ -723,6 +723,9 @@ public:
 #if ENABLE_DIMD
   static const CtxSet   DimdFlag;
 #endif
+#if JVET_AH0076_OBIC
+  static const CtxSet   obicFlag;
+#endif
 #if JVET_W0123_TIMD_FUSION
   static const CtxSet   TimdFlag;
 #endif

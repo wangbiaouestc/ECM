@@ -610,6 +610,10 @@ private:
   static_vector<double, NUM_DERIVED_EIP + MAX_MERGE_EIP>   m_dSavedModeCostEip;
   static_vector<double, NUM_DERIVED_EIP + MAX_MERGE_EIP>   m_dSavedHadListEip;
 #endif
+#if JVET_AH0076_OBIC
+  Pel* m_dimdPredBuf;
+  Pel* m_obicPredBuf;
+#endif
   PelStorage      m_tmpStorageLCU;
   PelStorage      m_colorTransResiBuf;
 #if JVET_AB0143_CCCM_TS
@@ -690,6 +694,10 @@ protected:
 public:
 #if INTRA_TRANS_ENC_OPT
   bool            m_skipTimdLfnstMtsPass;
+#endif
+#if JVET_AH0076_OBIC
+  bool            m_skipObicLfnstMtsPass;
+  bool            m_skipDimdLfnstMtsPass;
 #endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   bool            m_skipCCCMSATD;

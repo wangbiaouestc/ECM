@@ -4983,5 +4983,25 @@ const CtxSet ContextSetCfg::CCPMergeFusionType = ContextSetCfg::addCtxSet({
   { 107 },
 });
 #endif
+#if JVET_AH0076_OBIC
+const CtxSet ContextSetCfg::obicFlag = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  { DWE, },
+  { DWE, },
+  { DWE, },
+  { DWO, },
+  { DWO, },
+  { DWO, },
+  { DWO, },
+  { DWO, },
+  { DWO, },
+  });
+#endif
 // CONTEXTS WSA STOP
 #endif

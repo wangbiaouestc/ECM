@@ -781,6 +781,11 @@ public:
 #if JVET_AG0146_DIMD_ITMP_IBC
   int getBestNonAnglularMode(const CPelBuf& recoBuf, const CompArea& area, CodingUnit& cu, std::vector<Mv> BVs);
 #endif
+#if JVET_AH0076_OBIC
+  void deriveObicMode             ( const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu );
+  void generateObicBlending(PelBuf &piPred, const PredictionUnit &pu, PelBuf predFusion[OBIC_FUSION_NUM - 1], bool blendModes[OBIC_FUSION_NUM - 1], int planarIdx);
+  void generateDimdBlending(PelBuf &piPred, const PredictionUnit &pu, PelBuf &piBlock0, PelBuf &piBlock1, PelBuf &piBlock2, PelBuf &piBlock3, PelBuf &plnBlock);
+#endif
 #if JVET_AB0155_SGPM
   int deriveTimdMode              ( const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu, bool bFull = true, bool bHorVer = false );
 #else

@@ -144,6 +144,9 @@ public:
 #if ENABLE_DIMD
   void        cu_dimd_flag              (CodingUnit&                   cu);
  #endif
+#if JVET_AH0076_OBIC
+  void        cu_obic_flag              ( CodingUnit&                   cu );
+#endif
   void        cu_residual               ( CodingUnit&                   cu,     Partitioner&    pm,       CUCtx& cuCtx );
   void        rqt_root_cbf              ( CodingUnit&                   cu );
 

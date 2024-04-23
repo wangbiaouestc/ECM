@@ -334,6 +334,13 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
 #if JVET_AG0146_DIMD_ITMP_IBC
           m_pcIntraPred->getBestNonAnglularMode(currCU.cs->picture->getRecoBuf(area), area, currCU, m_pcIntraPred->m_bvBasedMergeCandidates);
 #endif
+#if JVET_AH0076_OBIC
+          if (currCU.obicFlag)
+          {
+            m_pcIntraPred->deriveObicMode(currCU.cs->picture->getRecoBuf(area), area, currCU);
+            pu->intraDir[0] = currCU.obicMode[0];
+          }
+#endif
         }
 #if JVET_W0123_TIMD_FUSION
         else if (currCU.timd)
@@ -1056,7 +1063,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
     {
       m_pcIntraPred->initIntraMip( pu, area );
 #if JVET_AB0067_MIP_DIMD_LFNST
+#if JVET_AH0076_OBIC
+      m_pcIntraPred->predIntraMip( compID, piPred, pu, true);
+#else
       m_pcIntraPred->predIntraMip( compID, piPred, pu, pu.cu->lfnstIdx > 0 ? true : false);
+#endif
 #else
       m_pcIntraPred->predIntraMip( compID, piPred, pu );
 #endif
@@ -1390,7 +1401,11 @@ void DecCu::xIntraRecACTBlk(TransformUnit& tu)
     {
       m_pcIntraPred->initIntraMip(pu, area);
 #if JVET_AB0067_MIP_DIMD_LFNST
+#if JVET_AH0076_OBIC
+      m_pcIntraPred->predIntraMip(compID, piPred, pu, true);
+#else
       m_pcIntraPred->predIntraMip(compID, piPred, pu, pu.cu->lfnstIdx > 0 ? true : false);
+#endif
 #else
       m_pcIntraPred->predIntraMip(compID, piPred, pu);
 #endif
