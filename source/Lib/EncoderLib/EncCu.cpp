@@ -3754,6 +3754,9 @@ void EncCu::xCheckRDCostHashInter( CodingStructure *&tempCS, CodingStructure *&b
   cu.qp = encTestMode.qp;
 #if INTER_LIC
   cu.licFlag = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  cu.licInheritPara = false;
+#endif
 #endif
   CU::addPUs(cu);
   cu.mmvdSkip = false;
@@ -3841,7 +3844,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
   MergeCtx mergeCtxCIIPtmp;
 #endif
 #endif
-#if JVET_AG0276_NLIC
+#if JVET_AG0276_NLIC || JVET_AH0314_LIC_INHERITANCE_FOR_MRG
   MergeCtx mergeOrgCtx;
 #endif
 #if JVET_AG0276_LIC_FLAG_SIGNALING
@@ -3930,7 +3933,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
     for (int i = 0; i < SUB_TMVP_NUM; i++)
     {
       mergeCtx.subPuMvpMiBuf[i] = MotionBuf(m_subPuMiBuf[i], bufSize);
-#if JVET_AG0276_NLIC
+#if JVET_AG0276_NLIC || JVET_AH0314_LIC_INHERITANCE_FOR_MRG
       mergeOrgCtx.subPuMvpMiBuf[i] = MotionBuf(m_subPuMiBuf[i], bufSize);
 #endif
       mrgCtx.subPuMvpMiBuf[i] = MotionBuf(m_subPuMiBuf[i], bufSize);
@@ -4019,6 +4022,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
     cu.tileIdx  = tempCS->pps->getTileIdx( tempCS->area.lumaPos() );
 #if INTER_LIC
     cu.licFlag  = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+    cu.licInheritPara = false;
+#endif
 #endif
 
     PredictionUnit pu( tempCS->area );
@@ -4145,7 +4151,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
       m_pcInterSearch->adjustMergeCandidatesLicFlag(pu, mergeCtx);
     }
 #endif
-#if JVET_AG0276_NLIC
+#if JVET_AG0276_NLIC || JVET_AH0314_LIC_INHERITANCE_FOR_MRG
     mergeOrgCtx = mergeCtx;
 #endif
 #if JVET_AG0276_LIC_FLAG_SIGNALING
@@ -4155,6 +4161,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
       for (int i = 0; i < mergeCtx.numValidMergeCand; i++)
       {
         mergeCtxOppositeLic.licFlags[i] = !mergeCtx.licFlags[i];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+        mergeCtxOppositeLic.licInheritPara[i] = false;
+#endif
       }
     }
 #endif
@@ -4169,7 +4178,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
       if (!sps.getUseTmvpNmvpReordering())
       {
         m_pcInterSearch->adjustInterMergeCandidates(pu, mergeCtx);
-#if JVET_AG0276_NLIC
+#if JVET_AG0276_NLIC || JVET_AH0314_LIC_INHERITANCE_FOR_MRG
         mergeOrgCtx = mergeCtx;
 #endif
       }
@@ -4182,24 +4191,49 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #else
         m_pcInterSearch->adjustMergeCandidatesInOneCandidateGroup(pu, mergeCtx, pu.cs->sps->getMaxNumMergeCand());
 #endif
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+        AltLMMergeCtx mrgCtxInherited;
+        PU::getAltMergeCandidates(pu, mrgCtxInherited, true);
+#endif
 #if JVET_AG0276_NLIC
         if (pu.cs->sps->getUseAltLM() && !CU::isTLCond(*pu.cu))
         {
           AltLMMergeCtx altLMMrgCtx;
           PU::getAltMergeCandidates(pu, altLMMrgCtx);
-          m_pcInterSearch->adjustMergeCandidates(pu, mergeOrgCtx, altLMMrgCtx, pu.cs->sps->getMaxNumMergeCand());
+          m_pcInterSearch->adjustMergeCandidates(pu, mergeOrgCtx
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                                               , &altLMMrgCtx
+                                               , &mrgCtxInherited
+#else
+                                               , altLMMrgCtx
+#endif
+                                               , pu.cs->sps->getMaxNumMergeCand());
 #if JVET_AG0276_LIC_FLAG_SIGNALING
           if (hasOppositelicMrg && pu.cs->sps->getUseMergeOppositeLic())
           {
             AltLMMergeCtx altLMBRMrgCtx;
             PU::getAltBRMergeCandidates(pu, altLMBRMrgCtx);
-            m_pcInterSearch->adjustMergeCandidates(pu, mergeCtxOppositeLic, altLMBRMrgCtx, pu.cs->sps->getMaxNumMergeCand());
+            m_pcInterSearch->adjustMergeCandidates(pu, mergeCtxOppositeLic
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                                                 , &altLMBRMrgCtx
+                                                 , nullptr
+#else
+                                                 , altLMBRMrgCtx
+#endif
+                                                 , pu.cs->sps->getMaxNumMergeCand());
           }
 #endif
         }
         else
         {
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+          m_pcInterSearch->adjustMergeCandidates(pu, mergeOrgCtx
+                                               , nullptr
+                                               , &mrgCtxInherited
+                                               , pu.cs->sps->getMaxNumMergeCand());
+#else
           mergeOrgCtx = mergeCtx;
+#endif
 #if JVET_AG0276_LIC_FLAG_SIGNALING
           if (hasOppositelicMrg && pu.cs->sps->getUseMergeOppositeLic())
           {
@@ -4212,6 +4246,11 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
         {
           m_pcInterSearch->adjustMergeCandidates(pu, mergeCtxOppositeLic, pu.cs->sps->getMaxNumMergeCand());
         }
+#elif JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+        m_pcInterSearch->adjustMergeCandidates(pu, mergeOrgCtx
+                                             , nullptr
+                                             , &mrgCtxInherited
+                                             , pu.cs->sps->getMaxNumMergeCand());
 #endif
       }
     }
@@ -4238,6 +4277,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
 #if INTER_LIC
       mergeCtx.licFlags[ui] = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+      mrgCtx.setDefaultLICParamToCtx(ui);
+#endif
 #endif
       mergeCtx.interDirNeighbours[ui]                  = 0;
       mergeCtx.mvFieldNeighbours[(ui << 1)].refIdx     = NOT_VALID;
@@ -4255,6 +4297,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
 #if INTER_LIC
       mergeCtxOppositeLic.licFlags[ui] = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+      mergeCtxOppositeLic.setDefaultLICParamToCtx(ui);
+#endif
 #endif
       mergeCtxOppositeLic.interDirNeighbours[ui] = 0;
       mergeCtxOppositeLic.mvFieldNeighbours[(ui << 1)].refIdx = NOT_VALID;
@@ -4268,7 +4313,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
     }
 #endif
 
-#if JVET_AG0276_NLIC
+#if JVET_AG0276_NLIC || JVET_AH0314_LIC_INHERITANCE_FOR_MRG
     if (mergeOrgCtx.numValidMergeCand != pu.cs->sps->getMaxNumMergeCand())
     {
       mergeOrgCtx.numValidMergeCand = pu.cs->sps->getMaxNumMergeCand();
@@ -4280,6 +4325,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
       mergeOrgCtx.altLMParaNeighbours[ui].resetAltLinearModel();
 #if INTER_LIC
       mergeOrgCtx.licFlags[ui] = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+      mergeOrgCtx.setDefaultLICParamToCtx(ui);
+#endif
 #endif
       mergeOrgCtx.interDirNeighbours[ui] = 0;
       mergeOrgCtx.mvFieldNeighbours[(ui << 1)].refIdx = NOT_VALID;
@@ -4291,6 +4339,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
       mergeOrgCtx.candCost[ui] = MAX_UINT64;
     }
 #endif
+
 
 #if JVET_AB0079_TM_BCW_MRG
     mrgCtxCiip.numValidMergeCand = mergeCtx.numValidMergeCand;
@@ -4310,6 +4359,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
 #if INTER_LIC 
       mrgCtxCiip.licFlags[uiMergeCand] = mergeCtx.licFlags[uiMergeCand];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+      mrgCtxCiip.copyLICParamFromCtx(uiMergeCand, mergeCtx, uiMergeCand);
+#endif
 #endif
 #if MULTI_HYP_PRED
       mrgCtxCiip.addHypNeighbours[uiMergeCand] = mergeCtx.addHypNeighbours[uiMergeCand];
@@ -4324,7 +4376,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
       )
     {
       m_pcInterSearch->adjustMergeCandidatesBcwIdx(pu, mergeCtx);
-#if JVET_AG0276_NLIC
+#if JVET_AG0276_NLIC || JVET_AH0314_LIC_INHERITANCE_FOR_MRG
       m_pcInterSearch->adjustMergeCandidatesBcwIdx(pu, mergeOrgCtx);
       MergeCtx mergeCtxTemp;
       mergeCtxTemp = mergeCtx;
@@ -4422,6 +4474,12 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
 #if INTER_LIC
       memcpy(ciipTmMrgCtx.licFlags, mergeCtxtmp.licFlags, CIIP_TM_MRG_MAX_NUM_CANDS * sizeof(bool));
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+      for (int ui = 0; ui < CIIP_TM_MRG_MAX_NUM_CANDS; ui++)
+      {
+        ciipTmMrgCtx.copyLICParamFromCtx(ui, mergeCtxtmp, ui);
+      }
+#endif
 #endif
 #if MULTI_HYP_PRED
       memcpy(ciipTmMrgCtx.addHypNeighbours, mergeCtxtmp.addHypNeighbours, CIIP_TM_MRG_MAX_NUM_CANDS * sizeof(MultiHypVec));
@@ -4638,6 +4696,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
         for (int i = 0; i < tmMrgCtxOppositeLic.numValidMergeCand; i++)
         {
           tmMrgCtxOppositeLic.licFlags[i] = !tmMrgCtx.licFlags[i];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+          tmMrgCtxOppositeLic.licInheritPara[i] = false;
+#endif
         }
       }
 #endif
@@ -4755,6 +4816,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
 #if INTER_LIC
           tmMrgCtx.licFlags[ui] = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+          tmMrgCtx.setDefaultLICParamToCtx(ui);
+#endif
 #endif
           tmMrgCtx.interDirNeighbours[ui] = 0;
           tmMrgCtx.mvFieldNeighbours[(ui << 1)].refIdx = NOT_VALID;
@@ -4781,6 +4845,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
 #if INTER_LIC
           tmMrgCtxOppositeLic.licFlags[ui] = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+          tmMrgCtxOppositeLic.setDefaultLICParamToCtx(ui);
+#endif
 #endif
           tmMrgCtxOppositeLic.interDirNeighbours[ui] = 0;
           tmMrgCtxOppositeLic.mvFieldNeighbours[(ui << 1)].refIdx = NOT_VALID;
@@ -5081,6 +5148,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
 #if INTER_LIC                                                   
             affineMergeCtxOppositeLic.licFlags[cntAffOppositeLic] = !affineMergeCtx.licFlags[i];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+            affineMergeCtxOppositeLic.licInheritPara[cntAffOppositeLic] = false;
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
             affineMergeCtxOppositeLic.obmcFlags[cntAffOppositeLic] = affineMergeCtx.obmcFlags[i];
@@ -5153,6 +5223,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
 #if INTER_LIC
           cu.licFlag = affineMergeCtxTmp.licFlags[uiAffMergeCand];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG && JVET_AG0164_AFFINE_GPM
+          affineMergeCtxTmp.setLICParamToPu(pu, uiAffMergeCand, cu.licFlag);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
           cu.obmcFlag = affineMergeCtxTmp.obmcFlags[uiAffMergeCand];
@@ -5471,6 +5544,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
 #if INTER_LIC
             cu.licFlag = affineMergeCtx.licFlags[uiAffMergeCand];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG && JVET_AG0164_AFFINE_GPM
+            affineMergeCtx.setLICParamToPu(pu, uiAffMergeCand, pu.cu->licFlag);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
             cu.obmcFlag = affineMergeCtx.obmcFlags[uiAffMergeCand];
@@ -5570,6 +5646,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
 #if INTER_LIC
           cu.licFlag = affineBMMergeCtx.licFlags[uiAffMergeCand];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG && JVET_AG0164_AFFINE_GPM
+          affineBMMergeCtx.setLICParamToPu(pu, uiAffMergeCand, pu.cu->licFlag);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
           cu.obmcFlag = affineBMMergeCtx.obmcFlags[uiAffMergeCand];
@@ -5645,6 +5724,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
 #if INTER_LIC
           affineBMMergeL0.licFlags[uiAffMergeCand] = affineBMMergeCtx.licFlags[uiAffMergeCand];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG && JVET_AG0164_AFFINE_GPM
+          affineBMMergeL0.copyLICParamFromCtx(uiAffMergeCand, affineBMMergeCtx, uiAffMergeCand);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
           affineBMMergeL0.obmcFlags[uiAffMergeCand] = affineBMMergeCtx.obmcFlags[uiAffMergeCand];
@@ -5668,6 +5750,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
 #if INTER_LIC
           affineBMMergeL1.licFlags[uiAffMergeCand] = affineBMMergeCtx.licFlags[uiAffMergeCand];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG && JVET_AG0164_AFFINE_GPM
+          affineBMMergeL1.copyLICParamFromCtx(uiAffMergeCand, affineBMMergeCtx, uiAffMergeCand);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
           affineBMMergeL1.obmcFlags[uiAffMergeCand] = affineBMMergeCtx.obmcFlags[uiAffMergeCand];
@@ -5718,6 +5803,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
 #if INTER_LIC
             cu.licFlag = affineMergeCtxOppositeLic.licFlags[uiAffMergeCand];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+            affineMergeCtxOppositeLic.setLICParamToPu(pu, NOT_VALID, false);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
             cu.obmcFlag = affineMergeCtxOppositeLic.obmcFlags[uiAffMergeCand];
@@ -5825,6 +5913,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
 #if INTER_LIC
               affineMergeCtx.licFlags[index] = affineMergeCtx.licFlags[uiAffMergeCand];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG && JVET_AG0164_AFFINE_GPM
+              affineMergeCtx.copyLICParamFromCtx(index, affineMergeCtx, uiAffMergeCand);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
               affineMergeCtx.obmcFlags[index] = affineMergeCtx.obmcFlags[uiAffMergeCand];
@@ -5858,6 +5949,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
 #if INTER_LIC
             cu.licFlag = affineMergeCtx.licFlags[uiAffMergeCand];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG && JVET_AG0164_AFFINE_GPM
+            affineMergeCtx.setLICParamToPu(pu, uiAffMergeCand, cu.licFlag);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
             cu.obmcFlag = affineMergeCtx.obmcFlags[uiAffMergeCand];
@@ -5969,6 +6063,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
 #if INTER_LIC
             cu.licFlag = affineMergeCtxOppositeLic.licFlags[uiAffMergeCand];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+            affineMergeCtxOppositeLic.setLICParamToPu(pu, NOT_VALID, false);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
             cu.obmcFlag = affineMergeCtxOppositeLic.obmcFlags[uiAffMergeCand];
@@ -6424,6 +6521,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
 #if INTER_LIC
       cu.licFlag          = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+      cu.licInheritPara = false;
+#endif
 #endif
       cu.skip             = false;
       cu.mmvdSkip = false;
@@ -6628,7 +6728,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
       {
 #if MERGE_ENC_OPT
 #if JVET_AB0079_TM_BCW_MRG
-#if JVET_AG0276_NLIC
+#if JVET_AG0276_NLIC || JVET_AH0314_LIC_INHERITANCE_FOR_MRG
         xCheckSATDCostCiipMerge(tempCS, cu, pu, mrgCtxCiip, acMergeTempBuffer, singleMergeTempBuffer, acMergeTmpBuffer, uiNumMrgSATDCand, rdModeList, candCostList, distParam, ctxStart, mergeOrgCtx);
 #else
         xCheckSATDCostCiipMerge(tempCS, cu, pu, mrgCtxCiip, acMergeTempBuffer, singleMergeTempBuffer, acMergeTmpBuffer, uiNumMrgSATDCand, rdModeList, candCostList, distParam, ctxStart);
@@ -7105,13 +7205,21 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
 #if INTER_LIC
       cu.licFlag          = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+      cu.licInheritPara = false;
+#endif
 #if JVET_AD0213_LIC_IMP
       for (int list = 0; list < 2; list++)
       {
         for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
         {
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+          cu.licScale[list][comp] = 32;
+          cu.licOffset[list][comp] = 0;
+#else
           cu.licScale[list][comp] = MAX_INT;
           cu.licOffset[list][comp] = MAX_INT;
+#endif
         }
       }
 #endif
@@ -7183,6 +7291,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
 #if INTER_LIC
             cu.licFlag = affineMergeCtx.licFlags[uiMergeCand];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+            affineMergeCtx.setLICParamToPu(pu, NOT_VALID, false);
+#endif
 #endif
 #if JVET_AG0276_NLIC
             cu.altLMFlag = affineMergeCtx.altLMFlag[uiMergeCand];
@@ -7332,6 +7443,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
 #if INTER_LIC
         pu.cu->licFlag = affineMergeCtxTmp.licFlags[pu.mergeIdx];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG && JVET_AG0164_AFFINE_GPM
+        affineMergeCtxTmp.setLICParamToPu(pu, pu.mergeIdx, pu.cu->licFlag);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
         pu.cu->obmcFlag = affineMergeCtxTmp.obmcFlags[pu.mergeIdx];
@@ -7352,6 +7466,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
         pu.mergeType      = affineMergeCtx.mergeType         [pu.mergeIdx];
 #if INTER_LIC
         pu.cu->licFlag    = affineMergeCtx.licFlags          [pu.mergeIdx];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG && JVET_AG0164_AFFINE_GPM
+        affineMergeCtx.setLICParamToPu(pu, pu.mergeIdx, pu.cu->licFlag);
+#endif
 #endif
         pu.interDir       = affineMergeCtx.interDirNeighbours[pu.mergeIdx];
         pu.cu->affineType = affineMergeCtx.affineType        [pu.mergeIdx];
@@ -7402,6 +7519,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
 #if INTER_LIC
           cu.licFlag = affineBMMergeL0.licFlags[uiMergeCand];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG && JVET_AG0164_AFFINE_GPM
+          affineBMMergeL0.setLICParamToPu(pu, uiMergeCand, cu.licFlag);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
           cu.obmcFlag = affineBMMergeL0.obmcFlags[uiMergeCand];
@@ -7450,6 +7570,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
 #if INTER_LIC
           cu.licFlag = affineBMMergeL1.licFlags[uiMergeCand];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG && JVET_AG0164_AFFINE_GPM
+          affineBMMergeL1.setLICParamToPu(pu, uiMergeCand, cu.licFlag);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
           cu.obmcFlag = affineBMMergeL1.obmcFlags[uiMergeCand];
@@ -7504,6 +7627,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
 #if INTER_LIC
         cu.licFlag = affineMergeCtxOppositeLic.licFlags[uiMergeCand];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+        affineMergeCtxOppositeLic.setLICParamToPu(pu, NOT_VALID, false);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
         cu.obmcFlag = affineMergeCtxOppositeLic.obmcFlags[uiMergeCand];
@@ -7556,6 +7682,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
 #if INTER_LIC
         cu.licFlag = affineMergeCtx.licFlags[uiMergeCand];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG && JVET_AG0164_AFFINE_GPM
+        affineMergeCtx.setLICParamToPu(pu, uiMergeCand, cu.licFlag);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
         cu.obmcFlag = affineMergeCtx.obmcFlags[uiMergeCand];
@@ -7813,9 +7942,19 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
               {
                 for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
                 {
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                  if(!cu.licInheritPara)
+#endif
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                  CHECK(cu.licScale[list][comp] != 32 || cu.licOffset[list][comp] != 0, "invalid lic parameters for ciip mode");
+#else
                   CHECK(cu.licScale[list][comp] != MAX_INT || cu.licScale[list][comp] != MAX_INT, "invalid lic parameters for ciip mode");
+#endif
                   if (alwCond)
                   {
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                  if(!cu.licInheritPara)
+#endif
                     m_pcInterSearch->setLicParam(list, comp, pu.cu->licScale[list][comp], pu.cu->licOffset[list][comp]);
                   }
                   else
@@ -7938,6 +8077,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
             pu.mmvdEncOptMode = 0;
             m_pcInterSearch->motionCompensation(pu);
 #if JVET_AD0213_LIC_IMP
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+          if(!cu.licInheritPara)
+#endif
             if (pu.cu->licFlag)
             {
               for (int list = 0; list < 2; list++)
@@ -7960,6 +8102,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
             pu.mvRefine = true;
             m_pcInterSearch->motionCompensation(pu);
 #if JVET_AD0213_LIC_IMP
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+          if(!cu.licInheritPara)
+#endif
             if (pu.cu->licFlag)
             {
               for (int list = 0; list < 2; list++)
@@ -8128,7 +8273,10 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
             m_pcInterSearch->motionCompensation(pu, REF_PIC_LIST_X, false, true);
 #endif
 #if JVET_AD0213_LIC_IMP
-            if (pu.cu->licFlag)
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+            if (!cu.licInheritPara)
+#endif
+              if (pu.cu->licFlag)
             {
               for (int list = 0; list < 2; list++)
               {
@@ -8150,6 +8298,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
           if (pu.cu->licFlag)
           {
             m_pcInterSearch->motionCompensation(pu);
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+            if(!cu.licInheritPara)
+#endif
             for (int list = 0; list < 2; list++)
             {
               if (pu.refIdx[list] >= 0)
@@ -8248,6 +8399,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
                   pu.cu->licOffset[list][comp] = 0;
                 }
                 else
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                if (!cu.licInheritPara)
+#endif
                 {
                   m_pcInterSearch->setLicParam(list, comp, pu.cu->licScale[list][comp], pu.cu->licOffset[list][comp]);
                 }
@@ -8483,7 +8637,11 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
   double geoTMFlagCost[2];
 #endif
 #if JVET_AA0058_GPM_ADAPTIVE_BLENDING
+#if JVET_AH0314_ADAPTIVE_GPM_BLENDING_IMPROV 
+  double geoBldFlagCost[TOTAL_GEO_BLENDING_NUM];
+#else
   double geoBldFlagCost[GEO_BLENDING_NUM];
+#endif
 #endif
 #if JVET_AG0164_AFFINE_GPM
   double geoAffMergeIdxCost[GEO_MAX_NUM_UNI_AFF_CANDS];
@@ -8539,12 +8697,14 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
     geoTMFlagCost[idx] = (double)fracBits * sqrtLambdaFracBits;
   }
 #endif
+#if !JVET_AH0314_ADAPTIVE_GPM_BLENDING_IMPROV
 #if JVET_AA0058_GPM_ADAPTIVE_BLENDING
   for (int idx = 0; idx < GEO_BLENDING_NUM; idx++)
   {
     uint64_t fracBits = m_CABACEstimator->geoBldFlagEst(ctxStart, idx);
     geoBldFlagCost[idx] = (double)fracBits * sqrtLambdaFracBits;
   }
+#endif
 #endif
 #if JVET_Y0065_GPM_INTRA
   bool bUseOnlyOneVector = (tempCS->slice->isInterP() || tempCS->sps->getMaxNumGeoCand() == 1);
@@ -8579,6 +8739,9 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
 #endif
 #if INTER_LIC
   cu.licFlag = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  cu.licInheritPara = false;
+#endif
 #endif
   cu.bcwIdx = BCW_DEFAULT;
   cu.geoFlag = true;
@@ -8643,8 +8806,21 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
 #endif
   maxNumMergeCandidates = min((int)maxNumMergeCandidates, mergeCtx[GEO_TM_OFF].numValidMergeCand);
 #else
-  PU::getGeoMergeCandidates(pu, mergeCtx, &m_mergeCand);
+  PU::getGeoMergeCandidates(pu, mergeCtx
+                          , &m_mergeCand
+  );
   maxNumMergeCandidates = min((int)maxNumMergeCandidates, mergeCtx.numValidMergeCand);
+#endif
+#if JVET_AH0314_ADAPTIVE_GPM_BLENDING_IMPROV
+  int blkSizeSmall = pu.lwidth() < pu.lheight() ? pu.lwidth() : pu.lheight();
+  int startIdx = (blkSizeSmall < GPM_BLENDING_SIZE_THRESHOLD) ? 0 : 1;
+  int endIdx = (blkSizeSmall < GPM_BLENDING_SIZE_THRESHOLD) ? GEO_BLENDING_NUM : TOTAL_GEO_BLENDING_NUM;
+  for (uint8_t idx = startIdx; idx < endIdx; idx++)
+  {
+    uint64_t fracBits = m_CABACEstimator->geoBldFlagEst(pu, ctxStart, idx);
+    geoBldFlagCost[idx] = (double)fracBits * sqrtLambdaFracBits;
+  }
+  m_CABACEstimator->getCtx() = ctxStart;
 #endif
 #if JVET_AG0164_AFFINE_GPM
   AffineMergeCtx affMergeCtx;
@@ -9065,6 +9241,10 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
   GeoBlendInfo geoBlendInfo[GEO_BLEND_MAX_NUM_CANDS];
   int numGeoBlendInfoCand = 0;
 
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  cu.licFlag = false;
+  mergeCtx[GEO_TM_OFF].setLICParamToPu(*cu.firstPU, NOT_VALID, false);
+#endif
   GeoBlendInfo  geoBIdst;
   m_pcInterSearch->getGeoBlendCand( cu, mergeCtx[GEO_TM_OFF], -1, geoBIdst, geoBlendInfo, &numGeoBlendInfoCand );
 
@@ -9412,7 +9592,14 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
     bool mmvdFlag1 = false;
 
 #if JVET_AA0058_GPM_ADAPTIVE_BLENDING
+#if JVET_AH0314_ADAPTIVE_GPM_BLENDING_IMPROV
+    int blkSizeSmall = pu.lwidth() < pu.lheight() ? pu.lwidth() : pu.lheight();
+    int startIdx = (blkSizeSmall < GPM_BLENDING_SIZE_THRESHOLD) ? 0 : 1;
+    int endIdx = (blkSizeSmall < GPM_BLENDING_SIZE_THRESHOLD) ? GEO_BLENDING_NUM : TOTAL_GEO_BLENDING_NUM;
+    for (uint8_t bldIdx = startIdx; bldIdx < endIdx; bldIdx++)
+#else
     for (uint8_t bldIdx = 0; bldIdx < GEO_BLENDING_NUM; bldIdx++)
+#endif
     {
       geoCombinations[candidateIdx * GEO_BLENDING_NUM + bldIdx] = m_acGeoWeightedBuffer[candidateIdx * GEO_BLENDING_NUM + bldIdx].getBuf(localUnitArea);
 #if JVET_Y0065_GPM_INTRA
@@ -10157,6 +10344,9 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
       cu.mtsFlag = false;
 #if INTER_LIC
       cu.licFlag = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+      cu.licInheritPara = false;
+#endif
 #endif
       cu.bcwIdx = BCW_DEFAULT;
       cu.geoFlag = true;
@@ -10267,6 +10457,36 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
       pu.gpmDmvrRefinePart1 = pu.geoMergeIdx1 < refinePossible.size() ? refinePossible[pu.geoMergeIdx1] : false;
 #endif
 
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+      {
+        int targetMergeIdx = pu.geoMergeIdx1;
+#if JVET_AG0164_AFFINE_GPM
+        bool isAffine      = pu.affineGPM[1];
+#endif
+#if JVET_Y0065_GPM_INTRA
+#if JVET_AG0164_AFFINE_GPM
+        if (targetMergeIdx >= GEO_MAX_ALL_INTER_UNI_CANDS)
+#else
+        if (targetMergeIdx >= GEO_MAX_NUM_UNI_CANDS)
+#endif
+        {
+          targetMergeIdx = pu.geoMergeIdx0;
+#if JVET_AG0164_AFFINE_GPM
+          isAffine       = pu.affineGPM[0];
+#endif
+        }
+#endif
+#if JVET_AG0164_AFFINE_GPM
+        if (isAffine)
+        {
+          affMergeCtx.setAffMergeInfo(pu, targetMergeIdx);
+          pu.cu->affine = false;
+        }
+        else
+#endif
+        mergeCtxRegular.setMergeInfo(pu, targetMergeIdx);
+      }
+#endif
 #if TM_MRG
       MergeCtx *mergeTmCtx0 = nullptr;
       MergeCtx *mergeTmCtx1 = nullptr;
@@ -10456,6 +10676,9 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
     cu.mtsFlag = false;
 #if INTER_LIC
     cu.licFlag = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+    cu.licInheritPara = false;
+#endif
 #endif
     cu.bcwIdx = BCW_DEFAULT;
     cu.geoFlag = true;
@@ -10803,6 +11026,14 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
 #endif
 #if INTER_LIC
           mergeCtx[i].licFlags[idx] = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+          mergeCtx[i].copyLICParamFromCtx(idx, mergeCtx[GEO_TM_OFF], idx);
+          mergeCtx[i].licFlags[idx] = mergeCtx[i].licInheritPara[idx];
+#else
+          mergeCtx[i].setDefaultLICParamToCtx(idx);
+#endif
+#endif
 #endif
           mergeCtx[i].interDirNeighbours[idx] = mergeCtx[GEO_TM_OFF].interDirNeighbours[idx];
           mergeCtx[i].mvFieldNeighbours[(idx << 1)].mv = mergeCtx[GEO_TM_OFF].mvFieldNeighbours[(idx << 1)].mv;
@@ -11046,7 +11277,14 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
 #endif
 
 #if JVET_AA0058_GPM_ADAPTIVE_BLENDING
+#if JVET_AH0314_ADAPTIVE_GPM_BLENDING_IMPROV
+      int blkSizeSmall = pu.lwidth() < pu.lheight() ? pu.lwidth() : pu.lheight();
+      int startIdx = (blkSizeSmall < GPM_BLENDING_SIZE_THRESHOLD) ? 0 : 1;
+      int endIdx = (blkSizeSmall < GPM_BLENDING_SIZE_THRESHOLD) ? GEO_BLENDING_NUM : TOTAL_GEO_BLENDING_NUM;
+      for (uint8_t bldIdx = startIdx; bldIdx < endIdx; bldIdx++)
+#else
       for (uint8_t bldIdx = 0; bldIdx < GEO_BLENDING_NUM; bldIdx++)
+#endif
       {
         geoCombinations[candidateIdx * GEO_BLENDING_NUM + bldIdx] = m_acGeoWeightedBuffer[candidateIdx * GEO_BLENDING_NUM + bldIdx].getBuf(localUnitArea);
 
@@ -11812,6 +12050,13 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
       else if (tmFlag0)
       {
         predSrc0 = geoTmBuffer[mrgTmCand0];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+        if (isIntra1)
+        {
+          int geoTmType = g_geoTmShape[0][g_geoParams[splitDir][0]];
+          mergeCtx[geoTmType].setMergeInfo(pu, mergeCand0);
+        }
+#endif
       }
 #endif
 #if JVET_AG0164_AFFINE_GPM
@@ -11822,12 +12067,25 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
           predSrc0 = geoMMVDBuf[mergeCand0][mmvdCand0];
           chromaAvailPtr0 = &isGeoMMVDChromaAvail[mergeCand0][mmvdCand0];
           predSrcTemp0 = geoMMVDTempBuf[mergeCand0][mmvdCand0];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+          if (isIntra1)
+          {
+            affMergeCtx.setAffMergeInfo(pu, mergeCand0, mmvdCand0);
+          }
+#endif
         }
         else
         {
           predSrc0 = geoBuffer[mergeCand0];
           chromaAvailPtr0 = &isGeoChromaAvail[mergeCand0];
           predSrcTemp0 = geoTempBuf[mergeCand0];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+          if (isIntra1)
+          {
+            affMergeCtx.setAffMergeInfo(pu, mergeCand0);
+            pu.cu->affine = false;
+          }
+#endif
         }
       }
 #endif
@@ -11852,6 +12110,12 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
         chromaAvailPtr0 = &isGeoChromaAvail[mergeCand0];
         predSrcTemp0 = geoTempBuf[mergeCand0];
 #endif
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+        if (isIntra1)
+        {
+          mergeCtxRegular.setMergeInfo(pu, mergeCand0);
+        }
+#endif
       }
 
       if (isIntra1)
@@ -11862,6 +12126,10 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
       else if (tmFlag1)
       {
         predSrc1 = geoTmBuffer[mrgTmCand1];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+        int geoTmType = g_geoTmShape[1][g_geoParams[splitDir][0]];
+        mergeCtx[geoTmType].setMergeInfo(pu, mergeCand1);
+#endif
       }
 #endif
 #if JVET_AG0164_AFFINE_GPM
@@ -11872,12 +12140,19 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
           predSrc1 = geoMMVDBuf[mergeCand1][mmvdCand1];
           chromaAvailPtr1 = &isGeoMMVDChromaAvail[mergeCand1][mmvdCand1];
           predSrcTemp1 = geoMMVDTempBuf[mergeCand1][mmvdCand1];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+          affMergeCtx.setAffMergeInfo(pu, mergeCand1, mmvdCand1);
+#endif
         }
         else
         {
           predSrc1 = geoBuffer[mergeCand1];
           chromaAvailPtr1 = &isGeoChromaAvail[mergeCand1];
           predSrcTemp1 = geoTempBuf[mergeCand1];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+          affMergeCtx.setAffMergeInfo(pu, mergeCand1);
+          pu.cu->affine = false;
+#endif
         }
       }
 #endif
@@ -11886,7 +12161,9 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
         predSrc1 = geoMMVDBuf[mergeCand1][mmvdCand1];
         chromaAvailPtr1 = &isGeoMMVDChromaAvail[mergeCand1][mmvdCand1];
         predSrcTemp1 = geoMMVDTempBuf[mergeCand1][mmvdCand1];
+#if !JVET_AH0314_LIC_INHERITANCE_FOR_MRG
         if (isIntra0)
+#endif
         {
 #if TM_MRG
           mergeCtx[GEO_TM_OFF].setGeoMmvdMergeInfo(pu, mergeCand1, mmvdCand1);
@@ -11901,6 +12178,9 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
 #if JVET_AG0164_AFFINE_GPM
         chromaAvailPtr1 = &isGeoChromaAvail[mergeCand1];
         predSrcTemp1 = geoTempBuf[mergeCand1];
+#endif
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+        mergeCtxRegular.setMergeInfo(pu, mergeCand1);
 #endif
       }
 
@@ -12311,6 +12591,9 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
         cu.mtsFlag = false;
 #if INTER_LIC
         cu.licFlag = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+        cu.licInheritPara = false;
+#endif
 #endif
         cu.bcwIdx = BCW_DEFAULT;
         cu.geoFlag = true;
@@ -12494,9 +12777,75 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
           pu.gpmDmvrRefinePart1 = refinePossible[pu.geoMergeIdx1];
         }
 #endif
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
 #if TM_MRG
         MergeCtx* mrgTmCtx0 = (pu.geoTmFlag0 == 0 ? nullptr : &mergeCtx[g_geoTmShape[0][g_geoParams[pu.geoSplitDir][0]]]);
         MergeCtx* mrgTmCtx1 = (pu.geoTmFlag1 == 0 ? nullptr : &mergeCtx[g_geoTmShape[1][g_geoParams[pu.geoSplitDir][0]]]);
+#endif
+#if JVET_Y0065_GPM_INTRA
+#if JVET_AG0164_AFFINE_GPM
+        if (pu.geoMergeIdx1 >= GEO_MAX_ALL_INTER_UNI_CANDS)
+#else
+        if (pu.geoMergeIdx1 >= GEO_MAX_NUM_UNI_CANDS)
+#endif
+        {
+#if TM_MRG
+          if (pu.geoTmFlag0)
+          {
+            mrgTmCtx0->setMergeInfo(pu, pu.geoMergeIdx0);
+          }
+          else
+#endif
+#if JVET_AG0164_AFFINE_GPM
+          if(pu.affineGPM[0])
+          {
+            affMergeCtx.setAffMergeInfo(pu, pu.geoMergeIdx0, pu.geoMMVDFlag0 ? pu.geoMMVDIdx0 : -1);
+            pu.cu->affine = false;
+          }
+          else
+#endif
+          if (pu.geoMMVDFlag0)
+          {
+            mergeCtxRegular.setGeoMmvdMergeInfo(pu, pu.geoMergeIdx0, pu.geoMMVDIdx0);
+          }
+          else
+          {
+            mergeCtxRegular.setMergeInfo(pu, pu.geoMergeIdx0);
+          }
+        }
+        else
+#endif
+        {
+#if TM_MRG
+          if (pu.geoTmFlag1)
+          {
+            mrgTmCtx1->setMergeInfo(pu, pu.geoMergeIdx1);
+          }
+          else
+#endif
+#if JVET_AG0164_AFFINE_GPM
+          if(pu.affineGPM[1])
+          {
+            affMergeCtx.setAffMergeInfo(pu, pu.geoMergeIdx1, pu.geoMMVDFlag1 ? pu.geoMMVDIdx1 : -1);
+            pu.cu->affine = false;
+          }
+          else
+#endif
+          if (pu.geoMMVDFlag1)
+          {
+            mergeCtxRegular.setGeoMmvdMergeInfo(pu, pu.geoMergeIdx1, pu.geoMMVDIdx1);
+          }
+          else
+          {
+            mergeCtxRegular.setMergeInfo(pu, pu.geoMergeIdx1);
+          }
+        }
+#endif
+#if TM_MRG
+#if !JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+        MergeCtx* mrgTmCtx0 = (pu.geoTmFlag0 == 0 ? nullptr : &mergeCtx[g_geoTmShape[0][g_geoParams[pu.geoSplitDir][0]]]);
+        MergeCtx* mrgTmCtx1 = (pu.geoTmFlag1 == 0 ? nullptr : &mergeCtx[g_geoTmShape[1][g_geoParams[pu.geoSplitDir][0]]]);
+#endif
 #if JVET_AA0058_GPM_ADAPTIVE_BLENDING
 #if JVET_AE0046_BI_GPM
         Mv* bdofSubPuMvOffsetPart0 = pu.gpmDmvrRefinePart0 ? (pu.geoTmFlag0 ? m_mvBufEncBDOF4GPM[g_geoTmShape[0][g_geoParams[pu.geoSplitDir][0]]][pu.geoMergeIdx0] : m_mvBufEncBDOF4GPM[GEO_TM_OFF][pu.geoMergeIdx0]) : nullptr;
@@ -12606,6 +12955,9 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
       cu.mtsFlag = false;
 #if INTER_LIC
       cu.licFlag = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+      cu.licInheritPara = false;
+#endif
 #endif
       cu.bcwIdx = BCW_DEFAULT;
       cu.geoBlendFlag = true;
@@ -12690,7 +13042,11 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
         }
       }
 
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+      mergeCtx[GEO_TM_OFF].setMergeInfo(pu, geoBI.mergeCand[1]);
+#else
       mergeCtx[GEO_TM_OFF].setMergeInfo(pu, 0);
+#endif
 
       pu.interDir = 3;
       pu.mergeIdx = MAX_UCHAR;
@@ -12798,6 +13154,9 @@ void EncCu::xCheckRDCostMergeGeo2Nx2N(CodingStructure *&tempCS, CodingStructure 
   cu.mtsFlag = false;
 #if INTER_LIC
   cu.licFlag = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  cu.licInheritPara = false;
+#endif
 #endif
   cu.bcwIdx = BCW_DEFAULT;
   cu.geoFlag = true;
@@ -13091,6 +13450,9 @@ void EncCu::xCheckRDCostMergeGeo2Nx2N(CodingStructure *&tempCS, CodingStructure 
       cu.mtsFlag = false;
 #if INTER_LIC
       cu.licFlag = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+      cu.licInheritPara = false;
+#endif
 #endif
       cu.bcwIdx = BCW_DEFAULT;
       cu.geoFlag = true;
@@ -13122,6 +13484,38 @@ void EncCu::xCheckRDCostMergeGeo2Nx2N(CodingStructure *&tempCS, CodingStructure 
       }
 #endif
 
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+      int targetMergeIdx = pu.geoMergeIdx1;
+#if JVET_AG0164_AFFINE_GPM
+      bool isAffine      = pu.affineGPM[1];
+#endif
+#if JVET_Y0065_GPM_INTRA
+#if JVET_AG0164_AFFINE_GPM
+      if (targetMergeIdx >= GEO_MAX_ALL_INTER_UNI_CANDS)
+#else
+      if (targetMergeIdx >= GEO_MAX_NUM_UNI_CANDS)
+#endif
+      {
+        targetMergeIdx = pu.geoMergeIdx0;
+#if JVET_AG0164_AFFINE_GPM
+        isAffine       = pu.affineGPM[0];
+#endif
+      }
+#endif
+#if JVET_AG0164_AFFINE_GPM
+      if (isAffine)
+      {
+        affMergeCtx.setAffMergeInfo(pu, targetMergeIdx);
+        pu.cu->affine = false;
+      }
+      else
+      {
+#endif
+      mergeCtxRegular.setMergeInfo(pu, targetMergeIdx);
+#if JVET_AG0164_AFFINE_GPM
+      }
+#endif
+#endif
       PU::spanGeoMotionInfo(pu, mergeCtx, pu.geoSplitDir, pu.geoMergeIdx0, pu.geoMergeIdx1);
       tempCS->getPredBuf().copyFrom(geoCombinations[candidateIdx]);
 #if ENABLE_OBMC
@@ -13166,6 +13560,9 @@ void EncCu::xCheckSATDCostRegularMerge(CodingStructure *&tempCS, CodingUnit &cu,
 #endif
 #if INTER_LIC
   cu.licFlag = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  cu.licInheritPara = false;
+#endif
 #endif
 #if JVET_AG0276_LIC_FLAG_SIGNALING
   pu.mergeOppositeLic = false;
@@ -13362,12 +13759,16 @@ void EncCu::xCheckSATDCostRegularMerge(CodingStructure *&tempCS, CodingUnit &cu,
   pu.bdmvrRefine = false;
 #endif
 }
+
 #if JVET_AG0135_AFFINE_CIIP
 void EncCu::xCheckSATDCostCiipAffineMerge(CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu, AffineMergeCtx affineMergeCtx, MergeCtx mergeCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer, PelUnitBuf  acMergeCIIPAffineBuffer[AFFINE_MRG_MAX_NUM_CANDS]
   , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &rdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart)
 {
 #if INTER_LIC
   cu.licFlag = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  cu.licInheritPara = false;
+#endif
 #endif
 #if JVET_AG0276_LIC_FLAG_SIGNALING
   pu.affineOppositeLic = false;
@@ -13536,6 +13937,9 @@ void EncCu::xCheckSATDCostRegularMergeOppositeLic(CodingStructure *&tempCS, Codi
 #endif
 #if INTER_LIC
   cu.licFlag = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  cu.licInheritPara = false;
+#endif
 #endif
   pu.mergeOppositeLic = true;
   cu.mmvdSkip = false;
@@ -13654,7 +14058,7 @@ void EncCu::xCheckSATDCostRegularMergeOppositeLic(CodingStructure *&tempCS, Codi
 }
 #endif
 void EncCu::xCheckSATDCostCiipMerge(CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu, MergeCtx mergeCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer, PelUnitBuf  acMergeTmpBuffer[MRG_MAX_NUM_CANDS]
-#if JVET_AG0276_NLIC
+#if JVET_AG0276_NLIC || JVET_AH0314_LIC_INHERITANCE_FOR_MRG
   , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &rdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart, MergeCtx mergeCtx1)
 #else
   , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &rdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart)
@@ -13666,6 +14070,9 @@ void EncCu::xCheckSATDCostCiipMerge(CodingStructure *&tempCS, CodingUnit &cu, Pr
 #endif
 #if INTER_LIC
   cu.licFlag = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  cu.licInheritPara = false;
+#endif
 #endif
   cu.mmvdSkip = false;
   cu.geoFlag = false;
@@ -13707,7 +14114,7 @@ void EncCu::xCheckSATDCostCiipMerge(CodingStructure *&tempCS, CodingUnit &cu, Pr
     //acMergeTmpBuffer[mergeCand] = m_acMergeTmpBuffer[mergeCand].getBuf(localUnitArea);
 
     // estimate merge bits
-#if JVET_AG0276_NLIC
+#if JVET_AG0276_NLIC || JVET_AH0314_LIC_INHERITANCE_FOR_MRG
     // lic flag is used to generate luma prediction samples for SATD RD to ensure the identical results as anchor; however, the correct solution is to remove such condition on lic flag
     if (mergeCtx1.licFlags[mergeCand])
     {
@@ -13724,7 +14131,7 @@ void EncCu::xCheckSATDCostCiipMerge(CodingStructure *&tempCS, CodingUnit &cu, Pr
     {
 #endif
     mergeCtx.setMergeInfo(pu, mergeCand);
-#if JVET_AG0276_NLIC
+#if JVET_AG0276_NLIC || JVET_AH0314_LIC_INHERITANCE_FOR_MRG
     m_pcInterSearch->motionCompensation(pu, acMergeTmpBuffer[mergeCand], REF_PIC_LIST_X, true, false);
     }
 #endif
@@ -13810,6 +14217,9 @@ void EncCu::xCheckSATDCostCiipTmMerge(CodingStructure *&tempCS, CodingUnit &cu, 
 #endif
 #if INTER_LIC
   cu.licFlag = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  cu.licInheritPara = false;
+#endif
 #endif
   cu.mmvdSkip = false;
   cu.geoFlag = false;
@@ -13949,6 +14359,9 @@ void EncCu::xCheckSATDCostMmvdMerge(CodingStructure *&tempCS, CodingUnit &cu, Pr
 #endif
 #if INTER_LIC
   cu.licFlag = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  cu.licInheritPara = false;
+#endif
 #endif
   cu.mmvdSkip = true;
   cu.geoFlag = false;
@@ -14090,6 +14503,9 @@ void EncCu::xCheckSATDCostAffineMergeOppositeLic(CodingStructure *&tempCS, Codin
   cu.affine = true;
 #if INTER_LIC
   cu.licFlag = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  cu.licInheritPara = false;
+#endif
 #endif
   pu.affineOppositeLic = true;
   pu.afMmvdFlag = false;
@@ -14124,6 +14540,9 @@ void EncCu::xCheckSATDCostAffineMergeOppositeLic(CodingStructure *&tempCS, Codin
 #endif
 #if INTER_LIC
     cu.licFlag = affineMergeCtx.licFlags[uiAffMergeCand];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG && JVET_AG0164_AFFINE_GPM
+    affineMergeCtx.setLICParamToPu(pu, uiAffMergeCand, cu.licFlag);
+#endif
 #endif
     pu.mv[0].setZero();
     pu.mv[1].setZero();
@@ -14232,6 +14651,9 @@ void EncCu::xCheckSATDCostAffineMerge(CodingStructure *&tempCS, CodingUnit &cu, 
   cu.affine = true;
 #if INTER_LIC
   cu.licFlag = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  cu.licInheritPara = false;
+#endif
 #endif
 #if JVET_AG0276_LIC_FLAG_SIGNALING
   pu.affineOppositeLic = false;
@@ -14272,6 +14694,9 @@ void EncCu::xCheckSATDCostAffineMerge(CodingStructure *&tempCS, CodingUnit &cu, 
 #endif
 #if INTER_LIC
     cu.licFlag = affineMergeCtx.licFlags[uiAffMergeCand];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG && JVET_AG0164_AFFINE_GPM
+    affineMergeCtx.setLICParamToPu(pu, uiAffMergeCand, cu.licFlag);
+#endif
 #endif
     pu.mv[0].setZero();
     pu.mv[1].setZero();
@@ -14402,6 +14827,9 @@ void EncCu::xCheckSATDCostBMAffineMerge(CodingStructure *&tempCS, CodingUnit &cu
   cu.affine = true;
 #if INTER_LIC
   cu.licFlag = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  cu.licInheritPara = false;
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
    cu.obmcFlag= true;
@@ -14442,6 +14870,9 @@ void EncCu::xCheckSATDCostBMAffineMerge(CodingStructure *&tempCS, CodingUnit &cu
 #endif
 #if INTER_LIC
     cu.licFlag = affineMergeCtx.licFlags[uiAffMergeCand];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG && JVET_AG0164_AFFINE_GPM
+    affineMergeCtx.setLICParamToPu(pu, uiAffMergeCand, cu.licFlag);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
    cu.obmcFlag= affineMergeCtx.obmcFlags[uiAffMergeCand];
@@ -14563,6 +14994,9 @@ void EncCu::xCheckSATDCostTMMerge(       CodingStructure*& tempCS,
 #if JVET_AG0276_LIC_FLAG_SIGNALING
   pu.tmMergeFlagOppositeLic = false;
 #endif
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  cu.licInheritPara = false;
+#endif
 
   const double sqrtLambdaForFirstPassIntra = m_pcRdCost->getMotionLambda() * FRAC_BITS_SCALE;
   int insertPos = -1;
@@ -14661,6 +15095,9 @@ void EncCu::xCheckSATDCostTMMergeOppositeLic( CodingStructure*& tempCS,
   pu.regularMergeFlag = false;
   pu.tmMergeFlag = true;
   pu.tmMergeFlagOppositeLic = true;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  cu.licInheritPara = false;
+#endif
   const double sqrtLambdaForFirstPassIntra = m_pcRdCost->getMotionLambda() * FRAC_BITS_SCALE;
   int insertPos = -1;
   for (uint32_t uiMergeCand = 0; uiMergeCand < mrgCtx.numValidMergeCand; uiMergeCand++)
@@ -14753,6 +15190,9 @@ void EncCu::xCheckSATDCostAffineMmvdMerge(       CodingStructure*& tempCS,
   cu.imv              = IMV_OFF;
 #if INTER_LIC
   cu.licFlag = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  cu.licInheritPara = false;
+#endif
 #endif
 
   pu.mergeFlag        = true;
@@ -14866,6 +15306,9 @@ void EncCu::xCheckSATDCostAffineMmvdMerge(       CodingStructure*& tempCS,
 #endif
 #if INTER_LIC
       pu.cu->licFlag    = affineMergeCtx.licFlags          [pu.mergeIdx];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG && JVET_AG0164_AFFINE_GPM
+      affineMergeCtx.setLICParamToPu(pu, pu.mergeIdx, pu.cu->licFlag);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
       pu.cu->obmcFlag   = affineMergeCtx.obmcFlags         [pu.mergeIdx];
@@ -14948,6 +15391,9 @@ void EncCu::xCheckSATDCostGeoMerge(CodingStructure *&tempCS, CodingUnit &cu, Pre
   cu.mtsFlag = false;
 #if INTER_LIC
   cu.licFlag = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  cu.licInheritPara = false;
+#endif
 #endif
   cu.bcwIdx = BCW_DEFAULT;
   cu.geoFlag = true;
@@ -15177,6 +15623,9 @@ void EncCu::xCheckRDCostAffineMerge2Nx2N( CodingStructure *&tempCS, CodingStruct
     cu.mmvdSkip = false;
 #if INTER_LIC
     cu.licFlag = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+    cu.licInheritPara = false;
+#endif
 #endif
 
     PredictionUnit pu( tempCS->area );
@@ -15255,6 +15704,9 @@ void EncCu::xCheckRDCostAffineMerge2Nx2N( CodingStructure *&tempCS, CodingStruct
       cu.affine = true;
 #if INTER_LIC
       cu.licFlag = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+      cu.licInheritPara = false;
+#endif
 #endif
       cu.predMode = MODE_INTER;
       cu.chromaQpAdj = m_cuChromaQpOffsetIdxPlus1;
@@ -15289,6 +15741,9 @@ void EncCu::xCheckRDCostAffineMerge2Nx2N( CodingStructure *&tempCS, CodingStruct
         cu.bcwIdx = affineMergeCtx.bcwIdx[uiMergeCand];
 #if INTER_LIC
         cu.licFlag = affineMergeCtx.licFlags[uiMergeCand];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG && JVET_AG0164_AFFINE_GPM
+        affineMergeCtx.setLICParamToPu(pu, uiMergeCand, cu.licFlag);
+#endif
 #endif
 
         pu.mergeType = affineMergeCtx.mergeType[uiMergeCand];
@@ -15390,6 +15845,9 @@ void EncCu::xCheckRDCostAffineMerge2Nx2N( CodingStructure *&tempCS, CodingStruct
       cu.tileIdx          = tempCS->pps->getTileIdx( tempCS->area.lumaPos() );
 #if INTER_LIC
       cu.licFlag = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+      cu.licInheritPara = false;
+#endif
 #endif
       cu.skip = false;
       cu.affine = true;
@@ -15409,6 +15867,9 @@ void EncCu::xCheckRDCostAffineMerge2Nx2N( CodingStructure *&tempCS, CodingStruct
       cu.bcwIdx = affineMergeCtx.bcwIdx[uiMergeCand];
 #if INTER_LIC
       cu.licFlag = affineMergeCtx.licFlags[uiMergeCand];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG && JVET_AG0164_AFFINE_GPM
+      affineMergeCtx.setLICParamToPu(pu, uiMergeCand, cu.licFlag);
+#endif
 #endif
 
       pu.mergeType = affineMergeCtx.mergeType[uiMergeCand];
@@ -15539,6 +16000,9 @@ void EncCu::xCheckRDCostAffineMmvd2Nx2N(CodingStructure *&tempCS, CodingStructur
     cu.geoFlag  = false;
 #if INTER_LIC
     cu.licFlag  = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+    cu.licInheritPara = false;
+#endif
 #endif
 
     PredictionUnit pu(tempCS->area);
@@ -15598,6 +16062,9 @@ void EncCu::xCheckRDCostAffineMmvd2Nx2N(CodingStructure *&tempCS, CodingStructur
       cu.affine      = true;
 #if INTER_LIC
       cu.licFlag     = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+      cu.licInheritPara = false;
+#endif
 #endif
       cu.predMode    = MODE_INTER;
       cu.chromaQpAdj = m_cuChromaQpOffsetIdxPlus1;
@@ -15637,6 +16104,9 @@ void EncCu::xCheckRDCostAffineMmvd2Nx2N(CodingStructure *&tempCS, CodingStructur
             pu.cu->affineType = affineMergeCtx.affineType        [pu.mergeIdx];
 #if INTER_LIC
             pu.cu->licFlag    = affineMergeCtx.licFlags          [pu.mergeIdx];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG && JVET_AG0164_AFFINE_GPM
+            affineMergeCtx.setLICParamToPu(pu, pu.mergeIdx, pu.cu->licFlag);
+#endif
 #endif
             pu.cu->bcwIdx     = affineMergeCtx.bcwIdx            [pu.mergeIdx];
             pu.mmvdMergeFlag  = false;
@@ -15724,6 +16194,9 @@ void EncCu::xCheckRDCostAffineMmvd2Nx2N(CodingStructure *&tempCS, CodingStructur
       cu.affine      = true;
 #if INTER_LIC
       cu.licFlag     = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+      cu.licInheritPara = false;
+#endif
 #endif
       cu.predMode    = MODE_INTER;
       cu.chromaQpAdj = m_cuChromaQpOffsetIdxPlus1;
@@ -15746,6 +16219,9 @@ void EncCu::xCheckRDCostAffineMmvd2Nx2N(CodingStructure *&tempCS, CodingStructur
         pu.mergeType      = affineMergeCtx.mergeType         [pu.mergeIdx];
 #if INTER_LIC
         pu.cu->licFlag    = affineMergeCtx.licFlags          [pu.mergeIdx];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG && JVET_AG0164_AFFINE_GPM
+        affineMergeCtx.setLICParamToPu(pu, pu.mergeIdx, pu.cu->licFlag);
+#endif
 #endif
         pu.interDir       = affineMergeCtx.interDirNeighbours[pu.mergeIdx];
         pu.cu->affineType = affineMergeCtx.affineType        [pu.mergeIdx];
@@ -15858,6 +16334,9 @@ void EncCu::xCheckRDCostTMMerge2Nx2N(CodingStructure *&tempCS, CodingStructure *
     cu.tileIdx  = tempCS->pps->getTileIdx( tempCS->area.lumaPos() );
 #if INTER_LIC
     cu.licFlag  = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+    cu.licInheritPara = false;
+#endif
 #endif
 
     PredictionUnit pu( tempCS->area );
@@ -15983,6 +16462,9 @@ void EncCu::xCheckRDCostTMMerge2Nx2N(CodingStructure *&tempCS, CodingStructure *
       cu.tileIdx          = tempCS->pps->getTileIdx( tempCS->area.lumaPos() );
 #if INTER_LIC
       cu.licFlag          = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+      cu.licInheritPara = false;
+#endif
 #endif
       cu.skip             = false;
       cu.mmvdSkip         = false;
@@ -16089,6 +16571,9 @@ void EncCu::xCheckRDCostTMMerge2Nx2N(CodingStructure *&tempCS, CodingStructure *
       cu.mmvdSkip         = false;
 #if INTER_LIC
       cu.licFlag          = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+      cu.licInheritPara = false;
+#endif
 #endif
       cu.affine           = false;
       cu.geoFlag          = false;
@@ -16289,6 +16774,9 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
     pu.regularMergeFlag = false;
 #if INTER_LIC
     cu.licFlag = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+    cu.licInheritPara = false;
+#endif
 #endif
     cu.geoFlag = false;
 #if JVET_AC0112_IBC_LIC
@@ -16527,6 +17015,9 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
       cu.mmvdSkip = false;
 #if INTER_LIC
       cu.licFlag = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+      cu.licInheritPara = false;
+#endif
 #endif
 #if JVET_AC0112_IBC_LIC
       cu.ibcLicFlag = false;
@@ -18493,6 +18984,9 @@ void EncCu::xCheckRDCostIBCModeMerge2Nx2N(CodingStructure *&tempCS, CodingStruct
             cu.sbtInfo = 0;
 #if INTER_LIC
             cu.licFlag = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+            cu.licInheritPara = false;
+#endif
 #endif
 #if JVET_AC0112_IBC_LIC
             cu.ibcLicFlag = false;
@@ -19132,6 +19626,9 @@ void EncCu::xCheckRDCostIBCMode(CodingStructure *&tempCS, CodingStructure *&best
     pu.regularMergeFlag = false;
 #if INTER_LIC
     cu.licFlag = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+    cu.licInheritPara = false;
+#endif
 #endif
 
 #if JVET_AC0112_IBC_CIIP
@@ -19663,6 +20160,7 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
     }
 #endif
 
+
   CodingUnit &cu      = tempCS->addCU( tempCS->area, partitioner.chType );
 
   partitioner.setCUData( cu );
@@ -19886,7 +20384,10 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
 #endif
         m_pcInterSearch->motionCompensation( *(cu.firstPU), predBuf, REF_PIC_LIST_X );
 #if JVET_AD0213_LIC_IMP
-        if (cu.licFlag)
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+        if (!cu.licInheritPara)
+#endif
+          if (cu.licFlag)
         {
           for (int list = 0; list < 2; list++)
           {
@@ -19926,6 +20427,9 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
 #endif
         m_pcInterSearch->motionCompensation( *(cuBest->firstPU), predBuf, REF_PIC_LIST_X );
 #if JVET_AD0213_LIC_IMP
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+          if(!cuBest->licInheritPara)
+#endif
         if (cuBest->licFlag)
         {
           for (int list = 0; list < 2; list++)
@@ -20176,6 +20680,7 @@ bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bes
     }
 #endif
 
+
   CodingUnit &cu = tempCS->addCU( tempCS->area, partitioner.chType );
 
   partitioner.setCUData( cu );
@@ -20413,6 +20918,9 @@ bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bes
 #endif
         m_pcInterSearch->motionCompensation( *(cu.firstPU), predBuf, REF_PIC_LIST_X );
 #if JVET_AD0213_LIC_IMP
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+          if(!cu.licInheritPara)
+#endif
         if (cu.licFlag)
         {
           for (int list = 0; list < 2; list++)
@@ -20453,7 +20961,10 @@ bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bes
 #endif
         m_pcInterSearch->motionCompensation( *(cuBest->firstPU), predBuf, REF_PIC_LIST_X );
 #if JVET_AD0213_LIC_IMP
-        if (cuBest->licFlag)
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+        if (!cuBest->licInheritPara)
+#endif
+          if (cuBest->licFlag)
         {
           for (int list = 0; list < 2; list++)
           {
@@ -22202,7 +22713,10 @@ void EncCu::xCheckRDCostInterMultiHyp2Nx2N(CodingStructure *&tempCS, CodingStruc
     m_pcInterSearch->motionCompensation(pu);
 #endif
 #if JVET_AD0213_LIC_IMP
-    if (pu.cu->licFlag)
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+    if (!pu.cu->licInheritPara)
+#endif
+      if (pu.cu->licFlag)
     {
       for (int list = 0; list < 2; list++)
       {
@@ -22527,6 +23041,9 @@ void EncCu::xCheckSATDCostBMMerge(CodingStructure*& tempCS,
       pu.cu->bcwIdx = mrgCtx.bcwIdx[candIdx];
 #if JVET_AD0213_LIC_IMP
       pu.cu->licFlag = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+      cu.licInheritPara = false;
+#endif
 #endif
       pu.mv[REF_PIC_LIST_0] = mrgCtx.mvFieldNeighbours[(candIdx << 1)].mv;
       pu.mv[REF_PIC_LIST_1] = mrgCtx.mvFieldNeighbours[(candIdx << 1) + 1].mv;
@@ -22733,6 +23250,9 @@ void EncCu::xCheckSATDCostBMMerge(CodingStructure*& tempCS,
 #endif
 #if MULTI_PASS_DMVR
   pu.bdmvrRefine = false;
+#endif
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  cu.licInheritPara = false;
 #endif
 }
 #endif

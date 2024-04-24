@@ -252,8 +252,13 @@ public:
   uint64_t    geo_affFlag_est(const TempCtx& ctxStart, const int flag, int ctxOffset);
 #endif
 #if JVET_AA0058_GPM_ADAPTIVE_BLENDING
+#if JVET_AH0314_ADAPTIVE_GPM_BLENDING_IMPROV
+  uint64_t    geoBldFlagEst             (const PredictionUnit& pu, const TempCtx& ctxStart, const int flag);
+  void        geoAdaptiveBlendingIdx    (const PredictionUnit& pu, const int idx);
+#else
   uint64_t    geoBldFlagEst             (const TempCtx& ctxStart, const int flag);
   void        geoAdaptiveBlendingIdx    (const int idx);
+#endif
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   void        geoModeIdx                ( const PredictionUnit&         pu);

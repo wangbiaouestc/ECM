@@ -6825,7 +6825,6 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
             biPredResult.cu = cu;
             biPredResult.pu = pu;
             biPredResult.pu.interDir = 3;
-
             biPredResult.cu.smvdMode = 1 + curRefList;
 
             biPredResult.pu.mv[curRefList] = cCurMvField.mv;
@@ -7489,6 +7488,9 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
     motionCompensation( pu, predBuf, REF_PIC_LIST_X );
 #endif
 #if JVET_AD0213_LIC_IMP
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+    if(!pu.cu->licInheritPara)
+#endif
     if (pu.cu->licFlag)
     {
       for (int list = 0; list < 2; list++)
@@ -7914,6 +7916,9 @@ void InterSearch::predInterSearchAdditionalHypothesis(PredictionUnit& pu, const 
 #endif
 #if INTER_LIC
   auto savedLICFlag = pu.cu->licFlag;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  auto savedLICInheritePara = pu.cu->licInheritPara;
+#endif
 #endif
   tempMHPredData.isMrg = true;
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
@@ -7959,6 +7964,9 @@ void InterSearch::predInterSearchAdditionalHypothesis(PredictionUnit& pu, const 
 #endif
       const auto savedAffine = pu.cu->affine;
       const auto savedIMV = pu.cu->imv;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+      m_isAddHypMC = true;
+#endif
       for (int i = 0; i < maxNumMergeCandidates; i++)
       {
         // get prediction for the additional hypothesis
@@ -7972,6 +7980,9 @@ void InterSearch::predInterSearchAdditionalHypothesis(PredictionUnit& pu, const 
 #if JVET_AG0276_NLIC
         fakePredData.cu->altLMFlag = m_geoMrgCtx.altLMFlag[i];
         fakePredData.cu->altLMParaUnit = m_geoMrgCtx.altLMParaNeighbours[i];
+#endif
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+        fakePredData.cu->licInheritPara = false;
 #endif
         fakePredData.mvRefine = true;
         if (savedLICFlag)
@@ -7988,9 +7999,15 @@ void InterSearch::predInterSearchAdditionalHypothesis(PredictionUnit& pu, const 
         fakePredData.cu->altLMFlag = savedAltLMFlag;
         fakePredData.cu->altLMParaUnit = savedAltLMParaUnit;
 #endif
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+        fakePredData.cu->licInheritPara = savedLICInheritePara;
+#endif
         fakePredData.cu->imv = savedIMV;
         fakePredData.cu->affine = savedAffine;
       }
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+      m_isAddHypMC = false;
+#endif
       if (savedLICFlag)
       {
         setGeoTmpBuffer(m_mhpMrgTempBufSet + 0x2);
@@ -8158,6 +8175,9 @@ void InterSearch::predInterSearchAdditionalHypothesis(PredictionUnit& pu, const 
 #endif
 #if INTER_LIC
         pu.cu->licFlag = tempMHPredData.licFlag;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+        pu.cu->licInheritPara = false;
+#endif
 #endif
         xMotionEstimation(pu, tempOrigBuf, eRefPicList, cMvPred, iRefIdxPred, cMv, tempMHPredData.mvpIdx, uiBits, uiCostTemp, amvpInfo, false, g_addHypWeight[tempMHPredData.weightIdx]);
         xCheckBestMVP(eRefPicList, cMv, cMvPred, tempMHPredData.mvpIdx, amvpInfo, uiBits, uiCostTemp, pu.cu->imv);
@@ -8167,6 +8187,9 @@ void InterSearch::predInterSearchAdditionalHypothesis(PredictionUnit& pu, const 
 #endif
 #if INTER_LIC
         pu.cu->licFlag = savedLICFlag;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+        pu.cu->licInheritPara = savedLICInheritePara;
+#endif
 #endif
         tempMHPredData.mv = cMv;
         tempMHPredData.mv.mvCliptoStorageBitDepth();
@@ -11280,7 +11303,6 @@ void InterSearch::xPredAffineInterSearch( PredictionUnit&       pu,
           }
 
           biPredResult.pu.interDir = 3;
-
           biPredResult.pu.mvpIdx[iRefList] = aaiMvpIdxBi[iRefList][iRefIdxTemp];
           biPredResult.pu.mvpIdx[1 - iRefList] = aaiMvpIdxBi[1 - iRefList][iRefIdxBi[1 - iRefList]];
           biPredResult.pu.mvpNum[iRefList] = aaiMvpNum[iRefList][iRefIdxTemp];
@@ -16102,8 +16124,13 @@ void InterSearch::checkEncLicOff(CodingUnit& cu, MergeCtx& mergeCtx)
     {
       for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
       {
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+        pu.cu->licScale[list][comp] = 32;
+        pu.cu->licOffset[list][comp] = 0;
+#else
         pu.cu->licScale[list][comp] = MAX_INT;
         pu.cu->licOffset[list][comp] = MAX_INT;
+#endif
       }
     }
 #endif
@@ -16216,6 +16243,9 @@ void InterSearch::checkEncLicOn(CodingUnit& cu, MergeCtx& mergeCtx)
   }
   motionCompensation(pu, m_predictionBeforeLIC, REF_PIC_LIST_X);
 #if JVET_AD0213_LIC_IMP
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+    if (!pu.cu->licInheritPara)
+#endif
   for (int list = 0; list < 2; list++)
   {
     if (pu.refIdx[list] >= 0)
@@ -16271,8 +16301,13 @@ void InterSearch::checkEncLicOn(CodingUnit& cu, MergeCtx& mergeCtx)
     {
       for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
       {
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+        pu.cu->licScale[list][comp] = 32;
+        pu.cu->licOffset[list][comp] = 0;
+#else
         pu.cu->licScale[list][comp] = MAX_INT;
         pu.cu->licOffset[list][comp] = MAX_INT;
+#endif
       }
     }
 #endif

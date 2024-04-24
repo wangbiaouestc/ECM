@@ -6062,6 +6062,43 @@ void CABACReader::geo_merge_idx1(PredictionUnit& pu)
 #if JVET_AA0058_GPM_ADAPTIVE_BLENDING
 void CABACReader::geoAdaptiveBlendingIdx( PredictionUnit& pu )
 {
+#if JVET_AH0314_ADAPTIVE_GPM_BLENDING_IMPROV
+  int blkSizeSmall = pu.lwidth() < pu.lheight() ? pu.lwidth() : pu.lheight();
+  int offset = (blkSizeSmall < GPM_BLENDING_SIZE_THRESHOLD) ? 0 : 4;
+  int bin0 = m_BinDecoder.decodeBin(Ctx::GeoBldFlag(0 + offset));
+  if (bin0 == 1)
+  {
+    pu.geoBldIdx = 2; //1
+  }
+  else
+  {
+    int bin1 = m_BinDecoder.decodeBin(Ctx::GeoBldFlag(1 + offset));
+    if (bin1 == 0)
+    {
+      int bin2 = m_BinDecoder.decodeBin(Ctx::GeoBldFlag(3 + offset));
+      if (bin2 == 0)
+      {
+        pu.geoBldIdx = 4; //000
+      }
+      else
+      {
+        pu.geoBldIdx = 3; //001
+      }
+    }
+    else
+    {
+      int bin2 = m_BinDecoder.decodeBin(Ctx::GeoBldFlag(2 + offset));
+      if (bin2 == 0)
+      {
+        pu.geoBldIdx = 1; //010
+      }
+      else
+      {
+        pu.geoBldIdx = 0; //011
+      }
+    }
+  }
+#else
   int bin0 = m_BinDecoder.decodeBin( Ctx::GeoBldFlag( 0 ) );
   if( bin0 == 1 )
   {
@@ -6095,6 +6132,13 @@ void CABACReader::geoAdaptiveBlendingIdx( PredictionUnit& pu )
       }
     }
   }
+#endif
+#if JVET_AH0314_ADAPTIVE_GPM_BLENDING_IMPROV
+  if (blkSizeSmall >= GPM_BLENDING_SIZE_THRESHOLD)
+  {
+    pu.geoBldIdx++;
+  }
+#endif
   DTRACE(g_trace_ctx, D_SYNTAX, "geo_adaptive_blending_idx() geo_bld_idx=%d\n", pu.geoBldIdx);
 }
 #endif
