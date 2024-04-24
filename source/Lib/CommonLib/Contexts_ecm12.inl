@@ -475,7 +475,24 @@ const CtxSet ContextSetCfg::GeoMmvdStepMvpIdx = ContextSetCfg::addCtxSet({
 });
 
 const CtxSet ContextSetCfg::GeoBldFlag = ContextSetCfg::addCtxSet({
-// ctx 97 100
+// ctx 97 104
+#if JVET_AH0314_ADAPTIVE_GPM_BLENDING_IMPROV
+ {  58,  22,  45,  13,  58,  22,  45,  13 },
+ {  60,  36,  58,  36,  60,  36,  58,  36 },
+ {  35,  35,  35,  35,  35,  35,  35,  35 },
+ {   1,   1,   1,   1,   1,   1,   1,   1 },
+ {   1,   1,   1,   1,   1,   1,   1,   1 },
+ {   8,   8,   8,   8,   8,   8,   8,   8 },
+ {  11,  18,  18,  11,  11,  18,  18,  11 },
+ {   4,  18,  11,  11,   4,  18,  11,  11 },
+ {  18,  18,  18,  18,  18,  18,  18,  18 },
+ { 132, 116, 116, 117, 132, 116, 116, 117 },
+ { 118, 116, 132, 118, 118, 116, 132, 118 },
+ { 117, 116, 116, 117, 117, 116, 116, 117 },
+ { 118, 117, 133, 119, 118, 117, 133, 119 },
+ { 119, 119, 119, 119, 119, 119, 119, 119 },
+ { 119, 119, 119, 119, 119, 119, 119, 119 },
+#else
  {  58,  22,  45,  13 },
  {  60,  36,  58,  36 },
  {  35,  35,  35,  35 },
@@ -491,6 +508,7 @@ const CtxSet ContextSetCfg::GeoBldFlag = ContextSetCfg::addCtxSet({
  { 118, 117, 133, 119 },
  { 119, 119, 119, 119 },
  { 119, 119, 119, 119 },
+#endif
 });
 
 const CtxSet ContextSetCfg::GeoSubModeIdx = ContextSetCfg::addCtxSet({

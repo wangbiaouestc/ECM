@@ -434,6 +434,9 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #endif
 #if INTER_LIC
   licFlag           = other.licFlag;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  licInheritPara    = other.licInheritPara;
+#endif
 #if JVET_AD0213_LIC_IMP
   for (int i = 0; i < 2; i++)
   {
@@ -686,13 +689,21 @@ void CodingUnit::initData()
 #endif
 #if INTER_LIC
   licFlag = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  licInheritPara = false;
+#endif
 #if JVET_AD0213_LIC_IMP
   for (int i = 0; i < 2; i++)
   {
     for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
     {
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+      licScale[i][comp] = 32;
+      licOffset[i][comp] = 0;
+#else
       licScale[i][comp] = MAX_INT;
       licOffset[i][comp] = MAX_INT;
+#endif
     }
   }
 #endif

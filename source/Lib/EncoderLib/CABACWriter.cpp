@@ -4975,7 +4975,19 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
       }
 #endif
 #if JVET_AA0058_GPM_ADAPTIVE_BLENDING
+#if JVET_AH0314_ADAPTIVE_GPM_BLENDING_IMPROV
+      int blkSizeSmall = pu.lwidth() < pu.lheight() ? pu.lwidth() : pu.lheight();
+      if (blkSizeSmall < GPM_BLENDING_SIZE_THRESHOLD)
+      {
+        geoAdaptiveBlendingIdx(pu, pu.geoBldIdx);
+      }
+      else
+      {
+        geoAdaptiveBlendingIdx(pu, pu.geoBldIdx - 1);
+      }
+#else
       geoAdaptiveBlendingIdx(pu.geoBldIdx);
+#endif
 #endif
 
 #if JVET_W0097_GPM_MMVD_TM
@@ -5898,18 +5910,57 @@ uint64_t CABACWriter::geo_affFlag_est(const TempCtx& ctxStart, const int flag, i
 
 
 #if JVET_AA0058_GPM_ADAPTIVE_BLENDING
+#if JVET_AH0314_ADAPTIVE_GPM_BLENDING_IMPROV
+uint64_t CABACWriter::geoBldFlagEst(const PredictionUnit& pu, const TempCtx& ctxStart, const int flag)
+#else
 uint64_t CABACWriter::geoBldFlagEst(const TempCtx& ctxStart, const int flag)
+#endif
 {
   getCtx() = ctxStart;
   resetBits();
-
+#if JVET_AH0314_ADAPTIVE_GPM_BLENDING_IMPROV
+  int blkSizeSmall = pu.lwidth() < pu.lheight() ? pu.lwidth() : pu.lheight();
+  if (blkSizeSmall < GPM_BLENDING_SIZE_THRESHOLD)
+  {
+    geoAdaptiveBlendingIdx(pu, flag);
+  }
+  else
+    geoAdaptiveBlendingIdx(pu, flag - 1);
+#else
   geoAdaptiveBlendingIdx(flag);
+#endif
 
   return getEstFracBits();
 }
 
+#if JVET_AH0314_ADAPTIVE_GPM_BLENDING_IMPROV
+void CABACWriter::geoAdaptiveBlendingIdx(const PredictionUnit& pu, const int idx)
+#else
 void CABACWriter::geoAdaptiveBlendingIdx(const int idx)
+#endif
 {
+#if JVET_AH0314_ADAPTIVE_GPM_BLENDING_IMPROV
+  int blkSizeSmall = pu.lwidth() < pu.lheight() ? pu.lwidth() : pu.lheight();
+  int offset = (blkSizeSmall < GPM_BLENDING_SIZE_THRESHOLD) ? 0 : 4;
+  if (idx == 2)
+  {
+    m_BinEncoder.encodeBin(1, Ctx::GeoBldFlag(0 + offset));
+  }
+  else
+  {
+    m_BinEncoder.encodeBin(0, Ctx::GeoBldFlag(0 + offset));
+    if (idx == 0 || idx == 1)
+    {
+      m_BinEncoder.encodeBin(1, Ctx::GeoBldFlag(1 + offset));
+      m_BinEncoder.encodeBin(idx == 0, Ctx::GeoBldFlag(2 + offset));
+    }
+    else
+    {
+      m_BinEncoder.encodeBin(0, Ctx::GeoBldFlag(1 + offset));
+      m_BinEncoder.encodeBin(idx == 3, Ctx::GeoBldFlag(3 + offset));
+    }
+  }
+#else
   if (idx == 2)
   {
     m_BinEncoder.encodeBin(1, Ctx::GeoBldFlag(0));
@@ -5928,6 +5979,7 @@ void CABACWriter::geoAdaptiveBlendingIdx(const int idx)
       m_BinEncoder.encodeBin(idx == 3, Ctx::GeoBldFlag(3));
     }
   }
+#endif
   DTRACE(g_trace_ctx, D_SYNTAX, "geo_adaptive_blending_idx() geo_bld_idx=%d\n", idx);
 }
 #endif

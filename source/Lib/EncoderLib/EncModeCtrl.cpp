@@ -2512,7 +2512,11 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
         }
         else
         {
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+          cuECtx.bestCU->secAltLMParaUnit.resetAltLinearModel();
+#else
           cuECtx.bestCU->secAltLMParaUnit = cuECtx.bestCU->altLMParaUnit;
+#endif
         }
         cuECtx.bestCU->altLMParaUnit.resetAltLinearModel();
 #if JVET_AG0276_LIC_FLAG_SIGNALING
@@ -2550,12 +2554,19 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
 #if INTER_LIC
               bool orgLicFlag = bestCU->licFlag;
               bestCU->licFlag = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+              bool orgLicInheritedFlag = bestCU->licInheritPara;
+              bestCU->licInheritPara = false;
+#endif
 #endif
               bool orgCiipFlag = bestCU->firstPU->ciipFlag;
               bestCU->firstPU->ciipFlag = false;
               m_pcInterSearch->xPredWoRefinement(*bestCU->firstPU, predBeforeMCAdjBuffer);
 #if INTER_LIC
               bestCU->licFlag = orgLicFlag;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+              bestCU->licInheritPara = orgLicInheritedFlag;
+#endif
 #endif
               bestCU->firstPU->ciipFlag = orgCiipFlag;
             }

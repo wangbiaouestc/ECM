@@ -314,13 +314,25 @@ namespace PU
     , bool enableTh4Gpm = false
 #endif
   );
-#if JVET_AG0276_NLIC
-  void     getAltMergeCandidates    (const PredictionUnit &pu, AltLMMergeCtx& cMrgCtx);
+#if JVET_AG0276_NLIC || JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  void     getAltMergeCandidates    (const PredictionUnit &pu, AltLMMergeCtx& cMrgCtx
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                                   , bool isLicInheritCand = false
+#endif
+  );
 #if JVET_AG0276_LIC_FLAG_SIGNALING
   void     getAltBRMergeCandidates  (const PredictionUnit &pu, AltLMMergeCtx& cMrgCtx);
-  bool     isValidAltMergeCandidate (const PredictionUnit &pu, bool isBRCand = false);
+  bool     isValidAltMergeCandidate (const PredictionUnit &pu, bool isBRCand = false
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                                   , bool isLicInheritCand = false
+#endif
+  );
 #else
-  bool     isValidAltMergeCandidate (const PredictionUnit &pu);
+  bool     isValidAltMergeCandidate (const PredictionUnit &pu
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                                   , bool isLicInheritCand = false
+#endif
+  );
 #endif
   uint32_t getAltMergeMvdThreshold  (const PredictionUnit &pu);
 #endif
@@ -734,7 +746,11 @@ namespace PU
 #endif
 
 #if JVET_AG0164_AFFINE_GPM
-  void getGeoAffMergeCandidates(PredictionUnit& pu, AffineMergeCtx& gpmAffMrgCtx, InterPrediction* pcInterPred, AffineMergeCtx* affMergeCtx = NULL);
+  void getGeoAffMergeCandidates(PredictionUnit& pu, AffineMergeCtx& gpmAffMrgCtx, InterPrediction* pcInterPred
+#if !JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                              , AffineMergeCtx* affMergeCtx = NULL
+#endif
+  );
   bool isAffineGPMValid(const PredictionUnit& pu);
   bool isAffineGPMSizeValid(const PredictionUnit& pu);
 

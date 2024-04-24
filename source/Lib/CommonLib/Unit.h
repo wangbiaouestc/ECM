@@ -449,6 +449,9 @@ struct CodingUnit : public UnitArea
 #endif
 #if INTER_LIC
   bool           licFlag;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  bool           licInheritPara;
+#endif
 #if JVET_AD0213_LIC_IMP
   int            licScale[2][3];
   int            licOffset[2][3];
@@ -844,6 +847,10 @@ struct GeoBlendInfo
   Distortion  uiCostTmp;  // uicost template
   MvField     mvFieldA[2];
   MvField     mvFieldB[2];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  int         scaleA[2], scaleB[2];
+  int         offsetA[2], offsetB[2];
+#endif
   int         dir[2];     // 0,1 or 2 (bi-dir)
   int         mergeCand[2];
   Distortion  sad = 0;    // sad of CU prediction
@@ -852,10 +859,19 @@ struct GeoBlendInfo
   int         iOrder;     // before re-ordering
   int         iMergeIdx;
 
-  bool isSame( MvField mvOtherFieldA[2], MvField mvOtherFieldB[2] )
+  bool isSame( MvField mvOtherFieldA[2], MvField mvOtherFieldB[2] 
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+             , int scaleOtherA [2], int scaleOtherB [2]
+             , int offsetOtherA[2], int offsetOtherB[2]
+#endif
+  )
   {
     bool  bSameA = (mvFieldA[0] == mvOtherFieldA[0]) && (mvFieldA[1] == mvOtherFieldA[1]);
     bool  bSameB = (mvFieldB[0] == mvOtherFieldB[0]) && (mvFieldB[1] == mvOtherFieldB[1]);
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+    bSameA &= (scaleA[0] == scaleOtherA[0] && offsetA[0] == offsetOtherA[0]) && (scaleA[1] == scaleOtherA[1] && offsetA[1] == offsetOtherA[1]);
+    bSameB &= (scaleB[0] == scaleOtherB[0] && offsetB[0] == offsetOtherB[0]) && (scaleB[1] == scaleOtherB[1] && offsetB[1] == offsetOtherB[1]);
+#endif
     return bSameA && bSameB;
   }
 };

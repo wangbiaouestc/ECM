@@ -652,6 +652,9 @@ void MergeCtx::copyRegularMergeCand(int dstCandIdx, MergeCtx& srcCtx, int srcCan
 #endif
 #if INTER_LIC
   licFlags          [dstCandIdx] = srcCtx.licFlags          [srcCandIdx];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  copyLICParamFromCtx(dstCandIdx, srcCtx, srcCandIdx);
+#endif
 #endif
   interDirNeighbours[dstCandIdx] = srcCtx.interDirNeighbours[srcCandIdx];
   useAltHpelIf      [dstCandIdx] = srcCtx.useAltHpelIf      [srcCandIdx];
@@ -731,9 +734,20 @@ void MergeCtx::saveMergeInfo(PredictionUnit& puTmp, PredictionUnit pu)
 #if JVET_AG0276_LIC_SLOPE_ADJUST
   puTmp.cu->licDelta = pu.cu->licDelta;
 #endif
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  puTmp.cu->licInheritPara = pu.cu->licInheritPara;
+  for (int list = 0; list < 2; list++)
+  {
+    for (int comp = 0; comp < 3; comp++)
+    {
+      puTmp.cu->licScale[list][comp] = pu.cu->licScale[list][comp];
+      puTmp.cu->licOffset[list][comp] = pu.cu->licOffset[list][comp];
+    }
+  }
+#endif
 }
 #endif
-void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
+void MergeCtx::setMergeInfo(PredictionUnit& pu, int candIdx)
 {
 #if JVET_X0049_ADAPT_DMVR
   pu.mergeIdx = candIdx;
@@ -743,20 +757,20 @@ void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
   }
 #endif
 #if !JVET_Z0075_IBC_HMVP_ENLARGE
-  CHECK( candIdx >= numValidMergeCand, "Merge candidate does not exist" );
+  CHECK(candIdx >= numValidMergeCand, "Merge candidate does not exist");
 #endif
 
-  pu.regularMergeFlag        = !(pu.ciipFlag || pu.cu->geoFlag);
-  pu.mergeFlag               = true;
+  pu.regularMergeFlag = !(pu.ciipFlag || pu.cu->geoFlag);
+  pu.mergeFlag = true;
   pu.mmvdMergeFlag = false;
-  pu.interDir                = interDirNeighbours[candIdx];
+  pu.interDir = interDirNeighbours[candIdx];
   pu.cu->imv = (!pu.cu->geoFlag && useAltHpelIf[candIdx]) ? IMV_HPEL : 0;
 #if !JVET_X0049_ADAPT_DMVR
-  pu.mergeIdx                = candIdx;
+  pu.mergeIdx = candIdx;
 #endif
-  pu.mergeType               = CU::isIBC( *pu.cu ) ? MRG_TYPE_IBC : MRG_TYPE_DEFAULT_N;
-  pu.mv     [REF_PIC_LIST_0] = mvFieldNeighbours[(candIdx << 1) + 0].mv;
-  pu.mv     [REF_PIC_LIST_1] = mvFieldNeighbours[(candIdx << 1) + 1].mv;
+  pu.mergeType = CU::isIBC(*pu.cu) ? MRG_TYPE_IBC : MRG_TYPE_DEFAULT_N;
+  pu.mv[REF_PIC_LIST_0] = mvFieldNeighbours[(candIdx << 1) + 0].mv;
+  pu.mv[REF_PIC_LIST_1] = mvFieldNeighbours[(candIdx << 1) + 1].mv;
 #if MULTI_PASS_DMVR
   pu.bdmvrRefine = false;
 #endif
@@ -765,6 +779,14 @@ void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
 #if JVET_AG0276_NLIC
   pu.cu->altLMFlag = altLMFlag[candIdx];
   pu.cu->altLMParaUnit = altLMParaNeighbours[candIdx];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  bool initializeAltLM = !pu.cu->altLMFlag
+                      && !pu.cu->geoFlag;
+  if (initializeAltLM)
+  {
+    pu.cu->altLMParaUnit.resetAltLinearModel();
+  }
+#endif
 #endif
 
   if (CU::isIBC(*pu.cu))
@@ -772,9 +794,9 @@ void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
     pu.bv = pu.mv[REF_PIC_LIST_0];
     pu.bv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT); // used for only integer resolution
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
-    if(!pu.cs->sps->getIBCFracFlag())
+    if (!pu.cs->sps->getIBCFracFlag())
 #endif
-    pu.cu->imv = pu.cu->imv == IMV_HPEL ? 0 : pu.cu->imv;
+      pu.cu->imv = pu.cu->imv == IMV_HPEL ? 0 : pu.cu->imv;
 #if MULTI_HYP_PRED
     pu.addHypData.clear();
     pu.numMergedAddHyps = 0;
@@ -796,7 +818,7 @@ void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
     pu.cu->rribcFlipType = 0;
 #endif
   }
-  pu.cu->bcwIdx = ( interDirNeighbours[candIdx] == 3 ) ? bcwIdx[candIdx] : BCW_DEFAULT;
+  pu.cu->bcwIdx = (interDirNeighbours[candIdx] == 3) ? bcwIdx[candIdx] : BCW_DEFAULT;
 #if MULTI_HYP_PRED
   if (pu.ciipFlag
 #if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
@@ -834,6 +856,10 @@ void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
 
 #if INTER_LIC
   pu.cu->licFlag = pu.cs->slice->getUseLIC() ? licFlags[candIdx] : false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  CHECK(!licFlags[candIdx] && licInheritPara[candIdx], "!licFlags[candIdx] && licInheritPara[candIdx]");
+  setLICParamToPu(pu, candIdx, licInheritPara[candIdx]);
+#endif
 #if JVET_AG0276_LIC_SLOPE_ADJUST
   pu.cu->licDelta = 0;
 #endif
@@ -846,8 +872,215 @@ void MergeCtx::setMergeInfo( PredictionUnit& pu, int candIdx )
 #endif
 }
 
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+template <typename MergeCtxType>
+void MergeCtx::setLICParamToPu(const MergeCtxType& src, PredictionUnit& pu, int candIdx, bool hasLIC)
+{
+  hasLIC &= pu.cs->slice->getUseLIC();
+  if(hasLIC)
+  {
+    pu.cu->licInheritPara = src.licInheritPara[candIdx];
+    for (int list = 0; list < 2; list++)
+    {
+      if (src.interDirNeighbours[candIdx] & (list + 1))
+      {
+        for (int comp = 0; comp < 3; comp++)
+        {
+          pu.cu->licScale [list][comp] = src.licScale [candIdx][list][comp];
+          pu.cu->licOffset[list][comp] = src.licOffset[candIdx][list][comp];
+        }
+      }
+      else
+      {
+        for (int comp = 0; comp < 3; comp++)
+        {
+          pu.cu->licScale [list][comp] = 32;
+          pu.cu->licOffset[list][comp] = 0;
+        }
+      }
+    }
+  }
+  else
+  {
+    pu.cu->licInheritPara = false;
+    for (int list = 0; list < 2; list++)
+    {
+      for (int comp = 0; comp < 3; comp++)
+      {
+        pu.cu->licScale [list][comp] = 32;
+        pu.cu->licOffset[list][comp] = 0;
+      }
+    }
+  }
+}
+
+template <typename MergeCtxType>
+void MergeCtx::loadLICParamFromPu(MergeCtxType& dst, const PredictionUnit* pu, int candIdx, bool allowAltModel, bool hasLIC)
+{
+  hasLIC &= (pu != nullptr && pu->cs->slice->getUseLIC());
+#if JVET_AG0276_NLIC
+  allowAltModel &= (pu != nullptr);
+  if (pu->cu->altLMFlag && !allowAltModel)
+  {
+    hasLIC = false;
+  }
+#endif
+
+  if (!hasLIC)
+  {
+    MergeCtx::setDefaultLICParamToCtx(dst, candIdx);
+#if JVET_AG0276_NLIC
+    dst.altLMParaNeighbours[candIdx].resetAltLinearModel();
+#endif
+    return;
+  }
+
+  CHECK(pu == nullptr, "pu cannot be a null pointer");
+  dst.licInheritPara[candIdx] = true;
+#if JVET_AG0276_NLIC
+  if (allowAltModel)
+  {
+    dst.altLMParaNeighbours[candIdx] = pu->cu->altLMParaUnit;
+  }
+  else
+  {
+    dst.altLMParaNeighbours[candIdx].resetAltLinearModel();
+  }
+
+#endif
+
+#if JVET_AG0276_NLIC
+  if (allowAltModel && pu->cu->altLMFlag)
+  {
+    setLICParamUsingAltLM(dst, candIdx);
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+    dst.altLMParaNeighbours[candIdx] = pu->cu->altLMBRParaUnit;
+#endif
+    return;
+  }
+#endif
+  
+  for (int list = 0; list < 2; list++)
+  {
+    for (int comp = 0; comp < 3; comp++)
+    {
+      dst.licScale [candIdx][list][comp] = pu->cu->licScale [list][comp];
+      dst.licOffset[candIdx][list][comp] = pu->cu->licOffset[list][comp];
+    }
+  }
+}
+
+template <typename MergeCtxType>
+void MergeCtx::loadLICParamFromMotInfo(MergeCtxType& dst, const MotionInfo* mi, int candIdx, bool allowAltModel, bool hasLIC)
+{
+  CHECK(true, "Invalid function");
+}
+
+template <typename MergeCtxType>
+void MergeCtx::copyLICParamFromCtx(MergeCtxType& dst, int candIdxDst, const MergeCtxType& src, int candIdxSrc)
+{
+  dst.licInheritPara[candIdxDst] = src.licInheritPara[candIdxSrc];
+  for (int list = 0; list < 2; list++)
+  {
+    if (src.interDirNeighbours[candIdxSrc] & (list + 1))
+    {
+      for (int comp = 0; comp < 3; comp++)
+      {
+        dst.licScale [candIdxDst][list][comp] = src.licScale [candIdxSrc][list][comp];
+        dst.licOffset[candIdxDst][list][comp] = src.licOffset[candIdxSrc][list][comp];
+      }
+    }
+    else
+    {
+      for (int comp = 0; comp < 3; comp++)
+      {
+        dst.licScale [candIdxDst][list][comp] = 32;
+        dst.licOffset[candIdxDst][list][comp] = 0;
+      }
+    }
+  }
+}
+
+template <typename MergeCtxType>
+void MergeCtx::setDefaultLICParamToCtx(MergeCtxType& dst, int candIdx)
+{
+  dst.licInheritPara[candIdx] = false;
+  for (int list = 0; list < 2; list++)
+  {
+    for (int comp = 0; comp < 3; comp++)
+    {
+      dst.licScale [candIdx][list][comp] = 32;
+      dst.licOffset[candIdx][list][comp] = 0;
+    }
+  }
+}
+
+template <typename MergeCtxType>
+void MergeCtx::setInheritAndLICFlags(MergeCtxType& dst, int candIdx)
+{
+  bool licL0 = false;
+  bool licL1 = false;
+
+  if (dst.interDirNeighbours[candIdx] & 1)
+  {
+    licL0 = dst.licScale [candIdx][0][0] != 32 || dst.licScale [candIdx][0][1] != 32 || dst.licScale [candIdx][0][2] != 32 ||
+            dst.licOffset[candIdx][0][0] !=  0 || dst.licOffset[candIdx][0][1] !=  0 || dst.licOffset[candIdx][0][2] !=  0;
+  }
+
+  if (dst.interDirNeighbours[candIdx] & 2)
+  {
+    licL1 = dst.licScale [candIdx][1][0] != 32 || dst.licScale [candIdx][1][1] != 32 || dst.licScale [candIdx][1][2] != 32 ||
+            dst.licOffset[candIdx][1][0] !=  0 || dst.licOffset[candIdx][1][1] !=  0 || dst.licOffset[candIdx][1][2] !=  0;
+  }
+
+  dst.licInheritPara[candIdx] = (licL0 | licL1);
+  dst.licFlags[candIdx] = dst.licInheritPara[candIdx];
+}
+
+#if JVET_AG0276_NLIC
+template <typename MergeCtxType>
+void MergeCtx::setLICParamUsingAltLM(MergeCtxType& dst, int candIdx)
+{
+  dst.licInheritPara[candIdx] = true;
+  for (int list = 0; list < 2; list++)
+  {
+    if (dst.interDirNeighbours[candIdx] & (list + 1))
+    {
+      for (int comp = 0; comp < 3; comp++)
+      {
+        dst.licScale [candIdx][list][comp] = dst.altLMParaNeighbours[candIdx].scale [comp];
+        dst.licOffset[candIdx][list][comp] = dst.altLMParaNeighbours[candIdx].offset[comp];
+      }
+    }
+    else
+    {
+      for (int comp = 0; comp < 3; comp++)
+      {
+        dst.licScale [candIdx][list][comp] = 32;
+        dst.licOffset[candIdx][list][comp] = 0;
+      }
+    }
+  }
+}
+#endif
+
+void MergeCtx::setLICParamToPu         (      PredictionUnit& pu, int candIdx, bool hasLIC)                     { MergeCtx::setLICParamToPu         (*this, pu, candIdx, hasLIC);                }
+void MergeCtx::loadLICParamFromPu      (const PredictionUnit* pu, int candIdx, bool allowAltModel, bool hasLIC) { MergeCtx::loadLICParamFromPu      (*this, pu, candIdx, allowAltModel, hasLIC); }
+void MergeCtx::loadLICParamFromMotInfo (const MotionInfo*     mi, int candIdx, bool allowAltModel, bool hasLIC) { MergeCtx::loadLICParamFromMotInfo (*this, mi, candIdx, allowAltModel, hasLIC); }
+void MergeCtx::copyLICParamFromCtx     (int candIdx, const MergeCtx& src, int candIdxSrc)                       { MergeCtx::copyLICParamFromCtx     (*this, candIdx, src, candIdxSrc);           }
+void MergeCtx::setDefaultLICParamToCtx (int candIdx)                                                            { MergeCtx::setDefaultLICParamToCtx (*this, candIdx);                            }
+void MergeCtx::setInheritAndLICFlags   (int candIdx)                                                            { MergeCtx::setInheritAndLICFlags   (*this, candIdx);                            }
+#if JVET_AG0276_NLIC
+void MergeCtx::setLICParamUsingAltLM   (int candIdx)                                                            { MergeCtx::setLICParamUsingAltLM   (*this, candIdx);                            }
+#endif
+#endif
+
 #if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
-int8_t  MergeCtx::getDir( Slice* slice, int candIdx, MvField *mvField )
+int8_t  MergeCtx::getDir( Slice* slice, int candIdx, MvField *mvField 
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                        , int* scale, int* offset
+#endif
+)
 {
   if (candIdx < 0)
   {
@@ -858,6 +1091,22 @@ int8_t  MergeCtx::getDir( Slice* slice, int candIdx, MvField *mvField )
   mvField[REF_PIC_LIST_1].refIdx = mvFieldNeighbours[(candIdx << 1) + 1].refIdx;
   mvField[REF_PIC_LIST_0].mv = mvFieldNeighbours[(candIdx << 1) + 0].mv;
   mvField[REF_PIC_LIST_1].mv = mvFieldNeighbours[(candIdx << 1) + 1].mv;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  if (licFlags[candIdx])
+  {
+    scale [REF_PIC_LIST_0] = licScale [candIdx][0][COMPONENT_Y];
+    scale [REF_PIC_LIST_1] = licScale [candIdx][1][COMPONENT_Y];
+    offset[REF_PIC_LIST_0] = licOffset[candIdx][0][COMPONENT_Y];
+    offset[REF_PIC_LIST_1] = licOffset[candIdx][1][COMPONENT_Y];
+  }
+  else
+  {
+    scale [REF_PIC_LIST_0] = 32;
+    scale [REF_PIC_LIST_1] = 32;
+    offset[REF_PIC_LIST_0] = 0;
+    offset[REF_PIC_LIST_1] = 0;
+  }
+#endif
 
   int8_t  refIdx[2] = { -1, -1 };
   Mv      mv[2];
@@ -879,10 +1128,18 @@ int8_t  MergeCtx::getDir( Slice* slice, int candIdx, MvField *mvField )
   {
     poc0 = slice->getRefPic(REF_PIC_LIST_0, refIdx[0])->getPOC();
     poc1 = slice->getRefPic(REF_PIC_LIST_1, refIdx[1])->getPOC();
-    if ( poc0 == poc1 && mv[0] == mv[1] ) 
+    if ( poc0 == poc1 && mv[0] == mv[1] 
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+      && scale [0] == scale[1] && offset[0] == offset[1]
+#endif
+      ) 
     {
       mvField[REF_PIC_LIST_1].refIdx = -1;
       mvField[REF_PIC_LIST_1].mv.setZero();
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+      scale [REF_PIC_LIST_1] = 32;
+      offset[REF_PIC_LIST_1] = 0;
+#endif
       return 0;
     }
   }
@@ -954,6 +1211,9 @@ bool MergeCtx::xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThr
   {
     for (uint32_t ui = 0; ui < mergeCandIndex; ui++)
     {
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+      if(licInheritPara[ui] == licInheritPara[mergeCandIndex])
+#endif
       if (interDirNeighbours[ui] == interDirNeighbours[mergeCandIndex])
       {
         if (interDirNeighbours[ui] == 3)
@@ -967,6 +1227,18 @@ bool MergeCtx::xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThr
             if (mvDiffL0.getAbsHor() < mvdSimilarityThresh && mvDiffL0.getAbsVer() < mvdSimilarityThresh
              && mvDiffL1.getAbsHor() < mvdSimilarityThresh && mvDiffL1.getAbsVer() < mvdSimilarityThresh)
             {
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+              if (licInheritPara[ui])
+              {
+                for (int comp = 0; comp < 1; comp++)
+                {
+                  if (licScale[ui][0][comp] != licScale[mergeCandIndex][0][comp]) return false;
+                  if (licOffset[ui][0][comp] != licOffset[mergeCandIndex][0][comp]) return false;
+                  if (licScale[ui][1][comp] != licScale[mergeCandIndex][1][comp]) return false;
+                  if (licOffset[ui][1][comp] != licOffset[mergeCandIndex][1][comp]) return false;
+                }
+              }
+#endif
               return true;
             }
           }
@@ -978,6 +1250,16 @@ bool MergeCtx::xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThr
             Mv mvDiff = mvFieldNeighbours[(ui << 1)].mv - mvFieldNeighbours[(mergeCandIndex << 1)].mv;
             if (mvDiff.getAbsHor() < mvdSimilarityThresh && mvDiff.getAbsVer() < mvdSimilarityThresh)
             {
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+              if (licInheritPara[ui])
+              {
+                for (int comp = 0; comp < 1; comp++)
+                {
+                  if (licScale[ui][0][comp] != licScale[mergeCandIndex][0][comp]) return false;
+                  if (licOffset[ui][0][comp] != licOffset[mergeCandIndex][0][comp]) return false;
+                }
+              }
+#endif
               return true;
             }
           }
@@ -989,6 +1271,16 @@ bool MergeCtx::xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThr
             Mv mvDiff = mvFieldNeighbours[(ui << 1) + 1].mv - mvFieldNeighbours[(mergeCandIndex << 1) + 1].mv;
             if (mvDiff.getAbsHor() < mvdSimilarityThresh && mvDiff.getAbsVer() < mvdSimilarityThresh)
             {
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+              if (licInheritPara[ui])
+              {
+                for (int comp = 0; comp < 1; comp++)
+                {
+                  if (licScale[ui][1][comp] != licScale[mergeCandIndex][1][comp]) return false;
+                  if (licOffset[ui][1][comp] != licOffset[mergeCandIndex][1][comp]) return false;
+                }
+              }
+#endif
               return true;
             }
           }
@@ -1005,6 +1297,9 @@ bool MergeCtx::xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThr
   for (uint32_t ui = 0; ui < mergeCandIndex; ui++)
 #endif
   {
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+    if(licInheritPara[ui] == licInheritPara[mergeCandIndex])
+#endif
     if (interDirNeighbours[ui] == interDirNeighbours[mergeCandIndex])
     {
       if (interDirNeighbours[ui] == 3)
@@ -1014,6 +1309,18 @@ bool MergeCtx::xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThr
             mvFieldNeighbours[(ui << 1)    ].mv     == mvFieldNeighbours[(mergeCandIndex << 1)    ].mv     &&
             mvFieldNeighbours[(ui << 1) + 1].mv     == mvFieldNeighbours[(mergeCandIndex << 1) + 1].mv)
         {
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+          if (licInheritPara[ui])
+          {
+            for (int comp = 0; comp < 1; comp++)
+            {
+              if (licScale[ui][0][comp] != licScale[mergeCandIndex][0][comp]) return false;
+              if (licOffset[ui][0][comp] != licOffset[mergeCandIndex][0][comp]) return false;
+              if (licScale[ui][1][comp] != licScale[mergeCandIndex][1][comp]) return false;
+              if (licOffset[ui][1][comp] != licOffset[mergeCandIndex][1][comp]) return false;
+            }
+          }
+#endif
           return true;
         }
       }
@@ -1022,6 +1329,16 @@ bool MergeCtx::xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThr
         if (mvFieldNeighbours[(ui << 1)].refIdx == mvFieldNeighbours[(mergeCandIndex << 1)].refIdx &&
             mvFieldNeighbours[(ui << 1)].mv     == mvFieldNeighbours[(mergeCandIndex << 1)].mv)
         {
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+          if (licInheritPara[ui])
+          {
+            for (int comp = 0; comp < 1; comp++)
+            {
+              if (licScale[ui][0][comp] != licScale[mergeCandIndex][0][comp]) return false;
+              if (licOffset[ui][0][comp] != licOffset[mergeCandIndex][0][comp]) return false;
+            }
+          }
+#endif
           return true;
         }
       }
@@ -1030,6 +1347,16 @@ bool MergeCtx::xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThr
         if (mvFieldNeighbours[(ui << 1) + 1].refIdx == mvFieldNeighbours[(mergeCandIndex << 1) + 1].refIdx &&
             mvFieldNeighbours[(ui << 1) + 1].mv     == mvFieldNeighbours[(mergeCandIndex << 1) + 1].mv)
         {
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+          if (licInheritPara[ui])
+          {
+            for (int comp = 0; comp < 1; comp++)
+            {
+              if (licScale[ui][1][comp] != licScale[mergeCandIndex][1][comp]) return false;
+              if (licOffset[ui][1][comp] != licOffset[mergeCandIndex][1][comp]) return false;
+            }
+          }
+#endif
           return true;
         }
       }
@@ -1049,6 +1376,9 @@ void MergeCtx::initMrgCand(int cnt)
 #endif
 #if INTER_LIC
   licFlags[cnt] = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  setDefaultLICParamToCtx(cnt);
+#endif
 #endif
 #if JVET_AC0112_IBC_LIC
   ibcLicFlags[cnt] = false;
@@ -1065,6 +1395,10 @@ void MergeCtx::initMrgCand(int cnt)
   interDirNeighbours[cnt] = 0;
   mvFieldNeighbours[(cnt << 1)].refIdx = NOT_VALID;
   mvFieldNeighbours[(cnt << 1) + 1].refIdx = NOT_VALID;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  mvFieldNeighbours[(cnt << 1) + 0].mv.setZero();
+  mvFieldNeighbours[(cnt << 1) + 1].mv.setZero();
+#endif
   useAltHpelIf[cnt] = false;
 #if MULTI_HYP_PRED
   addHypNeighbours[cnt].clear();
@@ -1414,22 +1748,45 @@ void MergeCtx::setGeoMmvdMergeInfo(PredictionUnit& pu, int mergeIdx, int mmvdIdx
 #if JVET_AG0276_NLIC
   pu.cu->altLMFlag = altLMFlag[mergeIdx];
   pu.cu->altLMParaUnit = altLMParaNeighbours[mergeIdx];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  bool initializeAltLM = !pu.cu->altLMFlag
+                      && !pu.cu->geoFlag;
+  if (initializeAltLM)
+  {
+    pu.cu->altLMParaUnit.resetAltLinearModel();
+  }
+#endif
 #endif
 #if INTER_LIC
   pu.cu->licFlag = pu.cs->slice->getUseLIC() ? licFlags[mergeIdx] : false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  setLICParamToPu(pu, mergeIdx, licInheritPara[mergeIdx]);
+#endif
 #if JVET_AG0276_LIC_SLOPE_ADJUST
   pu.cu->licDelta = 0;
 #endif
+#if !JVET_AH0314_LIC_INHERITANCE_FOR_MRG
   if (pu.interDir == 3)
   {
     CHECK(pu.cu->licFlag, "LIC is not used with bi-prediction in merge");
   }
+#endif
 #endif
 }
 void MergeCtx::copyMergeCtx(MergeCtx & orgMergeCtx)
 {
   memcpy(interDirNeighbours, orgMergeCtx.interDirNeighbours, MRG_MAX_NUM_CANDS * sizeof(unsigned char));
   memcpy(mvFieldNeighbours, orgMergeCtx.mvFieldNeighbours, (MRG_MAX_NUM_CANDS << 1) * sizeof(MvField));
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  for (int i = 0; i < MRG_MAX_NUM_CANDS; ++i)
+  {
+    copyLICParamFromCtx(i, orgMergeCtx, i);
+#if JVET_AG0276_NLIC
+    licFlags[i] = orgMergeCtx.licFlags[i];
+    altLMParaNeighbours[i] = orgMergeCtx.altLMParaNeighbours[i];
+#endif
+  }
+#endif
 }
 #endif
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
@@ -1706,9 +2063,20 @@ void MergeCtx::setMmvdMergeCandiInfo(PredictionUnit& pu, int candIdx)
 #if JVET_AG0276_NLIC
   pu.cu->altLMFlag = altLMFlag[fPosBaseIdx];
   pu.cu->altLMParaUnit = altLMParaNeighbours[fPosBaseIdx];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  bool initializeAltLM = !pu.cu->altLMFlag
+                      && !pu.cu->geoFlag;
+  if (initializeAltLM)
+  {
+    pu.cu->altLMParaUnit.resetAltLinearModel();
+  }
+#endif
 #endif
 #if INTER_LIC
   pu.cu->licFlag = licFlags[fPosBaseIdx];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  setLICParamToPu(pu, fPosBaseIdx, licInheritPara[fPosBaseIdx]);
+#endif
 #if JVET_AG0276_LIC_SLOPE_ADJUST
   pu.cu->licDelta = 0;
 #endif
@@ -1884,6 +2252,19 @@ bool AffineMergeCtx::xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilar
   return false;
 }
 #endif
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+void AffineMergeCtx::setLICParamToPu         (      PredictionUnit& pu, int candIdx, bool hasLIC)                               { MergeCtx::setLICParamToPu         (*this, pu, candIdx, hasLIC);                }
+void AffineMergeCtx::setLICParamToPu         (      PredictionUnit& pu, int candIdx, bool hasLIC)                         const { MergeCtx::setLICParamToPu         (*this, pu, candIdx, hasLIC);                }
+void AffineMergeCtx::loadLICParamFromPu      (const PredictionUnit* pu, int candIdx, bool allowAltModel, bool hasLIC)           { MergeCtx::loadLICParamFromPu      (*this, pu, candIdx, allowAltModel, hasLIC); }
+void AffineMergeCtx::loadLICParamFromMotInfo (const MotionInfo*     mi, int candIdx, bool allowAltModel, bool hasLIC)           { MergeCtx::loadLICParamFromMotInfo (*this, mi, candIdx, allowAltModel, hasLIC); }
+void AffineMergeCtx::copyLICParamFromCtx     (int candIdx, const AffineMergeCtx& src, int candIdxSrc)                           { MergeCtx::copyLICParamFromCtx     (*this, candIdx, src, candIdxSrc);           }
+void AffineMergeCtx::setDefaultLICParamToCtx (int candIdx)                                                                      { MergeCtx::setDefaultLICParamToCtx (*this, candIdx);                            }
+void AffineMergeCtx::setInheritAndLICFlags   (int candIdx)                                                                      { MergeCtx::setInheritAndLICFlags   (*this, candIdx);                            }
+#if JVET_AG0276_NLIC
+void AffineMergeCtx::setLICParamUsingAltLM   (int candIdx)                                                                      { MergeCtx::setLICParamUsingAltLM   (*this, candIdx);                            }
+#endif
+#endif
+
 #if JVET_AG0276_NLIC
 bool AffineMergeCtx::xCheckSimilarMotion1(int mergeCandIndex, uint32_t mvdSimilarityThresh, bool isAlt) const
 {
@@ -2265,11 +2646,15 @@ bool MergeCtx::setIbcMbvdMergeCandiInfo(PredictionUnit& pu, int candIdx, int can
 void AltLMMergeCtx::initAltLMMergeCtx(int idx)
 {
   altLMParaNeighbours[idx].resetAltLinearModel();
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  initMrgCand(idx);
+#else
   mvFieldNeighbours[(idx << 1) + 0].setMvField(Mv(), -1);
   mvFieldNeighbours[(idx << 1) + 1].setMvField(Mv(), -1);
   interDirNeighbours[idx] = 0;
   bcwIdx[idx] = BCW_DEFAULT;
   useAltHpelIf[idx] = false;
+#endif
 }
 
 bool AltLMMergeCtx::xCheckSameMotion(int mrgCandIdx, uint32_t mvdSimilarityThresh)
@@ -2708,6 +3093,9 @@ void AffineMergeCtx::setAffMergeInfo(PredictionUnit &pu, int candIdx, int8_t mmv
 #endif
 #if INTER_LIC
   pu.cu->licFlag = licFlags[candIdx];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  setLICParamToPu(pu, candIdx, licInheritPara[candIdx]);
+#endif
 #endif
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   pu.colIdx = colIdx[candIdx];
