@@ -4574,6 +4574,211 @@ bool PU::isDMChromaSgpm(const PredictionUnit &pu)
 }
 #endif
 
+#if JVET_AH0076_OBIC
+bool PU::isObicAvail(const PredictionUnit &pu)
+{
+  if (!pu.lumaPos().x && !pu.lumaPos().y)
+  {
+    return false;
+  }
+  if (!pu.Y().valid() || pu.cu->predMode != MODE_INTRA || !isLuma(pu.cu->chType) || !pu.cu->slice->getSPS()->getUseDimd() || pu.Y().area() <= 32)
+  {
+    return false;
+  }
+  if (!PU::checkAvailBlocks(pu))
+  {
+    return false;
+  }
+  return true;
+}
+bool PU::checkAvailBlocks(const PredictionUnit &pu)
+{
+  const int step = 4;
+  const CodingUnit& cu = *pu.cu;
+  const CompArea &area = cu.Y();
+  const int numCUs = NUM_OBIC_CUS;
+  const CodingUnit* cuNeighbours[numCUs];
+  cuNeighbours[0] = cu.cs->getCURestricted(cu.lumaPos().offset(-1, 0), cu, CH_L);
+  cuNeighbours[1] = cu.cs->getCURestricted(cu.lumaPos().offset(0, -1), cu, CH_L);
+  cuNeighbours[2] = cu.cs->getCURestricted(cu.lumaPos().offset(-1, -1), cu, CH_L);
+  
+  const CodingUnit* cuTemp;
+  for (int i = 0; i <= cu.lheight(); i += step)
+  {
+    cuTemp = cu.cs->getCURestricted(cu.lumaPos().offset(-1, i), cu, CH_L);
+    if (cuTemp && CU::isIntra(*cuTemp))
+    {
+      cuNeighbours[0] = cuTemp;
+      break;
+    }
+  }
+  for (int i = 0; i <= cu.lwidth(); i += step)
+  {
+    cuTemp = cu.cs->getCURestricted(cu.lumaPos().offset(i, -1), cu, CH_L);
+    if (cuTemp && CU::isIntra(*cuTemp))
+    {
+      cuNeighbours[1] = cuTemp;
+      break;
+    }
+  }
+  
+  const CodingUnit* cuLeft = cu.cs->getCURestricted(cu.lumaPos().offset(-1, 0), cu, CH_L);
+  const CodingUnit* cuTop  = cu.cs->getCURestricted(cu.lumaPos().offset(0, -1), cu, CH_L);
+  cuNeighbours[3] = cuLeft ? cu.cs->getCURestricted(cuLeft->lumaPos().offset(cuLeft->lwidth()-1, cuLeft->lheight()), cu, CH_L) : NULL;
+  cuNeighbours[4] = cuTop ? cu.cs->getCURestricted(cuTop->lumaPos().offset(cuTop->lwidth(), cuTop->lheight() - 1), cu, CH_L) : NULL;
+  cuNeighbours[5] = cuNeighbours[3] ? cu.cs->getCURestricted(cuNeighbours[3]->lumaPos().offset(cuNeighbours[3]->lwidth()-1, cuNeighbours[3]->lheight()), cu, CH_L) : NULL;
+  cuNeighbours[6] = cuNeighbours[4] ? cu.cs->getCURestricted(cuNeighbours[4]->lumaPos().offset(cuNeighbours[4]->lwidth(), cuNeighbours[4]->lheight() - 1), cu, CH_L) : NULL;
+  cuNeighbours[7] = cuLeft ? cu.cs->getCURestricted(cuLeft->lumaPos().offset(-1, 0), cu, CH_L) : NULL;
+  cuNeighbours[8] = cuTop ? cu.cs->getCURestricted(cuTop->lumaPos().offset(0, -1), cu, CH_L) : NULL;
+  cuNeighbours[9] = cuNeighbours[3] ? cu.cs->getCURestricted(cuNeighbours[3]->lumaPos().offset(-1, 0), cu, CH_L) : NULL;
+  cuNeighbours[10] = cuNeighbours[4] ? cu.cs->getCURestricted(cuNeighbours[4]->lumaPos().offset(0, -1), cu, CH_L) : NULL;
+  cuNeighbours[11] = cuNeighbours[5] ? cu.cs->getCURestricted(cuNeighbours[5]->lumaPos().offset(-1, 0), cu, CH_L) : NULL;
+  cuNeighbours[12] = cuNeighbours[6] ? cu.cs->getCURestricted(cuNeighbours[6]->lumaPos().offset(0, -1), cu, CH_L) : NULL;
+  
+  if ((!cuNeighbours[9]) && cuNeighbours[2])
+  {
+    cuNeighbours[9] = cu.cs->getCURestricted(cuNeighbours[2]->lumaPos().offset(-1, cuNeighbours[2]->lheight()-1), cu, CH_L);
+  }
+  if ((!cuNeighbours[10]) && cuNeighbours[2])
+  {
+    cuNeighbours[10] = cu.cs->getCURestricted(cuNeighbours[2]->lumaPos().offset(cuNeighbours[2]->lwidth()-1, -1), cu, CH_L);
+  }
+  if ((!cuNeighbours[11]) && cuLeft && cuNeighbours[7])
+  {
+    cuNeighbours[11] = cu.cs->getCURestricted(cuNeighbours[7]->lumaPos().offset(-1, 0), cu, CH_L);
+  }
+  if ((!cuNeighbours[12]) && cuTop && cuNeighbours[8])
+  {
+    cuNeighbours[12] = cu.cs->getCURestricted(cuNeighbours[8]->lumaPos().offset(0, -1), cu, CH_L);
+  }
+  
+  const Position  topLeft = area.topLeft();
+  // non-adjacent spatial candidates
+  int       offsetX           = 0;
+  int       offsetY           = 0;
+  int       cout              = 13;
+  const int numNACandidate[4] = { 3, 5, 5, 5 };
+  const int idxMap[4][5]      = { { 0, 1, 4 }, { 0, 1, 2, 3, 4 }, { 0, 1, 2, 3, 4 }, { 0, 1, 2, 3, 4 } };
+  for (int iDistanceIndex = 0; iDistanceIndex < NADISTANCE_LEVEL; iDistanceIndex++)
+  {
+    const int iNADistanceHor = cu.Y().width * (iDistanceIndex + 1);
+    const int iNADistanceVer = cu.Y().height * (iDistanceIndex + 1);
+    for (int iNASPIdx = 0; iNASPIdx < numNACandidate[iDistanceIndex]; iNASPIdx++)
+    {
+      switch (idxMap[iDistanceIndex][iNASPIdx])
+      {
+        case 0: offsetX = -iNADistanceHor - 1; offsetY = cu.Y().height + iNADistanceVer - 1; break;
+        case 1: offsetX = cu.Y().width + iNADistanceHor - 1; offsetY = -iNADistanceVer - 1; break;
+        case 2: offsetX = cu.Y().width >> 1; offsetY = -iNADistanceVer - 1; break;
+        case 3: offsetX = -iNADistanceHor - 1; offsetY = cu.Y().height >> 1; break;
+        case 4: offsetX = -iNADistanceHor - 1; offsetY = -iNADistanceVer - 1; break;
+        default: printf("error!"); exit(0); break;
+      }
+      cuNeighbours[cout++] = cu.cs->getCURestricted(topLeft.offset(offsetX, offsetY), cu, CH_L);
+    }
+  }
+  int numBlocks = 0;
+  int limitMaxNeigh = NUM_OBIC_CUS;
+  bool useNeighbour[numCUs];
+  int  neighboursInDistOrder[numCUs];
+  int  dists[numCUs];
+  for (int i = 0; i < numCUs; i++)
+  {
+    useNeighbour[i] = false;
+    neighboursInDistOrder[i] = 0;
+    dists[i] = 0;
+  }
+  for (int i = 0; i < numCUs; i++)
+  {
+    dists[i] = MAX_INT;
+  }
+  int numToMix = 0;
+  for (int i = 0; i < numCUs; i++)
+  {
+    useNeighbour[i] = (cuNeighbours[i] && CU::isIntra(*cuNeighbours[i]));
+    if (useNeighbour[i])
+    {
+      for (int j = i-1; j >= 0; j--)
+      {
+        if (!useNeighbour[j])
+        {
+          continue;
+        }
+        useNeighbour[i] &= (cuNeighbours[i]->lx() != cuNeighbours[j]->lx() || cuNeighbours[i]->ly() != cuNeighbours[j]->ly());
+      }
+    }
+    int curNeigh = i;
+    int curDist = (useNeighbour[i] ? abs( (int)(cu.lx()) - (int)(cuNeighbours[i]->lx())) + abs( (int)(cu.ly()) - (int)(cuNeighbours[i]->ly())) : 0);
+    
+    for (int j = 0; j < numCUs; j++)
+    {
+      if (curDist < dists[j])
+      {
+        for (int k = numCUs - 1; k > j; k--)
+        {
+          dists[k] = dists[k - 1];
+          neighboursInDistOrder[k] = neighboursInDistOrder[k - 1];
+        }
+        dists[j] = curDist;
+        neighboursInDistOrder[j] = curNeigh;
+        break;
+      }
+    }
+  }
+  for (int i = 0; i < numCUs; i++)
+  {
+    int j = neighboursInDistOrder[i];
+    if (limitMaxNeigh > 0 && numToMix >= limitMaxNeigh)
+    {
+      useNeighbour[j] = false;
+      continue;
+    }
+    if (useNeighbour[j])
+    {
+      numToMix ++;
+    }
+  }
+  for (int i = 0; i < numCUs; i++)
+  {
+    if (!useNeighbour[i])
+    {
+      continue;
+    }
+    if (cuNeighbours[i]->timd || cuNeighbours[i]->dimd || cuNeighbours[i]->sgpm || cuNeighbours[i]->tmrlFlag)
+    {
+      numBlocks++;
+    }
+#if JVET_AG0058_EIP
+    else if (cuNeighbours[i]->eipFlag && cu.slice->getSliceType() != I_SLICE)
+    {
+      numBlocks++;
+    }
+#endif
+#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
+    else if (cuNeighbours[i]->tmpFlag && cu.slice->getSliceType() != I_SLICE)
+    {
+      numBlocks++;
+    }
+#endif
+#if JVET_AB0067_MIP_DIMD_LFNST
+    else if (cuNeighbours[i]->mipFlag && cu.slice->getSliceType() != I_SLICE)
+    {
+      numBlocks++;
+    }
+#endif
+    else if (CU::isIntra(*cuNeighbours[i]) && !CU::isIBC(*cuNeighbours[i]) && !cuNeighbours[i]->mipFlag && !cuNeighbours[i]->tmpFlag && !cuNeighbours[i]->eipFlag && !CU::isPLT(*cuNeighbours[i]))
+    {
+      numBlocks++;
+    }
+  }
+  if (numBlocks < 1)
+  {
+    return false;
+  }
+  return true;
+}
+#endif
+  
 #if JVET_AB0155_SGPM
 uint32_t PU::getIntraDirLuma(const PredictionUnit &pu, const int partIdx)
 {

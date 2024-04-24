@@ -287,6 +287,15 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   plIdx = other.plIdx;
 #endif
 #if ENABLE_DIMD
+#if JVET_AH0076_OBIC
+  obicFlag = other.obicFlag;
+  obicIsBlended = other.obicIsBlended;
+  for (int i = 0; i < OBIC_FUSION_NUM; i++)
+  {
+    obicMode[i] = other.obicMode[i];
+    obicFusionWeight[i] = other.obicFusionWeight[i];
+  }
+#endif
 #if JVET_AG0146_DIMD_ITMP_IBC
   isBvDimd = other.isBvDimd;
   bvDimd = other.bvDimd;
@@ -532,6 +541,15 @@ void CodingUnit::initData()
   plIdx = 0;
 #endif
 #if ENABLE_DIMD
+#if JVET_AH0076_OBIC
+  obicFlag = false;
+  obicIsBlended = false;
+  for (int i = 0; i < OBIC_FUSION_NUM; i++)
+  {
+    obicMode[i] = -1;
+    obicFusionWeight[i] = 0;
+  }
+#endif
 #if JVET_AG0146_DIMD_ITMP_IBC
   isBvDimd  = 0;
   bvDimd    = Mv(0, 0);

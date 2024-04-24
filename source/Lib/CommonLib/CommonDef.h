@@ -593,6 +593,11 @@ static const int LM_CHROMA_IDX = NUM_LUMA_MODE; ///< chroma mode index for deriv
 #if ENABLE_DIMD
 static const int DIMD_IDX =                                        99; ///< index for intra DIMD mode
 #endif
+#if JVET_AH0076_OBIC
+static const int OBIC_IDX =                                       250;
+static const int OBIC_FUSION_NUM =                                  6;
+static const int NUM_OBIC_CUS    =                            13 + 18; // (13: adjacent, 18: non-adjacent)
+#endif
 #if JVET_AB0155_SGPM
 static const int SGPM_IDX =                                       200;   ///< index for SGPM mode
 #endif

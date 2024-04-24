@@ -1508,7 +1508,12 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
   {
     return;
   }
-
+#if JVET_AH0076_OBIC
+  if (cu.obicFlag)
+  {
+    return;
+  }
+#endif
   if( cu.bdpcmMode )
   {
     cu.firstPU->intraDir[0] = cu.bdpcmMode == 2? VER_IDX : HOR_IDX;
@@ -1731,7 +1736,12 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
 
 void CABACWriter::intra_luma_pred_mode( const PredictionUnit& pu )
 {
-
+#if JVET_AH0076_OBIC
+  if (pu.cu->obicFlag)
+  {
+    return;
+  }
+#endif
   if( pu.cu->bdpcmMode ) return;
 #if JVET_V0130_INTRA_TMP
   // check if sufficient search range is available
@@ -2035,7 +2045,25 @@ void CABACWriter::cu_dimd_flag(const CodingUnit& cu)
   }
   unsigned ctxId = DeriveCtx::CtxDIMDFlag(cu);
   m_BinEncoder.encodeBin(cu.dimd, Ctx::DimdFlag(ctxId));
+#if JVET_AH0076_OBIC
+  cu_obic_flag(cu);
+#endif
   DTRACE(g_trace_ctx, D_SYNTAX, "cu_dimd_flag() ctx=%d pos=(%d,%d) dimd=%d\n", ctxId, cu.lumaPos().x, cu.lumaPos().y, cu.dimd);
+}
+#endif
+
+#if JVET_AH0076_OBIC
+void CABACWriter::cu_obic_flag(const CodingUnit& cu )
+{
+  if (!cu.dimd || !cu.Y().valid() || cu.predMode != MODE_INTRA || !isLuma(cu.chType))
+  {
+    return;
+  }
+  if (!PU::isObicAvail(*cu.firstPU))
+  {
+    return;
+  }
+  m_BinEncoder.encodeBin(cu.obicFlag ? 1 : 0, Ctx::obicFlag(0));
 }
 #endif
 

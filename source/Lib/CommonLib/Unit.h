@@ -325,6 +325,12 @@ struct CodingUnit : public UnitArea
   uint8_t        plIdx;
 #endif
 #if ENABLE_DIMD
+#if JVET_AH0076_OBIC
+  bool obicFlag;
+  bool obicIsBlended;
+  int obicMode[OBIC_FUSION_NUM];
+  int obicFusionWeight[OBIC_FUSION_NUM];
+#endif
 #if JVET_AG0146_DIMD_ITMP_IBC
   bool           isBvDimd;
   Mv             bvDimd;

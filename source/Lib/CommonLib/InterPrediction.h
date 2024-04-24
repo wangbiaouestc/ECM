@@ -1696,15 +1696,15 @@ public:
                          PredictionUnit *blkDataTmp, PelStorage *pPadYUVContainerDyn, const UnitArea blkUnitAreaBuff,
                          PelStorage *pCurBuffYUV, PictureType pt);
   void mcFramePadRepExt(Picture *pcCurPic, Slice &slice, PictureType pt);
-#if JVET_AD0123_REF_PICTURE_PADDING_FOR_GDR
-  void padDirtyArea(Picture* pcCurPic, Slice& slice, PictureType pt);
-#endif
 #else
   void mcFramePadOneSide(Picture *pcCurPic, Slice &slice, PadDirection padDir, PelStorage *pPadBuffYUV,
                          PredictionUnit *blkDataTmp, PelStorage *pPadYUVContainerDyn, const UnitArea blkUnitAreaBuff,
                          PelStorage *pCurBuffYUV);
   void mcFramePadRepExt(Picture *pcCurPic, Slice &slice);
 #endif
+#endif
+#if JVET_Z0118_GDR && JVET_AD0123_REF_PICTURE_PADDING_FOR_GDR
+  void padDirtyArea(Picture* pcCurPic, Slice& slice, PictureType pt);
 #endif
 
 #if JVET_AE0059_INTER_CCCM

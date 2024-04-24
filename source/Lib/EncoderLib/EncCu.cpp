@@ -2594,7 +2594,11 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
   int8_t dimdChromaMode = -1;
   int8_t dimdChromaModeSecond = -1;
 #endif
-
+#if JVET_AH0076_OBIC
+  bool obicIsBlended = false;
+  int obicMode[OBIC_FUSION_NUM] = { -1 };
+  int obicFusionWeight[OBIC_FUSION_NUM] = { 0 };
+#endif
   if (isLuma(partitioner.chType))
   {
     CodingUnit cu(tempCS->area);
@@ -2703,7 +2707,9 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
     m_pcIntraSearch->getMpmListSize() = PU::getIntraMPMs( pu, m_pcIntraSearch->getMPMList(), m_pcIntraSearch->getNonMPMList() );
   }
 #endif
-
+#if JVET_AH0076_OBIC
+  bool obicModeDerived = false;
+#endif
 #if JVET_W0123_TIMD_FUSION
   bool timdDerived = false;
 #endif
@@ -2716,6 +2722,10 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
 #if INTRA_TRANS_ENC_OPT
   m_pcIntraSearch->m_skipTimdLfnstMtsPass = false;
   m_modeCtrl->resetLfnstCost();
+#endif
+#if JVET_AH0076_OBIC
+  m_pcIntraSearch->m_skipObicLfnstMtsPass = false;
+  m_pcIntraSearch->m_skipDimdLfnstMtsPass = false;
 #endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   m_pcIntraSearch->m_skipCCCMSATD = false;
@@ -2947,7 +2957,33 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
             }
           }
 #endif
-
+#if JVET_AH0076_OBIC
+          cu.obicFlag = false;
+          if (isLuma(partitioner.chType))
+          {
+            if (!obicModeDerived)
+            {
+              const CompArea &area = cu.Y();
+              m_pcIntraSearch->deriveObicMode(bestCS->picture->getRecoBuf(area), area, cu);
+              for (int i = 0; i < OBIC_FUSION_NUM; i++)
+              {
+                obicMode[i] = cu.obicMode[i];
+                obicFusionWeight[i] = cu.obicFusionWeight[i];
+              }
+              obicIsBlended = cu.obicIsBlended;
+              obicModeDerived = true;
+            }
+            else
+            {
+              for (int i = 0; i < OBIC_FUSION_NUM; i++)
+              {
+                cu.obicMode[i] = obicMode[i];
+                cu.obicFusionWeight[i] = obicFusionWeight[i];
+              }
+              cu.obicIsBlended = obicIsBlended;
+            }
+          }
+#endif
 #if TMP_FAST_ENC
           if (isLuma(partitioner.chType) && cu.slice->getSPS()->getUseIntraTMP())
           {
