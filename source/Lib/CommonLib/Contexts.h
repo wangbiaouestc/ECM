@@ -798,6 +798,9 @@ public:
   static const CtxSet   CCPMergeFusionFlag;
   static const CtxSet   CCPMergeFusionType;
 #endif
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  static const CtxSet   InterCcpMergeZeroRootCbfIdc;
+#endif
   static const unsigned NumberOfContexts;
 
   // combined sets for less complex copying

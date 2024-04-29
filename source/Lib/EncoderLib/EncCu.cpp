@@ -3421,7 +3421,6 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
       }
     }
   } //trGrpIdx
-
   if(!adaptiveColorTrans)
   m_modeCtrl->setBestNonDCT2Cost(bestNonDCT2Cost);
   return foundZeroRootCbf;

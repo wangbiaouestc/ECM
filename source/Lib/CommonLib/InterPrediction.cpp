@@ -37653,7 +37653,19 @@ std::vector<Mv> InterPrediction::deriveMVDFromMVSDIdxAffineSI(PredictionUnit& pu
   bool InterPrediction::deriveInterCcpMergePrediction( TransformUnit* tu, const PelBuf& lumaReconstruction, PelBuf& inBufCb, PelBuf& inBufCr, PelBuf& outBufCb, PelBuf& outBufCr, CCPModelCandidate interCcpMergeList[], int validNum)
   {
     PredictionUnit* pu = tu->cu->firstPU;
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+    CompArea    area;
+    if(tu->cu->interCcpMergeZeroRootCbfIdc)
+    {
+      area = tu->cu->blocks[COMPONENT_Cb];
+    }
+    else
+    {
+      area = tu->blocks[COMPONENT_Cb];
+    }
+#else
     const CompArea    &area      = tu->blocks[COMPONENT_Cb];
+#endif
     CCPModelCandidate candList[MAX_CCP_CAND_LIST_SIZE];
     tu->cu->firstPU->idxNonLocalCCP = 1;
     const int candIdx = tu->cu->firstPU->idxNonLocalCCP - 1;
@@ -37784,9 +37796,22 @@ std::vector<Mv> InterPrediction::deriveMVDFromMVSDIdxAffineSI(PredictionUnit& pu
       pu->curCand = candList[candIdx];
       m_pcIntraPred->combineCcpAndInter(*pu, inBufCb, inBufCr, outBufCb, outBufCr);
     }
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+    if (pu->cu->interCcpMergeZeroRootCbfIdc)
+    {
+      pu->idxNonLocalCCP = 0;
+    }
+    else
+    {
+      tu->curCand = candList[candIdx];
+      tu->cu->firstPU->curCand.type = 0;
+      tu->cu->firstPU->idxNonLocalCCP = 0;
+    }
+#else
     tu->curCand = candList[candIdx];
     tu->cu->firstPU->curCand.type = 0;
     tu->cu->firstPU->idxNonLocalCCP = 0;
+#endif
     return true;
   }
 #endif

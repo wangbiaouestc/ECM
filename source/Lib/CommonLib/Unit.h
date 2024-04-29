@@ -307,6 +307,9 @@ struct CodingUnit : public UnitArea
   ModeTypeSeries modeTypeSeries;
 #endif
   bool           skip;
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  int8_t         interCcpMergeZeroRootCbfIdc;
+#endif
   bool           mmvdSkip;
   bool           affine;
   int8_t         affineType;

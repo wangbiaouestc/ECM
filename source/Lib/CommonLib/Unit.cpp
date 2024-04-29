@@ -262,6 +262,9 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   mtDepth           = other.mtDepth;
   splitSeries       = other.splitSeries;
   skip              = other.skip;
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  interCcpMergeZeroRootCbfIdc = other.interCcpMergeZeroRootCbfIdc;
+#endif
   mmvdSkip = other.mmvdSkip;
   affine            = other.affine;
   affineType        = other.affineType;
@@ -517,6 +520,9 @@ void CodingUnit::initData()
   mtDepth           = 0;
   splitSeries       = 0;
   skip              = false;
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  interCcpMergeZeroRootCbfIdc = 0;
+#endif
   mmvdSkip = false;
   affine            = false;
   affineType        = 0;

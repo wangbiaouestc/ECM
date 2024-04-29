@@ -1069,7 +1069,12 @@ void EncApp::xInitLibCfg()
 #if JVET_AF0073_INTER_CCP_MERGE
   m_cEncLib.setUseInterCcpMerge                                  ( m_interCcpMerge );
   m_cEncLib.setInterCcpMergeFastMode                             ( m_interCcpMergeFastMode );
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  m_cEncLib.setUseInterCcpMergeZeroLumaCbf                       ( m_interCcpMergeZeroLumaCbf );
+  m_cEncLib.setInterCcpMergeZeroLumaCbfFastMode                  ( m_interCcpMergeZeroLumaCbfFastMode );
 #endif
+#endif
+
   // ADD_NEW_TOOL : (encoder app) add setting of tool enabling flags and associated parameters here
   m_cEncLib.setVirtualBoundariesEnabledFlag                      ( m_virtualBoundariesEnabledFlag );
   if( m_cEncLib.getVirtualBoundariesEnabledFlag() )

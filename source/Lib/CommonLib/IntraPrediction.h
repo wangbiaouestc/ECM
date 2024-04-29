@@ -250,6 +250,7 @@ public:
   uint8_t m_intraMPM[NUM_MOST_PROBABLE_MODES];
   uint8_t m_intraNonMPM[NUM_NON_MPM_MODES];
 #endif
+
 protected:
 #if JVET_AC0094_REF_SAMPLES_OPT
   Pel m_refBuffer[MAX_NUM_COMPONENT][NUM_PRED_BUF][((MAX_CU_SIZE << 3) + 1 + MAX_REF_LINE_IDX) * 2];
@@ -729,7 +730,11 @@ public:
   void xAddOnTheFlyCalcCCPCands4InterBlk(const PredictionUnit &pu, CompArea chromaArea, CCPModelCandidate candList[],
                                          int &validNum);
   void selectCcpMergeCand(PredictionUnit &pu, CCPModelCandidate candList[], int reorderlistSize);
-  void combineCcpAndInter(PredictionUnit &pu, PelBuf &inPredCb, PelBuf &inPredCr, PelBuf &outPredCb, PelBuf &outPredCr);
+  void combineCcpAndInter(PredictionUnit &pu, PelBuf &inPredCb, PelBuf &inPredCr, PelBuf &outPredCb, PelBuf &outPredCr
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+    , bool useExistCcp = false
+#endif
+  );
 #endif
 
 #if ENABLE_DIMD
