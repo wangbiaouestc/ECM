@@ -1850,6 +1850,9 @@ private:
 
 #if JVET_AF0073_INTER_CCP_MERGE
   bool              m_interCcpMerge;
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  bool              m_interCcpMergeZeroLumaCbf;
+#endif
 #endif
 
 #if LUMA_ADAPTIVE_DEBLOCKING_FILTER_QP_OFFSET
@@ -2564,6 +2567,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if JVET_AF0073_INTER_CCP_MERGE
   void      setUseInterCcpMerge   ( bool b )                                         { m_interCcpMerge = b; }
   bool      getUseInterCcpMerge   ()                                      const      { return m_interCcpMerge; }
+#endif
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  void      setUseInterCcpMergeZeroLumaCbf   ( bool b )                              { m_interCcpMergeZeroLumaCbf = b; }
+  bool      getUseInterCcpMergeZeroLumaCbf   ()                           const      { return m_interCcpMergeZeroLumaCbf; }
 #endif
   void      setUseMRL             ( bool b )                                        { m_MRL = b; }
   bool      getUseMRL             ()                                      const     { return m_MRL; }

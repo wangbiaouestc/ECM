@@ -955,8 +955,8 @@ void CABACWriter::cu_skip_flag( const CodingUnit& cu )
 
     if (cu.lwidth() < 128 && cu.lheight() < 128) // disable IBC mode larger than 64x64
     {
-    m_BinEncoder.encodeBin((cu.skip), Ctx::SkipFlag(ctxId));
-    DTRACE(g_trace_ctx, D_SYNTAX, "cu_skip_flag() ctx=%d skip=%d\n", ctxId, cu.skip ? 1 : 0);
+      m_BinEncoder.encodeBin((cu.skip), Ctx::SkipFlag(ctxId));
+      DTRACE(g_trace_ctx, D_SYNTAX, "cu_skip_flag() ctx=%d skip=%d\n", ctxId, cu.skip ? 1 : 0);
     }
     return;
   }
@@ -1014,8 +1014,13 @@ void CABACWriter::cu_skip_flag( const CodingUnit& cu )
     DTRACE(g_trace_ctx, D_SYNTAX, "ibc() ctx=%d cu.predMode=%d\n", ctxidx, cu.predMode);
     }
   }
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  if (cu.skip && CU::interCcpMergeZeroRootCbfAllowed(cu))
+  {
+    inter_ccp_merge_root_cbf_zero(cu);
+  }
+#endif
 }
-
 
 void CABACWriter::pred_mode( const CodingUnit& cu )
 {
@@ -2681,6 +2686,12 @@ void CABACWriter::cu_residual( const CodingUnit& cu, Partitioner& partitioner, C
 
     if( !cu.rootCbf )
     {
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+      if (CU::interCcpMergeZeroRootCbfAllowed(cu))
+      {
+        inter_ccp_merge_root_cbf_zero(cu);
+      }
+#endif
       CHECK(cu.colorTransform, "ACT should not be enabled for root_cbf = 0");
       return;
     }
@@ -2763,6 +2774,15 @@ void CABACWriter::rqt_root_cbf( const CodingUnit& cu )
    m_BinEncoder.encodeBin( cu.rootCbf, Ctx::QtRootCbf() ) ;
   DTRACE( g_trace_ctx, D_SYNTAX, "rqt_root_cbf() ctx=0 root_cbf=%d pos=(%d,%d)\n", cu.rootCbf ? 1 : 0, cu.lumaPos().x, cu.lumaPos().y );
 }
+
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+void CABACWriter::inter_ccp_merge_root_cbf_zero(const CodingUnit &cu) 
+{
+  unary_max_symbol(cu.interCcpMergeZeroRootCbfIdc, Ctx::InterCcpMergeZeroRootCbfIdc(0),
+    Ctx::InterCcpMergeZeroRootCbfIdc(1), MAX_CCP_MERGE_WEIGHT_IDX);
+  DTRACE(g_trace_ctx, D_SYNTAX, "inter_ccp_merge_root_cbf_zero() pos=(%d,%d) inter_ccp_merge_root_cbf_zero_flag=%d\n", cu.blocks[cu.chType].x, cu.blocks[cu.chType].y, cu.interCcpMergeZeroRootCbfIdc > 0 ? 1 : 0);
+}
+#endif
 
 void CABACWriter::adaptive_color_transform(const CodingUnit& cu)
 {
@@ -9929,7 +9949,11 @@ void CABACWriter::interCcpMerge(const TransformUnit& tu)
 {
   if (TU::interCcpMergeAllowed(tu))
   {
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+    m_BinEncoder.encodeBin(tu.interCcpMerge > 0 ? 1 : 0, Ctx::InterCcpMergeFlag(tu.cbf[COMPONENT_Y] ? 0 : 1));
+#else
     m_BinEncoder.encodeBin(tu.interCcpMerge > 0 ? 1 : 0, Ctx::InterCcpMergeFlag(0));
+#endif
     DTRACE(g_trace_ctx, D_SYNTAX, "inter_ccp_merge() pos=(%d,%d) inter_ccp_merge_flag=%d\n", tu.blocks[tu.chType].x, tu.blocks[tu.chType].y, tu.interCcpMerge > 0 ? 1 : 0);
   }
 }

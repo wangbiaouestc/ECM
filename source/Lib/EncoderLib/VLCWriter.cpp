@@ -1696,6 +1696,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if JVET_AG0058_EIP
   WRITE_FLAG(pcSPS->getUseEip() ? 1 : 0, "sps_eip_enabled_flag");
 #endif
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  WRITE_FLAG( pcSPS->getUseInterCcpMergeZeroLumaCbf() ? 1 : 0,                         "sps_inter_ccp_merge_zero_luma_cbf");
+#endif
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
   if (pcSPS->getTMnoninterToolsEnableFlag())
   {

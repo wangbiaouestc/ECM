@@ -149,7 +149,9 @@ public:
 #endif
   void        cu_residual               ( CodingUnit&                   cu,     Partitioner&    pm,       CUCtx& cuCtx );
   void        rqt_root_cbf              ( CodingUnit&                   cu );
-
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  void        inter_ccp_merge_root_cbf_zero( CodingUnit&                cu );
+#endif
   void        adaptive_color_transform(CodingUnit&             cu);
   void        sbt_mode                  ( CodingUnit&                   cu );
   void        end_of_ctu                ( CodingUnit&                   cu,     CUCtx&          cuCtx );

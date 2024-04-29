@@ -2099,6 +2099,9 @@ void EncLib::xInitSPS( SPS& sps )
 #endif
 #if JVET_AF0073_INTER_CCP_MERGE
   sps.setUseInterCcpMerge(m_interCcpMerge);
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  sps.setUseInterCcpMergeZeroLumaCbf(m_interCcpMergeZeroLumaCbf);
+#endif
 #endif
   // ADD_NEW_TOOL : (encoder lib) set tool enabling flags and associated parameters here
   sps.setUseISP                             ( m_ISP );
