@@ -1202,6 +1202,9 @@ void EncApp::xInitLibCfg()
 #if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
   m_cEncLib.setUseAlfPrecision                                   ( m_alfPrecision );
 #endif
+#if JVET_AH0057_CCALF_COEFF_PRECISION
+  m_cEncLib.setUseCCALFPrecision                                 ( m_ccalfPrecision );
+#endif
   m_cEncLib.setTestSAODisableAtPictureLevel                      ( m_bTestSAODisableAtPictureLevel );
   m_cEncLib.setSaoEncodingRate                                   ( m_saoEncodingRate );
   m_cEncLib.setSaoEncodingRateChroma                             ( m_saoEncodingRateChroma );

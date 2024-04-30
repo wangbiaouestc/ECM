@@ -1720,6 +1720,9 @@ private:
 #if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
   bool              m_alfPrecisionFlag;
 #endif
+#if JVET_AH0057_CCALF_COEFF_PRECISION
+  bool              m_ccalfPrecisionFlag;
+#endif
   bool              m_bTemporalIdNestingFlag; // temporal_id_nesting_flag
 
   bool              m_scalingListEnabledFlag;
@@ -2169,6 +2172,10 @@ public:
 #if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
   bool                    getAlfPrecisionFlag() const                                                 { return m_alfPrecisionFlag; }
   void                    setAlfPrecisionFlag( bool b )                                               { m_alfPrecisionFlag = b;    }
+#endif
+#if JVET_AH0057_CCALF_COEFF_PRECISION
+  bool                    getCCALFPrecisionFlag() const                                                   { return m_ccalfPrecisionFlag; }
+  void                    setCCALFPrecisionFlag( bool b )                                                 { m_ccalfPrecisionFlag = b; }
 #endif
   bool                    getALFEnabledFlag() const                                                       { return m_alfEnabledFlag; }
   void                    setALFEnabledFlag( bool b )                                                     { m_alfEnabledFlag = b; }
