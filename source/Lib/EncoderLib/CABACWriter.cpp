@@ -2573,16 +2573,33 @@ void CABACWriter::intra_chroma_pred_mode(const PredictionUnit& pu)
   }
 
 #if JVET_AC0071_DBV
+#if JVET_AH0136_CHROMA_REORDERING
+  bool hasDBV = false;
+#endif
   if (PU::hasChromaBvFlag(pu))
   {
+#if JVET_AH0136_CHROMA_REORDERING
+    hasDBV = true;
+    bool isDbvChromaMode = intraDir == DBV_CHROMA_IDX;
+    if (CS::isDualITree(*pu.cs) && pu.cs->sps->getUseChromaReordering())
+    {
+      int mode = PU::isDbvMode(pu.intraDir[1]) ? pu.intraDir[1] : PU::getFinalIntraMode(pu, CHANNEL_TYPE_CHROMA);
+      isDbvChromaMode = mode == pu.cu->chromaList[0];
+    }
+#else
     const bool isDbvChromaMode = intraDir == DBV_CHROMA_IDX;
+#endif
     m_BinEncoder.encodeBin(isDbvChromaMode ? 0 : 1, Ctx::DbvChromaMode());
     if (isDbvChromaMode)
     {
       if (PU::hasChromaFusionFlag(pu, pu.intraDir[1]))
       {
+#if JVET_AH0136_CHROMA_REORDERING
+        intraChromaFusionMode(pu);
+#else
         const bool isFusion = pu.isChromaFusion;
         m_BinEncoder.encodeBin(isFusion ? 1 : 0, Ctx::ChromaFusionMode());
+#endif
       }
       DTRACE(g_trace_ctx, D_SYNTAX, "intra_chroma_pred_modes() pos=(%d,%d) dir=%d\n",
         pu.blocks[CHANNEL_TYPE_CHROMA].x, pu.blocks[CHANNEL_TYPE_CHROMA].y, pu.intraDir[CHANNEL_TYPE_CHROMA]);
@@ -2591,6 +2608,108 @@ void CABACWriter::intra_chroma_pred_mode(const PredictionUnit& pu)
   }
 #endif
 
+#if JVET_AH0136_CHROMA_REORDERING
+  if (CS::isDualITree(*pu.cs) && pu.cs->sps->getUseChromaReordering())
+  {
+    int chromaIdx = 0;
+    bool hasMode = false;
+    int mode = PU::isDbvMode(pu.intraDir[1]) ? pu.intraDir[1] : PU::getFinalIntraMode(pu, CHANNEL_TYPE_CHROMA);
+    int start = 0;
+    int end = 6;
+#if JVET_AC0071_DBV
+    if (hasDBV)
+    {
+      start++;
+      end++;
+    }
+#endif
+#if ENABLE_DIMD && JVET_Z0050_DIMD_CHROMA_FUSION
+    if (!pu.cu->slice->getSPS()->getUseDimd())
+    {
+      end--;
+    }
+#endif
+    for (int i = start; i < end; i++)
+    {
+      if (mode == pu.cu->chromaList[i])
+      {
+        chromaIdx = i;
+        hasMode = true;
+        break;
+      }
+    }
+
+    if (hasDBV)
+    {
+      chromaIdx--;
+    }
+    CHECK(!hasMode, "wrong mode");
+    const bool     isDerivedMode = chromaIdx == 0;
+    m_BinEncoder.encodeBin(isDerivedMode ? 0 : 1, Ctx::IntraChromaPredMode(0));
+    if (isDerivedMode)
+    {
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+      if (PU::hasChromaFusionFlag(pu, pu.intraDir[1]))
+      {
+#if JVET_AC0119_LM_CHROMA_FUSION
+        intraChromaFusionMode(pu);
+#else
+        const bool     isFusion = pu.isChromaFusion;
+        m_BinEncoder.encodeBin(isFusion ? 1 : 0, Ctx::ChromaFusionMode());
+#endif
+      }
+#endif
+      DTRACE(g_trace_ctx, D_SYNTAX, "intra_chroma_pred_modes() pos=(%d,%d) dir=%d\n",
+        pu.blocks[CHANNEL_TYPE_CHROMA].x, pu.blocks[CHANNEL_TYPE_CHROMA].y, pu.intraDir[CHANNEL_TYPE_CHROMA]);
+      return;
+    }
+
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+    if (pu.cu->slice->getSPS()->getUseDimd())
+    {
+      const bool     isDimdChromaMode = chromaIdx == 1;
+      m_BinEncoder.encodeBin(isDimdChromaMode ? 0 : 1, Ctx::DimdChromaMode());
+      if (isDimdChromaMode)
+      {
+        if (PU::hasChromaFusionFlag(pu, pu.intraDir[1]))
+        {
+#if JVET_AC0119_LM_CHROMA_FUSION
+          intraChromaFusionMode(pu);
+#else
+          const bool     isFusion = pu.isChromaFusion;
+          m_BinEncoder.encodeBin(isFusion ? 1 : 0, Ctx::ChromaFusionMode());
+#endif
+        }
+        DTRACE(g_trace_ctx, D_SYNTAX, "intra_chroma_pred_modes() pos=(%d,%d) dir=%d\n",
+          pu.blocks[CHANNEL_TYPE_CHROMA].x, pu.blocks[CHANNEL_TYPE_CHROMA].y, pu.intraDir[CHANNEL_TYPE_CHROMA]);
+        return;
+      }
+    }
+    else
+    {
+      chromaIdx++;
+    }
+#endif
+
+    // chroma candidate index
+    {
+      m_BinEncoder.encodeBinsEP(chromaIdx - 2, 2);
+      DTRACE(g_trace_ctx, D_SYNTAX, "intra_chroma_pred_modes() pos=(%d,%d) cand_idx=%d\n", pu.blocks[CHANNEL_TYPE_CHROMA].x, pu.blocks[CHANNEL_TYPE_CHROMA].y, chromaIdx - 2);
+#if JVET_Z0050_DIMD_CHROMA_FUSION
+      if (PU::hasChromaFusionFlag(pu, pu.intraDir[1]))
+      {
+#if JVET_AC0119_LM_CHROMA_FUSION
+        intraChromaFusionMode(pu);
+#else
+        const bool     isFusion = pu.isChromaFusion;
+        m_BinEncoder.encodeBin(isFusion ? 1 : 0, Ctx::ChromaFusionMode());
+#endif
+      }
+#endif
+    }
+    return;
+  }
+#endif
   const bool     isDerivedMode = intraDir == DM_CHROMA_IDX;
   m_BinEncoder.encodeBin(isDerivedMode ? 0 : 1, Ctx::IntraChromaPredMode(0));
   if (isDerivedMode)

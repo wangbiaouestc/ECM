@@ -502,6 +502,9 @@ protected:
 #if JVET_AD0085_MPM_SORTING
   bool      m_mpmSorting;
 #endif
+#if JVET_AH0136_CHROMA_REORDERING
+  bool      m_chromaReordering;
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   int       m_cccm;
 #endif

@@ -274,6 +274,9 @@ namespace PU
   uint32_t getCoLocatedIntraLumaMode      (const PredictionUnit &pu);
 #endif
 #if JVET_AC0071_DBV
+#if JVET_AH0136_CHROMA_REORDERING
+  bool isDbvMode(int mode);
+#endif
   bool dbvModeAvail(const PredictionUnit &pu);
   void deriveChromaBv(PredictionUnit &pu);
 #if JVET_AA0070_RRIBC
@@ -292,6 +295,9 @@ namespace PU
                                    , const Mv chromaBv
 #endif
                                    , bool isRefTemplate = false, bool isRefAbove = false);
+#endif
+#if JVET_AH0136_CHROMA_REORDERING
+  bool checkIsChromaBvCandidateValidChromaTm(const PredictionUnit &pu, const Mv mv, int filterIdx = 0, bool isRefTemplate = false, bool isRefAbove = false);
 #endif
   int      getWideAngle                   ( const TransformUnit &tu, const uint32_t dirMode, const ComponentID compID );
 #if MULTI_PASS_DMVR || JVET_W0097_GPM_MMVD_TM

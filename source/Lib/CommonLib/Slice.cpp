@@ -3927,6 +3927,9 @@ SPS::SPS()
 #if JVET_AD0085_MPM_SORTING
 , m_mpmSorting                      ( false )
 #endif
+#if JVET_AH0136_CHROMA_REORDERING
+, m_chromaReordering                ( false )
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
 , m_cccm                      ( false )
 #endif

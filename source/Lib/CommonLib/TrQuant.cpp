@@ -544,7 +544,11 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
     }
 #endif
 #if JVET_AC0071_DBV
+#if JVET_AH0136_CHROMA_REORDERING
+    if (compID != COMPONENT_Y && PU::isDbvMode(intraMode))
+#else
     if (compID != COMPONENT_Y && intraMode == DBV_CHROMA_IDX)
+#endif
     {
       intraMode = PLANAR_IDX;
     }
@@ -833,7 +837,11 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
     }
 #endif
 #if JVET_AC0071_DBV
+#if JVET_AH0136_CHROMA_REORDERING
+    if (compID != COMPONENT_Y && PU::isDbvMode(intraMode))
+#else
     if (compID != COMPONENT_Y && intraMode == DBV_CHROMA_IDX)
+#endif
     {
       intraMode = PLANAR_IDX;
     }
@@ -2735,7 +2743,11 @@ int TrQuant::getLfnstIdx(const TransformUnit &tu, ComponentID compID)
   }
 #endif
 #if JVET_AC0071_DBV
+#if JVET_AH0136_CHROMA_REORDERING
+  if (compID != COMPONENT_Y && PU::isDbvMode(intraMode))
+#else
   if (compID != COMPONENT_Y && intraMode == DBV_CHROMA_IDX)
+#endif
   {
     intraMode = PLANAR_IDX;
   }

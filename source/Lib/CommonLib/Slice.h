@@ -1807,6 +1807,9 @@ private:
 #if JVET_AD0085_MPM_SORTING
   bool              m_mpmSorting;
 #endif
+#if JVET_AH0136_CHROMA_REORDERING
+  bool              m_chromaReordering;
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   int               m_cccm;
 #endif
@@ -2522,6 +2525,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if JVET_AD0085_MPM_SORTING
   void      setUseMpmSorting   (bool b)                                          { m_mpmSorting = b; }
   bool      getUseMpmSorting   ()                                      const     { return m_mpmSorting; }
+#endif
+#if JVET_AH0136_CHROMA_REORDERING
+  void      setUseChromaReordering(bool b)                                       { m_chromaReordering = b; }
+  bool      getUseChromaReordering()                                   const     { return m_chromaReordering; }
 #endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   void      setUseCccm( int i )                                                  { m_cccm = i; }

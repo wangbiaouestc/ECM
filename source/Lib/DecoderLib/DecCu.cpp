@@ -469,7 +469,11 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
 #endif
           }
         }
+#if JVET_AH0136_CHROMA_REORDERING
+        if (currCU.firstPU->parseChromaMode && (!CS::isDualITree(cs) || !currCU.cs->sps->getUseChromaReordering()))
+#else
         if (currCU.firstPU->parseChromaMode)
+#endif
         {
           unsigned chromaCandModes[NUM_CHROMA_MODE];
           PU::getIntraChromaCandModes(*currCU.firstPU, chromaCandModes);
@@ -627,7 +631,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 #endif
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
 #if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+#if JVET_AH0136_CHROMA_REORDERING
+  if (((!PU::isLMCMode(pu.intraDir[1]) && compID == COMPONENT_Cb && !pu.cu->bdpcmModeChroma) && CS::isDualITree(cs) && pu.cs->sps->getUseChromaReordering()) || ((pu.intraDir[1] == DIMD_CHROMA_IDX || pu.ccpMergeFusionType == 1) && compID == COMPONENT_Cb))
+#else
   if ((pu.intraDir[1] == DIMD_CHROMA_IDX || pu.ccpMergeFusionType == 1) && compID == COMPONENT_Cb)
+#endif
 #else
   if (pu.intraDir[1] == DIMD_CHROMA_IDX && compID == COMPONENT_Cb)
 #endif
@@ -651,6 +659,57 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 #endif
   }
 #endif
+#if JVET_AH0136_CHROMA_REORDERING
+  if ((!PU::isLMCMode(pu.intraDir[1]) && compID == COMPONENT_Cb && !pu.cu->bdpcmModeChroma) && CS::isDualITree(cs) && pu.cs->sps->getUseChromaReordering())
+  {
+    CompArea areaCb = pu.Cb();
+    CompArea areaCr = pu.Cr();
+    CompArea lumaArea = CompArea(COMPONENT_Y, pu.chromaFormat, areaCb.lumaPos(), recalcSize(pu.chromaFormat, CHANNEL_TYPE_CHROMA, CHANNEL_TYPE_LUMA, areaCb.size()));
+    m_pcIntraPred->deriveNonCcpChromaModes(cs.picture->getRecoBuf(lumaArea), cs.picture->getRecoBuf(areaCb), cs.picture->getRecoBuf(areaCr), lumaArea, areaCb, areaCr, *pu.cu, pu, m_pcInterPred);
+    int chromaIdx = -1;
+#if JVET_AC0071_DBV
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+    if (cs.slice->getSPS()->getUseDimd())
+    {
+      chromaIdx = pu.intraDir[1] == DBV_CHROMA_IDX ? 0 : (pu.intraDir[1] == DM_CHROMA_IDX ? 1 : (pu.intraDir[1] == DIMD_CHROMA_IDX ? 2 : pu.candId + 3));
+    }
+    else
+    {
+      chromaIdx = pu.intraDir[1] == DBV_CHROMA_IDX ? 0 : (pu.intraDir[1] == DM_CHROMA_IDX ? 1 : pu.candId + 2);
+    }
+#else
+    chromaIdx = pu.intraDir[1] == DBV_CHROMA_IDX ? 0 : (pu.intraDir[1] == DM_CHROMA_IDX ? 1 : pu.candId + 2);
+#endif
+    if (!PU::hasChromaBvFlag(pu))
+    {
+      chromaIdx--;
+    }
+#else
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+    if (cs.slice->getSPS()->getUseDimd())
+    {
+      chromaIdx = pu.intraDir[1] == DM_CHROMA_IDX ? 0 : (pu.intraDir[1] == DIMD_CHROMA_IDX ? 1 : pu.candId + 2);
+    }
+    else
+    {
+      chromaIdx = pu.intraDir[1] == DM_CHROMA_IDX ? 0 : pu.candId + 1;
+    }
+#else
+    chromaIdx = pu.intraDir[1] == DM_CHROMA_IDX ? 0 : pu.candId + 1;
+#endif
+#endif
+    pu.intraDir[1] = pu.cu->chromaList[chromaIdx];
+#if JVET_AC0071_DBV
+    if (PU::isDbvMode(pu.intraDir[1]) && CS::isDualITree(cs))
+    {
+      pu.bv = pu.cu->bvs[pu.intraDir[1] - DBV_CHROMA_IDX];
+      pu.mv[0] = pu.cu->mvs[pu.intraDir[1] - DBV_CHROMA_IDX];
+      pu.cu->rribcFlipType = pu.cu->rribcTypes[pu.intraDir[1] - DBV_CHROMA_IDX];
+    }
+#endif
+    CHECK(pu.intraDir[1] < 0, "wrong intraDir");
+  }
+#endif
 #if JVET_AE0100_BVGCCCM
   if (pu.bvgCccmFlag && compID == COMPONENT_Cb)
   {
@@ -660,7 +719,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
   }
 #endif
 #if JVET_AC0071_DBV
-  if (pu.intraDir[1] == DBV_CHROMA_IDX && compID == COMPONENT_Cb)
+  if (pu.intraDir[1] == DBV_CHROMA_IDX && compID == COMPONENT_Cb
+#if JVET_AH0136_CHROMA_REORDERING
+    && !pu.cs->sps->getUseChromaReordering()
+#endif
+    )
   {
     PU::deriveChromaBv(pu);
   }
@@ -1120,7 +1183,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
       }
       else
 #if JVET_AC0071_DBV
+#if JVET_AH0136_CHROMA_REORDERING
+        if (compID != COMPONENT_Y && PU::isDbvMode(uiChFinalMode))
+#else
       if (compID != COMPONENT_Y && uiChFinalMode == DBV_CHROMA_IDX)
+#endif
       {
         m_pcIntraPred->predIntraDbv(compID, piPred, pu
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
@@ -1134,7 +1201,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 #if JVET_Z0050_DIMD_CHROMA_FUSION
       if (compID != COMPONENT_Y && pu.isChromaFusion)
       {
-        m_pcIntraPred->geneChromaFusionPred(compID, piPred, pu);
+        m_pcIntraPred->geneChromaFusionPred(compID, piPred, pu
+#if JVET_AH0136_CHROMA_REORDERING
+          , m_pcInterPred
+#endif
+        );
       }
 #endif
     }
@@ -1183,7 +1254,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
       else
       {
 #if JVET_AC0071_DBV
+#if JVET_AH0136_CHROMA_REORDERING
+        if (PU::isDbvMode(uiChFinalMode))
+#else
         if (uiChFinalMode == DBV_CHROMA_IDX)
+#endif
         {
           m_pcIntraPred->predIntraDbv(COMPONENT_Cr, piPredCr, pu
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
@@ -1197,7 +1272,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 #if JVET_Z0050_DIMD_CHROMA_FUSION
         if (pu.isChromaFusion)
         {
-          m_pcIntraPred->geneChromaFusionPred(COMPONENT_Cr, piPredCr, pu);
+          m_pcIntraPred->geneChromaFusionPred(COMPONENT_Cr, piPredCr, pu
+#if JVET_AH0136_CHROMA_REORDERING
+            , m_pcInterPred
+#endif
+          );
         }
 #endif
       }
@@ -1272,7 +1351,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
   if( !tu.cu->ispMode || !isLuma( compID ) )
   {
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AC0071_DBV
+#if JVET_AH0136_CHROMA_REORDERING
+    if (!(PU::isDbvMode(uiChFinalMode) && compID == COMPONENT_Cb))
+#else
     if (!(uiChFinalMode == DBV_CHROMA_IDX && compID == COMPONENT_Cb))
+#endif
 #endif
     cs.setDecomp( area );
   }
@@ -1320,7 +1403,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
   pReco.copyFrom( piPred );
 #endif
 #if JVET_AC0071_DBV && JVET_AA0070_RRIBC
+#if JVET_AH0136_CHROMA_REORDERING
+  if (compID != COMPONENT_Y && PU::isDbvMode(uiChFinalMode) && tu.cu->rribcFlipType)
+#else
   if (compID != COMPONENT_Y && uiChFinalMode == DBV_CHROMA_IDX && tu.cu->rribcFlipType)
+#endif
   {
     pReco.flipSignal(tu.cu->rribcFlipType == 1);
   }

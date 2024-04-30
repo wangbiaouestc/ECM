@@ -72,13 +72,22 @@ public:
   static inline bool getSwitchCondition(const CodingUnit &cu,ChannelType channelType) {
     bool            condition     =
       cu.predMode == MODE_INTRA && cu.slice->getSliceType() != I_SLICE &&
-      ((!cu.tmpFlag && channelType == CHANNEL_TYPE_LUMA)||(channelType == CHANNEL_TYPE_CHROMA && cu.firstPU->intraDir[1] != DBV_CHROMA_IDX));
+      ((!cu.tmpFlag && channelType == CHANNEL_TYPE_LUMA)||(channelType == CHANNEL_TYPE_CHROMA 
+#if JVET_AH0136_CHROMA_REORDERING
+        && !(cu.firstPU->intraDir[1] >= DBV_CHROMA_IDX && cu.firstPU->intraDir[1] <= DBV_CHROMA_IDX9)
+#else
+        && cu.firstPU->intraDir[1] != DBV_CHROMA_IDX
+#endif
+        ));
     assert(cu.slice->getSliceType() != I_SLICE || channelType == cu.chType);
     int tmpMaxSize = cu.cs->sps->getIntraTMPMaxSize();
     condition = condition || (cu.predMode == MODE_IBC && channelType == CHANNEL_TYPE_LUMA && cu.slice->getSliceType() == I_SLICE)
                 || (cu.predMode == MODE_INTRA && ((channelType == CHANNEL_TYPE_LUMA && cu.tmpFlag && !cu.bdpcmMode && !cu.dimd
-                                                && cu.lwidth() <= tmpMaxSize && cu.lheight() <= tmpMaxSize) ||
-                                               (channelType == CHANNEL_TYPE_CHROMA && cu.firstPU->intraDir[1] == DBV_CHROMA_IDX)) && cu.slice->getSliceType() == I_SLICE);
+                                                && cu.lwidth() <= tmpMaxSize && cu.lheight() <= tmpMaxSize)
+#if !JVET_AH0136_CHROMA_REORDERING
+                  || (channelType == CHANNEL_TYPE_CHROMA && cu.firstPU->intraDir[1] == DBV_CHROMA_IDX)
+#endif
+                  ) && cu.slice->getSliceType() == I_SLICE);
     return condition;
   }
 #endif

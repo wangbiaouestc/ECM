@@ -1978,6 +1978,9 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_AD0085_MPM_SORTING
   sps.setUseMpmSorting      ( m_mpmSorting );
 #endif
+#if JVET_AH0136_CHROMA_REORDERING
+  sps.setUseChromaReordering (m_chromaReordering);
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   sps.setUseCccm            ( m_cccm );
 #endif
