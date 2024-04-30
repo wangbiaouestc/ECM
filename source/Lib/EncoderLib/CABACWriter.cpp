@@ -8204,13 +8204,12 @@ void CABACWriter::residual_coding( const TransformUnit& tu, ComponentID compID, 
     if (cuCtx && tu.mtsIdx[compID] != MTS_SKIP && tu.blocks[compID].height >= 4 && tu.blocks[compID].width >= 4)
     {
 #if JVET_AG0061_INTER_LFNST_NSPT
-      const int lfnstLastScanPosTh = CU::isIntra(*(tu.cu))
-                                       ? (isLuma(compID) ? LFNST_LAST_SIG_LUMA : LFNST_LAST_SIG_CHROMA)
-                                       : (isLuma(compID) ? LFNST_LAST_SIG_LUMA_INTER : LFNST_LAST_SIG_CHROMA_INTER);
+      const int lfnstLastScanPosTh = isLuma( compID ) ? ( CU::isIntra( *( tu.cu ) ) ? LFNST_LAST_SIG_LUMA : LFNST_LAST_SIG_LUMA_INTER ) : LFNST_LAST_SIG_CHROMA;
+      cuCtx->lfnstLastScanPos |= ( CU::isIntra( *( tu.cu ) ) || isLuma( compID ) ) ? ( cctx.scanPosLast() >= lfnstLastScanPosTh ) : false;
 #else
       const int lfnstLastScanPosTh = isLuma(compID) ? LFNST_LAST_SIG_LUMA : LFNST_LAST_SIG_CHROMA;
-#endif
       cuCtx->lfnstLastScanPos |= cctx.scanPosLast() >= lfnstLastScanPosTh;
+#endif
     }
     if (cuCtx && isLuma(compID) && tu.mtsIdx[compID] != MTS_SKIP)
     {
