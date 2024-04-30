@@ -1242,6 +1242,11 @@ void HLSyntaxReader::parseAlfAps( APS* aps )
   {
     if (ccAlfParam.newCcAlfFilter[ccIdx])
     {
+#if JVET_AH0057_CCALF_COEFF_PRECISION
+      READ_CODE(2, code,
+        ccIdx == 0 ? "alf_cc_cb_frame_precision_idx" : "alf_cc_cr_frame_precision_idx");
+      ccAlfParam.ccAlfCoeffPrec[ccIdx] = code + MIN_CCALF_PREC;
+#endif
       if (MAX_NUM_CC_ALF_FILTERS > 1)
       {
         READ_UVLC(code, ccIdx == 0 ? "alf_cc_cb_filters_signalled_minus1" : "alf_cc_cr_filters_signalled_minus1");
@@ -2145,7 +2150,16 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   {
     pcSPS->setCCALFEnabledFlag(false);
   }
-
+#if JVET_AH0057_CCALF_COEFF_PRECISION
+  if (pcSPS->getCCALFEnabledFlag())
+  {
+    READ_FLAG(uiCode, "sps_ccalf_precision_flag");                  pcSPS->setCCALFPrecisionFlag(uiCode ? true : false);
+  }
+  else
+  {
+    pcSPS->setCCALFPrecisionFlag(false);
+  }
+#endif
 #if SIGN_PREDICTION
   READ_CODE(4, uiCode, "num_predicted_coef_signs");
   pcSPS->setNumPredSigns(uiCode);

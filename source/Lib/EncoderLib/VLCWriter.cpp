@@ -776,6 +776,10 @@ void HLSWriter::codeAlfAps( APS* pcAPS )
   {
     if (paramCcAlf.newCcAlfFilter[ccIdx])
     {
+#if JVET_AH0057_CCALF_COEFF_PRECISION
+      WRITE_CODE(paramCcAlf.ccAlfCoeffPrec[ccIdx] - MIN_CCALF_PREC, 2,
+        ccIdx == 0 ? "alf_cc_cb_frame_precision_idx" : "alf_cc_cr_frame_precision_idx");
+#endif
       const int filterCount = paramCcAlf.ccAlfFilterCount[ccIdx];
       CHECK(filterCount > MAX_NUM_CC_ALF_FILTERS, "CC ALF Filter count is too large");
       CHECK(filterCount == 0, "CC ALF Filter count is too small");
@@ -1312,7 +1316,12 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
   {
     WRITE_FLAG( pcSPS->getCCALFEnabledFlag(),                                            "sps_ccalf_enabled_flag" );
   }
-
+#if JVET_AH0057_CCALF_COEFF_PRECISION
+  if (pcSPS->getCCALFEnabledFlag())
+  {
+    WRITE_FLAG(pcSPS->getCCALFPrecisionFlag(),                                           "sps_ccalf_precision_flag" );
+  }
+#endif
 #if SIGN_PREDICTION
   WRITE_CODE(pcSPS->getNumPredSigns(), 4, "num_predicted_coef_signs");
 #if JVET_Y0141_SIGN_PRED_IMPROVE

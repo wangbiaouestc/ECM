@@ -434,6 +434,10 @@ static const int MAX_NUM_ALF_CHROMA_COEFF    =                     21 + 5;
 #else
 static const int MAX_NUM_ALF_CHROMA_COEFF    =                     21;
 #endif
+#if JVET_AH0057_CCALF_COEFF_PRECISION
+static const int MAX_NUM_CCALF_PREC          =                     4;
+static const int MIN_CCALF_PREC              =                     7;
+#endif
 #else
 static const int MAX_NUM_ALF_LUMA_COEFF      =                     13;
 static const int MAX_NUM_ALF_CHROMA_COEFF    =                      7;
