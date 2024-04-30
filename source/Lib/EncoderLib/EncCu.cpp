@@ -2594,6 +2594,10 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
   int8_t dimdChromaMode = -1;
   int8_t dimdChromaModeSecond = -1;
 #endif
+#if JVET_AH0136_CHROMA_REORDERING
+  int8_t dimdBlendModeChroma[DIMD_FUSION_NUM - 1] = { 0 };
+  int chromaList[7] = { -1 };
+#endif
 #if JVET_AH0076_OBIC
   bool obicIsBlended = false;
   int obicMode[OBIC_FUSION_NUM] = { -1 };
@@ -2678,8 +2682,12 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
 #endif
 #endif
   }
-#if JVET_Z0050_DIMD_CHROMA_FUSION && (JVET_AC0094_REF_SAMPLES_OPT)
+#if (JVET_Z0050_DIMD_CHROMA_FUSION && (JVET_AC0094_REF_SAMPLES_OPT)) || JVET_AH0136_CHROMA_REORDERING
+#if JVET_AH0136_CHROMA_REORDERING
+  if (CS::isDualITree(*tempCS) ? isChroma(partitioner.chType) : false)
+#else
   if (tempCS->slice->getSPS()->getUseDimd() && (CS::isDualITree(*tempCS) ? isChroma(partitioner.chType) : false))
+#endif
   {
     CodingUnit cu(tempCS->area);
     cu.cs = tempCS;
@@ -2688,9 +2696,33 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
     const CompArea areaCb = tempCS->area.Cb();
     const CompArea areaCr = tempCS->area.Cr();
     const CompArea lumaArea = CompArea(COMPONENT_Y, (tempCS->area).chromaFormat, areaCb.lumaPos(), recalcSize((tempCS->area).chromaFormat, CHANNEL_TYPE_CHROMA, CHANNEL_TYPE_LUMA, areaCb.size()));
-    IntraPrediction::deriveDimdChromaMode(bestCS->picture->getRecoBuf(lumaArea), bestCS->picture->getRecoBuf(areaCb), bestCS->picture->getRecoBuf(areaCr), lumaArea, areaCb, areaCr, cu);
-    dimdChromaMode = cu.dimdChromaMode;
-    dimdChromaModeSecond = cu.dimdChromaModeSecond;
+#if JVET_AH0136_CHROMA_REORDERING
+    if (tempCS->slice->getSPS()->getUseDimd())
+    {
+#endif
+      IntraPrediction::deriveDimdChromaMode(bestCS->picture->getRecoBuf(lumaArea), bestCS->picture->getRecoBuf(areaCb), bestCS->picture->getRecoBuf(areaCr), lumaArea, areaCb, areaCr, cu);
+      dimdChromaMode = cu.dimdChromaMode;
+      dimdChromaModeSecond = cu.dimdChromaModeSecond;
+#if JVET_AH0136_CHROMA_REORDERING
+      for (int i = 0; i < 5; i++)
+      {
+        dimdBlendModeChroma[i] = cu.dimdBlendModeChroma[i];
+      }
+    }
+    if (tempCS->slice->getSPS()->getUseChromaReordering())
+    {
+      PredictionUnit pu(tempCS->area);
+      pu.cu = &cu;
+      cu.firstPU = &pu;
+      pu.cs = bestCS;
+      cu.cs = bestCS;
+      m_pcIntraSearch->deriveNonCcpChromaModes(bestCS->picture->getRecoBuf(lumaArea), bestCS->picture->getRecoBuf(areaCb), bestCS->picture->getRecoBuf(areaCr), lumaArea, areaCb, areaCr, cu, pu, m_pcInterSearch);
+      for (int i = 0; i < 7; i++)
+      {
+        chromaList[i] = cu.chromaList[i];
+      }
+    }
+#endif
   }
 #endif
 #elif SECONDARY_MPM
@@ -2836,8 +2868,23 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
           {
             cu.dimdChromaMode = dimdChromaMode;
             cu.dimdChromaModeSecond = dimdChromaModeSecond;
+#if JVET_AH0136_CHROMA_REORDERING
+            for (int i = 0; i < 5; i++)
+            {
+              cu.dimdBlendModeChroma[i] = dimdBlendModeChroma[i];
+            }
+#endif
           }
 #endif
+#endif
+#if JVET_AH0136_CHROMA_REORDERING
+          if (tempCS->slice->getSPS()->getUseChromaReordering() && (CS::isDualITree(*tempCS) ? isChroma(partitioner.chType) : false))
+          {
+            for (int i = 0; i < 7; i++)
+            {
+              cu.chromaList[i] = chromaList[i];
+            }
+          }
 #endif
           cu.lfnstIdx         = lfnstIdx;
           cu.mtsFlag          = mtsFlag;

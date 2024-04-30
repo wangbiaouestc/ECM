@@ -362,6 +362,14 @@ struct CodingUnit : public UnitArea
   int8_t         dimdRelWeight[3]; // max number of predictions to blend
 #endif
 #endif
+#if JVET_AH0136_CHROMA_REORDERING
+  int8_t         dimdBlendModeChroma[DIMD_FUSION_NUM - 1];
+  uint8_t        chromaList[7];
+  Mv             mvs[10];
+  Mv             bvs[10];
+  int            rribcTypes[10];
+  int            mvsNum;
+#endif
 #if TMP_FAST_ENC
 #if JVET_AD0086_ENHANCED_INTRA_TMP
 #if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
@@ -546,7 +554,7 @@ struct CodingUnit : public UnitArea
 
 struct IntraPredictionData
 {
-#if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
+#if ENABLE_DIMD || JVET_W0123_TIMD_FUSION || JVET_AH0136_CHROMA_REORDERING
   bool      parseLumaMode = false;
   int8_t    candId = -1;
   bool      parseChromaMode = false;

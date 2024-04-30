@@ -500,6 +500,9 @@ protected:
 #endif
 
   void xFillReferenceSamples      ( const CPelBuf &recoBuf,      Pel* refBufUnfiltered, const CompArea &area, const CodingUnit &cu );
+#if JVET_AH0136_CHROMA_REORDERING
+  void xFillReferenceSamplesForCoLuma(const CPelBuf &recoBuf, Pel* refBufUnfiltered, const CompArea &area, const CodingUnit &cu);
+#endif
   void xFilterReferenceSamples(const Pel *refBufUnfiltered, Pel *refBufFiltered, const CompArea &area, const SPS &sps,
                                int multiRefIdx
   );
@@ -664,7 +667,11 @@ public:
   void   xCflmCalcModels(const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, CccmModel& cflmModel, int modelId, int modelThr);
   void   xCflmApplyModel(const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, CccmModel& cflmModel, int modelId, int modelThr, PelBuf& piPred);
   void   xCflmCreateLumaRef       (const PredictionUnit& pu, const CompArea& chromaArea);
-  bool   xCflmCreateChromaPred    (const PredictionUnit& pu, const ComponentID compId, PelBuf& piPred);
+  bool   xCflmCreateChromaPred    (const PredictionUnit& pu, const ComponentID compId, PelBuf& piPred
+#if JVET_AH0136_CHROMA_REORDERING
+    , InterPrediction *pcInterPred
+#endif
+  );
   PelBuf xCflmGetRefBuf           (const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, int& areaWidth, int& areaHeight, int& refSizeX, int& refSizeY, int& refPosPicX, int& refPosPicY) const;
   PelBuf xCflmGetPuBuf            (const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea) const;
   int    xCflmCalcRefAver         (const PredictionUnit& pu, const CompArea& chromaArea);
@@ -744,6 +751,12 @@ public:
   static void deriveDimdMode      (const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu);
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
   static void deriveDimdChromaMode(const CPelBuf &recoBufY, const CPelBuf &recoBufCb, const CPelBuf &recoBufCr, const CompArea &areaY, const CompArea &areaCb, const CompArea &areaCr, CodingUnit &cu);
+#if JVET_AH0136_CHROMA_REORDERING
+   void deriveNonCcpChromaModes(const CPelBuf &recoBufY, const CPelBuf &recoBufCb, const CPelBuf &recoBufCr, const CompArea &areaY, const CompArea &areaCb, const CompArea &areaCr, CodingUnit &cu, PredictionUnit &pu, InterPrediction *pcInterPred);
+   void buildChromaModeList(const CompArea &area, CodingUnit &cu, PredictionUnit &pu, uint8_t chromaList[NUM_CHROMA_LIST_MODE], int &existNum, bool &hasDBV);
+   void predCoLuma(const CompArea &area, const CPelBuf &recoBuf, PredictionUnit &pu, uint8_t predMode, PelBuf predBuf, InterPrediction *pcInterPred, CodingUnit &chromaCu);
+   void predChromaTM(const CompArea &areaCb, const CompArea &areaCr, PredictionUnit &pu, uint8_t predMode, PelBuf predCb, PelBuf predCr, TemplateType eTplType, InterPrediction *pcInterPred);
+#endif
 #endif
 #if JVET_AB0067_MIP_DIMD_LFNST && ENABLE_DIMD
   static int deriveDimdMipMode(PelBuf& reducedPred, int width, int height, CodingUnit& cu);
@@ -980,7 +993,11 @@ public:
   void geneIntrainterPred         (const CodingUnit &cu, PelStorage& pred);
 #if JVET_Z0050_DIMD_CHROMA_FUSION
 #if JVET_AD0188_CCP_MERGE
-  void geneChromaFusionPred       (const ComponentID compId, PelBuf &piPred, PredictionUnit &pu);
+  void geneChromaFusionPred       (const ComponentID compId, PelBuf &piPred, PredictionUnit &pu
+#if JVET_AH0136_CHROMA_REORDERING
+    , InterPrediction *pcInterPred = NULL
+#endif
+  );
 #else
   void geneChromaFusionPred       (const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu);
 #endif

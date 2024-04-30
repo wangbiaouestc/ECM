@@ -345,6 +345,23 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   }
 #endif
 #endif
+#if JVET_AH0136_CHROMA_REORDERING
+  for (uint32_t i = 0; i < 7; i++)
+  {
+    chromaList[i] = other.chromaList[i];
+  }
+  for (int i = 0; i < 5; i++)
+  {
+    dimdBlendModeChroma[i] = other.dimdBlendModeChroma[i];
+  }
+  for (int i = 0; i < 10; i++)
+  {
+    mvs[i] = other.mvs[i];
+    bvs[i] = other.bvs[i];
+    rribcTypes[i] = other.rribcTypes[i];
+  }
+  mvsNum = other.mvsNum;
+#endif
 #if TMP_FAST_ENC
 #if JVET_AD0086_ENHANCED_INTRA_TMP
 #if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
@@ -601,6 +618,23 @@ void CodingUnit::initData()
     dimdRelWeight[i] = -1;
   }
 #endif
+#endif
+#if JVET_AH0136_CHROMA_REORDERING
+  for (uint32_t i = 0; i < 7; i++)
+  {
+    chromaList[i] = -1;
+  }
+  for (int i = 0; i < 5; i++)
+  {
+    dimdBlendModeChroma[i] = -1;
+  }
+  for (int i = 0; i < 10; i++)
+  {
+    mvs[i].setZero();
+    bvs[i].setZero();
+    rribcTypes[i] = 0;
+  }
+  mvsNum = 0;
 #endif
 #if TMP_FAST_ENC
 #if JVET_AD0086_ENHANCED_INTRA_TMP

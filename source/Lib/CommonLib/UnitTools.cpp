@@ -3066,7 +3066,14 @@ bool PU::hasChromaFusionFlag(const PredictionUnit &pu, int intraMode)
   bool hasChromaFusionFlag = pu.cs->slice->getSliceType() == I_SLICE;
 #endif
 #if JVET_AC0071_DBV && JVET_AC0119_LM_CHROMA_FUSION
-  hasChromaFusionFlag &= intraMode != DBV_CHROMA_IDX;
+#if JVET_AH0136_CHROMA_REORDERING
+  if (!pu.cs->sps->getUseChromaReordering())
+  {
+#endif
+    hasChromaFusionFlag &= intraMode != DBV_CHROMA_IDX;
+#if JVET_AH0136_CHROMA_REORDERING
+  }
+#endif
 #endif
 #if JVET_AC0119_LM_CHROMA_FUSION
   hasChromaFusionFlag &= PU::isLMCModeEnabled(pu, LM_CHROMA_IDX);
@@ -4913,6 +4920,35 @@ uint32_t PU::getIntraDirLuma( const PredictionUnit &pu )
 
 void PU::getIntraChromaCandModes(const PredictionUnit &pu, unsigned modeList[NUM_CHROMA_MODE])
 {
+#if JVET_AH0136_CHROMA_REORDERING
+  if (CS::isDualITree(*pu.cs) && pu.cs->sps->getUseChromaReordering())
+  {
+    modeList[0] = LM_CHROMA_IDX;
+    modeList[1] = MDLM_L_IDX;
+    modeList[2] = MDLM_T_IDX;
+#if MMLM
+    modeList[3] = MMLM_CHROMA_IDX;
+    modeList[4] = MMLM_L_IDX;
+    modeList[5] = MMLM_T_IDX;
+    modeList[6] = pu.cu->chromaList[0];
+    modeList[7] = pu.cu->chromaList[1];
+    modeList[8] = pu.cu->chromaList[2];
+    modeList[9] = pu.cu->chromaList[3];
+    modeList[10] = pu.cu->chromaList[4];
+    modeList[11] = pu.cu->chromaList[5];
+    modeList[12] = pu.cu->chromaList[6];
+#else
+    modeList[3] = pu.cu->chromaList[0];
+    modeList[4] = pu.cu->chromaList[1];
+    modeList[5] = pu.cu->chromaList[2];
+    modeList[6] = pu.cu->chromaList[3];
+    modeList[7] = pu.cu->chromaList[4];
+    modeList[8] = pu.cu->chromaList[5];
+    modeList[9] = pu.cu->chromaList[6];
+#endif
+    return;
+}
+#endif
   modeList[0] = PLANAR_IDX;
   modeList[1] = VER_IDX;
   modeList[2] = HOR_IDX;
@@ -5100,7 +5136,11 @@ uint32_t PU::getFinalIntraMode( const PredictionUnit &pu, const ChannelType &chT
   }
 #endif
 #if JVET_AC0071_DBV
+#if JVET_AH0136_CHROMA_REORDERING
+  if ((pu.cs->sps->getUseChromaReordering() && CS::isDualITree(*pu.cs) && (PU::isDbvMode(pu.intraDir[1]) && !isLuma(chType) && pu.cu->mvs[pu.intraDir[1] - DBV_CHROMA_IDX] == Mv())) || ((!CS::isDualITree(*pu.cs) || !pu.cs->sps->getUseChromaReordering()) && uiIntraMode == DBV_CHROMA_IDX && !isLuma(chType) && pu.bv == Mv()))
+#else
   if (uiIntraMode == DBV_CHROMA_IDX && !isLuma(chType) && pu.bv == Mv())
+#endif
   {
     uiIntraMode = PLANAR_IDX;
   }
@@ -5166,6 +5206,16 @@ uint32_t PU::getCoLocatedIntraLumaMode(const PredictionUnit &pu)
 #endif
 
 #if JVET_AC0071_DBV
+#if JVET_AH0136_CHROMA_REORDERING
+bool PU::isDbvMode(int mode)
+{
+  if (mode >= DBV_CHROMA_IDX && mode <= DBV_CHROMA_IDX9)
+  {
+    return true;
+  }
+  return false;
+}
+#endif
 bool PU::dbvModeAvail(const PredictionUnit &pu)
 {
 #if JVET_AF0066_ENABLE_DBV_4_SINGLE_TREE
@@ -5201,6 +5251,12 @@ void PU::deriveChromaBv(PredictionUnit &pu)
     return;
   }
 #endif
+#if JVET_AH0136_CHROMA_REORDERING
+  if (!pu.cs->sps->getUseIntraDBV())
+  {
+    return;
+  }
+#endif
   pu.bv.set(0, 0);
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   pu.mv[0].setZero();
@@ -5219,6 +5275,9 @@ void PU::deriveChromaBv(PredictionUnit &pu)
   lumaArea = clipArea(lumaArea, pu.cs->picture->block(COMPONENT_Y));
 
   Position posList[5] = { lumaArea.center(), lumaArea.topLeft(), lumaArea.topRight(), lumaArea.bottomLeft(), lumaArea.bottomRight() };
+#if JVET_AH0136_CHROMA_REORDERING
+  int cnt = 0;
+#endif
   for (int n = 0; n < NUM_DBV_POSITION; n++)
   {
     const PredictionUnit *lumaPU = pu.cs->picture->cs->getPU(posList[n], CHANNEL_TYPE_LUMA);
@@ -5243,18 +5302,43 @@ void PU::deriveChromaBv(PredictionUnit &pu)
       if (PU::checkIsChromaBvCandidateValid(pu, chromaBv))
 #endif
       {
-        pu.bv = lumaBv;
+#if JVET_AH0136_CHROMA_REORDERING
+        if (pu.cs->sps->getUseChromaReordering())
+        {
+          pu.cu->bvs[cnt] = lumaBv;
+          pu.cu->bvs[cnt].changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
+          pu.cu->mvs[cnt] = lumaBv;
+          pu.cu->rribcTypes[cnt] = lumaPU->cu->rribcFlipType;
+          cnt++;
+          if (cnt - 1 > 0)
+          {
+            for (int i = 0; i < cnt - 1; i++)
+            {
+              if (pu.cu->mvs[i] == lumaBv)
+              {
+                cnt--;
+              }
+            }
+          }
+        }
+        else
+        {
+#endif
+          pu.bv = lumaBv;
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
-        pu.bv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
-        pu.mv[0] = lumaBv;
+          pu.bv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
+          pu.mv[0] = lumaBv;
 #endif
 #if JVET_AA0070_RRIBC
-        pu.cu->rribcFlipType = lumaPU->cu->rribcFlipType;
+          pu.cu->rribcFlipType = lumaPU->cu->rribcFlipType;
 #endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
-        pu.intraDir[1] = bkIntraDir;
+          pu.intraDir[1] = bkIntraDir;
 #endif
-        return;
+          return;
+#if JVET_AH0136_CHROMA_REORDERING
+        }
+#endif
       }
 #if JVET_AE0169_BIPREDICTIVE_IBC
       if (CU::isIBC(*lumaPU->cu) && lumaPU->interDir == 3)
@@ -5273,13 +5357,38 @@ void PU::deriveChromaBv(PredictionUnit &pu)
         if (PU::checkIsChromaBvCandidateValid(pu, chromaBv))
 #endif
         {
+#if JVET_AH0136_CHROMA_REORDERING
+          if (pu.cs->sps->getUseChromaReordering())
+          {
+            pu.cu->bvs[cnt] = lumaBv;
+            pu.cu->bvs[cnt].changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
+            pu.cu->mvs[cnt] = lumaBv;
+            pu.cu->rribcTypes[cnt] = lumaPU->cu->rribcFlipType;
+            cnt++;
+            if (cnt - 1 > 0)
+            {
+              for (int i = 0; i < cnt - 1; i++)
+              {
+                if (pu.cu->mvs[i] == lumaBv)
+                {
+                  cnt--;
+                }
+              }
+            }
+          }
+          else
+          {
+#endif
 #if JVET_AA0070_RRIBC
-          pu.cu->rribcFlipType = lumaPU->cu->rribcFlipType;
+            pu.cu->rribcFlipType = lumaPU->cu->rribcFlipType;
 #endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
-          pu.intraDir[1] = bkIntraDir;
+            pu.intraDir[1] = bkIntraDir;
 #endif
-          return;
+            return;
+#if JVET_AH0136_CHROMA_REORDERING
+          }
+#endif
         }
       }
 #endif
@@ -5287,6 +5396,9 @@ void PU::deriveChromaBv(PredictionUnit &pu)
   }
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   pu.intraDir[1] = bkIntraDir;
+#endif
+#if JVET_AH0136_CHROMA_REORDERING
+  pu.cu->mvsNum = cnt;
 #endif
 }
 
@@ -5367,6 +5479,44 @@ bool PU::checkIsChromaBvCandidateValid(const PredictionUnit &pu
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   int roiWidth  = (isRefTemplate && !isRefAbove) ? DBV_TEMPLATE_SIZE : pu.Cb().width;
   int roiHeight = (isRefTemplate && isRefAbove ) ? DBV_TEMPLATE_SIZE : pu.Cb().height;
+  uint32_t validType = checkValidBv(pu, COMPONENT_Cb, roiWidth, roiHeight, mv, true, filterIdx);
+  return validType != IBC_BV_INVALID;
+#else
+  const int cuPelX = pu.Cb().x;
+  const int cuPelY = pu.Cb().y;
+  int roiWidth = (isRefTemplate && !isRefAbove) ? DBV_TEMPLATE_SIZE : pu.Cb().width;
+  int roiHeight = (isRefTemplate && isRefAbove) ? DBV_TEMPLATE_SIZE : pu.Cb().height;
+  int xPred = chromaBv.getHor();
+  int yPred = chromaBv.getVer();
+  if ((xPred + roiWidth) > 0 && (yPred + roiHeight) > 0)
+  {
+    return false;
+  }
+  int refRightX = cuPelX + xPred + roiWidth - 1;
+  int refLeftX = cuPelX + xPred;
+  int refBottomY = cuPelY + yPred + roiHeight - 1;
+  int refTopY = cuPelY + yPred;
+  const Position refPosLT(refLeftX, refTopY);
+  const Position refPosBR(refRightX, refBottomY);
+  if (!pu.cs->isDecomp(refPosBR, pu.chType))
+  {
+    return false;
+  }
+  if (!pu.cs->isDecomp(refPosLT, pu.chType))
+  {
+    return false;
+  }
+  return true;
+#endif
+}
+#endif
+
+#if JVET_AH0136_CHROMA_REORDERING
+bool PU::checkIsChromaBvCandidateValidChromaTm(const PredictionUnit &pu, const Mv mv, int filterIdx, bool isRefTemplate, bool isRefAbove)
+{
+#if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+  int roiWidth = (isRefTemplate && !isRefAbove) ? 2 : pu.Cb().width;
+  int roiHeight = (isRefTemplate && isRefAbove) ? 2 : pu.Cb().height;
   uint32_t validType = checkValidBv(pu, COMPONENT_Cb, roiWidth, roiHeight, mv, true, filterIdx);
   return validType != IBC_BV_INVALID;
 #else
@@ -8070,8 +8220,20 @@ bool PU::searchBv(const PredictionUnit& pu, int xPos, int yPos, int width, int h
 
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
 #if JVET_AC0071_DBV
-  const bool isDBV     = (pu.cs->slice->getSliceType() == I_SLICE && CS::isDualITree(*pu.cs) && pu.cu->slice->getSPS()->getUseIntraDBV())
-                      && compID != COMPONENT_Y && pu.intraDir[1] == DBV_CHROMA_IDX;
+  const bool isDBV = (pu.cs->slice->getSliceType() == I_SLICE && CS::isDualITree(*pu.cs) && pu.cu->slice->getSPS()->getUseIntraDBV())
+    && compID != COMPONENT_Y &&
+#if JVET_AH0136_CHROMA_REORDERING
+    PU::isDbvMode(pu.intraDir[1]);
+#else
+    pu.intraDir[1] == DBV_CHROMA_IDX;
+#endif
+#endif
+#if JVET_AH0136_CHROMA_REORDERING && JVET_AC0071_DBV
+  bool isLumaDbv = false;
+  if (pu.cs->sps->getUseChromaReordering() && compID == COMPONENT_Y && PU::isDbvMode(pu.intraDir[1]) && CS::isDualITree(*pu.cs))
+  {
+    isLumaDbv = true;
+  }
 #endif
   const int szShiftHor = ::getComponentScaleX(compID, pu.chromaFormat);
   const int szShiftVer = ::getComponentScaleY(compID, pu.chromaFormat);
@@ -8134,6 +8296,20 @@ bool PU::searchBv(const PredictionUnit& pu, int xPos, int yPos, int width, int h
   {
     return false;
   }
+#if JVET_AH0136_CHROMA_REORDERING && JVET_AC0071_DBV
+  if (isLumaDbv)
+  {
+    if (refBottomY >> ctuSizeLog2 > yPos >> ctuSizeLog2)
+    {
+      return false;
+    }
+    if ((refRightX >> ctuSizeLog2 > xPos >> ctuSizeLog2) && (refBottomY >> ctuSizeLog2 == yPos >> ctuSizeLog2))
+    {
+      return false;
+    }
+    return true;
+  }
+#endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   if (refRightX >= xPos && refBottomY >= yPos)
 #else
@@ -29306,7 +29482,13 @@ uint32_t PU::getFinalIntraModeForTransform( const TransformUnit &tu, const Compo
   }
 #endif
 #if JVET_AC0071_DBV
-  if (compID != COMPONENT_Y && intraMode == DBV_CHROMA_IDX)
+  if (compID != COMPONENT_Y 
+#if JVET_AH0136_CHROMA_REORDERING
+    && PU::isDbvMode(intraMode)
+#else
+    && intraMode == DBV_CHROMA_IDX
+#endif
+    )
   {
     intraMode = PLANAR_IDX;
   }

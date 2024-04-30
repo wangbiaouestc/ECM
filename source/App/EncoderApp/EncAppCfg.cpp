@@ -1154,6 +1154,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_AD0085_MPM_SORTING
   ( "MPMSorting",                                     m_mpmSorting,                                      true,  "Enable template-based intra MPM list construction\n" )
 #endif
+#if JVET_AH0136_CHROMA_REORDERING
+  ("ChromaReordering",                                m_chromaReordering,                                true, "Enable template-based intra chroma list reordering\n")
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   ( "CCCM",                                           m_cccm,                                               2,  "CCCM mode (0:off, 1:on, 2:on subsampling and no subsampling)  [default: 2]")
 #endif
@@ -4093,6 +4096,13 @@ bool EncAppCfg::xCheckParameter()
       m_mpmSorting = false;
     }
 #endif
+#if JVET_AH0136_CHROMA_REORDERING
+    if (m_chromaReordering)
+    {
+      msg(WARNING, "ChromaReordering is forcefully disabled since the enable flag of non-inter-TM tools is set off. \n");
+      m_chromaReordering = false;
+    }
+#endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
     if (m_tmibc)
     {
@@ -5787,6 +5797,9 @@ void EncAppCfg::xPrintParameter()
 #if JVET_AD0085_MPM_SORTING && !JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
   msg(VERBOSE, "MPMSorting:%d ", m_mpmSorting);
 #endif
+#if JVET_AH0136_CHROMA_REORDERING && !JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  msg(VERBOSE, "ChromaReordering:%d ", m_chromaReordering);
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   msg(VERBOSE, "CCCM:%d ", m_cccm);
 #endif
@@ -5839,6 +5852,9 @@ void EncAppCfg::xPrintParameter()
 #endif
 #if JVET_AD0085_MPM_SORTING
   msg(VERBOSE, "MPMsorting:%d ", m_mpmSorting);
+#endif
+#if JVET_AH0136_CHROMA_REORDERING
+  msg(VERBOSE, "ChromaReordering:%d ", m_chromaReordering);
 #endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   msg(VERBOSE, "TM-IBC:%d ", m_tmibc);

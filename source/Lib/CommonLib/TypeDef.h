@@ -206,6 +206,7 @@
 #define JVET_AG0059_CCP_MERGE_ENHANCEMENT                 1 // JVET-AG0059: Enhancements on CCP merge for chroma intra coding
 #define JVET_AH0065_RELAX_LINE_BUFFER                     1 // JVET-AH0065: Relaxing line buffer restriction
 #define JVET_AH0086_EIP_BIAS_AND_CLIP                     1 // JVET-AH0086: EIP with bias and clipping
+#define JVET_AH0136_CHROMA_REORDERING                     1 // JVET-AH0136: Non-CCP intra chroma mode reordering
 
 //IBC
 #define JVET_Y0058_IBC_LIST_MODIFY                        1 // JVET-Y0058: Modifications of IBC merge/AMVP list construction, ARMC-TM-IBC part is included under JVET_W0090_ARMC_TM

@@ -2923,10 +2923,14 @@ void CABACReader::intra_chroma_pred_mode(PredictionUnit& pu)
       pu.intraDir[1] = DBV_CHROMA_IDX;
       if (PU::hasChromaFusionFlag(pu, pu.intraDir[1]))
       {
+#if JVET_AH0136_CHROMA_REORDERING
+        intraChromaFusionMode(pu);
+#else
         if (m_BinDecoder.decodeBin(Ctx::ChromaFusionMode()) == 1)
         {
           pu.isChromaFusion = true;
         }
+#endif
       }
       DTRACE(g_trace_ctx, D_SYNTAX, "intra_chroma_pred_modes() pos=(%d,%d) dir=%d\n",
         pu.blocks[CHANNEL_TYPE_CHROMA].x, pu.blocks[CHANNEL_TYPE_CHROMA].y, pu.intraDir[CHANNEL_TYPE_CHROMA]);
@@ -2998,7 +3002,10 @@ void CABACReader::intra_chroma_pred_mode(PredictionUnit& pu)
 #endif
   }
 #endif
-
+#if JVET_AH0136_CHROMA_REORDERING
+  pu.intraDir[1] = PLANAR_IDX;
+  pu.candId = candId;
+#else
   unsigned chromaCandModes[NUM_CHROMA_MODE];
   PU::getIntraChromaCandModes(pu, chromaCandModes);
 
@@ -3012,6 +3019,7 @@ void CABACReader::intra_chroma_pred_mode(PredictionUnit& pu)
   pu.intraDir[1] = chromaCandModes[candId];
 #if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
   pu.candId = candId;
+#endif
 #endif
 }
 

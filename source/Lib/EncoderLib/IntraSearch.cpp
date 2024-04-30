@@ -3688,6 +3688,12 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
       IntraPrediction::deriveDimdChromaMode(cs.picture->getRecoBuf(lumaArea), cs.picture->getRecoBuf(areaCb), cs.picture->getRecoBuf(areaCr), lumaArea, areaCb, areaCr, *pu.cu);
 #endif
 #endif
+#if JVET_AH0136_CHROMA_REORDERING && ENABLE_DIMD && JVET_Z0050_DIMD_CHROMA_FUSION
+      if (!cu.slice->getSPS()->getUseDimd() && cu.cs->sps->getUseChromaReordering())
+      {
+        uiMaxMode--;
+      }
+#endif
 #if JVET_AC0071_DBV
       if (PU::hasChromaBvFlag(pu))
       {
@@ -3773,11 +3779,19 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
       }
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
 #if JVET_AC0071_DBV
+#if JVET_AH0136_CHROMA_REORDERING
+      bool modeIsEnable[NUM_INTRA_MODE + 3 + 9]; // use intra mode idx to check whether enable
+      for (int i = 0; i < NUM_INTRA_MODE + 3 + 9; i++)
+      {
+        modeIsEnable[i] = 1;
+      }
+#else
       bool modeIsEnable[NUM_INTRA_MODE + 3]; // use intra mode idx to check whether enable
       for (int i = 0; i < NUM_INTRA_MODE + 3; i++)
       {
         modeIsEnable[i] = 1;
       }
+#endif
 #else
       bool modeIsEnable[NUM_INTRA_MODE + 2]; // use intra mode idx to check whether enable
       for (int i = 0; i < NUM_INTRA_MODE + 2; i++)
@@ -3946,17 +3960,51 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
         {
           continue;
         }
-        if ((mode == LM_CHROMA_IDX) || (mode == PLANAR_IDX) || (mode == DM_CHROMA_IDX)
+#if JVET_AH0136_CHROMA_REORDERING
+        if (CS::isDualITree(*pu.cs) && cu.cs->sps->getUseChromaReordering())
+        {
+          if ((mode == LM_CHROMA_IDX) || mode == pu.cu->chromaList[0] || mode == pu.cu->chromaList[1]) 
+          {
+            continue;
+          }
+#if ENABLE_DIMD && JVET_Z0050_DIMD_CHROMA_FUSION
+#if JVET_AC0071_DBV
+          if ((cu.slice->getSPS()->getUseDimd() && (mode == pu.cu->chromaList[2] || (PU::hasChromaBvFlag(pu) && mode == pu.cu->chromaList[3]))) || (!cu.slice->getSPS()->getUseDimd() && (PU::hasChromaBvFlag(pu) && mode == pu.cu->chromaList[2])))
+          {
+            continue;
+          }
+#else
+          if ((cu.slice->getSPS()->getUseDimd() && mode == pu.cu->chromaList[2]))
+          {
+            continue;
+          }
+#endif
+#else
+#if JVET_AC0071_DBV
+          if (PU::hasChromaBvFlag(pu) && mode == pu.cu->chromaList[2])
+          {
+            continue;
+          }
+#endif
+#endif
+        }
+        else
+        {
+#endif
+          if ((mode == LM_CHROMA_IDX) || (mode == PLANAR_IDX) || (mode == DM_CHROMA_IDX)
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
-          || (mode == DIMD_CHROMA_IDX)
+            || (mode == DIMD_CHROMA_IDX)
 #endif
 #if JVET_AC0071_DBV
-          || (mode == DBV_CHROMA_IDX)
+            || (mode == DBV_CHROMA_IDX)
 #endif
-          ) // only pre-check regular modes and MDLM modes, not including DM, DIMD, Planar, and LM
-        {
-          continue;
+            ) // only pre-check regular modes and MDLM modes, not including DM, DIMD, Planar, and LM
+          {
+            continue;
+          }
+#if JVET_AH0136_CHROMA_REORDERING
         }
+#endif
         pu.intraDir[1] = mode; // temporary assigned, for SATD checking.
 
         int64_t sad = 0;
@@ -3982,8 +4030,29 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
         }
         else
         {
-          initPredIntraParams(pu, pu.Cb(), *pu.cs->sps);
-          predIntraAng(COMPONENT_Cb, predCb, pu);
+#if JVET_AH0136_CHROMA_REORDERING && JVET_AC0071_DBV
+          if (cu.cs->sps->getUseChromaReordering() && CS::isDualITree(cs) && PU::isDbvMode(mode))
+          {
+            pu.bv = cu.bvs[mode - DBV_CHROMA_IDX];
+            pu.mv[0] = cu.mvs[mode - DBV_CHROMA_IDX];
+            pu.cu->rribcFlipType = cu.rribcTypes[mode - DBV_CHROMA_IDX];
+            predIntraDbv(COMPONENT_Cb, predCb, pu, pcInterPred);
+            if (pu.cu->rribcFlipType)
+            {
+              predCb.flipSignal(pu.cu->rribcFlipType == 1);
+            }
+            pu.bv.setZero();
+            pu.mv[0].setZero();
+            pu.cu->rribcFlipType = 0;
+          }
+          else
+          {
+#endif
+            initPredIntraParams(pu, pu.Cb(), *pu.cs->sps);
+            predIntraAng(COMPONENT_Cb, predCb, pu);
+#if JVET_AH0136_CHROMA_REORDERING
+          }
+#endif
         }
         sadCb = distParamSad.distFunc(distParamSad) * 2;
         satdCb = distParamSatd.distFunc(distParamSatd);
@@ -4001,12 +4070,39 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
         }
         else
         {
-          initPredIntraParams(pu, pu.Cr(), *pu.cs->sps);
-          predIntraAng(COMPONENT_Cr, predCr, pu);
+#if JVET_AH0136_CHROMA_REORDERING && JVET_AC0071_DBV
+          if (cu.cs->sps->getUseChromaReordering() && CS::isDualITree(cs) && PU::isDbvMode(mode))
+          {
+            pu.bv = cu.bvs[mode - DBV_CHROMA_IDX];
+            pu.mv[0] = cu.mvs[mode - DBV_CHROMA_IDX];
+            pu.cu->rribcFlipType = cu.rribcTypes[mode - DBV_CHROMA_IDX];
+            predIntraDbv(COMPONENT_Cr, predCr, pu, pcInterPred);
+            if (pu.cu->rribcFlipType)
+            {
+              predCr.flipSignal(pu.cu->rribcFlipType == 1);
+            }
+            pu.bv.setZero();
+            pu.mv[0].setZero();
+            pu.cu->rribcFlipType = 0;
+          }
+          else
+          {
+#endif
+            initPredIntraParams(pu, pu.Cr(), *pu.cs->sps);
+            predIntraAng(COMPONENT_Cr, predCr, pu);
+#if JVET_AH0136_CHROMA_REORDERING
+          }
+#endif
         }
         sadCr = distParamSad.distFunc(distParamSad) * 2;
         satdCr = distParamSatd.distFunc(distParamSatd);
         sad += std::min(sadCr, satdCr);
+#if JVET_AH0136_CHROMA_REORDERING && JVET_AC0071_DBV
+        if (cu.cs->sps->getUseChromaReordering() && CS::isDualITree(*pu.cs) && PU::isDbvMode(mode) && cu.mvs[mode - DBV_CHROMA_IDX] == Mv())
+        {
+          sad = INT64_MAX;
+        }
+#endif
         satdSortedCost[idx] = sad;
 #if JVET_AD0120_LBCCP && MMLM
         if(mode == MMLM_CHROMA_IDX)
@@ -4873,7 +4969,11 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
         if (uiMode < 0)
         {
             cu.bdpcmModeChroma = -uiMode;
+#if JVET_AH0136_CHROMA_REORDERING
+            chromaIntraMode = cu.bdpcmModeChroma == 2 ? VER_IDX : HOR_IDX;
+#else
             chromaIntraMode = cu.bdpcmModeChroma == 2 ? chromaCandModes[1] : chromaCandModes[2];
+#endif
         }
         else
         {
@@ -4895,7 +4995,11 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
           }
 #endif
 #if JVET_AC0071_DBV
+#if JVET_AH0136_CHROMA_REORDERING
+          if (PU::isDbvMode(chromaIntraMode) && !PU::hasChromaBvFlag(pu))
+#else
           if (chromaIntraMode == DBV_CHROMA_IDX && !PU::hasChromaBvFlag(pu))
+#endif
           {
             continue;
           }
@@ -5119,6 +5223,9 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
 #endif
 
 #if JVET_Z0050_DIMD_CHROMA_FUSION
+#if JVET_AH0136_CHROMA_REORDERING
+      cs.setDecomp(pu.Cb(), false);
+#endif
 #if JVET_AC0119_LM_CHROMA_FUSION
       uint32_t uiFusionModeNum = 2;
 #if MMLM
@@ -5167,8 +5274,25 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
         if (PU::hasChromaFusionFlag(pu, chromaIntraMode))
         {
           pu.intraDir[1] = chromaIntraMode;
-          if (!xCflmCreateChromaPred(pu, COMPONENT_Cb, predStorage[uiMode].Cb()) ||
-            !xCflmCreateChromaPred(pu, COMPONENT_Cr, predStorage[uiMode].Cr()))
+#if JVET_AH0136_CHROMA_REORDERING && JVET_AC0071_DBV
+          if (cu.cs->sps->getUseChromaReordering() && PU::isDbvMode(pu.intraDir[1]) && CS::isDualITree(cs))
+          {
+            pu.bv = cu.bvs[pu.intraDir[1] - DBV_CHROMA_IDX];
+            pu.mv[0] = cu.mvs[pu.intraDir[1] - DBV_CHROMA_IDX];
+            pu.cu->rribcFlipType = cu.rribcTypes[pu.intraDir[1] - DBV_CHROMA_IDX];
+          }
+#endif
+          if (!xCflmCreateChromaPred(pu, COMPONENT_Cb, predStorage[uiMode].Cb()
+#if JVET_AH0136_CHROMA_REORDERING
+            , pcInterPred
+#endif
+          ) ||
+            !xCflmCreateChromaPred(pu, COMPONENT_Cr, predStorage[uiMode].Cr()
+#if JVET_AH0136_CHROMA_REORDERING
+              , pcInterPred
+#endif
+            ))
+
           {
             break;
           }
@@ -5184,8 +5308,17 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
 
             fusionStorage[idx].Cb().copyFrom( predStorage[uiMode].Cb() );
             fusionStorage[idx].Cr().copyFrom( predStorage[uiMode].Cr() );
-            geneChromaFusionPred(COMPONENT_Cb, fusionStorage[idx].Cb(), pu);
-            geneChromaFusionPred(COMPONENT_Cr, fusionStorage[idx].Cr(), pu);
+
+            geneChromaFusionPred(COMPONENT_Cb, fusionStorage[idx].Cb(), pu
+#if JVET_AH0136_CHROMA_REORDERING
+              , pcInterPred
+#endif
+            );
+            geneChromaFusionPred(COMPONENT_Cr, fusionStorage[idx].Cr(), pu
+#if JVET_AH0136_CHROMA_REORDERING
+              , pcInterPred
+#endif
+            );
 
             distParamSadCb.cur = fusionStorage[idx].Cb();
             distParamSatdCb.cur = fusionStorage[idx].Cb();
@@ -5337,6 +5470,9 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
       pu.curCand = {};
 #endif
 #endif
+#if JVET_AH0136_CHROMA_REORDERING
+      cs.setDecomp(pu.Cb(), false);
+#endif
 
 #if JVET_Z0050_CCLM_SLOPE
 #if MMLM
@@ -5436,6 +5572,10 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
 #endif
 #if JVET_AD0188_CCP_MERGE
               ccpModelBest    = pu.curCand;
+#endif
+              isChromaFusion = pu.isChromaFusion;
+#if JVET_AA0126_GLM
+              bestGlmIdc = pu.glmIdc;
 #endif
             }
           }
@@ -8226,6 +8366,9 @@ void IntraSearch::xEncIntraHeader( CodingStructure &cs, Partitioner &partitioner
     if( isFirst )
     {
       m_CABACEstimator->bdpcm_mode( cu, ComponentID(CHANNEL_TYPE_CHROMA) );
+#if JVET_AH0136_CHROMA_REORDERING
+      if (!cu.bdpcmModeChroma)
+#endif
       m_CABACEstimator->intra_chroma_pred_mode( pu );
     }
   }
@@ -9318,7 +9461,11 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
     }
   }
 #if JVET_AC0071_DBV && JVET_AA0070_RRIBC
+#if JVET_AH0136_CHROMA_REORDERING
+  if (compID != COMPONENT_Y && PU::isDbvMode(uiChFinalMode) && pu.cu->rribcFlipType)
+#else
   if (compID != COMPONENT_Y && uiChFinalMode == DBV_CHROMA_IDX && pu.cu->rribcFlipType)
+#endif
   {
     cs.getRecoBuf(area).flipSignal(pu.cu->rribcFlipType == 1);
     if (jointCbCr)
@@ -11533,12 +11680,23 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
     // Do predictions here to avoid repeating the "default0Save1Load2" stuff
     int  predMode   = pu.cu->bdpcmModeChroma ? BDPCM_IDX : PU::getFinalIntraMode(pu, CHANNEL_TYPE_CHROMA);
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AC0071_DBV
+#if JVET_AH0136_CHROMA_REORDERING
+    if (!PU::isDbvMode(predMode) || pu.isChromaFusion > 0)
+#else
     if (predMode != DBV_CHROMA_IDX)
+#endif
     {
       cs.setDecomp(currArea.Cb(), true); // set in advance (required for Cb2/Cr2 in 4:2:2 video)
     }
 #endif
-
+#if JVET_AH0136_CHROMA_REORDERING && JVET_AC0071_DBV
+    if (pu.cs->sps->getUseChromaReordering() && PU::isDbvMode(predMode) && CS::isDualITree(cs))
+    {
+      pu.bv = pu.cu->bvs[predMode - DBV_CHROMA_IDX];
+      pu.mv[0] = pu.cu->mvs[predMode - DBV_CHROMA_IDX];
+      pu.cu->rribcFlipType = pu.cu->rribcTypes[predMode - DBV_CHROMA_IDX];
+    }
+#endif
     PelBuf piPredCb = cs.getPredBuf(cbArea);
     PelBuf piPredCr = cs.getPredBuf(crArea);
 
@@ -11669,7 +11827,11 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
       {
 #endif
 #if JVET_AC0071_DBV
+#if JVET_AH0136_CHROMA_REORDERING
+      if (PU::isDbvMode(predMode))
+#else
       if (predMode == DBV_CHROMA_IDX)
+#endif
       {
         predIntraDbv(COMPONENT_Cb, piPredCb, pu
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
@@ -11682,6 +11844,9 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
 #endif
         );
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AC0071_DBV
+#if JVET_AH0136_CHROMA_REORDERING
+        if (pu.isChromaFusion == 0)
+#endif
         cs.setDecomp(currArea.Cb(), true); // set in advance (required for Cb2/Cr2 in 4:2:2 video)
 #endif
       }
@@ -11696,8 +11861,16 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
 #if JVET_Z0050_DIMD_CHROMA_FUSION
       if (pu.isChromaFusion)
       {
-        geneChromaFusionPred(COMPONENT_Cb, piPredCb, pu);
-        geneChromaFusionPred(COMPONENT_Cr, piPredCr, pu);
+        geneChromaFusionPred(COMPONENT_Cb, piPredCb, pu
+#if JVET_AH0136_CHROMA_REORDERING
+          , pcInterPred
+#endif
+        );
+        geneChromaFusionPred(COMPONENT_Cr, piPredCr, pu
+#if JVET_AH0136_CHROMA_REORDERING
+          , pcInterPred
+#endif
+        );
       }
 #endif
 #if JVET_AC0119_LM_CHROMA_FUSION
@@ -11710,7 +11883,11 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
     PelBuf resiCb  = cs.getResiBuf(cbArea);
     PelBuf resiCr  = cs.getResiBuf(crArea);
 #if JVET_AC0071_DBV && JVET_AA0070_RRIBC
+#if JVET_AH0136_CHROMA_REORDERING
+    if (PU::isDbvMode(predMode) && currTU.cu->rribcFlipType)
+#else
     if (predMode == DBV_CHROMA_IDX && currTU.cu->rribcFlipType)
+#endif
     {
       resiCb.copyFrom(cs.getOrgBuf(cbArea));
       resiCr.copyFrom(cs.getOrgBuf(crArea));

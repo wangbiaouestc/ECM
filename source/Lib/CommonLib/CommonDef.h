@@ -659,8 +659,24 @@ static const int MDLM_T_IDX =                          LM_CHROMA_IDX + 2; ///< M
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
 static const int DIMD_CHROMA_IDX =                     NUM_INTRA_MODE; ///< chroma mode index for derived by DIMD method
 #if JVET_AC0071_DBV
+#if JVET_AH0136_CHROMA_REORDERING
+static const int DBV_CHROMA_IDX = NUM_INTRA_MODE + 1;
+static const int DBV_CHROMA_IDX1 = NUM_INTRA_MODE + 2;
+static const int DBV_CHROMA_IDX2 = NUM_INTRA_MODE + 3;
+static const int DBV_CHROMA_IDX3 = NUM_INTRA_MODE + 4;
+static const int DBV_CHROMA_IDX4 = NUM_INTRA_MODE + 5;
+static const int DBV_CHROMA_IDX5 = NUM_INTRA_MODE + 6;
+static const int DBV_CHROMA_IDX6 = NUM_INTRA_MODE + 7;
+static const int DBV_CHROMA_IDX7 = NUM_INTRA_MODE + 8;
+static const int DBV_CHROMA_IDX8 = NUM_INTRA_MODE + 9;
+static const int DBV_CHROMA_IDX9 = NUM_INTRA_MODE + 10;
+static const int DM_CHROMA_IDX = NUM_INTRA_MODE + 11; ///< chroma mode index for derived from luma intra mode
+static const int NUM_CHROMA_TM_LINES_IN_REORDERING = 1;
+static const int NUM_CHROMA_LIST_MODE = 7 + 4 + 5 + 10; /// 7 orginal modes + 4 collocated modes + 5 neighboring modes + 10 DBV modes
+#else
 static const int DBV_CHROMA_IDX = NUM_INTRA_MODE + 1;
 static const int DM_CHROMA_IDX = NUM_INTRA_MODE + 2; ///< chroma mode index for derived from luma intra mode
+#endif
 #else
 static const int DM_CHROMA_IDX =                       NUM_INTRA_MODE + 1; ///< chroma mode index for derived from luma intra mode
 #endif
