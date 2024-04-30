@@ -192,6 +192,9 @@ namespace CU
 #if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
   bool isGeoBlendAvailable(const CodingUnit& cu);
 #endif
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  bool interCcpMergeZeroRootCbfAllowed(const CodingUnit& cu);
+#endif
 }
 // PU tools
 namespace PU

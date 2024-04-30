@@ -6198,6 +6198,28 @@ const CtxSet ContextSetCfg::InterCccmFlag = ContextSetCfg::addCtxSet({
 #if JVET_AF0073_INTER_CCP_MERGE
 const CtxSet ContextSetCfg::InterCcpMergeFlag = ContextSetCfg::addCtxSet({
 // ctx 1585 1585
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+ { 40,  CNU,},
+ { 40,  CNU,},
+ { 35,  CNU,},
+ { 40,  CNU,},
+ {  5,  DWS,},
+ {  2,  DWS,},
+ {  8,  DWS,},
+ {  5,  DWS,},
+ { 25,  DWE,},
+ { 18,  DWE,},
+ { 18,  DWE,},
+ { 25,  DWE,},
+ { 99,  DWO,},
+ { 98,  DWO,},
+ {115,  DWO,},
+ {162,  DWO,},
+ {119,  DWO,},
+ {119,  DWO,},
+ { 99,  DWO,},
+ {114,  DWO,},
+#else
  {  40 },
  {  40 },
  {  35 },
@@ -6218,7 +6240,34 @@ const CtxSet ContextSetCfg::InterCcpMergeFlag = ContextSetCfg::addCtxSet({
  { 119 },
  {  99 },
  { 114 },
+#endif
 });
+#endif
+
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+const CtxSet ContextSetCfg::InterCcpMergeZeroRootCbfIdc = ContextSetCfg::addCtxSet
+({
+  { CNU, CNU, },
+  { CNU, CNU, },
+  { CNU, CNU, },
+  { CNU, CNU, },
+  { DWS, DWS, },
+  { DWS, DWS, },
+  { DWS, DWS, },
+  { DWS, DWS, },
+  { DWE, DWE, },
+  { DWE, DWE, },
+  { DWE, DWE, },
+  { DWE, DWE, },
+  { DWO, DWO, },
+  { DWO, DWO, },
+  { DWO, DWO, },
+  { DWO, DWO, },
+  { DWO, DWO, },
+  { DWO, DWO, },
+  { DWO, DWO, },
+  { DWO, DWO, },
+  });
 #endif
 
 #if JVET_AG0058_EIP

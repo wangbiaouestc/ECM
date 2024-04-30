@@ -622,7 +622,12 @@ protected:
 #if JVET_AF0073_INTER_CCP_MERGE
   bool m_interCcpMerge; ///< Cross-component prediction merge for inter prediction
   int  m_interCcpMergeFastMode;
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  bool m_interCcpMergeZeroLumaCbf;
+  int m_interCcpMergeZeroLumaCbfFastMode;
 #endif
+#endif
+
 #if JVET_AE0100_BVGCCCM
   bool m_bvgCccm; ///< Block vector guided CCCM
 #endif

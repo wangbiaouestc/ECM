@@ -2656,6 +2656,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_AG0058_EIP
   READ_FLAG(uiCode, "sps_eip_enabled_flag");                        pcSPS->setUseEip(uiCode != 0);
 #endif
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  READ_FLAG(uiCode, "sps_inter_ccp_merge_zero_luma_cbf");           pcSPS->setUseInterCcpMergeZeroLumaCbf( uiCode != 0 );
+#endif
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
   if (pcSPS->getTMnoninterToolsEnableFlag())
   {

@@ -46,6 +46,9 @@
 #include "CommonLib/BitStream.h"
 #include "DecCu.h"
 #include "CABACReader.h"
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+using namespace std;
+#endif
 
 //! \ingroup DecoderLib
 //! \{

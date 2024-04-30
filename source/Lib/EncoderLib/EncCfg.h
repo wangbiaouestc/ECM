@@ -1044,7 +1044,12 @@ protected:
 #if JVET_AF0073_INTER_CCP_MERGE
   bool m_interCcpMerge;
   int  m_interCcpMergeFastMode;
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  bool m_interCcpMergeZeroLumaCbf;
+  int m_interCcpMergeZeroLumaCbfFastMode;
 #endif
+#endif
+
 #if JVET_AE0100_BVGCCCM
   bool m_bvgCccm;
 #endif
@@ -1865,7 +1870,14 @@ public:
   bool getUseInterCcpMerge() const { return m_interCcpMerge; }
   void setInterCcpMergeFastMode(int currMode) { m_interCcpMergeFastMode = currMode; }
   int  getInterCcpMergeFastMode() const { return m_interCcpMergeFastMode; }
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  void setUseInterCcpMergeZeroLumaCbf(bool b) { m_interCcpMergeZeroLumaCbf = b; }
+  bool getUseInterCcpMergeZeroLumaCbf() const { return m_interCcpMergeZeroLumaCbf; }
+  void setInterCcpMergeZeroLumaCbfFastMode(int currMode) { m_interCcpMergeZeroLumaCbfFastMode = currMode; }
+  bool getInterCcpMergeZeroLumaCbfFastMode() const { return m_interCcpMergeZeroLumaCbfFastMode; }
 #endif
+#endif
+
 #if JVET_V0094_BILATERAL_FILTER
   void      setUseBIF                       ( bool b )       { m_BIF = b; }
   bool      getUseBIF                       ()         const { return m_BIF; }

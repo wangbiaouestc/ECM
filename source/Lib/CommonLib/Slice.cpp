@@ -224,7 +224,6 @@ void Slice::initSlice()
   m_biDirPred = false;
   m_symRefIdx[0] = -1;
   m_symRefIdx[1] = -1;
-
   for (uint32_t component = 0; component < MAX_NUM_COMPONENT; component++)
   {
     m_iSliceChromaQpDelta[component] = 0;

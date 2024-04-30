@@ -1239,7 +1239,6 @@ void CABACReader::cu_skip_flag( CodingUnit& cu )
     cu.rootCbf = false;
     cu.predMode = MODE_INTRA;
     cu.mmvdSkip = false;
-
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
     if( !cu.slice->getSPS()->getUseIbcMerge() )
     {
@@ -1350,6 +1349,12 @@ void CABACReader::cu_skip_flag( CodingUnit& cu )
     cu.rootCbf  = false;
     cu.predMode = MODE_INTER;
   }
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  if (skip && CU::interCcpMergeZeroRootCbfAllowed(cu))
+  {
+    inter_ccp_merge_root_cbf_zero(cu);
+  }
+#endif
 }
 
 void CABACReader::imv_mode( CodingUnit& cu, MergeCtx& mrgCtx )
@@ -3035,6 +3040,13 @@ void CABACReader::cu_residual( CodingUnit& cu, Partitioner &partitioner, CUCtx& 
     {
       cu.colorTransform = false;
       cu.cs->addEmptyTUs( partitioner );
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+      cu.interCcpMergeZeroRootCbfIdc = 0;
+      if (CU::interCcpMergeZeroRootCbfAllowed(cu))
+      {
+        inter_ccp_merge_root_cbf_zero(cu);
+      }
+#endif
       return;
     }
   }
@@ -3110,6 +3122,15 @@ void CABACReader::rqt_root_cbf( CodingUnit& cu )
   cu.rootCbf = ( m_BinDecoder.decodeBin( Ctx::QtRootCbf() ) );
   DTRACE( g_trace_ctx, D_SYNTAX, "rqt_root_cbf() ctx=0 root_cbf=%d pos=(%d,%d)\n", cu.rootCbf ? 1 : 0, cu.lumaPos().x, cu.lumaPos().y );
 }
+
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+void CABACReader::inter_ccp_merge_root_cbf_zero(CodingUnit &cu)
+{
+  cu.interCcpMergeZeroRootCbfIdc = unary_max_symbol(Ctx::InterCcpMergeZeroRootCbfIdc(0), Ctx::InterCcpMergeZeroRootCbfIdc(1),
+    MAX_CCP_MERGE_WEIGHT_IDX);
+  DTRACE(g_trace_ctx, D_SYNTAX, "inter_ccp_merge_root_cbf_zero() pos=(%d,%d) inter_ccp_merge_root_cbf_zero_flag=%d\n", cu.blocks[cu.chType].x, cu.blocks[cu.chType].y, cu.interCcpMergeZeroRootCbfIdc);
+}
+#endif
 
 void CABACReader::adaptive_color_transform(CodingUnit& cu)
 {
@@ -8264,6 +8285,7 @@ void CABACReader::transform_unit(TransformUnit& tu, CUCtx& cuCtx, Partitioner& p
     TU::setCbfAtDepth(tu, COMPONENT_Cb, trDepth, (chromaCbfs.Cb ? 1 : 0));
     TU::setCbfAtDepth(tu, COMPONENT_Cr, trDepth, (chromaCbfs.Cr ? 1 : 0));
   }
+
   bool lumaOnly  = (cu.chromaFormat == CHROMA_400 || !tu.blocks[COMPONENT_Cb].valid());
   bool cbfLuma   = (tu.cbf[COMPONENT_Y] != 0);
   bool cbfChroma = (lumaOnly ? false : (chromaCbfs.Cb || chromaCbfs.Cr));
@@ -10021,7 +10043,11 @@ void CABACReader::interCcpMerge(TransformUnit& tu)
 {
   if (TU::interCcpMergeAllowed(tu))
   {
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+    tu.interCcpMerge = m_BinDecoder.decodeBin(Ctx::InterCcpMergeFlag(tu.cbf[COMPONENT_Y] ? 0 : 1));
+#else
     tu.interCcpMerge = m_BinDecoder.decodeBin(Ctx::InterCcpMergeFlag(0));
+#endif
     DTRACE(g_trace_ctx, D_SYNTAX, "inter_ccp_merge() pos=(%d,%d) inter_ccp_merge_flag=%d\n", tu.blocks[tu.chType].x, tu.blocks[tu.chType].y, tu.interCcpMerge);
   }
 }

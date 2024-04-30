@@ -270,6 +270,7 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
         }
 #endif
       }
+
       switch( currCU.predMode )
       {
       case MODE_INTER:
@@ -566,7 +567,6 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
         THROW( "Invalid prediction mode" );
         break;
       }
-
       m_pcInterPred->xFillIBCBuffer(currCU);
 #if JVET_Z0118_GDR // decompressCtu
       cs.updateReconMotIPM( currCU ); // decompressCtu : need
@@ -2478,7 +2478,6 @@ void DecCu::xDecodeInterTexture(CodingUnit &cu)
     {
       cs.getRecoBuf(cu).get(COMPONENT_Y).rspSignal(m_pcReshape->getFwdLUT());
     }
-
 #if JVET_AG0145_ADAPTIVE_CLIPPING
     ClpRng clpRng = cs.slice->clpRng(COMPONENT_Y);
     if (cs.slice->getSPS()->getUseLmcs() && cs.slice->getLmcsEnabledFlag())
@@ -2494,10 +2493,33 @@ void DecCu::xDecodeInterTexture(CodingUnit &cu)
     }
     cs.getRecoBuf(cu).get(COMPONENT_Y).reconstruct(cs.getRecoBuf(cu).get(COMPONENT_Y), cs.getResiBuf(cu).get(COMPONENT_Y), clpRng);
 #endif
-#if JVET_AA0070_RRIBC
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
     if (CU::isIBC(cu) && cu.rribcFlipType)
     {
       cu.cs->getRecoBuf(cu).get(COMPONENT_Y).flipSignal(cu.rribcFlipType == 1);
+    }
+    if (cu.interCcpMergeZeroRootCbfIdc)
+    {
+      int validNum = 0;
+      CCPModelCandidate interCcpMergeList[MAX_CCP_CAND_LIST_SIZE];
+      m_pcIntraPred->xAddOnTheFlyCalcCCPCands4InterBlk(*cu.firstPU, cu.blocks[COMPONENT_Cb], interCcpMergeList, validNum);
+      PelBuf bufCb = cs.getPredBuf( cu.blocks[COMPONENT_Cb] );
+      PelBuf bufCr = cs.getPredBuf( cu.blocks[COMPONENT_Cr] );
+      const bool valid = m_pcInterPred->deriveInterCcpMergePrediction(cu.firstTU, cs.getRecoBuf(cu.blocks[COMPONENT_Y]), bufCb, bufCr, bufCb, bufCr, interCcpMergeList, validNum);
+      CHECK( !valid, "invalid inter ccp merge for rootCbf = 0" );
+      cs.getRecoBuf(cu.blocks[COMPONENT_Cb]).copyClip(cs.getPredBuf(cu.blocks[COMPONENT_Cb]), cs.slice->clpRng(COMPONENT_Cb));
+      cs.getRecoBuf(cu.blocks[COMPONENT_Cr]).copyClip(cs.getPredBuf(cu.blocks[COMPONENT_Cr]), cs.slice->clpRng(COMPONENT_Cr));
+      cu.firstPU->idxNonLocalCCP = 0;
+      cu.firstTU->curCand ={};
+      cu.firstTU->curCand.type = CCP_TYPE_NONE;
+    }
+#endif
+#if JVET_AA0070_RRIBC
+    if (CU::isIBC(cu) && cu.rribcFlipType)
+    {
+#if !JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+      cu.cs->getRecoBuf(cu).get(COMPONENT_Y).flipSignal(cu.rribcFlipType == 1);
+#endif
       if (isChromaEnabled(cu.chromaFormat) && cu.Cb().valid())
       {
         cu.cs->getRecoBuf(cu).get(COMPONENT_Cb).flipSignal(cu.rribcFlipType == 1);
@@ -2506,8 +2528,6 @@ void DecCu::xDecodeInterTexture(CodingUnit &cu)
     }
 #endif
 #endif
-
-
     return;
   }
 

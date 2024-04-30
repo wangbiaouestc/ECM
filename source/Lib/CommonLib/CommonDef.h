@@ -1638,6 +1638,9 @@ static const int NUM_CCP_PARAMS = CCCM_NO_SUB_NUM_PARAMS;
 static const int NUM_CCP_PARAMS = CCCM_NUM_PARAMS;
 #endif
 #endif
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+static const int MAX_CCP_MERGE_WEIGHT_IDX = 2;
+#endif
 #if JVET_AD0140_MVD_PREDICTION
 static const int MVD_PREDICTION_SIGN_SUFFIX_BIN_THR =            2;
 static const int MVD_PREDICTION_EGC_OFFSET =                     1;

@@ -1093,37 +1093,106 @@ bool CU::interCcpMergeSearchAllowed(const CodingUnit& cu)
   {
     return false;
   }
+
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  if (!cu.cs->slice->getSPS()->getUseInterCcpMergeZeroLumaCbf())
+  {
+#endif
+    if (cu.predMode != MODE_INTER)
+    {
+      return false;
+    }
+    if (cu.blocks[COMPONENT_Cb].area() < 16)
+    {
+      return false;
+    }
+    if (cu.firstTU->blocks[COMPONENT_Cb].width != cu.blocks[COMPONENT_Cb].width || cu.firstTU->blocks[COMPONENT_Cb].height != cu.blocks[COMPONENT_Cb].height)
+    {
+      return false;
+    }
+    if (!cu.firstTU->blocks[COMPONENT_Cb].valid())
+    {
+      return false;
+    }
+    if (!cu.firstTU->blocks[COMPONENT_Cr].valid())
+    {
+      return false;
+    }
+    if (cu.blocks[COMPONENT_Cb].area() > 1024)
+    {
+      return false;
+    }
+    if (!cu.firstPU->mergeFlag)
+    {
+      return false;
+    }
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  }
+  else
+  {
+    if (!cu.firstTU->blocks[COMPONENT_Cb].valid())
+    {
+      return false;
+    }
+    if (!cu.firstTU->blocks[COMPONENT_Cr].valid())
+    {
+      return false;
+    }
+    if (cu.firstTU->blocks[COMPONENT_Cb].width != cu.blocks[COMPONENT_Cb].width || cu.firstTU->blocks[COMPONENT_Cb].height != cu.blocks[COMPONENT_Cb].height)
+    {
+      return false;
+    }
+    if (cu.predMode != MODE_INTER)
+    {
+      return false;
+    }
+    if (!cu.firstPU->mergeFlag && (cu.blocks[COMPONENT_Cb].area() < 16 || cu.blocks[COMPONENT_Cb].area() > 1024))
+    {
+      return false;
+    }
+  }
+#endif
+
+  return true;
+}
+#endif
+
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+bool CU::interCcpMergeZeroRootCbfAllowed(const CodingUnit& cu)
+{
+  if (!cu.cs->slice->getSPS()->getUseInterCcpMerge())
+  {
+    return false;
+  }
+  if (!cu.cs->slice->getSPS()->getUseInterCcpMergeZeroLumaCbf())
+  {
+    return false;
+  }
+  if(cu.rootCbf)
+  {
+    return false;
+  }
+  if (cu.colorTransform)
+  {
+    return false;
+  }
+  if (cu.chromaFormat == CHROMA_400 || !cu.blocks[COMPONENT_Cb].valid())
+  {
+    return false;
+  }
   if (cu.predMode != MODE_INTER)
   {
     return false;
   }
-  if (cu.blocks[COMPONENT_Cb].area() < 16)
+  if (!cu.slice->getCheckLDB() && !cu.skip && cu.blocks[COMPONENT_Cb].area() > 1024)
   {
     return false;
   }
-  if (cu.firstTU->blocks[COMPONENT_Cb].width != cu.blocks[COMPONENT_Cb].width || cu.firstTU->blocks[COMPONENT_Cb].height != cu.blocks[COMPONENT_Cb].height)
-  {
-    return false;
-  }
-  if (!cu.firstTU->blocks[COMPONENT_Cb].valid())
-  {
-    return false;
-  }
-  if (!cu.firstTU->blocks[COMPONENT_Cr].valid())
-  {
-    return false;
-  }
-  if (cu.blocks[COMPONENT_Cb].area() > 1024)
-  {
-    return false;
-  }
-  if (!cu.firstPU->mergeFlag)
-  {
-    return false;
-  }
+
   return true;
 }
 #endif
+
 
 #if JVET_AC0094_REF_SAMPLES_OPT
 void CU::getNbModesRemovedFirstLast(const bool &areAboveRightUnavail, const bool &areBelowLeftUnavail, const SizeType &height, const SizeType &width, int &nbRemovedFirst, int &nbRemovedLast)
@@ -28452,14 +28521,21 @@ bool TU::interCcpMergeAllowed(const TransformUnit& tu)
   {
     return false;
   }
+
   if (!CU::interCcpMergeSearchAllowed(*tu.cu))
   {
     return false;
   }
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  if ((!tu.cs->slice->getSPS()->getUseInterCcpMergeZeroLumaCbf() && !TU::getCbf(tu, COMPONENT_Y)) ||
+     (tu.cs->slice->getSPS()->getUseInterCcpMergeZeroLumaCbf() && TU::getCbf(tu, COMPONENT_Y) && tu.cu->blocks[COMPONENT_Cb].area() > 1024 && !tu.cu->slice->getCheckLDB()))
+#else
   if (!TU::getCbf(tu, COMPONENT_Y))
+#endif
   {
     return false;
   }
+
   return true;
 }
 #endif

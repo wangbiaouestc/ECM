@@ -11196,8 +11196,13 @@ void IntraPrediction::xGetLumaRecPixels(const PredictionUnit &pu, CompArea chrom
   const int  topTemplateSampNum = 2 * uiCWidth; // for MDLM, the number of template samples is 2W or 2H.
   const int  leftTemplateSampNum = 2 * uiCHeight;
 #if JVET_AF0073_INTER_CCP_MERGE
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  assert((!pu.cu->rootCbf) || (pu.cu->firstTU->interCcpMerge) || (m_topRefLength >= topTemplateSampNum));
+  assert((!pu.cu->rootCbf) || (pu.cu->firstTU->interCcpMerge) || (m_leftRefLength >= leftTemplateSampNum));
+#else
   assert((pu.cu->firstTU->interCcpMerge) || (m_topRefLength >= topTemplateSampNum));
   assert((pu.cu->firstTU->interCcpMerge) || (m_leftRefLength >= leftTemplateSampNum));
+#endif
 #else
   assert(m_topRefLength >= topTemplateSampNum);
   assert(m_leftRefLength >= leftTemplateSampNum);
@@ -17584,7 +17589,6 @@ int IntraPrediction::xGetOneCCPCandCost( PredictionUnit &pu, CCPModelCandidate &
 void IntraPrediction::predCCPCandidate(PredictionUnit &pu, PelBuf &predCb, PelBuf &predCr)
 {
   const int bitDepth = pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA);
-
   if (pu.idxNonLocalCCP)
   {
     CompArea                   chromaArea = pu.Cb();
@@ -18183,13 +18187,20 @@ void IntraPrediction::selectCcpMergeCand(PredictionUnit& pu, CCPModelCandidate c
   }
   return;
 }
-void IntraPrediction::combineCcpAndInter(PredictionUnit& pu, PelBuf& inPredCb, PelBuf& inPredCr, PelBuf& outPredCb, PelBuf& outPredCr)
+void IntraPrediction::combineCcpAndInter(PredictionUnit& pu, PelBuf& inPredCb, PelBuf& inPredCr, PelBuf& outPredCb, PelBuf& outPredCr
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  , bool useExistCcp
+#endif
+)
 {
   CompArea chromaArea = pu.Cb();
   int predCbStride = MAX_CU_SIZE + 1;
   PelBuf predCbIntra = PelBuf(m_pCcpMerge[0] + predCbStride + 1, predCbStride, Size(chromaArea));
   int predCrStride = MAX_CU_SIZE + 1;
   PelBuf predCrIntra = PelBuf(m_pCcpMerge[1] + predCrStride + 1, predCrStride, Size(chromaArea));
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  if (!useExistCcp)
+#endif
   predCCPCandidate(pu, predCbIntra, predCrIntra);
 
   Pel* predCbIntraBuf = predCbIntra.buf;
@@ -18209,12 +18220,36 @@ void IntraPrediction::combineCcpAndInter(PredictionUnit& pu, PelBuf& inPredCb, P
 
   const ClpRng& clpRngCb = pu.cu->cs->slice->clpRng(COMPONENT_Cb);
   const ClpRng& clpRngCr = pu.cu->cs->slice->clpRng(COMPONENT_Cr);
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  constexpr int shift = 2;
+  constexpr int offset = shift << 1 >> 1;
+  constexpr int one = 1 << shift;
+  constexpr int ccpWeighting[one + 1] = { 0, 3, 4, 1, 2 };
+  CHECK(pu.cu->interCcpMergeZeroRootCbfIdc > MAX_CCP_MERGE_WEIGHT_IDX, "Wrong interCcpMergeZeroRootCbfIdc");
+  const auto tu = *pu.cu->firstTU;
+  const bool lumaCbf = TU::getCbf(tu, COMPONENT_Y);
+  int wCc = 3;
+  if (tu.interCcpMerge)
+  {
+    wCc = lumaCbf || MAX_CCP_MERGE_WEIGHT_IDX == 1 ? 3 : 4;
+  }
+  else
+  {
+    wCc = ccpWeighting[pu.cu->interCcpMergeZeroRootCbfIdc];
+  }
+  const int wInter = one - wCc;
+#endif
   for (int cntH = 0; cntH < outPredCb.height; cntH++)
   {
     for (int cntW = 0; cntW < outPredCb.width; cntW++)
     {
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+      predCbDstBuf[cntH * predCbDstStride + cntW] = ClipPel(((wCc * predCbIntraBuf[cntH * predCbIntraStride + cntW] + wInter * predCbInterBuf[cntH * predCbInterStride + cntW] + offset) >> shift), clpRngCb);
+      predCrDstBuf[cntH * predCrDstStride + cntW] = ClipPel(((wCc * predCrIntraBuf[cntH * predCrIntraStride + cntW] + wInter * predCrInterBuf[cntH * predCrInterStride + cntW] + offset) >> shift), clpRngCr);
+#else
       predCbDstBuf[cntH * predCbDstStride + cntW] = ClipPel(((3 * predCbIntraBuf[cntH * predCbIntraStride + cntW] + predCbInterBuf[cntH * predCbInterStride + cntW] + 2) >> 2), clpRngCb);
       predCrDstBuf[cntH * predCrDstStride + cntW] = ClipPel(((3 * predCrIntraBuf[cntH * predCrIntraStride + cntW] + predCrInterBuf[cntH * predCrInterStride + cntW] + 2) >> 2), clpRngCr);
+#endif
     }
   }
 }
