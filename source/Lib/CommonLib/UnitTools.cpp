@@ -9687,8 +9687,10 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
     }
     if (boundaryCond)
     {
+#if !JVET_AH0068_RM_TEMP_BUFF_CONSTRAINT
       int posYInCtu = posRB.y & pcv.maxCUHeightMask;
       if (posYInCtu + 4 < pcv.maxCUHeight)
+#endif
       {
         posC0 = posRB.offset(4, 4);
         isC0Avail = true;
@@ -12393,8 +12395,10 @@ void PU::getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
     }
     if (boundaryCond)
     {
+#if !JVET_AH0068_RM_TEMP_BUFF_CONSTRAINT
       int posYInCtu = posRB.y & pcv.maxCUHeightMask;
       if (posYInCtu + 4 < pcv.maxCUHeight)
+#endif
       {
         posC0 = posRB.offset(4, 4);
         isC0Avail = true;
@@ -12889,8 +12893,10 @@ void PU::getTmvpBMCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
         }
         if (boundaryCond)
         {
+  #if !JVET_AH0068_RM_TEMP_BUFF_CONSTRAINT
           int posYInCtu = posRB.y & pcv.maxCUHeightMask;
           if (posYInCtu + offsetY0 < pcv.maxCUHeight)
+  #endif
           {
             posC0 = posRB.offset(offsetX0, offsetY0);
             isC0Avail = true;
@@ -12910,8 +12916,10 @@ void PU::getTmvpBMCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
           }
           if (boundaryCond)
           {
+#if !JVET_AH0068_RM_TEMP_BUFF_CONSTRAINT
             int posYInCtu = posCenter.y & pcv.maxCUHeightMask;
             if (posYInCtu + offsetY1 < pcv.maxCUHeight)
+#endif
             {
               posC1 = posCenter.offset(offsetX1, offsetY1);
               isC1Avail = true; 
@@ -12931,8 +12939,10 @@ void PU::getTmvpBMCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
           }
           if (boundaryCond)
           {
+#if !JVET_AH0068_RM_TEMP_BUFF_CONSTRAINT
             int posYInCtu = posRB.y & pcv.maxCUHeightMask;
             if (posYInCtu + offsetY1 < pcv.maxCUHeight)
+#endif
             {
               posC1 = posRB.offset(offsetX1, offsetY1);
               isC1Avail = true;
@@ -13292,8 +13302,10 @@ void PU::getTmvpMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
         }
         if (boundaryCond)
         {
+#if !JVET_AH0068_RM_TEMP_BUFF_CONSTRAINT
           int posYInCtu = posRB.y & pcv.maxCUHeightMask;
           if (posYInCtu + offsetY0 < pcv.maxCUHeight)
+#endif
           {
             posC0 = posRB.offset(offsetX0, offsetY0);
             isC0Avail = true;
@@ -13313,8 +13325,10 @@ void PU::getTmvpMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
           }
           if (boundaryCond)
           {
+#if !JVET_AH0068_RM_TEMP_BUFF_CONSTRAINT
             int posYInCtu = posCenter.y & pcv.maxCUHeightMask;
             if (posYInCtu + offsetY1 < pcv.maxCUHeight)
+#endif
             {
               posC1 = posCenter.offset(offsetX1, offsetY1);
               isC1Avail = true;
@@ -13334,8 +13348,10 @@ void PU::getTmvpMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
           }
           if (boundaryCond)
           {
+#if !JVET_AH0068_RM_TEMP_BUFF_CONSTRAINT
             int posYInCtu = posRB.y & pcv.maxCUHeightMask;
             if (posYInCtu + offsetY1 < pcv.maxCUHeight)
+#endif
             {
               posC1 = posRB.offset(offsetX1, offsetY1);
               isC1Avail = true;
@@ -13546,8 +13562,10 @@ void PU::getTmvpMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
           }
           if (boundaryCond)
           {
+#if !JVET_AH0068_RM_TEMP_BUFF_CONSTRAINT
             int posYInCtu = posRB.y & pcv.maxCUHeightMask;
             if (posYInCtu + offsetY0 < pcv.maxCUHeight)
+#endif
             {
               posC0 = posRB.offset(offsetX0, offsetY0);
               isC0Avail = true;
@@ -13567,8 +13585,10 @@ void PU::getTmvpMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
             }
             if (boundaryCond)
             {
+#if !JVET_AH0068_RM_TEMP_BUFF_CONSTRAINT
               int posYInCtu = posCenter.y & pcv.maxCUHeightMask;
               if (posYInCtu + offsetY1 < pcv.maxCUHeight)
+#endif
               {
                 posC1 = posCenter.offset(offsetX1, offsetY1);
                 isC1Avail = true;
@@ -13588,8 +13608,10 @@ void PU::getTmvpMergeCand(const PredictionUnit &pu, MergeCtx& mrgCtx)
             }
             if (boundaryCond)
             {
+#if !JVET_AH0068_RM_TEMP_BUFF_CONSTRAINT
               int posYInCtu = posRB.y & pcv.maxCUHeightMask;
               if (posYInCtu + offsetY1 < pcv.maxCUHeight)
+#endif
               {
                 posC1 = posRB.offset(offsetX1, offsetY1);
                 isC1Avail = true;
@@ -17280,8 +17302,10 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
             }
             if (boundaryCond)
             {
+#if !JVET_AH0068_RM_TEMP_BUFF_CONSTRAINT
               int posYInCtu = posRB.y & pcv.maxCUHeightMask;
               if (posYInCtu + 4 < pcv.maxCUHeight)
+#endif
               {
                 posC0 = posRB.offset(4, 4);
                 isC0Avail = true;
@@ -17329,8 +17353,10 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
         }
         if (boundaryCond)
         {
+#if !JVET_AH0068_RM_TEMP_BUFF_CONSTRAINT
           int posYInCtu = posRB.y & pcv.maxCUHeightMask;
           if (posYInCtu + 4 < pcv.maxCUHeight)
+#endif
           {
             posC0 = posRB.offset(4, 4);
             isC0Avail = true;
@@ -17377,8 +17403,10 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
       }
       if (boundaryCond)
       {
+#if !JVET_AH0068_RM_TEMP_BUFF_CONSTRAINT
         int posYInCtu = posRB.y & pcv.maxCUHeightMask;
         if (posYInCtu + 4 < pcv.maxCUHeight)
+#endif
         {
           posC0 = posRB.offset(4, 4);
           isC0Avail = true;
@@ -17434,8 +17462,10 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
     }
     if (boundaryCond)
     {
+#if !JVET_AH0068_RM_TEMP_BUFF_CONSTRAINT
       int posYInCtu = posRB.y & pcv.maxCUHeightMask;
       if (posYInCtu + 4 < pcv.maxCUHeight)
+#endif
       {
         posC0 = posRB.offset(4, 4);
         isC0Avail = true;
@@ -19214,8 +19244,10 @@ void PU::fillAffineMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, co
       }
       if (boundaryCond)
       {
+#if !JVET_AH0068_RM_TEMP_BUFF_CONSTRAINT
         int posYInCtu = posRB.y & pcv.maxCUHeightMask;
         if (posYInCtu + 4 < pcv.maxCUHeight)
+#endif
         {
           posC0 = posRB.offset(4, 4);
           bC0Avail = true;
@@ -21601,8 +21633,10 @@ void PU::getAffineMergeCand( const PredictionUnit &pu, AffineMergeCtx& affMrgCtx
         }
         if (boundaryCond)
         {
+#if !JVET_AH0068_RM_TEMP_BUFF_CONSTRAINT
           int posYInCtu = posRB.y & pcv.maxCUHeightMask;
           if (posYInCtu + 4 < pcv.maxCUHeight)
+#endif
           {
             posC0 = posRB.offset(4, 4);
             isC0Avail = true;
@@ -22378,8 +22412,10 @@ void PU::getBMAffineMergeCand(const PredictionUnit &pu, AffineMergeCtx& affineBM
         }
         if (boundaryCond)
         {
+#if !JVET_AH0068_RM_TEMP_BUFF_CONSTRAINT
           int posYInCtu = posRB.y & pcv.maxCUHeightMask;
           if (posYInCtu + 4 < pcv.maxCUHeight)
+#endif
           {
             posC0 = posRB.offset(4, 4);
             C0Avail = true;
@@ -23734,8 +23770,10 @@ void clipColPos(int& posX, int& posY, const PredictionUnit& pu)
 {
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   Position puPos = pu.lumaPos();
+#if !JVET_AH0068_RM_TEMP_BUFF_CONSTRAINT
   int log2CtuSize = floorLog2(pu.cs->sps->getCTUSize());
   int ctuY = ((puPos.y >> log2CtuSize) << log2CtuSize);
+#endif
   int horMax;
   int horMin;
   const SubPic &curSubPic = pu.cu->slice->getPPS()->getSubPicFromPos(puPos);
@@ -23749,8 +23787,13 @@ void clipColPos(int& posX, int& posY, const PredictionUnit& pu)
     horMax = (int)pu.cs->pps->getPicWidthInLumaSamples() - 1;
     horMin = 0;
   }
+#if JVET_AH0068_RM_TEMP_BUFF_CONSTRAINT
+  int verMax = (int)pu.cs->pps->getPicHeightInLumaSamples() - 1;
+  int verMin = 0;
+#else
   int verMax = std::min((int)pu.cs->pps->getPicHeightInLumaSamples() - 1, ctuY + (int)pu.cs->sps->getCTUSize() - 1);
   int verMin = std::max((int)0, ctuY);
+#endif
 
   posX = std::min(horMax, std::max(horMin, posX));
   posY = std::min(verMax, std::max(verMin, posY));
