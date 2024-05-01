@@ -761,6 +761,9 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
 #if JVET_AE0159_FIBC || JVET_AE0059_INTER_CCCM || JVET_AE0078_IBC_LIC_EXTENSION || JVET_AF0073_INTER_CCP_MERGE
   m_cInterSearch.setIntraPrediction(&m_cIntraSearch);
 #endif
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+  m_cIntraSearch.setInterPrediction(&m_cInterSearch);
+#endif
   m_iMaxRefPicNum = 0;
 
 #if ER_CHROMA_QP_WCG_PPS

@@ -376,6 +376,9 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #endif
   tmpIsSubPel  = other.tmpIsSubPel;
   tmpSubPelIdx = other.tmpSubPelIdx;
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+  tmpFracIdx    = other.tmpFracIdx;
+#endif
 #endif
 #endif
 #if JVET_W0123_TIMD_FUSION
@@ -647,6 +650,9 @@ void CodingUnit::initData()
   tmpFlmFlag    = false;
   tmpIsSubPel  = 0;
   tmpSubPelIdx = -1;
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+  tmpFracIdx    = -1;
+#endif
 #if JVET_AG0136_INTRA_TMP_LIC
   tmpLicFlag   = false;
 #endif

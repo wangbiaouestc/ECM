@@ -9472,11 +9472,28 @@ void CABACWriter::tmp_flag(const CodingUnit& cu)
           DTRACE(g_trace_ctx, D_SYNTAX, "tmp_lic_idx=%d\n", cu.ibcLicIdx);
         }
       }
+#if !JVET_AH0200_INTRA_TMP_BV_REORDER
       if (!cu.tmpFlmFlag && !cu.tmpLicFlag)
 #else
       if (!cu.tmpFlmFlag)
 #endif
+#else
+      if (!cu.tmpFlmFlag)
+#endif
       {
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+        if(cu.lwidth() * cu.lheight() <= TMP_SKIP_REFINE_THRESHOLD)
+        {
+          if(cu.tmpFracIdx > 0)
+          {
+            m_BinEncoder.encodeBin(1, Ctx::TmpFlag(7));
+          }
+          else
+          {
+            m_BinEncoder.encodeBin(0, Ctx::TmpFlag(7));
+          }
+        }
+#else
         m_BinEncoder.encodeBin(cu.tmpIsSubPel != 0 ? 1 : 0, Ctx::TmpFlag(4));
         if (cu.tmpIsSubPel)
         {
@@ -9488,6 +9505,7 @@ void CABACWriter::tmp_flag(const CodingUnit& cu)
           m_BinEncoder.encodeBinsEP(cu.tmpSubPelIdx, 3);
         }
         DTRACE(g_trace_ctx, D_SYNTAX, "tmp_is_subpel() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.tmpIsSubPel);
+#endif
       }
     }
   }

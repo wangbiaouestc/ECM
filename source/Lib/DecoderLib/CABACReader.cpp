@@ -9630,6 +9630,7 @@ void CABACReader::tmp_flag(CodingUnit& cu)
         cu.tmpLicFlag = m_BinDecoder.decodeBin(Ctx::TmpLic(0));
         cu.ibcLicFlag = cu.tmpLicFlag;
         DTRACE(g_trace_ctx, D_SYNTAX, "tmpLicFlag() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.tmpLicFlag);
+
         if (cu.slice->getSPS()->getItmpLicExtension() && cu.ibcLicFlag)
         {
           const int bin1 = m_BinDecoder.decodeBin(Ctx::ItmpLicIndex(0));
@@ -9649,11 +9650,32 @@ void CABACReader::tmp_flag(CodingUnit& cu)
           cu.ibcLicIdx = 0;
         }
       }
+
+#if !JVET_AH0200_INTRA_TMP_BV_REORDER
       if (!cu.tmpFlmFlag && !cu.tmpLicFlag)
 #else
       if (!cu.tmpFlmFlag)
 #endif
+#else
+      if (!cu.tmpFlmFlag)
+#endif
       {
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+        if(cu.lwidth() * cu.lheight() > TMP_SKIP_REFINE_THRESHOLD)
+        {
+          cu.tmpFracIdx = 0;
+        }
+        else if(m_BinDecoder.decodeBin(Ctx::TmpFlag(7)))
+        {
+          cu.tmpFracIdx = 1;
+        }
+        else
+        {
+          cu.tmpFracIdx = 0;
+        }
+        cu.tmpIsSubPel  = 0;
+        cu.tmpSubPelIdx = -1;
+#else
         cu.tmpIsSubPel = m_BinDecoder.decodeBin(Ctx::TmpFlag(4));
         if (cu.tmpIsSubPel)
         {
@@ -9664,6 +9686,7 @@ void CABACReader::tmp_flag(CodingUnit& cu)
           }
           cu.tmpSubPelIdx = m_BinDecoder.decodeBinsEP(3);
         }
+#endif
         DTRACE(g_trace_ctx, D_SYNTAX, "tmp_is_subpel() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.tmpIsSubPel);
       }
       else

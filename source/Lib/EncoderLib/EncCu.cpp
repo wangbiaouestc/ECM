@@ -2905,7 +2905,15 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
 #if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
           if (bvListDerived == 0)
           {
-            PU::getItmpMergeCandidate(*cu.firstPU, m_pcIntraSearch->m_bvBasedMergeCandidates);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+            m_pcIntraSearch->m_bvBasedMergeCandidates.clear();
+            m_pcIntraSearch->m_sgpmMvBasedMergeCandidates.clear();
+#endif
+            PU::getItmpMergeCandidate(*cu.firstPU, m_pcIntraSearch->m_bvBasedMergeCandidates
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+             , m_pcIntraSearch->m_sgpmMvBasedMergeCandidates
+#endif
+            );
             bvListDerived = 1;
           }
 #endif

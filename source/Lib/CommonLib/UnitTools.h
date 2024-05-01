@@ -200,9 +200,19 @@ namespace CU
 namespace PU
 {
 #if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
-  int  getItmpMergeCandidate      (const PredictionUnit& pu, std::vector<Mv>& pBvs);
+  int  getItmpMergeCandidate      (const PredictionUnit& pu, std::vector<Mv>& pBvs
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+    , std::vector<Mv>& pSgpmMvs
+#endif
+  );
   bool validItmpBv                (const PredictionUnit& pu, int tmpXdisp, int tmpYdisp);
   bool checkValidIntraTmpMergeCand(const PredictionUnit& pu, Mv Bv);
+#if JVET_AH0055_INTRA_TMP_ARBVP
+  bool CheckBvAvailable(std::vector<Mv> &pBv, Mv curBv);
+#endif
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+  bool validIBCItmpMv(const PredictionUnit& pu, Mv curMv, int templateSize);
+#endif
 #endif
 #if JVET_AD0184_REMOVAL_OF_DIVISION_OPERATIONS
   int getMeanValue(int sum, int div);

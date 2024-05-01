@@ -998,6 +998,10 @@ struct CodedCUInfo
   bool     isRribcCoded;
   bool     isRribcTested;
 #endif
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+  bool     skipFracTmp;
+#endif
+
   bool     validMv[NUM_REF_PIC_LIST_01][MAX_STORED_CU_INFO_REFS];
   Mv       saveMv [NUM_REF_PIC_LIST_01][MAX_STORED_CU_INFO_REFS];
 

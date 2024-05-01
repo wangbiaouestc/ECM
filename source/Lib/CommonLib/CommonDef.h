@@ -2079,9 +2079,16 @@ static const int FIX_FILTER_NUM_COEFF    = 42;
 static const int TMP_TEMPLATE_SIZE =            4; // must be multiple of 4 for SIMD
 static const int TMP_MAXSIZE_DEPTH =            6; // should be log2(TMP_TEMPLATE_SIZE): keep as 6 to avoid any error
 static const int USE_MORE_BLOCKSIZE_DEPTH_MAX = TMP_MAXSIZE_DEPTH - 1;
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+static const int INIT_THRESHOULD_SHIFTBITS =    0;
+#if JVET_AG0136_INTRA_TMP_LIC
+static const int INIT_THRESHOLD_SHIFTBITS_SUPP = 0;
+#endif
+#else
 static const int INIT_THRESHOULD_SHIFTBITS =    2;  ///< (default 2) Early skip threshold for checking distance.
 #if JVET_AG0136_INTRA_TMP_LIC
 static const int INIT_THRESHOLD_SHIFTBITS_SUPP = 4;
+#endif
 #endif
 static const int TMP_SEARCH_RANGE_MULT_FACTOR = 5;
 #if JVET_AD0086_ENHANCED_INTRA_TMP
@@ -2090,6 +2097,15 @@ static const int TMP_GROUP_IDX       = 3;
 static const int FUSION_IDX_NUM      = TMP_FUSION_NUM * TMP_GROUP_IDX;
 static const int MTMP_NUM            = 19;
 static const int MTMP_NUM_SPARSE     = 30;
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+static const int TMP_BV_REORDER_MAX   = 2;
+static const int TMP_REFINE_NONLIC_BV_NUM  = 0;
+static const int TMP_REFINE_LIC_BV_NUM     = 0;
+static const int TMP_SKIP_REFINE_THRESHOLD = 128;
+static const int TMP_TEMPLATE_COST_SHIFT   = 3;
+static const double TMP_INT_BV_COST_SCALE = 0.85;
+static const double TMP_ENC_REFINE_THRESHOLD = 1.1;
+#endif
 #if JVET_AG0136_INTRA_TMP_LIC 
 static const int MTMP_NUM_SPARSE_FOR_LIC = 15;
 #endif
@@ -2133,6 +2149,10 @@ static const int TMP_SAMPLING = 1 << LOG2_TMP_SAMPLING;
 
 #if JVET_AG0151_INTRA_TMP_MERGE_MODE
 static const int TMP_NUM_MERGE_CANDS = 10;
+#endif
+#if JVET_AH0055_INTRA_TMP_ARBVP
+static const int NUM_TMP_ARBVP = 20;
+static const int EBVP_RANGE = 1;
 #endif
 #if JVET_AG0152_SGPM_ITMP_IBC
 static const int SGPM_NUM_BVS = 6; // maximum BVs to be considered into the list for Itmp-Sgpm
