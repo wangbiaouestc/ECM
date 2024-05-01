@@ -384,6 +384,9 @@ struct CodingUnit : public UnitArea
   bool               tmpFusionFlag;
   int                tmpIsSubPel;
   int                tmpSubPelIdx;
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+  int                tmpFracIdx;
+#endif
 #endif
 #endif
 #if JVET_W0123_TIMD_FUSION

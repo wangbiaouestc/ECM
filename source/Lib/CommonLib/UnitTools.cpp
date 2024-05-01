@@ -1302,7 +1302,11 @@ bool CU::isIdxModeValid(const bool &areAboveRightUnavail, const bool &areBelowLe
 #endif
 // PU tools
 #if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
+#if JVET_AH0055_INTRA_TMP_ARBVP
+bool PU::CheckBvAvailable(std::vector<Mv>& pBv, Mv curBv)
+#else
 bool CheckBvAvailable(std::vector<Mv>& pBv, Mv curBv)
+#endif
 {
   for (int i = 0; i < pBv.size(); i++)
   {
@@ -1314,7 +1318,11 @@ bool CheckBvAvailable(std::vector<Mv>& pBv, Mv curBv)
   return 0;
 }
 
-void getNeighBv(const PredictionUnit& puOrg, const PredictionUnit* pu, std::vector<Mv>& pBv)
+void getNeighBv(const PredictionUnit& puOrg, const PredictionUnit* pu, std::vector<Mv>& pBv
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+    , std::vector<Mv>& pSgpmMvs
+#endif
+)
 {
   if (!pu || ((pu->cu->predMode != MODE_IBC) && (!pu->cu->tmpFlag)))
   {
@@ -1324,11 +1332,28 @@ void getNeighBv(const PredictionUnit& puOrg, const PredictionUnit* pu, std::vect
   {
     if (PU::validItmpBv(puOrg, pu->bv.hor, pu->bv.ver))
     {
+#if JVET_AH0055_INTRA_TMP_ARBVP
+      if (!PU::CheckBvAvailable(pBv, pu->bv))
+#else
       if (!CheckBvAvailable(pBv, pu->bv))
+#endif
       {
         pBv.push_back(pu->bv);
       }
     }
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+    if (PU::validIBCItmpMv(puOrg, pu->mv[0], SGPM_TEMPLATE_SIZE))
+    {
+#if JVET_AH0055_INTRA_TMP_ARBVP
+      if (!PU::CheckBvAvailable(pSgpmMvs, pu->mv[0]))
+#else
+      if (!CheckBvAvailable(pSgpmMvs, pu->mv[0]))
+#endif
+      {
+        pSgpmMvs.push_back(pu->mv[0]);
+      }
+    }
+#endif
 
     if (pu->interDir == 3)
     {
@@ -1336,11 +1361,28 @@ void getNeighBv(const PredictionUnit& puOrg, const PredictionUnit* pu, std::vect
       bv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
       if (PU::validItmpBv(puOrg, bv.hor, bv.ver))
       {
+#if JVET_AH0055_INTRA_TMP_ARBVP
+        if (!PU::CheckBvAvailable(pBv, bv))
+#else
         if (!CheckBvAvailable(pBv, bv))
+#endif
         {
           pBv.push_back(bv);
         }
       }
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+      if (PU::validIBCItmpMv(puOrg, pu->mv[1], SGPM_TEMPLATE_SIZE))
+      {
+#if JVET_AH0055_INTRA_TMP_ARBVP
+        if (!PU::CheckBvAvailable(pSgpmMvs, pu->mv[1]))
+#else
+        if (!CheckBvAvailable(pSgpmMvs, pu->mv[1]))
+#endif
+        {
+          pSgpmMvs.push_back(pu->mv[1]);
+        }
+      }
+#endif
     }
 
     return;
@@ -1350,11 +1392,30 @@ void getNeighBv(const PredictionUnit& puOrg, const PredictionUnit* pu, std::vect
   {
     if (PU::validItmpBv(puOrg, pu->bv.hor, pu->bv.ver))
     {
+#if JVET_AH0055_INTRA_TMP_ARBVP
+      if (!PU::CheckBvAvailable(pBv, pu->bv))
+#else
       if (!CheckBvAvailable(pBv, pu->bv))
+#endif  
       {
         pBv.push_back(pu->bv);
+
       }
     }
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+    if (PU::validIBCItmpMv(puOrg, pu->mv[0], SGPM_TEMPLATE_SIZE))
+    {
+#if JVET_AH0055_INTRA_TMP_ARBVP
+      if (!PU::CheckBvAvailable(pSgpmMvs, pu->mv[0]))
+#else
+      if (!CheckBvAvailable(pSgpmMvs, pu->mv[0]))
+#endif
+      {
+        pSgpmMvs.push_back(pu->mv[0]);
+      }
+    }
+#endif
+
     if (pu->cu->tmpIdx > 0
 #if JVET_AG0136_INTRA_TMP_LIC
       && !pu->cu->tmpLicFlag
@@ -1365,27 +1426,57 @@ void getNeighBv(const PredictionUnit& puOrg, const PredictionUnit* pu, std::vect
 
       if (PU::validItmpBv(puOrg, bv.hor, bv.ver))
       {
+#if JVET_AH0055_INTRA_TMP_ARBVP
+        if (!PU::CheckBvAvailable(pBv, bv))
+#else
         if (!CheckBvAvailable(pBv, bv))
+#endif
         {
           pBv.push_back(bv);
         }
       }
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+      bv.changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
+      if (PU::validIBCItmpMv(puOrg, bv, SGPM_TEMPLATE_SIZE))
+      {
+#if JVET_AH0055_INTRA_TMP_ARBVP
+        if (!PU::CheckBvAvailable(pSgpmMvs, bv))
+#else
+        if (!CheckBvAvailable(pSgpmMvs, bv))
+#endif
+        {
+          pSgpmMvs.push_back(bv);
+        }
+      }
+#endif
     }
     return;
   }
 }
 
-int PU::getItmpMergeCandidate(const PredictionUnit& pu, std::vector<Mv>& pBvs)
+int PU::getItmpMergeCandidate(const PredictionUnit& pu, std::vector<Mv>& pBvs
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+    , std::vector<Mv>& pSgpmMvs
+#endif
+)
 {
   const CompArea area = pu.Y();
   const Position topLeft = area.topLeft();
   const ChannelType ch = pu.chType;
 
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+  getNeighBv(pu, (pu.cs->getPURestricted(topLeft.offset(-1, pu.Y().height - 1), pu, ch)), pBvs, pSgpmMvs);
+  getNeighBv(pu, (pu.cs->getPURestricted(topLeft.offset(pu.Y().width - 1, -1), pu, ch)), pBvs, pSgpmMvs);
+  getNeighBv(pu, (pu.cs->getPURestricted(topLeft.offset(-1, -1), pu, ch)), pBvs, pSgpmMvs);
+  getNeighBv(pu, (pu.cs->getPURestricted(topLeft.offset(pu.Y().width, -1), pu, ch)), pBvs, pSgpmMvs);
+  getNeighBv(pu, (pu.cs->getPURestricted(topLeft.offset(-1, pu.Y().height), pu, ch)), pBvs, pSgpmMvs);
+#else
   getNeighBv(pu, (pu.cs->getPURestricted(topLeft.offset(-1, pu.Y().height - 1), pu, ch)), pBvs);
   getNeighBv(pu, (pu.cs->getPURestricted(topLeft.offset(pu.Y().width - 1, -1), pu, ch)), pBvs);
   getNeighBv(pu, (pu.cs->getPURestricted(topLeft.offset(-1, -1), pu, ch)), pBvs);
   getNeighBv(pu, (pu.cs->getPURestricted(topLeft.offset(pu.Y().width, -1), pu, ch)), pBvs);
   getNeighBv(pu, (pu.cs->getPURestricted(topLeft.offset(-1, pu.Y().height), pu, ch)), pBvs);
+#endif
 
   int offsetX = 0;
   int offsetY = 0;
@@ -1407,7 +1498,11 @@ int PU::getItmpMergeCandidate(const PredictionUnit& pu, std::vector<Mv>& pBvs)
       case 4:offsetX = -iNADistanceHor - 1; offsetY = -iNADistanceVer - 1;    break;
       default: printf("error!"); exit(0); break;
       }
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+      getNeighBv(pu, pu.cs->getPURestricted(topLeft.offset(offsetX, offsetY), pu, ch), pBvs, pSgpmMvs);
+#else
       getNeighBv(pu, pu.cs->getPURestricted(topLeft.offset(offsetX, offsetY), pu, ch), pBvs);
+#endif
     }
   }
 
@@ -1425,6 +1520,7 @@ bool PU::validItmpBv(const PredictionUnit& pu, int tmpXdisp, int tmpYdisp)
   const int y = pu.ly();
   const int w = pu.lwidth();
   const int h = pu.lheight();
+
   const Position p1(x + tmpXdisp + w - 1, y + tmpYdisp + h - 1);
   if (!pu.cs->isDecomp(p1, CHANNEL_TYPE_LUMA))
   {
@@ -1437,6 +1533,32 @@ bool PU::validItmpBv(const PredictionUnit& pu, int tmpXdisp, int tmpYdisp)
   }
   return 1;
 }
+
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+bool PU::validIBCItmpMv(const PredictionUnit& pu, Mv curMv, int templateSize)
+{
+  const int x = pu.lx();
+  const int y = pu.ly();
+  const int w = pu.lwidth();
+  const int h = pu.lheight();
+
+  int xLumaBv = (curMv.hor >> MV_FRACTIONAL_BITS_INTERNAL);
+  int yLumaBv = (curMv.ver >> MV_FRACTIONAL_BITS_INTERNAL);
+
+  const Position p1(x + xLumaBv + w - 1, y + yLumaBv + h - 1);
+  if (!pu.cs->isDecomp(p1, CHANNEL_TYPE_LUMA))
+  {
+    return 0;
+  }
+  const Position p2(x + xLumaBv - templateSize, y + yLumaBv - templateSize);
+  if (!pu.cs->isDecomp(p2, CHANNEL_TYPE_LUMA))
+  {
+    return 0;
+  }
+
+  return 1;
+}
+#endif
 #endif
 
 #if SECONDARY_MPM

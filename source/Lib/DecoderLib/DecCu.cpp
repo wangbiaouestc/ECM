@@ -122,6 +122,9 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
 #if JVET_AE0159_FIBC || JVET_AE0059_INTER_CCCM || JVET_AE0078_IBC_LIC_EXTENSION || JVET_AF0073_INTER_CCP_MERGE
   m_pcInterPred->setIntraPrediction( m_pcIntraPred );
 #endif
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+  m_pcIntraPred->setInterPrediction(m_pcInterPred);
+#endif
 #if JVET_Z0118_GDR
   // reset current IBC Buffer only when VB pass through
   if (cs.isGdrEnabled() && cs.isInGdrIntervalOrRecoveryPoc())
@@ -322,7 +325,14 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
         if (currCU.dimd || currCU.sgpm || (chType == CHANNEL_TYPE_LUMA && currCU.tmpFlag))
         {
           m_pcIntraPred->m_bvBasedMergeCandidates.clear();
-          PU::getItmpMergeCandidate(*currCU.firstPU, m_pcIntraPred->m_bvBasedMergeCandidates);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+          m_pcIntraPred->m_sgpmMvBasedMergeCandidates.clear();
+#endif
+          PU::getItmpMergeCandidate(*currCU.firstPU, m_pcIntraPred->m_bvBasedMergeCandidates
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+             , m_pcIntraPred->m_sgpmMvBasedMergeCandidates
+#endif          
+          );
         }
 #endif
 #if ENABLE_DIMD
@@ -1006,6 +1016,21 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
                                             , false
 #endif
                                             );
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+        if(!tu.cu->tmpFlmFlag && !tu.cu->tmpFusionFlag)
+        {
+          if(pu.lwidth() * pu.lheight() > TMP_SKIP_REFINE_THRESHOLD)
+          {
+            tu.cu->tmpIsSubPel  = 0;
+            tu.cu->tmpSubPelIdx = 0;
+          } 
+          else
+          {
+            m_pcIntraPred->searchFracCandidate(tu.cu, m_pcIntraPred->getTargetPatch(floorLog2(std::max(pu.lwidth(), pu.lheight())) - 2), tempType);
+          }
+        }
+#endif		
+
 #if JVET_AG0136_INTRA_TMP_LIC
         if (tu.cu->tmpLicFlag)
         {
@@ -1030,9 +1055,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
           }
           else
           {
+#if !JVET_AH0200_INTRA_TMP_BV_REORDER
             m_pcIntraPred->setBvMvFromMemory(*(tu.cu), (tu.cu)->tmpIdx, true);
             m_pcInterPred->LicItmp(pu, bufDumb, false);
             m_pcIntraPred->getMemLicParams((tu.cu)->ibcLicIdx, (tu.cu)->tmpIdx) = m_pcInterPred->getArrayLicParams();
+#endif
           }
         }
 #endif
@@ -1049,10 +1076,12 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 #endif
                                                   );
         }
+#if !JVET_AH0200_INTRA_TMP_BV_REORDER
         if (pu.cu->tmpIsSubPel)
         {
           m_pcIntraPred->xPadForInterpolation(pu.cu);
         }
+#endif
 #endif
 #if JVET_AB0061_ITMP_BV_FOR_IBC
         m_pcIntraPred->generateTMPrediction(piPred.buf, piPred.stride, foundCandiNum, pu
@@ -1072,7 +1101,13 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
         {
           if (!(tu.cu)->tmpFusionFlag)
           {
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+            PelBuf bufDumb;
+            m_pcInterPred->LicItmp(pu, bufDumb, false);
+            const auto& arrayLicParams = m_pcInterPred->getArrayLicParams();
+#else
             const auto& arrayLicParams = m_pcIntraPred->getMemLicParams((tu.cu)->ibcLicIdx, (tu.cu)->tmpIdx);
+#endif
             if ((tu.cu)->ibcLicIdx == IBC_LIC_IDX_M)
             {
               piPred.linearTransforms(arrayLicParams[1], arrayLicParams[0], arrayLicParams[2], arrayLicParams[4], arrayLicParams[3], arrayLicParams[5], arrayLicParams[6], true, (tu.cu)->cs->slice->clpRng(COMPONENT_Y));

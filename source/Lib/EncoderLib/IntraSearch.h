@@ -238,6 +238,9 @@ private:
 #endif
     int      tmpIsSubPel;
     int      tmpSubPelIdx;
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+    int      tmpFracIdx;
+#endif
 #endif
 #endif
 #if JVET_AB0155_SGPM
@@ -257,6 +260,9 @@ private:
 #if JVET_AD0086_ENHANCED_INTRA_TMP
 #if JVET_AG0136_INTRA_TMP_LIC
       , tmpIdx(0) , tmpFusionFlag(false) , tmpFlmFlag(false) , tmpLicFlag(false) , tmpLicIdc(0), tmpIsSubPel(0), tmpSubPelIdx(0)
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+      , tmpFracIdx(-1)
+#endif
 #else
       , tmpIdx(0) , tmpFusionFlag(false) , tmpFlmFlag(false) , tmpIsSubPel(0), tmpSubPelIdx(0)
 #endif
@@ -271,6 +277,9 @@ private:
 #if JVET_AD0086_ENHANCED_INTRA_TMP
 #if JVET_AG0136_INTRA_TMP_LIC
       , const int tmpi = 0 , const bool tmpff = 0  , const int tmpflmf = 0 , const int tmpLic = 0 , const int tmpLicIdc = 0 , const int tmpsp = 0, const int tmpspi = 0
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+    , const int tmpfi = -1
+#endif
 #else
       , const int tmpi = 0 , const bool tmpff = 0  , const int tmpflmf = 0 , const int tmpsp = 0, const int tmpspi = 0
 #endif
@@ -296,6 +305,9 @@ private:
 #if JVET_AD0086_ENHANCED_INTRA_TMP
 #if JVET_AG0136_INTRA_TMP_LIC
       , tmpIdx(tmpi) , tmpFusionFlag(tmpff) , tmpFlmFlag(tmpflmf) , tmpLicFlag(tmpLic) , tmpLicIdc(tmpLicIdc) ,tmpIsSubPel(tmpsp) , tmpSubPelIdx(tmpspi)
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+      , tmpFracIdx(tmpfi)
+#endif
 #else
       , tmpIdx(tmpi) , tmpFusionFlag(tmpff) , tmpFlmFlag(tmpflmf) , tmpIsSubPel(tmpsp) , tmpSubPelIdx(tmpspi)
 #endif
@@ -331,6 +343,9 @@ private:
 #endif
       tmpIsSubPel   = other.tmpIsSubPel;    // CU::tmpIsSubPel
       tmpSubPelIdx  = other.tmpSubPelIdx;   // CU::tmpSubPelIdx
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+      tmpFracIdx   = other.tmpFracIdx;
+#endif
 #endif
       sgpmFlag     = other.sgpmFlag;   // CU::sgpmFlag
       sgpmSplitDir = other.sgpmSplitDir;
@@ -360,6 +375,9 @@ private:
 #endif
                 && tmpIsSubPel == cmp.tmpIsSubPel
                 && tmpSubPelIdx == cmp.tmpSubPelIdx
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+                && tmpFracIdx == cmp.tmpFracIdx
+#endif
 #endif
                 && sgpmFlag == cmp.sgpmFlag
                 && sgpmSplitDir == cmp.sgpmSplitDir); // sgpmMode0 and sgpmMode1 seems no need
@@ -383,6 +401,9 @@ private:
 #if JVET_AD0086_ENHANCED_INTRA_TMP
 #if JVET_AG0136_INTRA_TMP_LIC
       const int tmpi, const bool tmpff, const int tmpflmf,  const int tmpLicItmp, const int tmpLicIdc, const int tmpsp, const int tmpspi,
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+                     const int tmpfi,
+#endif
 #else
                      const int tmpi, const bool tmpff, const int tmpflmf,  const int tmpsp, const int tmpspi,
 #endif
@@ -392,6 +413,9 @@ private:
 #if JVET_AD0086_ENHANCED_INTRA_TMP
 #if JVET_AG0136_INTRA_TMP_LIC
         ,tmpi ,tmpff ,tmpflmf , tmpLicItmp, tmpLicIdc, tmpsp, tmpspi
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+        ,tmpfi
+#endif
 #else
         ,tmpi ,tmpff ,tmpflmf , tmpsp, tmpspi
 #endif
@@ -413,6 +437,9 @@ private:
 #endif
       && tmpIsSubPel == cmp.tmpIsSubPel
       && tmpSubPelIdx == cmp.tmpSubPelIdx
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+      && tmpFracIdx == cmp.tmpFracIdx
+#endif
 #endif
 			   && rdCost == cmp.rdCost && sgpmFlag == cmp.sgpmFlag
               && sgpmSplitDir == cmp.sgpmSplitDir);   // sgpmMode0 and sgpmMode1 seems no need

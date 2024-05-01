@@ -4530,6 +4530,16 @@ void InterPrediction::xPredIBCBlkPadding(const PredictionUnit& pu, ComponentID c
                                        , int width, int height, int filterIdx)
 {
         Position         offset = refOffsetByIntBv;
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+        int              deltaX = 0;
+        int              deltaY = 0;
+        if(pu.cu->tmpFlag && pu.cu->tmpIsSubPel != 0 && compID == COMPONENT_Y)
+        {
+          deltaX = ((pu.mv[0].hor >> MV_FRACTIONAL_BITS_INTERNAL) < pu.bv.hor) ? 1 : 0;
+          deltaY = ((pu.mv[0].ver >> MV_FRACTIONAL_BITS_INTERNAL) < pu.bv.ver) ? 1 : 0;
+          offset = offset.offset(deltaX, deltaY);
+        }
+#endif
         CPelBuf&         refBuf = refBufBeforePadding;
   const CodingStructure& cs     = *pu.cs;
 
@@ -4566,10 +4576,17 @@ void InterPrediction::xPredIBCBlkPadding(const PredictionUnit& pu, ComponentID c
   }
 
   // Load reference samples to local buffer
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+  Position addedOffsetTL(xFilterTap == 0 ? 0 : (1 - deltaX - (xFilterTap >> 1))
+                       , yFilterTap == 0 ? 0 : (1 - deltaY - (yFilterTap >> 1)));
+  Position addedOffsetBR(xFilterTap == 0 ? 0 : ((xFilterTap >> 1) - deltaX)
+                       , yFilterTap == 0 ? 0 : ((yFilterTap >> 1) - deltaY));
+#else
   Position addedOffsetTL(xFilterTap == 0 ? 0 : (1 - (xFilterTap >> 1))
                        , yFilterTap == 0 ? 0 : (1 - (yFilterTap >> 1)));
   Position addedOffsetBR(xFilterTap == 0 ? 0 : (xFilterTap >> 1)
                        , yFilterTap == 0 ? 0 : (yFilterTap >> 1));
+#endif
   Position ibcRefOffset = offset.offset(addedOffsetTL);
   CPelBuf ibcRefBuf;
   ibcRefBuf = refPic->getRecoBuf(CompArea(compID, pu.chromaFormat, ibcRefOffset, Size(ibcRefWidth, ibcRefHeight)), wrapRef);
@@ -4769,6 +4786,11 @@ void InterPrediction::xPredIBCBlkPadding(const PredictionUnit& pu, ComponentID c
       }
     }
   }
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+  deltaX = xFilterTap == 0 ? 0 : deltaX;
+  deltaY = yFilterTap == 0 ? 0 : deltaY;
+  refBuf.buf    = localRefBuf.bufAt(-addedOffsetTL.getX() - deltaX, -addedOffsetTL.getY() - deltaY);
+#endif
 
 }
 #endif

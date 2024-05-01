@@ -106,6 +106,24 @@ public:
 #endif
 };
 
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+class TempLibFracFast
+{
+public:
+  int   m_subpel;
+  int   m_fracDir;
+
+  TempLibFracFast();
+  ~TempLibFracFast();
+  TempLibFracFast(const int pPrec, const int pDirt)
+  {
+    m_subpel = pPrec, m_fracDir = pDirt;
+  }; 
+};
+#endif
+#endif
+
 typedef short TrainDataType;
 #endif
 
@@ -425,6 +443,15 @@ protected:
 #if JVET_AD0086_ENHANCED_INTRA_TMP
   static_vector<TempLibFast, MTMP_NUM> m_mtmpCandList;
   static_vector<uint64_t, MTMP_NUM>    m_mtmpCostList;
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+  static_vector<TempLibFracFast, TMP_BV_REORDER_MAX> m_mtmpFracCandList[MTMP_NUM];
+  static_vector<uint64_t, TMP_BV_REORDER_MAX>    m_mtmpFracCostList[MTMP_NUM];
+  int m_log2SizeTop;
+  int m_log2SizeLeft;
+  int m_sizeTopLeft;
+  int m_topMeanTar;
+  int m_leftMeanTar;
+#endif
 #if JVET_AG0136_INTRA_TMP_LIC
   static_vector<TempLibFast, MTMP_NUM> m_mtmpCandListUseMR;
   static_vector<uint64_t, MTMP_NUM>    m_mtmpCostListUseMR;
@@ -537,6 +564,9 @@ public:
 #endif
 #if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
   std::vector<Mv> m_bvBasedMergeCandidates;
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+  std::vector<Mv> m_sgpmMvBasedMergeCandidates;
+#endif
 #endif
 #if LMS_LINEAR_MODEL && MMLM
   struct MMLMParameters
@@ -776,7 +806,11 @@ public:
   );
 #if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
   void predTimdIbcItmp(const ComponentID compId, const PredictionUnit& pu, Mv Bv, Pel* pPred, uint32_t uiStride, uint32_t iWidth, uint32_t iHeight, TemplateType eTempType, int32_t iTemplateWidth, int32_t iTemplateHeight, Pel* piOrg, int orgStride);
-  void predUsingBv(Pel* piPred, unsigned int uiStride, Mv Bv, CodingUnit cu);
+  void predUsingBv(Pel* piPred, unsigned int uiStride, Mv Bv, CodingUnit cu
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+  , bool isIntBv = true
+#endif  
+  );
 #endif
   void xIntraPredTimdAngLuma(Pel* pDstBuf, const ptrdiff_t dstStride, Pel* refMain, int width, int height, int deltaPos, int intraPredAngle, const ClpRng& clpRng, int xOffset, int yOffset);
 #if JVET_AC0119_LM_CHROMA_FUSION
@@ -1071,6 +1105,13 @@ public:
                                       , const bool bJointCalc
 #endif
                                       );
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+  void xPadForFracSearchInterpolation (CodingUnit* pcCU, RefTemplateType tempType);
+  void xTmpFracSearchIF(PredictionUnit& pu, Pel* padbf0, unsigned int padStride, Pel* preTmpbf0, unsigned int predTempStride, Pel* tmp0, unsigned int tmpStride, int extUiWidth, int extUiHeight, int fracPrec, int fracDir);
+  void searchFracCandidate( CodingUnit* pcCU, Pel** tarPatch, RefTemplateType tempType);
+  InterPrediction *m_pcInterPred;
+  void setInterPrediction( InterPrediction *inter);
+#endif
 #else
   void searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, );
   void candidateSearchIntra          ( CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight );
@@ -1157,6 +1198,9 @@ public:
     }
 #if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
     m_bvBasedMergeCandidates.clear();
+#endif
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+    m_sgpmMvBasedMergeCandidates.clear();
 #endif
   }
   void initTmpFlmParams()
