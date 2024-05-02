@@ -260,6 +260,9 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   depth             = other.depth;
   btDepth           = other.btDepth;
   mtDepth           = other.mtDepth;
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  mtImplicitDepth   = other.mtImplicitDepth;
+#endif
   splitSeries       = other.splitSeries;
   skip              = other.skip;
 #if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
@@ -538,6 +541,9 @@ void CodingUnit::initData()
   depth             = 0;
   btDepth           = 0;
   mtDepth           = 0;
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  mtImplicitDepth   = 0;
+#endif
   splitSeries       = 0;
   skip              = false;
 #if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0

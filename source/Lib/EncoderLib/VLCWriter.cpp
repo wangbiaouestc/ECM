@@ -1683,6 +1683,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
     }
 #endif
   }
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  WRITE_FLAG(pcSPS->getEnableMaxMttIncrease() ? 1 : 0, "inter_enable_max_mtt_depth_increase");
+#endif
 #if MULTI_HYP_PRED
   WRITE_FLAG(pcSPS->getUseInterMultiHyp() ? 1 : 0, "inter_multi_hyp_enable_flag");
   if (pcSPS->getUseInterMultiHyp())

@@ -2652,6 +2652,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
     pcSPS->setUseGeo(0);
     pcSPS->setMaxNumGeoCand(0);
   }
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  READ_FLAG(uiCode, "inter_enable_max_mtt_depth_increase");            pcSPS->setEnableMaxMttIncrease(uiCode);
+#endif
 #if MULTI_HYP_PRED
   READ_FLAG(uiCode, "inter_multi_hyp_enable_flag");                  pcSPS->setMaxNumAddHyps(uiCode);
   if (pcSPS->getUseInterMultiHyp())

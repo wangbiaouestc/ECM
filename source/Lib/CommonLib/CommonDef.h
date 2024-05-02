@@ -281,6 +281,11 @@ static const double LAMBDA_DEC_SIDE[MAX_QP+1] = {
 };
 #endif
 
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+static const int QTBTTT_TEMPO_PRED_BUFFER_SIZE      =              16;
+static const int QTBTTT_TEMPO_PRED_BLOCK_RESOLUTION =              16;
+static const int LOG2__BLOCK_RESOLUTION             =               4;
+#endif
 #if JVET_AG0145_ADAPTIVE_CLIPPING
 static const int ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_1 =                5;
 static const int ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_0 =                1;

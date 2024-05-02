@@ -317,6 +317,11 @@ typedef AreaBuf<const TCoeff> CPLTescapeBuf;
 typedef AreaBuf<      bool>  PLTtypeBuf;
 typedef AreaBuf<const bool> CPLTtypeBuf;
 
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+typedef AreaBuf<      SplitPred>  QTDepthBuf;
+typedef AreaBuf<const SplitPred> CQTDepthBuf;
+#endif
+
 #define SIZE_AWARE_PER_EL_OP( OP, INC )                     \
 if( ( width & 7 ) == 0 )                                    \
 {                                                           \

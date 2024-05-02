@@ -146,6 +146,9 @@ void Partitioner::setCUData( CodingUnit& cu )
   cu.depth       = currDepth;
   cu.btDepth     = currBtDepth;
   cu.mtDepth     = currMtDepth;
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  cu.mtImplicitDepth = currImplicitBtDepth;
+#endif
   cu.qtDepth     = currQtDepth;
   cu.splitSeries = getSplitSeries();
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
@@ -379,9 +382,136 @@ void QTBTPartitioner::splitCurrArea( const PartSplit split, const CodingStructur
     currQgChromaPos = currArea().chromaPos();
 }
 
-void QTBTPartitioner::canSplit( const CodingStructure &cs, bool& canNo, bool& canQt, bool& canBh, bool& canBv, bool& canTh, bool& canTv )
+void QTBTPartitioner::canSplit( const CodingStructure &cs, bool& canNo, bool& canQt, bool& canBh, bool& canBv, bool& canTh, bool& canTv
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  , unsigned& maxMtt
+#endif
+)
 {
   const PartSplit implicitSplit = m_partStack.back().checkdIfImplicit ? m_partStack.back().implicitSplit : getImplicitSplit( cs );
+
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  Picture* pColPic = cs.slice->getRefPic(RefPicList(cs.slice->isInterB() ? 1 - cs.slice->getColFromL0Flag() : 0), cs.slice->getColRefIdx());
+
+  unsigned maxBTD = cs.pcv->getMaxBtDepth(*cs.slice, chType) + currImplicitBtDepth;
+  unsigned maxBtSize = cs.pcv->getMaxBtSize(*cs.slice, chType);
+  unsigned minBtSize = cs.pcv->getMinBtSize(*cs.slice, chType);
+  unsigned maxTtSize = cs.pcv->getMaxTtSize(*cs.slice, chType);
+  unsigned minTtSize = cs.pcv->getMinTtSize(*cs.slice, chType);
+  unsigned minQtSize = cs.pcv->getMinQtSize(*cs.slice, chType);
+
+  canNo = canQt = canBh = canTh = canBv = canTv = true;
+  bool canBtt = currMtDepth < maxBTD;
+  maxMtt = maxBTD;
+
+  if ((!cs.slice->isIntra() && pColPic != NULL && pColPic->cs->slice != NULL)
+    && (pColPic->cs->area.Y().contains(currArea().blocks[chType].pos().offset((currArea().blocks[chType].lumaSize().width) >> 1,
+      ((currArea().blocks[chType].lumaSize().height) >> 1)))))
+  {
+    SplitPred currentSplitPred = pColPic->cs->getQtDepthInfo(currArea().blocks[chType].pos().offset((currArea().blocks[chType].lumaSize().width) >> 1,
+                                                             ((currArea().blocks[chType].lumaSize().height) >> 1)));
+
+    if (!cs.sps->getPLTMode() || (!pColPic->cs->slice->isIntra()))
+    {
+      if ((int)(currQtDepth + 1) < (int)(currentSplitPred.minqtDetphCol))
+      {
+        canBh = canTh = canBv = canTv = false;
+        canNo = false;
+      }
+    }
+    if (!cs.sps->getPLTMode())
+    {
+      if ((int)(currQtDepth + 1) < (int)(currentSplitPred.qtDetphCol))
+      {
+        if (currMtDepth == 0)
+        {
+          canBh = canBv = false;
+        }
+      }
+    }
+
+    if (pColPic->cs->slice->isIntra())
+    {
+      if ((cs.pcv->getMaxBtDepth(*cs.slice, chType) < currentSplitPred.maxBtDetphCol)
+        && (currQtDepth == currentSplitPred.qtDetphCol - 1)
+        )
+      {
+        if ((currentSplitPred.mttDetphCol >= (pColPic->maxTemporalBtDepth)))
+          maxBTD--;
+      }
+    }
+    if(cs.slice->getSPS()->getEnableMaxMttIncrease())
+    {
+      if (!pColPic->cs->slice->isIntra())
+      {
+        if ((cs.pcv->getMaxBtDepth(*cs.slice, chType) < currentSplitPred.maxBtDetphCol)
+          && (currQtDepth == currentSplitPred.qtDetphCol - 1)
+          )
+        {
+          if ((currentSplitPred.mttDetphCol == (pColPic->maxTemporalBtDepth >> 1))
+            && (((!pColPic->cs->slice->isIntra()) && (std::abs(cs.slice->getPic()->getPOC() - pColPic->getPOC()) <= 2) && cs.slice->getPic()->temporalId != pColPic->temporalId)
+              || ((pColPic->cs->slice->isIntra()) && (cs.slice->getPic()->temporalId == pColPic->temporalId))))
+          {
+            maxBTD++;
+          }
+        }
+      }
+
+      if ((cs.pcv->getMaxBtDepth(*cs.slice, chType) < currentSplitPred.maxBtDetphCol)
+        && (currQtDepth == currentSplitPred.qtDetphCol))
+      {
+        if ((currentSplitPred.mttDetphCol >= (pColPic->maxTemporalBtDepth >> 1)))
+          if (((!pColPic->cs->slice->isIntra()) && (std::abs(cs.slice->getPic()->getPOC() - pColPic->getPOC()) <= 2) && cs.slice->getPic()->temporalId != pColPic->temporalId)
+            || ((pColPic->cs->slice->isIntra()) && (cs.slice->getPic()->temporalId == pColPic->temporalId)))
+          {
+            maxBTD++;
+          }
+      }
+    }
+    if (!cs.sps->getPLTMode())
+    {
+      if ((uint8_t)log2(cs.sps->getCTUSize() / (minQtSize << 1)) >= cs.pcv->getMaxBtDepth(*cs.slice, chType))
+      {
+        if ((uint8_t)cs.pcv->getMaxBtDepth(*cs.slice, chType) == currentSplitPred.maxBtDetphCol)
+        {
+          if (((int)currQtDepth) > ((int)currentSplitPred.qtDetphCol))
+          {
+            if (maxBTD > 0)
+            {
+              maxBTD--;
+            }
+          }
+        }
+      }
+      if (cs.slice->getSliceQp() >= pColPic->cs->slice->getSliceQp())
+      {
+        if (cs.pcv->getMaxBtDepth(*cs.slice, chType) > currentSplitPred.maxBtDetphCol)
+        {
+          if (maxBTD > 0)
+          {
+            maxBTD--;
+          }
+        }
+        if (maxBTD > currentSplitPred.maxBtDetphCol)
+        {
+          if (maxBTD > 0)
+          {
+            maxBTD--;
+          }
+          if (maxBTD > currentSplitPred.maxBtDetphCol)
+          {
+            if (maxBTD > 0)
+            {
+              maxBTD--;
+            }
+          }
+        }
+      }
+    }
+    maxMtt = maxBTD;
+    canBtt = currMtDepth < maxBTD;
+  }
+#else
 
   const unsigned maxBTD         = cs.pcv->getMaxBtDepth( *cs.slice, chType ) + currImplicitBtDepth;
   const unsigned maxBtSize      = cs.pcv->getMaxBtSize ( *cs.slice, chType );
@@ -392,6 +522,7 @@ void QTBTPartitioner::canSplit( const CodingStructure &cs, bool& canNo, bool& ca
 
   canNo = canQt = canBh = canTh = canBv = canTv = true;
   bool canBtt = currMtDepth < maxBTD;
+#endif
 
   // the minimal and maximal sizes are given in luma samples
   const CompArea&  area  = currArea().Y();
@@ -507,7 +638,12 @@ bool QTBTPartitioner::canSplit( const PartSplit split, const CodingStructure &cs
 
   bool canNo, canQt, canBh, canTh, canBv, canTv;
 
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  unsigned maxMtt;
+  canSplit( cs, canNo, canQt, canBh, canBv, canTh, canTv, maxMtt );
+#else
   canSplit( cs, canNo, canQt, canBh, canBv, canTh, canTv );
+#endif
   switch( split )
   {
   case CTU_LEVEL:
