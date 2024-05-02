@@ -960,7 +960,7 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setUseCcpMerge                                       ( m_ccpMerge );
 #endif
 #if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
-  m_cEncLib.setUseDdCcpFusion                                    ( m_ddCcpFusion );
+  m_cEncLib.setUseDdCcpFusion                                    ( m_cccm ? m_ddCcpFusion : false );
 #endif
 #if ENABLE_OBMC
   m_cEncLib.setUseObmc                                           ( m_OBMC );
