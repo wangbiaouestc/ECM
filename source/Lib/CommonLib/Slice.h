@@ -1774,7 +1774,13 @@ private:
   bool              m_MTS;
   bool              m_IntraMTS;                   // 18
   bool              m_InterMTS;                   // 19
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  bool              m_intraLFNSTISlice;
+  bool              m_intraLFNSTPBSlice;
+  bool              m_interLFNST;
+#else
   bool              m_LFNST;
+#endif
   bool              m_SMVD;
   bool              m_Affine;
   bool              m_AffineType;
@@ -2459,8 +2465,17 @@ void                    setCCALFEnabledFlag( bool b )                           
   bool      getUseIntraMTS        ()                                      const     { return m_IntraMTS; }
   void      setUseInterMTS        ( bool b )                                        { m_InterMTS = b; }
   bool      getUseInterMTS        ()                                      const     { return m_InterMTS; }
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  void      setUseIntraLFNSTISlice  ( bool b )                                      { m_intraLFNSTISlice = b; }
+  bool      getUseIntraLFNSTISlice  ()                                    const     { return m_intraLFNSTISlice; }
+  void      setUseIntraLFNSTPBSlice ( bool b )                                      { m_intraLFNSTPBSlice = b; }
+  bool      getUseIntraLFNSTPBSlice ()                                    const     { return m_intraLFNSTPBSlice; }
+  void      setUseInterLFNST      ( bool b )                                        { m_interLFNST = b; }
+  bool      getUseInterLFNST      ()                                      const     { return m_interLFNST; }
+#else
   void      setUseLFNST           ( bool b )                                        { m_LFNST = b; }
   bool      getUseLFNST           ()                                      const     { return m_LFNST; }
+#endif
   void      setUseSMVD(bool b)                                                      { m_SMVD = b; }
   bool      getUseSMVD()                                                  const     { return m_SMVD; }
   void      setUseBcw             ( bool b )                                        { m_bcw = b; }

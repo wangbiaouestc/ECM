@@ -29700,7 +29700,11 @@ bool CU::isNSPTAllowed( const TransformUnit &tu, const ComponentID compID, int w
 {
   bool allowNSPT = isIntra;
 #if JVET_AG0061_INTER_LFNST_NSPT
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  if( tu.cs->sps->getUseInterLFNST() && CU::isInter( *tu.cu ) )
+#else
   if (CU::isInter(*tu.cu))
+#endif
   {
     allowNSPT = true;
   }

@@ -493,7 +493,13 @@ void EncApp::xInitLibCfg()
     CHECK(m_noMipConstraintFlag && m_MIP, "MIP shall be deactivated when m_noMipConstraintFlag is equal to 1");
 
     m_cEncLib.setNoLfnstConstraintFlag(m_noLfnstConstraintFlag);
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+    bool spsLfnstEnabled = ( m_intraLFNSTISlice || m_intraLFNSTPBSlice );
+    spsLfnstEnabled |= m_interLFNST;
+    CHECK( m_noLfnstConstraintFlag && spsLfnstEnabled, "LFNST shall be deactivated when m_noLfnstConstraintFlag is equal to 1" );
+#else
     CHECK(m_noLfnstConstraintFlag && m_LFNST, "LFNST shall be deactivated when m_noLfnstConstraintFlag is equal to 1");
+#endif
 
     m_cEncLib.setNoMmvdConstraintFlag(m_noMmvdConstraintFlag);
     CHECK(m_noMmvdConstraintFlag && m_MMVD, "MMVD shall be deactivated when m_noMmvdConstraintFlag is equal to 1");
@@ -804,8 +810,17 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setLog2SignPredArea                                  (m_log2SignPredArea);
 #endif
 #endif
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  m_cEncLib.setIntraLFNSTISlice                                  ( m_intraLFNSTISlice );
+  m_cEncLib.setIntraLFNSTPBSlice                                 ( m_intraLFNSTPBSlice );
+  m_cEncLib.setInterLFNST                                        ( m_interLFNST );
+#else
   m_cEncLib.setLFNST                                             ( m_LFNST );
+#endif
   m_cEncLib.setUseFastLFNST                                      ( m_useFastLFNST );
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  m_cEncLib.setUseFastInterLFNST                                 ( m_useFastInterLFNST );
+#endif
   m_cEncLib.setSbTmvpEnabledFlag(m_sbTmvpEnableFlag);
   m_cEncLib.setAffine                                            ( m_Affine );
   m_cEncLib.setAffineType                                        ( m_AffineType );

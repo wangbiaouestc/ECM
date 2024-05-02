@@ -1028,8 +1028,17 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("TTFastSkipThr",                                   m_ttFastSkipThr,                                  1.075, "Threshold value of fast skip method for TT split partition")
 #endif
   ("DualITree",                                       m_dualTree,                                       false, "Use separate QTBT trees for intra slice luma and chroma channel types")
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  ( "IntraLFNSTISlice",                               m_intraLFNSTISlice,                               false, "Enable intra-LFNST for I-Slice (0:off, 1:on)  [default: off]" )
+  ( "IntraLFNSTPBSlice",                              m_intraLFNSTPBSlice,                              false, "Enable intra-LFNST for P/B-Slice (0:off, 1:on)  [default: off]" )
+  ( "InterLFNST",                                     m_interLFNST,                                     false, "Enable inter-LFNST/NSPT (0:off, 1:on)  [default: off]" )
+#else
   ( "LFNST",                                          m_LFNST,                                          false, "Enable LFNST (0:off, 1:on)  [default: off]" )
+#endif
   ( "FastLFNST",                                      m_useFastLFNST,                                   false, "Fast methods for LFNST" )
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  ( "FastInterLFNST",                                 m_useFastInterLFNST,                              false, "Fast methods for inter-LFNST/NSPT" )
+#endif
   ("SbTMVP",                                          m_sbTmvpEnableFlag,                               false, "Enable Subblock Temporal Motion Vector Prediction (0: off, 1: on) [default: off]")
   ("MMVD",                                            m_MMVD,                                            true, "Enable Merge mode with Motion Vector Difference (0:off, 1:on)  [default: 1]")
   ("Affine",                                          m_Affine,                                         false, "Enable affine prediction (0:off, 1:on)  [default: off]")
@@ -5572,7 +5581,13 @@ void EncAppCfg::xPrintParameter()
   {
     msg( VERBOSE, "\nTOOL CFG: " );
     msg( VERBOSE, "GOP:%d ", m_iGOPSize );
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+    msg( VERBOSE, "IntraLFNSTISlice:%d ", m_intraLFNSTISlice );
+    msg( VERBOSE, "IntraLFNSTPBSlice:%d ", m_intraLFNSTPBSlice );
+    msg( VERBOSE, "InterLFNST:%d ", m_interLFNST );
+#else
     msg( VERBOSE, "LFNST:%d ", m_LFNST );
+#endif
     msg( VERBOSE, "MMVD:%d ", m_MMVD);
     msg( VERBOSE, "Affine:%d ", m_Affine );
     if ( m_Affine )
@@ -5730,7 +5745,16 @@ void EncAppCfg::xPrintParameter()
   if( m_ImvMode ) msg( VERBOSE, "IMV4PelFast:%d ", m_Imv4PelFast );
   if( m_MTS ) msg( VERBOSE, "MTSMaxCand: %1d(intra) %1d(inter) ", m_MTSIntraMaxCand, m_MTSInterMaxCand );
   if( m_ISP ) msg( VERBOSE, "ISPFast:%d ", m_useFastISP );
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  if( m_intraLFNSTISlice || m_intraLFNSTPBSlice ) msg( VERBOSE, "FastLFNST:%d ", m_useFastLFNST );
+#else
   if( m_LFNST ) msg( VERBOSE, "FastLFNST:%d ", m_useFastLFNST );
+#endif
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  bool lfnstEnabled = ( m_intraLFNSTISlice || m_intraLFNSTPBSlice );
+  lfnstEnabled |= m_interLFNST;
+  if( lfnstEnabled ) msg( VERBOSE, "FastInterLFNST:%d ", m_useFastInterLFNST );
+#endif
   msg( VERBOSE, "AMaxBT:%d ", m_useAMaxBT );
   msg( VERBOSE, "E0023FastEnc:%d ", m_e0023FastEnc );
   msg( VERBOSE, "ContentBasedFastQtbt:%d ", m_contentBasedFastQtbt );

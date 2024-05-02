@@ -2085,7 +2085,13 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
     }
 #endif
   }
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  READ_FLAG( uiCode, "sps_intra_lfnst_intra_slice_enabled_flag" );               pcSPS->setUseIntraLFNSTISlice( uiCode != 0 );
+  READ_FLAG( uiCode, "sps_intra_lfnst_inter_slice_enabled_flag" );               pcSPS->setUseIntraLFNSTPBSlice( uiCode != 0 );
+  READ_FLAG( uiCode, "sps_inter_lfnst_enabled_flag" );            pcSPS->setUseInterLFNST( uiCode != 0 );
+#else
   READ_FLAG(uiCode, "sps_lfnst_enabled_flag");                    pcSPS->setUseLFNST(uiCode != 0);
+#endif
 #endif
 
 #if JVET_S0052_RM_SEPARATE_COLOUR_PLANE
@@ -2916,7 +2922,13 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   }
 #endif
 
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  bool spsLfnstEnabled = ( pcSPS->getUseIntraLFNSTISlice() || pcSPS->getUseIntraLFNSTPBSlice() );
+  spsLfnstEnabled |= pcSPS->getUseInterLFNST();
+  if( spsLfnstEnabled && pcSPS->getScalingListFlag() )
+#else
   if (pcSPS->getUseLFNST() && pcSPS->getScalingListFlag())
+#endif
   {
     READ_FLAG(uiCode, "scaling_matrix_for_lfnst_disabled_flag"); pcSPS->setDisableScalingMatrixForLfnstBlks(uiCode ? true : false);
   }

@@ -477,7 +477,13 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
 #endif
   {
 #if JVET_AC0130_NSPT
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+    bool spsIntraLfnstEnabled = ( ( tu.cu->slice->getSliceType() == I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTISlice() ) ||
+                                  ( tu.cu->slice->getSliceType() != I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTPBSlice() ) );
+    bool allowNSPT = CU::isNSPTAllowed( tu, compID, width, height, spsIntraLfnstEnabled && CU::isIntra( *( tu.cu ) ) );
+#else
     bool allowNSPT = CU::isNSPTAllowed( tu, compID, width, height, CU::isIntra( *( tu.cu ) ) );
+#endif
     if( allowNSPT )
     {
       return;
@@ -770,7 +776,13 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
 #endif
   {
 #if JVET_AC0130_NSPT
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+    bool spsIntraLfnstEnabled = ( ( tu.cu->slice->getSliceType() == I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTISlice() ) ||
+                                  ( tu.cu->slice->getSliceType() != I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTPBSlice() ) );
+    bool allowNSPT = CU::isNSPTAllowed( tu, compID, width, height, spsIntraLfnstEnabled && CU::isIntra( *( tu.cu ) ) );
+#else
     bool allowNSPT = CU::isNSPTAllowed( tu, compID, width, height, CU::isIntra( *( tu.cu ) ) );
+#endif
     if( allowNSPT )
     {
       return;
@@ -1057,7 +1069,13 @@ void TrQuant::invTransformNxN( TransformUnit &tu, const ComponentID &compID, Pel
 
   DTRACE_COEFF_BUF(D_TCOEFF, tempCoeff, tu, tu.cu->predMode, compID);
 
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  bool spsIntraLfnstEnabled = ( ( tu.cu->slice->getSliceType() == I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTISlice() ) ||
+                                ( tu.cu->slice->getSliceType() != I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTPBSlice() ) );
+  if( ( spsIntraLfnstEnabled && CU::isIntra( *tu.cu ) ) || ( tu.cs->sps->getUseInterLFNST() && CU::isInter( *tu.cu ) ) )
+#else
   if (tu.cs->sps->getUseLFNST())
+#endif
   {
     xInvLfnst(tu, compID);
   }
@@ -1393,7 +1411,13 @@ void TrQuant::xT( const TransformUnit &tu, const ComponentID &compID, const CPel
 #endif
 
 #if JVET_AC0130_NSPT
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  bool spsIntraLfnstEnabled = ( ( tu.cu->slice->getSliceType() == I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTISlice() ) ||
+                                ( tu.cu->slice->getSliceType() != I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTPBSlice() ) );
+  bool allowNSPT = CU::isNSPTAllowed( tu, compID, width, height, spsIntraLfnstEnabled && CU::isIntra( *( tu.cu ) ) );
+#else
   const bool allowNSPT = CU::isNSPTAllowed( tu, compID, width, height, CU::isIntra( *(tu.cu) ) );
+#endif
 #endif
 
 #if EXTENDED_LFNST
@@ -1405,10 +1429,18 @@ void TrQuant::xT( const TransformUnit &tu, const ComponentID &compID, const CPel
     skipHeight = height - lfnst_threshold;
   }
 #else
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+#if JVET_AC0130_NSPT
+  if( ( ( spsIntraLfnstEnabled && CU::isIntra( *( tu.cu ) ) ) || ( tu.cs->sps->getUseInterLFNST() && CU::isInter( *( tu.cu ) ) ) ) && tu.cu->lfnstIdx && !allowNSPT )
+#else
+  if( ( ( spsIntraLfnstEnabled && CU::isIntra( *( tu.cu ) ) ) || ( tu.cs->sps->getUseInterLFNST() && CU::isInter( *( tu.cu ) ) ) ) && tu.cu->lfnstIdx )
+#endif
+#else
 #if JVET_AC0130_NSPT
   if( tu.cs->sps->getUseLFNST() && tu.cu->lfnstIdx && !allowNSPT )
 #else
   if( tu.cs->sps->getUseLFNST() && tu.cu->lfnstIdx )
+#endif
 #endif
   {
     if( ( width == 4 && height > 16 ) || ( width > 16 && height == 4 ) )
@@ -1516,7 +1548,13 @@ void TrQuant::xIT( const TransformUnit &tu, const ComponentID &compID, const CCo
 #endif
 
 #if JVET_AC0130_NSPT
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  bool spsIntraLfnstEnabled = ( ( tu.cu->slice->getSliceType() == I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTISlice() ) ||
+                                ( tu.cu->slice->getSliceType() != I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTPBSlice() ) );
+  bool allowNSPT = CU::isNSPTAllowed( tu, compID, width, height, spsIntraLfnstEnabled && CU::isIntra( *( tu.cu ) ) );
+#else
   const bool allowNSPT = CU::isNSPTAllowed( tu, compID, width, height, CU::isIntra( *(tu.cu) ) );
+#endif
 #endif
 
 #if EXTENDED_LFNST
@@ -1528,10 +1566,18 @@ void TrQuant::xIT( const TransformUnit &tu, const ComponentID &compID, const CCo
     skipHeight = height - lfnst_threshold;
   }
 #else
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+#if JVET_AC0130_NSPT
+  if( ( ( spsIntraLfnstEnabled && CU::isIntra( *( tu.cu ) ) ) || ( tu.cs->sps->getUseInterLFNST() && CU::isInter( *( tu.cu ) ) ) ) && tu.cu->lfnstIdx && !allowNSPT )
+#else
+  if( ( ( spsIntraLfnstEnabled && CU::isIntra( *( tu.cu ) ) ) || ( tu.cs->sps->getUseInterLFNST() && CU::isInter( *( tu.cu ) ) ) ) && tu.cu->lfnstIdx )
+#endif
+#else
 #if JVET_AC0130_NSPT
   if( tu.cs->sps->getUseLFNST() && tu.cu->lfnstIdx && !allowNSPT )
 #else
   if( tu.cs->sps->getUseLFNST() && tu.cu->lfnstIdx )
+#endif
 #endif
   {
     if( ( width == 4 && height > 16 ) || ( width > 16 && height == 4 ) )
@@ -2130,14 +2176,26 @@ void TrQuant::transformNxN( TransformUnit& tu, const ComponentID& compID, const 
       xT(tu, compID, resiBuf, tempCoeff, uiWidth, uiHeight);
     }
 #if JVET_AG0061_INTER_LFNST_NSPT
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+    bool spsIntraLfnstEnabled = ( ( tu.cu->slice->getSliceType() == I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTISlice() ) ||
+                                  ( tu.cu->slice->getSliceType() != I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTPBSlice() ) );
+    if( ( spsIntraLfnstEnabled && CU::isIntra( *tu.cu ) ) || ( sps.getUseInterLFNST() && CU::isInter( *tu.cu ) ) )
+#else
     if (sps.getUseLFNST())
+#endif
     {
       xFwdLfnst(tu, compID);
     }
 #endif
   }
 #if !JVET_AG0061_INTER_LFNST_NSPT
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  bool spsIntraLfnstEnabled = ( ( tu.cu->slice->getSliceType() == I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTISlice() ) ||
+                                ( tu.cu->slice->getSliceType() != I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTPBSlice() ) );
+  if( ( spsIntraLfnstEnabled && CU::isIntra( *tu.cu ) ) || ( sps.getUseInterLFNST() && CU::isInter( *tu.cu ) ) )
+#else
   if (sps.getUseLFNST())
+#endif
   {
     xFwdLfnst(tu, compID, loadTr);
   }
@@ -2388,7 +2446,13 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
   int log2Width = floorLog2(uiWidth);
   int log2Height = floorLog2(uiHeight);
   int actualTrIdx = 0, actualLfnstIdx = 0;
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  bool spsIntraLfnstEnabled = ( ( tu.cu->slice->getSliceType() == I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTISlice() ) ||
+                                ( tu.cu->slice->getSliceType() != I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTPBSlice() ) );
+  bool lfnstEnabled = ( ( ( spsIntraLfnstEnabled && CU::isIntra( *( tu.cu ) ) ) || ( tu.cu->cs->sps->getUseInterLFNST() && CU::isInter( *( tu.cu ) ) ) ) && tu.checkLFNSTApplied( residCompID ) );
+#else
   bool lfnstEnabled = tu.checkLFNSTApplied(residCompID);
+#endif
   if (lfnstEnabled)
   {
     actualLfnstIdx = getLfnstIdx(tu, residCompID);
@@ -2785,7 +2849,13 @@ int TrQuant::getLfnstIdx(const TransformUnit &tu, ComponentID compID)
   CHECK((lfnstIdx != 1) && (lfnstIdx != 2), "invalid lfnst idx");
 #endif
 #if JVET_AC0130_NSPT
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  bool spsIntraLfnstEnabled = ( ( tu.cu->slice->getSliceType() == I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTISlice() ) ||
+                                ( tu.cu->slice->getSliceType() != I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTPBSlice() ) );
+  bool allowNSPT = CU::isNSPTAllowed( tu, compID, area.width, area.height, spsIntraLfnstEnabled && CU::isIntra( *( tu.cu ) ) );
+#else
   bool allowNSPT = CU::isNSPTAllowed( tu, compID, area.width, area.height, CU::isIntra( *( tu.cu ) ) );
+#endif
   intraMode = allowNSPT ? PU::getNSPTIntraMode( PU::getWideAngle( tu, intraMode, compID ) ) : getLFNSTIntraMode( PU::getWideAngle( tu, intraMode, compID ) );
 #else
   intraMode = getLFNSTIntraMode(PU::getWideAngle(tu, intraMode, compID));

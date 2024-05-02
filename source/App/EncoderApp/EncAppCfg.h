@@ -392,8 +392,17 @@ protected:
   double    m_ttFastSkipThr;
 #endif
   bool      m_dualTree;
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  bool      m_intraLFNSTISlice;
+  bool      m_intraLFNSTPBSlice;
+  bool      m_interLFNST;
+#else
   bool      m_LFNST;
+#endif
   bool      m_useFastLFNST;
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  bool      m_useFastInterLFNST;
+#endif
   bool      m_sbTmvpEnableFlag;
   bool      m_Affine;
   bool      m_AffineType;

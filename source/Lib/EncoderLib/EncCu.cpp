@@ -2530,9 +2530,17 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
 #endif
 #endif
 
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  bool spsIntraLfnstEnabled = ( ( tempCS->slice->getSliceType() == I_SLICE && sps.getUseIntraLFNSTISlice() ) ||
+                                ( tempCS->slice->getSliceType() != I_SLICE && sps.getUseIntraLFNSTPBSlice() ) );
+#endif
   bool       skipOtherLfnst      = false;
   int        startLfnstIdx       = 0;
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  int        endLfnstIdx         = spsIntraLfnstEnabled ? maxLfnstIdx : 0;
+#else
   int        endLfnstIdx         = sps.getUseLFNST() ? maxLfnstIdx : 0;
+#endif
 #if INTRA_TRANS_ENC_OPT
   if (m_pcEncCfg->getIntraPeriod() == 1)
   {
@@ -2546,7 +2554,11 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
 #if JVET_W0103_INTRA_MTS
   int grpNumMax = 1;
 #else
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  int grpNumMax = spsIntraLfnstEnabled ? m_pcEncCfg->getMTSIntraMaxCand() : 1;
+#else
   int grpNumMax = sps.getUseLFNST() ? m_pcEncCfg->getMTSIntraMaxCand() : 1;
+#endif
 #endif
   m_modeCtrl->setISPWasTested(false);
   m_pcIntraSearch->invalidateBestModeCost();
@@ -2794,7 +2806,11 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
   for( int trGrpIdx = 0; trGrpIdx < grpNumMax; trGrpIdx++ )
   {
     const uint8_t startMtsFlag = trGrpIdx > 0;
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+    const uint8_t endMtsFlag   = spsIntraLfnstEnabled ? considerMtsSecondPass : 0;
+#else
     const uint8_t endMtsFlag   = sps.getUseLFNST() ? considerMtsSecondPass : 0;
+#endif
 
     if( ( trGrpIdx == 0 || ( !skipSecondMtsPass && considerMtsSecondPass ) ) && trGrpCheck[ trGrpIdx ] )
     {
@@ -2811,7 +2827,11 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
             continue;
           }
           //3) if interHad is 0, only try further modes if some intra mode was already better than inter
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+          if( spsIntraLfnstEnabled && m_pcEncCfg->getUsePbIntraFast() && !tempCS->slice->isIntra() && bestCU && CU::isInter( *bestCS->getCU( partitioner.chType ) ) && interHad == 0 )
+#else
           if( sps.getUseLFNST() && m_pcEncCfg->getUsePbIntraFast() && !tempCS->slice->isIntra() && bestCU && CU::isInter( *bestCS->getCU( partitioner.chType ) ) && interHad == 0 )
+#endif
           {
             continue;
           }
@@ -3362,7 +3382,11 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
 
           if( !mtsFlag ) static_cast< double& >( costSize2Nx2NmtsFirstPass ) = tempCS->cost;
 
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+          if( spsIntraLfnstEnabled && !tempCS->cus.empty() )
+#else
           if( sps.getUseLFNST() && !tempCS->cus.empty() )
+#endif
           {
             skipOtherLfnst = m_modeCtrl->checkSkipOtherLfnst( encTestMode, tempCS, partitioner );
           }
@@ -3385,7 +3409,11 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
             }
           }
          
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+          if( !spsIntraLfnstEnabled )
+#else
           if( !sps.getUseLFNST() )
+#endif
           {
             xCheckBestMode( tempCS, bestCS, partitioner, encTestMode );
           }
@@ -3465,7 +3493,11 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
       } //for lfnstIdx
     } //if (!skipSecondMtsPass && considerMtsSecondPass && trGrpCheck[iGrpIdx])
 
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+    if( spsIntraLfnstEnabled && trGrpIdx < 3 )
+#else
     if( sps.getUseLFNST() && trGrpIdx < 3 )
+#endif
     {
       trGrpCheck[ trGrpIdx + 1 ] = false;
 
@@ -21571,7 +21603,11 @@ void EncCu::xEncodeInterResidual(   CodingStructure *&tempCS
 #if JVET_AG0061_INTER_LFNST_NSPT
   cu->lfnstFlag           = false;
   cu->lfnstIdx            = 0;
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  const bool lfnstAllowed = tempCS->sps->getUseInterLFNST() && CU::isInter( *cu )
+#else
   const bool lfnstAllowed = tempCS->sps->getUseLFNST() && CU::isInter(*cu)
+#endif
                             && partitioner.currArea().lwidth() <= tempCS->sps->getMaxTbSize()
                             && partitioner.currArea().lheight() <= tempCS->sps->getMaxTbSize();
 #endif
@@ -22016,7 +22052,11 @@ void EncCu::xEncodeInterResidual(   CodingStructure *&tempCS
       bool testLN = true;
       if (bestCost != MAX_DOUBLE && LNOffCost != MAX_DOUBLE)
       {
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+        double th = m_pcEncCfg->getUseFastInterLFNST() ? 1.01 : std::max( ( 1.0 + 1.0 / sqrt( cu->lwidth() * cu->lheight() ) ), 1.07 );
+#else
         double th = std::max((1.0 + 1.0 / sqrt(cu->lwidth() * cu->lheight())), 1.07);
+#endif
         if (!(prevBestLN == 0 || m_LNCostSave == MAX_DOUBLE))
         {
           assert(m_sbtCostSave[1] <= m_LNCostSave);
