@@ -1809,7 +1809,13 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setLog2SignPredArea                    (m_log2SignPredArea);
 #endif
 #endif
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  sps.setUseIntraLFNSTISlice                 ( m_intraLFNSTISlice );
+  sps.setUseIntraLFNSTPBSlice                ( m_intraLFNSTPBSlice );
+  sps.setUseInterLFNST                       ( m_interLFNST );
+#else
   sps.setUseLFNST                            ( m_LFNST );
+#endif
   sps.setSbTMVPEnabledFlag(m_sbTmvpEnableFlag);
   sps.setAMVREnabledFlag                ( m_ImvMode != IMV_OFF );
   sps.setBDOFEnabledFlag                    ( m_BIO );

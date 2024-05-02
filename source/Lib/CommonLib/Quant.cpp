@@ -1010,7 +1010,13 @@ void Quant::quant(TransformUnit &tu, const ComponentID &compID, const CCoeffBuf 
     const uint32_t lfnstIdx = tu.cu->lfnstIdx;
 #if JVET_W0119_LFNST_EXTENSION
 #if JVET_AC0130_NSPT
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+    bool spsIntraLfnstEnabled = ( ( tu.cu->slice->getSliceType() == I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTISlice() ) ||
+                                  ( tu.cu->slice->getSliceType() != I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTPBSlice() ) );
+    bool allowNSPT = CU::isNSPTAllowed( tu, compID, uiWidth, uiHeight, spsIntraLfnstEnabled && CU::isIntra( *( tu.cu ) ) );
+#else
     bool allowNSPT = CU::isNSPTAllowed( tu, compID, uiWidth, uiHeight, CU::isIntra( *( tu.cu ) ) );
+#endif
 
     const int maxNumberOfCoeffs = lfnstIdx > 0 ? ( allowNSPT ? PU::getNSPTMatrixDim( uiWidth, uiHeight ) : PU::getLFNSTMatrixDim( uiWidth, uiHeight ) ) : piQCoef.area();
 #else
@@ -1018,7 +1024,13 @@ void Quant::quant(TransformUnit &tu, const ComponentID &compID, const CCoeffBuf 
 #endif
 #else
 #if JVET_AC0130_NSPT
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+    bool spsIntraLfnstEnabled = ( ( tu.cu->slice->getSliceType() == I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTISlice() ) ||
+                                  ( tu.cu->slice->getSliceType() != I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTPBSlice() ) );
+    bool allowNSPT = CU::isNSPTAllowed( tu, compID, uiWidth, uiHeight, spsIntraLfnstEnabled && CU::isIntra( *( tu.cu ) ) );
+#else
     bool allowNSPT = CU::isNSPTAllowed( tu, compID, uiWidth, uiHeight, CU::isIntra( *( tu.cu ) ) );
+#endif
 
     const int maxNumberOfCoeffs = lfnstIdx > 0 ? ( allowNSPT ? PU::getNSPTMatrixDim( uiWidth, uiHeight ) : ( ( ( uiWidth == 4 && uiHeight == 4 ) || ( uiWidth == 8 && uiHeight == 8 ) ) ? 8 : 16 ) ) : piQCoef.area();
 #else

@@ -407,8 +407,17 @@ protected:
   bool      m_SBT;                                ///< Sub-Block Transform for inter blocks
   int       m_SBTFast64WidthTh;                   ///< Enable size-64 SBT in encoder RDO check for HD and above sequences
 
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  bool      m_intraLFNSTISlice;
+  bool      m_intraLFNSTPBSlice;
+  bool      m_interLFNST;
+#else
   bool      m_LFNST;
+#endif
   bool      m_useFastLFNST;
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  bool      m_useFastInterLFNST;
+#endif
   bool      m_sbTmvpEnableFlag;
   bool      m_Affine;
   bool      m_AffineType;
@@ -1532,10 +1541,23 @@ public:
   bool      getSubPicIdMappingInSpsFlag                 ()                          { return m_subPicIdMappingInSpsFlag; }
   uint32_t  getSubPicIdLen                              ()                          { return m_subPicIdLen; }
   uint32_t  getSubPicId                                 (int i)                     { return m_subPicId[i]; }
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  void      setIntraLFNSTISlice             ( bool b )       { m_intraLFNSTISlice = b; }
+  bool      getIntraLFNSTISlice()                      const { return m_intraLFNSTISlice; }
+  void      setIntraLFNSTPBSlice            ( bool b )       { m_intraLFNSTPBSlice = b; }
+  bool      getIntraLFNSTPBSlice()                     const { return m_intraLFNSTPBSlice; }
+  void      setInterLFNST                   ( bool b )       { m_interLFNST = b; }
+  bool      getInterLFNST()                            const { return m_interLFNST; }
+#else
   void      setLFNST                        ( bool b )       { m_LFNST = b; }
   bool      getLFNST()                                 const { return m_LFNST; }
+#endif
   void      setUseFastLFNST                 ( bool b )       { m_useFastLFNST = b; }
   bool      getUseFastLFNST()                          const { return m_useFastLFNST; }
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  void      setUseFastInterLFNST            ( bool b )       { m_useFastInterLFNST = b; }
+  bool      getUseFastInterLFNST()                     const { return m_useFastInterLFNST; }
+#endif
 
   void      setUseLMChroma                  ( int n )        { m_LMChroma = n; }
   int       getUseLMChroma()                           const { return m_LMChroma; }

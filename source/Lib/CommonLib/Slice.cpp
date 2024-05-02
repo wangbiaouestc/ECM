@@ -3897,7 +3897,13 @@ SPS::SPS()
 , m_verCollocatedChromaFlag   ( false )
 , m_IntraMTS                  ( false )
 , m_InterMTS                  ( false )
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+, m_intraLFNSTISlice          ( false )
+, m_intraLFNSTPBSlice         ( false )
+, m_interLFNST                ( false )
+#else
 , m_LFNST                     ( false )
+#endif
 , m_Affine                    ( false )
 , m_AffineType                ( false )
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
