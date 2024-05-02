@@ -616,6 +616,9 @@ protected:
 
   bool      m_wrapAround;
   unsigned  m_wrapAroundOffset;
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  bool      m_enableMaxMttIncrease;
+#endif
 #if MULTI_HYP_PRED
   int       m_numMHPCandsToTest;
   int       m_maxNumAddHyps;
@@ -1925,6 +1928,10 @@ public:
   int       getChromaBIFStrength            ()         const { return m_chromaBIFStrength; }
   void      setChromaBIFQPOffset            ( int val )       { m_chromaBIFQPOffset = val; }
   int       getChromaBIFQPOffset            ()         const { return m_chromaBIFQPOffset; }
+#endif
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  void      setEnableMaxMttIncrease         ( bool b )       { m_enableMaxMttIncrease = b; }
+  bool      getEnableMaxMttIncrease         ()         const { return m_enableMaxMttIncrease; }
 #endif
 #if MULTI_HYP_PRED
   void      setNumMHPCandsToTest(int i) { m_numMHPCandsToTest = i; }

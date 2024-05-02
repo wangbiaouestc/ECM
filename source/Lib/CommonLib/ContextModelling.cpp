@@ -253,7 +253,12 @@ void DeriveCtx::CtxSplit( const CodingStructure& cs, Partitioner& partitioner, u
 
   if( _canSplit == nullptr )
   {
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+    unsigned maxMtt;
+    partitioner.canSplit(cs, canSplit[0], canSplit[1], canSplit[2], canSplit[3], canSplit[4], canSplit[5], maxMtt);
+#else
     partitioner.canSplit( cs, canSplit[0], canSplit[1], canSplit[2], canSplit[3], canSplit[4], canSplit[5] );
+#endif
   }
   else
   {

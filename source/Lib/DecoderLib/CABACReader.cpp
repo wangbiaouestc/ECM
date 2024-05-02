@@ -1034,7 +1034,12 @@ PartSplit CABACReader::split_cu_mode( CodingStructure& cs, Partitioner &partitio
   PartSplit mode = CU_DONT_SPLIT;
 
   bool canNo, canQt, canBh, canBv, canTh, canTv;
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  unsigned maxMtt;
+  partitioner.canSplit( cs, canNo, canQt, canBh, canBv, canTh, canTv, maxMtt );
+#else
   partitioner.canSplit( cs, canNo, canQt, canBh, canBv, canTh, canTv );
+#endif
 
   bool canSpl[6] = { canNo, canQt, canBh, canBv, canTh, canTv };
 
@@ -1042,10 +1047,56 @@ PartSplit CABACReader::split_cu_mode( CodingStructure& cs, Partitioner &partitio
   DeriveCtx::CtxSplit( cs, partitioner, ctxSplit, ctxQtSplit, ctxBttHV, ctxBttH12, ctxBttV12, canSpl );
 
   bool isSplit = canBh || canBv || canTh || canTv || canQt;
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  bool canBtt = canBh || canBv || canTh || canTv;
+  bool       isQt = canQt;
+#endif
 
   if( canNo && isSplit )
   {
-    isSplit = m_BinDecoder.decodeBin( Ctx::SplitFlag( ctxSplit ) );
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+    bool colSplitPredExist = false;
+    SplitPred currentSplitPred;
+
+    Picture* pColPic = cs.slice->getRefPic(RefPicList(cs.slice->isInterB() ? 1 - cs.slice->getColFromL0Flag() : 0), cs.slice->getColRefIdx());
+    if (!cs.slice->isIntra() && pColPic != NULL && pColPic->cs->slice != NULL 
+      && (pColPic->cs->area.Y().contains(partitioner.currArea().blocks[partitioner.chType].pos().offset((partitioner.currArea().blocks[partitioner.chType].lumaSize().width) >> 1,
+        ((partitioner.currArea().blocks[partitioner.chType].lumaSize().height) >> 1)))))
+    {
+      currentSplitPred = pColPic->cs->getQtDepthInfo(partitioner.currArea().blocks[partitioner.chType].pos().offset((partitioner.currArea().blocks[partitioner.chType].lumaSize().width) >> 1,
+                                                     ((partitioner.currArea().blocks[partitioner.chType].lumaSize().height) >> 1)));
+      colSplitPredExist = true;
+    }
+
+    if (colSplitPredExist && (partitioner.currQtDepth < currentSplitPred.qtDetphCol))
+    {
+      if (isQt && canBtt)
+      {
+        isQt = m_BinDecoder.decodeBin(Ctx::SplitQtFlag(ctxQtSplit));
+
+        if (isQt)
+        {
+          return CU_QUAD_SPLIT;
+        }
+        canBtt = false;
+
+        if (!isQt)
+        {
+          isSplit = m_BinDecoder.decodeBin(Ctx::SplitFlag(ctxSplit));
+        }
+      }
+      else
+      {
+        isSplit = m_BinDecoder.decodeBin(Ctx::SplitFlag(ctxSplit));
+      }
+    }
+    else
+    {
+#endif
+      isSplit = m_BinDecoder.decodeBin(Ctx::SplitFlag(ctxSplit));
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+    }
+#endif
   }
 
 #if ENABLE_TRACING
@@ -1058,8 +1109,10 @@ PartSplit CABACReader::split_cu_mode( CodingStructure& cs, Partitioner &partitio
     return CU_DONT_SPLIT;
   }
 
+#if !JVET_AH0135_TEMPORAL_PARTITIONING
   const bool canBtt = canBh || canBv || canTh || canTv;
   bool       isQt   = canQt;
+#endif
 
   if( isQt && canBtt )
   {

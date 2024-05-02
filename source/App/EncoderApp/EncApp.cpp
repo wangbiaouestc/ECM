@@ -1379,6 +1379,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setSliceLevelWp                                      ( m_sliceLevelWp );
   m_cEncLib.setSliceLevelDeltaQp                                 ( m_sliceLevelDeltaQp );
   m_cEncLib.setSliceLevelAlf                                     ( m_sliceLevelAlf  );
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  m_cEncLib.setEnableMaxMttIncrease                              ( m_enableMaxMttIncrease );
+#endif
 #if MULTI_HYP_PRED
   m_cEncLib.setNumMHPCandsToTest(m_numMHPCandsToTest);
   m_cEncLib.setMaxNumAddHyps(m_maxNumAddHyps);

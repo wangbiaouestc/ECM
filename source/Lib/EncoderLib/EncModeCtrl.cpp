@@ -1269,6 +1269,28 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
   }
 
 #endif
+
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  const CodingUnit* cuLeft = cs.getCU(cs.area.blocks[partitioner.chType].pos().offset(-1, 0), partitioner.chType);
+  const CodingUnit* cuAbove = cs.getCU(cs.area.blocks[partitioner.chType].pos().offset(0, -1), partitioner.chType);
+
+  bool qtBeforeBt = ((cuLeft && cuAbove && cuLeft->qtDepth > partitioner.currQtDepth && cuAbove->qtDepth > partitioner.currQtDepth)
+    || (cuLeft && !cuAbove && cuLeft->qtDepth > partitioner.currQtDepth)
+    || (!cuLeft && cuAbove && cuAbove->qtDepth > partitioner.currQtDepth)
+    || (!cuAbove && !cuLeft && cs.area.lwidth() >= (32 << cs.slice->getDepth()))
+    )
+    && (cs.area.lwidth() > (cs.pcv->getMinQtSize(*cs.slice, partitioner.chType) << 1));
+
+  unsigned maxBTD;
+  bool canNo, canQt, canBh, canBv, canTh, canTv;
+
+  partitioner.canSplit( cs, canNo, canQt, canBh, canBv, canTh, canTv, maxBTD );
+
+  if (!canBh && !canBv)
+  {
+    qtBeforeBt = true;
+  }
+#else
   const CodingUnit* cuLeft  = cs.getCU( cs.area.blocks[partitioner.chType].pos().offset( -1, 0 ), partitioner.chType );
   const CodingUnit* cuAbove = cs.getCU( cs.area.blocks[partitioner.chType].pos().offset( 0, -1 ), partitioner.chType );
 
@@ -1278,6 +1300,7 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
                          || ( !cuAbove && !cuLeft   && cs.area.lwidth() >= ( 32 << cs.slice->getDepth() ) ) )
                          && ( cs.area.lwidth() > ( cs.pcv->getMinQtSize( *cs.slice, partitioner.chType ) << 1 ) );
 
+#endif
   // set features
   ComprCUCtx &cuECtx  = m_ComprCUCtxList.back();
   cuECtx.set( BEST_NON_SPLIT_COST,  MAX_DOUBLE );
@@ -1357,13 +1380,20 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
 
   if( !cuECtx.get<bool>( QT_BEFORE_BT ) )
   {
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+    if ( canQt )
+#endif
     for( int qp = maxQP; qp >= minQP; qp-- )
     {
       m_ComprCUCtxList.back().testModes.push_back( { ETM_SPLIT_QT, ETO_STANDARD, qp } );
     }
   }
 
+#if JVET_AH0135_TEMPORAL_PARTITIONING 
+  if ( canTv )
+#else
   if( partitioner.canSplit( CU_TRIV_SPLIT, cs ) )
+#endif
   {
     // add split modes
     for( int qp = maxQP; qp >= minQP; qp-- )
@@ -1372,7 +1402,11 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
     }
   }
 
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  if ( canTh )
+#else
   if( partitioner.canSplit( CU_TRIH_SPLIT, cs ) )
+#endif
   {
     // add split modes
     for( int qp = maxQP; qp >= minQP; qp-- )
@@ -1384,7 +1418,11 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
   int minQPq = minQP;
   int maxQPq = maxQP;
   xGetMinMaxQP( minQP, maxQP, cs, partitioner, baseQP, *cs.sps, *cs.pps, CU_BT_SPLIT );
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  if ( canBv )
+#else
   if( partitioner.canSplit( CU_VERT_SPLIT, cs ) )
+#endif
   {
     // add split modes
     for( int qp = maxQP; qp >= minQP; qp-- )
@@ -1398,7 +1436,11 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
     m_ComprCUCtxList.back().set( DID_VERT_SPLIT, false );
   }
 
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  if ( canBh )
+#else
   if( partitioner.canSplit( CU_HORZ_SPLIT, cs ) )
+#endif
   {
     // add split modes
     for( int qp = maxQP; qp >= minQP; qp-- )
@@ -1414,14 +1456,28 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
 
   if( cuECtx.get<bool>( QT_BEFORE_BT ) )
   {
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+    if ( canQt )
+#endif
     for( int qp = maxQPq; qp >= minQPq; qp-- )
     {
       m_ComprCUCtxList.back().testModes.push_back( { ETM_SPLIT_QT, ETO_STANDARD, qp } );
     }
   }
 
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  if ( canNo )
+  {
+#endif
   m_ComprCUCtxList.back().testModes.push_back( { ETM_POST_DONT_SPLIT } );
 
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  }
+  else
+  {
+    return;
+  }
+#endif
   xGetMinMaxQP( minQP, maxQP, cs, partitioner, baseQP, *cs.sps, *cs.pps, CU_DONT_SPLIT );
 
   int  lowestQP = minQP;
@@ -2161,7 +2217,13 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
 #endif
           if( !cuECtx.get<bool>( QT_BEFORE_BT ) && bestCU )
           {
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+            bool canNo, canQt, canBh, canBv, canTh, canTv;
+            unsigned maxBTD;
+            partitioner.canSplit( cs, canNo, canQt, canBh, canBv, canTh, canTv, maxBTD );
+#else 
             unsigned maxBTD        = cs.pcv->getMaxBtDepth( slice, partitioner.chType );
+#endif
             const CodingUnit *cuBR = bestCS->cus.back();
             unsigned height        = partitioner.currArea().lumaSize().height;
 
@@ -2815,6 +2877,12 @@ bool EncModeCtrlMTnoRQT::useModeResult( const EncTestMode& encTestmode, CodingSt
   }
 
   int maxMtD = tempCS->pcv->getMaxBtDepth( *tempCS->slice, partitioner.chType ) + partitioner.currImplicitBtDepth;
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  bool canNo, canQt, canBh, canBv, canTh, canTv;
+  unsigned maxBTD;
+  partitioner.canSplit( *tempCS, canNo, canQt, canBh, canBv, canTh, canTv, maxBTD );
+  maxMtD = (int)maxBTD;
+#endif
 
   if( encTestmode.type == ETM_SPLIT_BT_H )
   {

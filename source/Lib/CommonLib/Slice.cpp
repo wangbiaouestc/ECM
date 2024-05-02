@@ -3808,6 +3808,9 @@ SPS::SPS()
 #if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
   , m_useGeoBlend(true)
 #endif
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  , m_enableMaxMttIncrease(false)
+#endif
 #endif
 , m_SBT                       ( false )
 , m_ISP                       ( false )

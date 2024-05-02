@@ -2091,6 +2091,9 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setItmpLicMode                        ( m_itmpLicMode );
 #endif
   sps.setWrapAroundEnabledFlag                      ( m_wrapAround );
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  sps.setEnableMaxMttIncrease               ( m_enableMaxMttIncrease );
+#endif
 #if MULTI_HYP_PRED
   sps.setMaxNumAddHyps(m_maxNumAddHyps);
   sps.setNumAddHypWeights(m_numAddHypWeights);

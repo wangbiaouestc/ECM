@@ -1291,6 +1291,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #endif
   ("WrapAround",                                      m_wrapAround,                                     false, "Enable horizontal wrap-around motion compensation for inter prediction (0:off, 1:on)  [default: off]")
   ("WrapAroundOffset",                                m_wrapAroundOffset,                                  0u, "Offset in luma samples used for computing the horizontal wrap-around position")
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  ("EnableMaxMttIncrease",                            m_enableMaxMttIncrease,                           false, "Enable Maximum MTT depth increase for temporal partitioning prediction")
+#endif
 #if MULTI_HYP_PRED
   ("NumMHPCandToTest",                                m_numMHPCandsToTest,                                  2, "number of MHP candidates to test at encoder")
   ("AdditionalInterHyps",                             m_maxNumAddHyps,                                      2, "number of additional inter prediction hypotheseis")

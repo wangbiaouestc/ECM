@@ -298,6 +298,9 @@ struct CodingUnit : public UnitArea
   // a triple split would increase the mtDepth by 1, but the qtDepth by 2 in the first and last part and by 1 in the middle part (because of the 1-2-1 split proportions)
   uint8_t        btDepth; // number of applied binary splits, after switching to the mtt (or it's equivalent)
   uint8_t        mtDepth; // the actual number of splits after switching to mtt (equals btDepth if only binary splits are allowed)
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  uint8_t        mtImplicitDepth;
+#endif
   int8_t         chromaQpAdj;
   int8_t         qp;
   SplitSeries    splitSeries;

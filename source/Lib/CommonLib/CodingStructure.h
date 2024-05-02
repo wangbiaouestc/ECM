@@ -179,6 +179,9 @@ public:
   const PredictionUnit *getPU(const Position &pos, const ChannelType _chType) const;
   const TransformUnit  *getTU(const Position &pos, const ChannelType _chType, const int subTuIdx = -1) const;
 
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  CodingUnit     *getCUTempo(const Position& pos, const ChannelType effChType);
+#endif
   CodingUnit     *getCU(const Position &pos, const ChannelType _chType);
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   CodingUnit     *getLumaCU( const Position &pos );
@@ -365,6 +368,9 @@ private:
 #else
   MotionInfo *m_motionBuf;
 #endif
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  SplitPred *currQtDepthBuf;
+#endif
 
 #if JVET_W0123_TIMD_FUSION
 #if JVET_Z0118_GDR
@@ -401,6 +407,14 @@ public:
   MotionInfo& getMotionInfo( const Position& pos );
   const MotionInfo& getMotionInfo( const Position& pos ) const;
 
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  void SetSplitPred();
+
+  QTDepthBuf getQtDepthBuf(const Area& _area);
+  QTDepthBuf getQTDepthBuf()                      { return getQtDepthBuf(area.Y()); }
+
+  SplitPred& getQtDepthInfo(const Position& pos);
+#endif
 #if JVET_AE0043_CCP_MERGE_TEMPORAL
   CCPModelIdxBuf getCcpmIdxBuf( const     Area& bufArea);
   CCPModelIdxBuf getCcpmIdxBuf( const UnitArea& bufArea) { return getCcpmIdxBuf( bufArea.Cb() ); }
