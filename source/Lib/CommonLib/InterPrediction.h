@@ -272,7 +272,9 @@ public:
   int32_t m_bmSubBlkH;
   std::vector<BMSubBlkInfo> m_bmSubBlkList;
 #endif
-
+#if JVET_AH0119_SUBBLOCK_TM
+  MotionInfo            m_sbMiBuf[3][(MAX_CU_SIZE * MAX_CU_SIZE) >> (MIN_CU_LOG2 << 1)];
+#endif
 protected:
   InterpolationFilter  m_if;
 
@@ -1134,7 +1136,9 @@ public:
 #endif
 );
 #endif
-
+#if JVET_AH0119_SUBBLOCK_TM 
+  void getAffAndSbtmvpRefTemplate(PredictionUnit& pu, PelUnitBuf& pcBufPredRefTop, PelUnitBuf& pcBufPredRefLeft,bool isBilinear, AffineMergeCtx affMrgCtx, int interpolationIdx = 2, bool isStore = false, Mv mvOffset = Mv(0, 0), int targetList = 0);
+#endif
 #if JVET_AD0140_MVD_PREDICTION
   template <int iAbove1Left2All3 = 3>
   bool    getAffAMLRefTemplateMvdPredUni(PredictionUnit& pu, PelUnitBuf& pcBufPredRefTop, PelUnitBuf& pcBufPredRefLeft,
@@ -1512,10 +1516,28 @@ public:
   bool      processBDMVR              (PredictionUnit& pu);
 #endif
 #if JVET_AB0112_AFFINE_DMVR
-  bool      processBDMVR4Affine(PredictionUnit& pu);
+  bool      processBDMVR4Affine(PredictionUnit& pu
+#if JVET_AH0119_SUBBLOCK_TM
+    , AffineMergeCtx &affineMergeCtx, bool doTM
+#endif
+  );
+#endif
+#if JVET_AH0119_SUBBLOCK_TM
+  bool processTM4SbTmvpBaseMV(PredictionUnit& pu, AffineMergeCtx &affineMergeCtx, int uiAffMergeCand, Distortion& uiCostOri, Distortion& uiCostBest, uint32_t targetList);
+  bool processTM4SbTmvp(PredictionUnit& pu, AffineMergeCtx &affineMergeCtx, int uiAffMergeCand, bool isEncoder);
 #endif
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
-  bool      processTM4Affine(PredictionUnit& pu, AffineMergeCtx &affineMergeCtx, int uiAffMergeCand, bool isEncoder);
+  bool      processTM4Affine(PredictionUnit& pu, AffineMergeCtx &affineMergeCtx, int uiAffMergeCand, bool isEncoder
+#if JVET_AH0119_SUBBLOCK_TM
+    , bool isTmPara = true
+#endif
+  );
+#if JVET_AH0119_SUBBLOCK_TM
+  Distortion xGetTemplateMatchingError(PredictionUnit& pu, AffineMergeCtx &affineMergeCtx, int interpolationIdx=2 , bool isStore=false);
+  bool processTM4AffineBaseMV(PredictionUnit& pu, AffineMergeCtx &affineMergeCtx, int uiAffMergeCand, Mv(&bestCPMV)[2][3], Distortion& uiCostOri, Distortion& uiCostBest, uint32_t targetList);
+  void xUpdateCPMV(PredictionUnit &pu, int32_t targetRefList, const Mv(&curCPMV)[2][3], const int deltaMvHorX, const int deltaMvHorY, const int deltaMvVerX, const int deltaMvVerY, const int baseCP);
+  bool processTM4AffinePara(PredictionUnit& pu, AffineMergeCtx &affineMergeCtx, int uiAffMergeCand, int32_t targetRefList, Mv(&cpBestMVF)[2][3], Distortion& uiCostOri, Distortion& uiCostBest);
+#endif
 #endif
 #if JVET_X0049_ADAPT_DMVR
   bool      processBDMVRPU2Dir        (PredictionUnit& pu, bool subPURefine[2], Mv(&finalMvDir)[2]);

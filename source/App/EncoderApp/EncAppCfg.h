@@ -411,6 +411,9 @@ protected:
 #if JVET_AG0276_NLIC
   bool      m_useAffAltLMTM;
 #endif
+#if JVET_AH0119_SUBBLOCK_TM
+  bool      m_useSbTmvpTM;
+#endif
 #endif
 #if JVET_AG0135_AFFINE_CIIP
   bool      m_useCiipAffine;

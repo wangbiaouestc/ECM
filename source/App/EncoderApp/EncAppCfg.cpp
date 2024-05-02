@@ -1048,6 +1048,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_AG0276_NLIC
   ("AffAltLMTM",                                      m_useAffAltLMTM,                                   true, "Enable TM-based subblock motion refinement for affine AltLM")
 #endif
+#if JVET_AH0119_SUBBLOCK_TM
+  ("SbTmvpTM",                                        m_useSbTmvpTM,                                     true, "Enable TM-based subblock motion refinement for sbtmvp and affine (0:off, 1:on)  [default: on]")
+#endif
 #endif
 #if AFFINE_MMVD
   ("AffineMMVD",                                      m_AffineMmvdMode,                                  true, "Affine MMVD mode (0:off, 1:on)  [default: on]" )
@@ -4262,6 +4265,13 @@ bool EncAppCfg::xCheckParameter()
     {
       msg(WARNING, "MVD prediction is forcefully disabled since the enable flag of TM tools is set off. \n");
       m_mvdPred = false;
+    }
+#endif
+#if JVET_AH0119_SUBBLOCK_TM
+    if (m_useSbTmvpTM)
+    {
+      msg(WARNING, "Subblock TM is forcefully disabled since enable flag of TM tools is set off. \n");
+      m_useSbTmvpTM = false;
     }
 #endif
   }

@@ -3309,7 +3309,11 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
             {
               if (PU::checkBDMVR4Affine(pu))
               {
-                m_pcInterPred->processBDMVR4Affine(pu);
+                m_pcInterPred->processBDMVR4Affine(pu
+#if JVET_AH0119_SUBBLOCK_TM
+                  , affineMergeCtx, false
+#endif
+                );
               }
               for (int i = 0; i < 2; ++i)
               {
@@ -3585,10 +3589,24 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
               else
               {
 #endif
+#if JVET_AH0119_SUBBLOCK_TM
+                for (int i = 0; i < 3; i++)
+                {
+                  m_mvBufBDMVR[0][i].setZero();
+                  m_mvBufBDMVR[1][i].setZero();
+                }
+                m_pcInterPred->setBdmvrSubPuMvBuf(m_mvBufBDMVR[0], m_mvBufBDMVR[1]);
+#endif
 #if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
                 if (PU::checkBDMVR4Affine(pu))
 #endif
-                m_pcInterPred->processBDMVR4Affine(pu);
+
+                m_pcInterPred->processBDMVR4Affine(pu
+#if JVET_AH0119_SUBBLOCK_TM
+                  , affineMergeCtx
+                  , !pu.affineOppositeLic
+#endif
+                );
 #if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
               }
 #endif
@@ -3601,6 +3619,40 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
               pu.mvAffi[1][2] += m_mvBufBDMVR[1][0];
 #endif
             }
+          }
+#endif
+#if JVET_AH0119_SUBBLOCK_TM
+          else if (pu.cs->sps->getUseAffineTM()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+            && pu.cs->sps->getTMToolsEnableFlag()
+#endif          
+#if JVET_AG0276_NLIC
+            && (pu.cs->sps->getUseAffAltLMTM() || !pu.cu->altLMFlag)
+#endif
+            && !pu.afMmvdFlag&&pu.mergeType != MRG_TYPE_SUBPU_ATMVP && pu.interDir == 3 && PU::checkBDMVR4Affine(pu) && !pu.affBMMergeFlag &&
+#if JVET_AG0276_NLIC
+            ((!pu.cu->altLMFlag && !affineMergeCtx.xCheckSimilarMotion1(pu.mergeIdx, PU::getBDMVRMvdThreshold(pu), false)) ||
+            (pu.cu->altLMFlag && !affineMergeCtx.xCheckSimilarMotion1(pu.mergeIdx, PU::getBDMVRMvdThreshold(pu), true)))
+#else
+            !affineMergeCtx.xCheckSimilarMotion(pu.mergeIdx, PU::getBDMVRMvdThreshold(pu))
+#endif
+            && !pu.affineOppositeLic
+            )
+          {
+            for (int i = 0; i < 3; i++)
+            {
+              m_mvBufBDMVR[0][i].setZero();
+              m_mvBufBDMVR[1][i].setZero();
+            }
+            m_pcInterPred->setBdmvrSubPuMvBuf(m_mvBufBDMVR[0], m_mvBufBDMVR[1]);
+            pu.bdmvrRefine = false;
+            m_pcInterPred->processTM4Affine(pu, affineMergeCtx, -1, false);//bi
+            pu.mvAffi[0][0] += m_mvBufBDMVR[0][0];
+            pu.mvAffi[0][1] += m_mvBufBDMVR[0][1];
+            pu.mvAffi[0][2] += m_mvBufBDMVR[0][2];
+            pu.mvAffi[1][0] += m_mvBufBDMVR[1][0];
+            pu.mvAffi[1][1] += m_mvBufBDMVR[1][1];
+            pu.mvAffi[1][2] += m_mvBufBDMVR[1][2];
           }
 #endif
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
@@ -3629,14 +3681,38 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
             if (!affineMergeCtx.xCheckSimilarMotion(pu.mergeIdx, PU::getBDMVRMvdThreshold(pu)))
 #endif
             {
-              m_pcInterPred->processTM4Affine(pu, affineMergeCtx, isAdditional ? 0 : -1, false);
+              m_pcInterPred->processTM4Affine(pu, affineMergeCtx, isAdditional ? 0 : -1, false
+#if JVET_AH0119_SUBBLOCK_TM              
+                , !pu.affineOppositeLic
+#endif
+              );//uni
+#if JVET_AH0119_SUBBLOCK_TM
+              pu.mvAffi[0][0] += m_mvBufBDMVR[0][0];
+              pu.mvAffi[0][1] += m_mvBufBDMVR[0][1];
+              pu.mvAffi[0][2] += m_mvBufBDMVR[0][2];
+              pu.mvAffi[1][0] += m_mvBufBDMVR[1][0];
+              pu.mvAffi[1][1] += m_mvBufBDMVR[1][1];
+              pu.mvAffi[1][2] += m_mvBufBDMVR[1][2];
+#else
               pu.mvAffi[0][0] += m_mvBufBDMVR[0][0];
               pu.mvAffi[0][1] += m_mvBufBDMVR[0][0];
               pu.mvAffi[0][2] += m_mvBufBDMVR[0][0];
               pu.mvAffi[1][0] += m_mvBufBDMVR[1][0];
               pu.mvAffi[1][1] += m_mvBufBDMVR[1][0];
               pu.mvAffi[1][2] += m_mvBufBDMVR[1][0];
+#endif
             }
+          }
+#endif
+#if JVET_AH0119_SUBBLOCK_TM
+          if (pu.cs->sps->getUseSbTmvpTM()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+            && pu.cs->sps->getTMToolsEnableFlag()
+#endif
+            &&  PU::checkAffineTMCondition(pu)
+            &&  pu.mergeType== MRG_TYPE_SUBPU_ATMVP)
+          {
+            m_pcInterPred->processTM4SbTmvp(pu, affineMergeCtx, -1, false);
           }
 #endif
 #if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT

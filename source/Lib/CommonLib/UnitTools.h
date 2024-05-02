@@ -699,6 +699,9 @@ namespace PU
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
     , int subIdx, MergeCtx mergeCtxIn
     , int col = 0
+#if JVET_AH0119_SUBBLOCK_TM
+    , bool fixRefIdx = false
+#endif
 #else
     , int mmvdList
 #endif

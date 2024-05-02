@@ -121,12 +121,22 @@
 #define NGTXCTX                                           7
 #endif
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+#if JVET_AH0119_SUBBLOCK_TM
+static const double REFINE_THRESHOLD_AFFINE_MERGE = 0.80;
+static const double REFINE_THRESHOLD_SBTMVP_MERGE = 0.80;
+#else
 static const double REFINE_THRESHOLD_AFFINE_MERGE = 0.75;
+#endif
 #endif
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
 static const int SUB_TMVP_CANDIDATE_NUM = 10;
 static const int SUB_TMVP_INDEX = 3;  // 1: 2 subtmvp; 2: 4 subtmvp
+#if JVET_AH0119_SUBBLOCK_TM
+static const int SUB_TMVP_NUM = 2 * SUB_TMVP_INDEX * 2 - 5;
+static const int COLIDX_MAP[2 * SUB_TMVP_INDEX * 2] = { 0,1,2,3,7,5,4,9,8,6,10,11 };
+#else
 static const int SUB_TMVP_NUM = 2 * SUB_TMVP_INDEX;
+#endif
 static const int SUB_TMVP_MV_THRESHOLD = 2;
 static const int AMVP_TMVP_INDEX = 1;  // 1: 2 AMVP tmvp; 2: 4 AMVP tmvp
 #endif
