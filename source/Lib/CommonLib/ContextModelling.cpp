@@ -1163,6 +1163,232 @@ void MergeCtx::setIbcL1Info( PredictionUnit& pu, int candIdx )
 #endif
 
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION                                
+#if JVET_AH0119_SUBBLOCK_TM
+bool AffineMergeCtx::xCheckSimilarSbTMVP(PredictionUnit pu, int mergeCandIndex, uint32_t mvdSimilarityThresh) const
+{
+  if (mvFieldNeighbours[(mergeCandIndex << 1)][0].refIdx < 0 && mvFieldNeighbours[(mergeCandIndex << 1) + 1][0].refIdx < 0)
+  {
+    return true;
+  }
+  if (mvdSimilarityThresh > 1)
+  {
+    int mvdTh = mvdSimilarityThresh;
+    for (uint32_t ui = 0; ui < mergeCandIndex; ui++)
+    {
+      if (interDirNeighbours[ui] == interDirNeighbours[mergeCandIndex])
+      {
+        bool similarCheck = false;
+        if (interDirNeighbours[ui] == 3)
+        {
+          if (mvFieldNeighbours[(ui << 1)][0].refIdx == mvFieldNeighbours[(mergeCandIndex << 1)][0].refIdx
+            && mvFieldNeighbours[(ui << 1) + 1][0].refIdx == mvFieldNeighbours[(mergeCandIndex << 1) + 1][0].refIdx)
+          {
+            Mv mvDiffL0 = mvFieldNeighbours[(ui << 1)][0].mv - mvFieldNeighbours[(mergeCandIndex << 1)][0].mv;
+            Mv mvDiffL1 = mvFieldNeighbours[(ui << 1) + 1][0].mv - mvFieldNeighbours[(mergeCandIndex << 1) + 1][0].mv;
+
+            if (mvDiffL0.getAbsHor() < mvdTh && mvDiffL0.getAbsVer() < mvdTh && mvDiffL1.getAbsHor() < mvdTh
+              && mvDiffL1.getAbsVer() < mvdTh)
+            {
+              similarCheck = true;
+            }
+          }
+        }
+        else if (interDirNeighbours[ui] == 1)
+        {
+          if (mvFieldNeighbours[(ui << 1)][0].refIdx == mvFieldNeighbours[(mergeCandIndex << 1)][0].refIdx)
+          {
+            Mv mvDiff = mvFieldNeighbours[(ui << 1)][0].mv - mvFieldNeighbours[(mergeCandIndex << 1)][0].mv;
+            if (mvDiff.getAbsHor() < mvdTh && mvDiff.getAbsVer() < mvdTh)
+            {
+              similarCheck = true;
+            }
+          }
+        }
+        else if (interDirNeighbours[ui] == 2)
+        {
+          if (mvFieldNeighbours[(ui << 1) + 1][0].refIdx == mvFieldNeighbours[(mergeCandIndex << 1) + 1][0].refIdx)
+          {
+            Mv mvDiff = mvFieldNeighbours[(ui << 1) + 1][0].mv - mvFieldNeighbours[(mergeCandIndex << 1) + 1][0].mv;
+            if (mvDiff.getAbsHor() < mvdTh && mvDiff.getAbsVer() < mvdTh)
+            {
+              similarCheck = true;
+            }
+          }
+        }
+        if (similarCheck)
+        {
+          Size      puSize = pu.lumaSize();
+          int       numPartLine = std::max(puSize.width >> ATMVP_SUB_BLOCK_SIZE, 1u);
+          int       numPartCol = std::max(puSize.height >> ATMVP_SUB_BLOCK_SIZE, 1u);
+          int       puHeight = numPartCol == 1 ? puSize.height : 1 << ATMVP_SUB_BLOCK_SIZE;
+          int       puWidth = numPartLine == 1 ? puSize.width : 1 << ATMVP_SUB_BLOCK_SIZE;
+          MotionBuf mb0 = mrgCtx->subPuMvpMiBuf[colIdx[ui]];
+          MotionBuf mb1 = mrgCtx->subPuMvpMiBuf[colIdx[mergeCandIndex]];
+          for (int h = 0; h < puSize.height && similarCheck; h += puHeight)
+          {
+            for (int w = 0; w < puSize.width && similarCheck; w += puWidth)
+            {
+              MotionInfo mi0 = mb0.buf[(w >> ATMVP_SUB_BLOCK_SIZE) + (h >> ATMVP_SUB_BLOCK_SIZE) * (mrgCtx->subPuMvpMiBuf[0].stride)];
+              MotionInfo mi1 = mb1.buf[(w >> ATMVP_SUB_BLOCK_SIZE) + (h >> ATMVP_SUB_BLOCK_SIZE) * (mrgCtx->subPuMvpMiBuf[0].stride)];
+              char interDir0 = mi0.interDir;
+              char interDir1 = mi1.interDir;
+              if (interDir1 != interDir0)
+              {
+                similarCheck = false;
+              }
+              else
+              {
+                if (interDir1 == 1)
+                {
+                  if (mi1.refIdx[0] == mi0.refIdx[0])
+                  {
+                    Mv mvDiff = mi0.mv[0] - mi1.mv[0];
+                    if (mvDiff.getAbsHor() >= mvdTh || mvDiff.getAbsVer() >= mvdTh)
+                    {
+                      similarCheck = false;
+                    }
+                  }
+                  else
+                  {
+                    similarCheck = false;
+                  }
+                }
+                else if (interDir1 == 2)
+                {
+                  if (mi1.refIdx[1] == mi0.refIdx[1])
+                  {
+                    Mv mvDiff = mi0.mv[1] - mi1.mv[1];
+                    if (mvDiff.getAbsHor() >= mvdTh || mvDiff.getAbsVer() >= mvdTh)
+                    {
+                      similarCheck = false;
+                    }
+                  }
+                  else
+                  {
+                    similarCheck = false;
+                  }
+                }
+                else if (interDir1 == 3)
+                {
+                  if (mi1.refIdx[1] == mi0.refIdx[1] && mi1.refIdx[0] == mi0.refIdx[0])
+                  {
+                    Mv mvDiffL0 = mi0.mv[1] - mi1.mv[1];
+                    Mv mvDiffL1 = mi0.mv[0] - mi1.mv[0];
+                    if (mvDiffL0.getAbsHor() >= mvdTh || mvDiffL0.getAbsVer() >= mvdTh || mvDiffL1.getAbsHor() >= mvdTh
+                      || mvDiffL1.getAbsVer() >= mvdTh)
+                    {
+                      similarCheck = false;
+                    }
+                  }
+                  else
+                  {
+                    similarCheck = false;
+                  }
+                }
+              }
+            }
+          }
+          if (similarCheck)
+          {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+  else
+  {
+    for (uint32_t ui = 0; ui < mergeCandIndex; ui++)
+    {
+      if (interDirNeighbours[ui] == interDirNeighbours[mergeCandIndex])
+      {
+        bool similarCheck = false;
+        if (interDirNeighbours[ui] == 3)
+        {
+          if (mvFieldNeighbours[(ui << 1)][0].refIdx == mvFieldNeighbours[(mergeCandIndex << 1)][0].refIdx
+            && mvFieldNeighbours[(ui << 1) + 1][0].refIdx == mvFieldNeighbours[(mergeCandIndex << 1) + 1][0].refIdx
+            && mvFieldNeighbours[(ui << 1)][0].mv == mvFieldNeighbours[(mergeCandIndex << 1)][0].mv
+            && mvFieldNeighbours[(ui << 1) + 1][0].mv == mvFieldNeighbours[(mergeCandIndex << 1) + 1][0].mv)
+          {
+            similarCheck = true;
+          }
+        }
+        else if (interDirNeighbours[ui] == 1)
+        {
+          if (mvFieldNeighbours[(ui << 1)][0].refIdx == mvFieldNeighbours[(mergeCandIndex << 1)][0].refIdx
+            && mvFieldNeighbours[(ui << 1)][0].mv == mvFieldNeighbours[(mergeCandIndex << 1)][0].mv)
+          {
+            similarCheck = true;
+          }
+        }
+        else if (interDirNeighbours[ui] == 2)
+        {
+          if (mvFieldNeighbours[(ui << 1) + 1][0].refIdx == mvFieldNeighbours[(mergeCandIndex << 1) + 1][0].refIdx
+            && mvFieldNeighbours[(ui << 1) + 1][0].mv == mvFieldNeighbours[(mergeCandIndex << 1) + 1][0].mv)
+          {
+            similarCheck = true;
+          }
+        }
+        if (similarCheck)
+        {
+          Size      puSize = pu.lumaSize();
+          int       numPartLine = std::max(puSize.width >> ATMVP_SUB_BLOCK_SIZE, 1u);
+          int       numPartCol = std::max(puSize.height >> ATMVP_SUB_BLOCK_SIZE, 1u);
+          int       puHeight = numPartCol == 1 ? puSize.height : 1 << ATMVP_SUB_BLOCK_SIZE;
+          int       puWidth = numPartLine == 1 ? puSize.width : 1 << ATMVP_SUB_BLOCK_SIZE;
+          MotionBuf mb0 = mrgCtx->subPuMvpMiBuf[colIdx[ui]];
+          MotionBuf mb1 = mrgCtx->subPuMvpMiBuf[colIdx[mergeCandIndex]];
+          for (int h = 0; h < puSize.height && similarCheck; h += puHeight)
+          {
+            for (int w = 0; w < puSize.width && similarCheck; w += puWidth)
+            {
+              MotionInfo mi0 = mb0.buf[(w >> ATMVP_SUB_BLOCK_SIZE) + (h >> ATMVP_SUB_BLOCK_SIZE) * (mrgCtx->subPuMvpMiBuf[0].stride)];
+              MotionInfo mi1 = mb1.buf[(w >> ATMVP_SUB_BLOCK_SIZE) + (h >> ATMVP_SUB_BLOCK_SIZE) * (mrgCtx->subPuMvpMiBuf[0].stride)];
+              char interDir0 = mi0.interDir;
+              char interDir1 = mi1.interDir;
+              if (interDir1 != interDir0)
+              {
+                similarCheck = false;
+              }
+              else
+              {
+                if (interDir1 == 1)
+                {
+                  if (mi1.refIdx[0] != mi0.refIdx[0] || mi1.mv[0] != mi0.mv[0])
+                  {
+                    similarCheck = false;
+                  }
+                }
+                else if (interDir1 == 2)
+                {
+                  if (mi1.refIdx[1] != mi0.refIdx[1] || mi1.mv[1] != mi0.mv[1])
+                  {
+                    similarCheck = false;
+                  }
+                }
+                else if (interDir1 == 3)
+                {
+                  if (mi1.refIdx[1] != mi0.refIdx[1] || mi1.mv[1] != mi0.mv[1] || mi1.refIdx[0] != mi0.refIdx[0]
+                    || mi1.mv[0] != mi0.mv[0])
+                  {
+                    similarCheck = false;
+                  }
+                }
+              }
+            }
+          }
+          if (similarCheck)
+          {
+            return true;
+          }
+        }
+      }
+    }
+  }
+  return false;
+}
+#endif
 bool MergeCtx::xCheckSimilarMotionSubTMVP(int mergeCandIndex, uint32_t mvdSimilarityThresh) const
 {
   if (interDirNeighbours[mergeCandIndex] == 0)

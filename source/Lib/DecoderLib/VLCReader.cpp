@@ -2556,6 +2556,16 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
       pcSPS->setUseAffAltLMTM(false);
     }
 #endif
+#if JVET_AH0119_SUBBLOCK_TM
+    if (pcSPS->getTMToolsEnableFlag())
+    {
+      READ_FLAG(uiCode, "sps_tm_sbtmvp_flag");       pcSPS->setUseSbTmvpTM(uiCode != 0);
+    }
+    else
+    {
+      pcSPS->setUseSbTmvpTM(false);
+    }
+#endif
 #endif
   }
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED

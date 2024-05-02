@@ -829,6 +829,9 @@ void EncApp::xInitLibCfg()
 #if JVET_AG0276_NLIC
   m_cEncLib.setUseAffAltLMTM                                     ( m_useAffAltLMTM );
 #endif
+#if JVET_AH0119_SUBBLOCK_TM
+  m_cEncLib.setUseSbTmvpTM                                       ( m_useSbTmvpTM );
+#endif
 #endif
 #if AFFINE_MMVD
   m_cEncLib.setAffineMmvdMode                                    ( m_AffineMmvdMode );

@@ -3911,6 +3911,9 @@ SPS::SPS()
 #if JVET_AG0276_NLIC
 , m_useAffAltLMTM             ( false )
 #endif
+#if JVET_AH0119_SUBBLOCK_TM 
+, m_useSbTmvpTM               ( false )
+#endif
 #endif
 , m_PROF                      ( false )
 #if ENABLE_DIMD

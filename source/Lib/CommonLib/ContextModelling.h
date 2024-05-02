@@ -1012,6 +1012,9 @@ public:
 #if JVET_AG0276_NLIC
   bool          xCheckSimilarMotion1(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1, bool isAltLM = false) const;
 #endif
+#if JVET_AH0119_SUBBLOCK_TM
+  bool          xCheckSimilarSbTMVP(PredictionUnit pu, int mergeCandIndex, uint32_t mvdSimilarityThresh = 1) const;
+#endif
 #if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
   void          setLICParamToPu         (      PredictionUnit& pu, int candIdx, bool hasLIC);
   void          setLICParamToPu         (      PredictionUnit& pu, int candIdx, bool hasLIC) const;

@@ -1897,6 +1897,14 @@ void EncLib::xInitSPS( SPS& sps )
     }
   }
 #endif
+#if JVET_AH0119_SUBBLOCK_TM
+  sps.setUseSbTmvpTM(m_useSbTmvpTM);
+  if (getBaseQP() < 27)
+  {
+    sps.setUseSbTmvpTM(false);
+    sps.setUseAffineTM(false);
+  }
+#endif
 #endif
 #if JVET_AG0135_AFFINE_CIIP
   sps.setUseCiipAffine         (((m_sourceWidth * m_sourceHeight) > (m_intraPeriod == -1 ? 832 * 480 : 0)) ? m_useCiipAffine : false);

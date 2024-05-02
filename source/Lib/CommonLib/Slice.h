@@ -1789,6 +1789,9 @@ private:
 #if JVET_AG0276_NLIC
   bool              m_useAffAltLMTM;
 #endif
+#if JVET_AH0119_SUBBLOCK_TM
+  bool              m_useSbTmvpTM;
+#endif
 #endif
   bool              m_PROF;
   bool              m_bcw;                        //
@@ -2637,6 +2640,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if JVET_AG0276_NLIC
   void      setUseAffAltLMTM      ( bool b )                                        { m_useAffAltLMTM = b; }
   bool      getUseAffAltLMTM      ()                                      const     { return m_useAffAltLMTM; }
+#endif
+#if JVET_AH0119_SUBBLOCK_TM
+  void      setUseSbTmvpTM        ( bool b )                                        { m_useSbTmvpTM = b; }
+  bool      getUseSbTmvpTM        ()                                      const     { return m_useSbTmvpTM; }
 #endif
 #endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
