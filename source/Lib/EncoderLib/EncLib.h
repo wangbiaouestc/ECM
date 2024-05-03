@@ -164,7 +164,7 @@ public:
   APS**                     getApss() { return m_apss; }
   Ctx                       m_entropyCodingSyncContextState;      ///< leave in addition to vector for compatibility
   PLTBuf                    m_palettePredictorSyncState;
-#if JVET_AC0096
+#if JVET_AC0096 || JVET_AH0171
   int                       m_gopRprPpsId;
 #endif
 protected:
@@ -275,7 +275,11 @@ public:
                PelStorage* pcPicYuvFilteredOrg,
                const InputColourSpaceConversion snrCSC, // used for SNR calculations. Picture in original colour space.
                std::list<PelUnitBuf*>& rcListPicYuvRecOut,
-               int& iNumEncoded );
+               int& iNumEncoded
+#if JVET_AH0171
+    , PelStorage** ppcPicYuvRPR
+#endif
+  );
 
   bool encode( const InputColourSpaceConversion snrCSC, // used for SNR calculations. Picture in original colour space.
                std::list<PelUnitBuf*>& rcListPicYuvRecOut,

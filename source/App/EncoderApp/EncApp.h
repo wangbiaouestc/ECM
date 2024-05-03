@@ -98,6 +98,9 @@ private:
   PelStorage*            m_trueOrgPic;
   PelStorage*            m_orgPic;
   PelStorage*            m_filteredOrgPic;
+#if JVET_AH0171
+  PelStorage*            m_rprPic[2];
+#endif
 #if EXTENSION_360_VIDEO
   TExt360AppEncTop*      m_ext360;
 #endif

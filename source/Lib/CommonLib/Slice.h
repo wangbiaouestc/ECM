@@ -1519,6 +1519,9 @@ private:
   int               m_rprSwitchingResolutionOrderList[MAX_RPR_SWITCHING_ORDER_LIST_SIZE];
   int               m_rprSwitchingQPOffsetOrderList[MAX_RPR_SWITCHING_ORDER_LIST_SIZE];
 #endif
+#if JVET_AH0171
+  bool              m_gopBasedRPREnabledFlag;
+#endif
   uint32_t          m_log2ParallelMergeLevelMinus2;
   bool              m_ppsValidFlag[64];
   Size              m_scalingWindowSizeInPPS[64];
@@ -1906,6 +1909,10 @@ void                    setCCALFEnabledFlag( bool b )                           
   int       getRprSwitchingResolutionOrderList(int idx)                  const { return m_rprSwitchingResolutionOrderList[idx]; }
   void      setRprSwitchingQPOffsetOrderList(int value, int idx)                    { m_rprSwitchingQPOffsetOrderList[idx] = value; }
   int       getRprSwitchingQPOffsetOrderList(int idx)                    const { return m_rprSwitchingQPOffsetOrderList[idx]; }
+#endif
+#if JVET_AH0171
+  bool      getGOPBasedRPREnabledFlag()                                  const { return m_gopBasedRPREnabledFlag; }
+  void      setGOPBasedRPREnabledFlag(bool flag)                         { m_gopBasedRPREnabledFlag = flag; }
 #endif
   uint32_t  getLog2ParallelMergeLevelMinus2() const { return m_log2ParallelMergeLevelMinus2; }
   void      setLog2ParallelMergeLevelMinus2(uint32_t mrgLevel) { m_log2ParallelMergeLevelMinus2 = mrgLevel; }
