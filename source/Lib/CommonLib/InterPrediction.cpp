@@ -2105,7 +2105,13 @@ void InterPrediction::xProcessDMVR(PredictionUnit& pu, PelUnitBuf &pcYuvDst, con
     const int widthInSubPu = pu.lumaSize().width / DMVR_SUBCU_WIDTH;
     const int spatActivityThreshold = ACTIVITY_TH[std::max<int>(0, pu.cu->qp)];
     // subblock boundary activity threshold
+#if JVET_AH0171
+    // corresponds to encoding in 1/2 reduced resolution when GOP based RPR is used
+    const int boundaryDiffThreshold =
+      pu.cu->slice->getPPS()->getPPSId() == (ENC_PPS_ID_RPR + pu.cu->slice->getNalUnitLayerId()) && pu.cu->slice->getSPS()->getGOPBasedRPREnabledFlag() ? 5 : 10;
+#else
     const int boundaryDiffThreshold = 10;
+#endif
 #endif
     int yStart = 0;
     for (int y = puPos.y; y < (puPos.y + pu.lumaSize().height); y = y + dy, yStart = yStart + dy)

@@ -1463,6 +1463,19 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("ScalingRatioHor3",                                m_scalingRatioHor3,                         1.25, "Scaling ratio in hor direction (4/5)")
   ("ScalingRatioVer3",                                m_scalingRatioVer3,                         1.25, "Scaling ratio in ver direction (4/5)")
 #endif
+#if JVET_AH0171
+  ("GOPBasedRPR",                                     m_gopBasedRPREnabledFlag,                  false, "Enables decision to encode pictures in GOP in full resolution or one of three downscaled resolutions(default is 1/2, 2/3 and 4/5 in both dimensions)")
+  ("GOPBasedRPRQPTh",                                 m_gopBasedRPRQPThreshold,                     32, "QP threshold parameter that determines which QP GOP-based RPR is invoked for given by QP >= GOPBasedRPRQPTh")
+  ("PsnrThresholdRPR",                                m_psnrThresholdRPR,                         47.0, "PSNR threshold for GOP based RPR (1/2)")
+  ("PsnrThresholdRPR2",                               m_psnrThresholdRPR2,                        44.0, "PSNR threshold for GOP based RPR (2/3)")
+  ("PsnrThresholdRPR3",                               m_psnrThresholdRPR3,                        41.0, "PSNR threshold for GOP based RPR (4/5)")
+  ("QpOffsetRPR",                                     m_qpOffsetRPR,                                -6, "QP offset for RPR (-6 for 1/2)")
+  ("QpOffsetRPR2",                                    m_qpOffsetRPR2,                               -4, "QP offset for RPR2 (-4 for 2/3)")
+  ("QpOffsetRPR3",                                    m_qpOffsetRPR3,                               -2, "QP offset for RPR3 (-2 for 4/5)")
+  ("QpOffsetChromaRPR",                               m_qpOffsetChromaRPR,                          -6, "QP offset for RPR (-6 for 0.5x)")
+  ("QpOffsetChromaRPR2",                              m_qpOffsetChromaRPR2,                         -4, "QP offset for RPR2 (-4 for 2/3x)")
+  ("QpOffsetChromaRPR3",                              m_qpOffsetChromaRPR3,                         -2, "QP offset for RPR3 (-2 for 4/5x)")
+#endif
   ( "MaxLayers",                                      m_maxLayers,                                  1, "Max number of layers" )
 #if JVET_S0163_ON_TARGETOLS_SUBLAYERS
   ( "EnableOperatingPointInformation",                m_OPIEnabled,                             false, "Enables writing of Operating Point Information (OPI)" )
@@ -1554,7 +1567,22 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #endif
 
 #if JVET_AC0096
+#if JVET_AH0171
+  if (m_gopBasedRPREnabledFlag)
+  {
+    m_upscaledOutput = 2;
+    if (m_scalingRatioHor == 1.0 && m_scalingRatioVer == 1.0)
+    {
+      m_scalingRatioHor = 2.0;
+      m_scalingRatioVer = 2.0;
+    }
+    // enable dmvr encoder selection
+    m_dmvrEncSelect = true;
+  }
+  m_resChangeInClvsEnabled = m_scalingRatioHor != 1.0 || m_scalingRatioVer != 1.0 || m_gopBasedRPREnabledFlag || m_rprFunctionalityTestingEnabledFlag;
+#else
   m_resChangeInClvsEnabled = m_scalingRatioHor != 1.0 || m_scalingRatioVer != 1.0 || m_rprFunctionalityTestingEnabledFlag;
+#endif
 #else
   m_resChangeInClvsEnabled = m_scalingRatioHor != 1.0 || m_scalingRatioVer != 1.0;
 #endif
@@ -4262,11 +4290,21 @@ void EncAppCfg::xPrintParameter()
   if (m_resChangeInClvsEnabled)
   {
 #if JVET_AC0096
+#if JVET_AH0171
+    if (m_gopBasedRPREnabledFlag || m_rprFunctionalityTestingEnabledFlag)
+#else
     if (m_rprFunctionalityTestingEnabledFlag)
+#endif
     {
+#if JVET_AH0171
+      msg(VERBOSE, "RPR:(%1.2lfx, %1.2lfx)|%d ", m_scalingRatioHor, m_scalingRatioVer, m_rprFunctionalityTestingEnabledFlag ? m_rprSwitchingSegmentSize : m_iGOPSize);
+      msg(VERBOSE, "RPR2:(%1.2lfx, %1.2lfx)|%d ", m_scalingRatioHor2, m_scalingRatioVer2, m_rprFunctionalityTestingEnabledFlag ? m_rprSwitchingSegmentSize : m_iGOPSize);
+      msg(VERBOSE, "RPR3:(%1.2lfx, %1.2lfx)|%d ", m_scalingRatioHor3, m_scalingRatioVer3, m_rprFunctionalityTestingEnabledFlag ? m_rprSwitchingSegmentSize : m_iGOPSize);
+#else
       msg(VERBOSE, "RPR:(%1.2lfx, %1.2lfx)|%d ", m_scalingRatioHor, m_scalingRatioVer, m_rprSwitchingSegmentSize);
       msg(VERBOSE, "RPR2:(%1.2lfx, %1.2lfx)|%d ", m_scalingRatioHor2, m_scalingRatioVer2, m_rprSwitchingSegmentSize);
       msg(VERBOSE, "RPR3:(%1.2lfx, %1.2lfx)|%d ", m_scalingRatioHor3, m_scalingRatioVer3, m_rprSwitchingSegmentSize);
+#endif
     }
 #else
     msg( VERBOSE, "RPR:(%1.2lfx, %1.2lfx)|%d ", m_scalingRatioHor, m_scalingRatioVer, m_switchPocPeriod );
