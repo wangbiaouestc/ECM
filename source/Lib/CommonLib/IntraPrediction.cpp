@@ -25057,16 +25057,19 @@ int IntraPrediction::decoderDerivedCcp(PredictionUnit& pu, std::vector<DecoderDe
   int bestNoFusionCost = MAX_INT;
   int bestNoFusionIndex = 0;
 
-  pu.intraDir[1] = LM_CHROMA_IDX;
-  pu.cccmFlag = 0;
-  cost = tmCostDecoderDerivedCcp(pu, numDdccpModes, pu.intraDir[1]);
-  decoderDerivedCcpList.push_back({ pu.curCand, cost, pu.intraDir[1], pu.cccmFlag, pu.glCccmFlag, pu.ccInsideFilter });
-  if (cost < bestNoFusionCost)
+  if (pu.cs->sps->getUseLMChroma())
   {
-    bestNoFusionCost = cost;
-    bestNoFusionIndex = numDdccpModes;
+    pu.intraDir[1] = LM_CHROMA_IDX;
+    pu.cccmFlag = 0;
+    cost = tmCostDecoderDerivedCcp(pu, numDdccpModes, pu.intraDir[1]);
+    decoderDerivedCcpList.push_back({ pu.curCand, cost, pu.intraDir[1], pu.cccmFlag, pu.glCccmFlag, pu.ccInsideFilter });
+    if (cost < bestNoFusionCost)
+    {
+      bestNoFusionCost = cost;
+      bestNoFusionIndex = numDdccpModes;
+    }
+    numDdccpModes++;
   }
-  numDdccpModes++;
 
   pu.intraDir[1] = LM_CHROMA_IDX;
   pu.cccmFlag = 1;
