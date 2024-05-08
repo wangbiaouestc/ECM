@@ -10772,6 +10772,7 @@ void IntraPrediction::predCoLuma(const CompArea &area, const CPelBuf &recoBuf, P
       }
 
       // padding
+      pred = predBuf.buf;
       // left
       if (refx < 0)
       {
@@ -11145,7 +11146,7 @@ void IntraPrediction::predChromaTM(const CompArea &areaCb, const CompArea &areaC
 #endif
   {
     m_topRefLength = (areaCb.width + line) << 1;
-    m_leftRefLength = (areaCb.height + predMode) << 1;
+    m_leftRefLength = (areaCb.height + line) << 1;
     xFillTimdReferenceSamples(pu.cs->picture->getRecoBuf(areaCb), m_refBuffer[COMPONENT_Cb][PRED_BUF_UNFILTERED], areaCb, *pu.cu, line, line);
     initPredIntraParams(pu, areaCb, *(pu.cs->sps));
     predTimdIntraAng(COMPONENT_Cb, pu, predMode, predCb.buf, predCb.stride, areaCb.width + line, areaCb.height + line, eTplType, line, line);
