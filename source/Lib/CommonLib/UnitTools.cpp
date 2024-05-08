@@ -3566,7 +3566,7 @@ bool PU::allowMPMSorted(const PredictionUnit& pu)
 #if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
 bool PU::hasDecoderDerivedCCP(const PredictionUnit &pu)
 {
-  if (!pu.cs->sps->getUseLMChroma() || !pu.cu->slice->getSPS()->getUseDdCcpFusion())
+  if (!pu.cu->slice->getSPS()->getUseDdCcpFusion())
   {
     return false;
   }

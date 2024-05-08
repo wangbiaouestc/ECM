@@ -2741,7 +2741,14 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   READ_UVLC(uiCode, "sps_ccp_merge");                               pcSPS->setUseCcpMerge(uiCode);
 #endif
 #if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
-  READ_UVLC(uiCode, "sps_ddccp_fusion");                            pcSPS->setUseDdCcpFusion(uiCode);
+  if (pcSPS->getUseCccm())
+  {
+    READ_UVLC(uiCode, "sps_ddccp_fusion");                            pcSPS->setUseDdCcpFusion(uiCode);
+  }
+  else
+  {
+    pcSPS->setUseDdCcpFusion(0);
+  }
 #endif
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
   }
