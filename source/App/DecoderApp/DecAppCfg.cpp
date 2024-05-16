@@ -86,6 +86,7 @@ bool DecAppCfg::parseCfg( int argc, char* argv[] )
 #if ENABLE_SIMD_OPT && defined(TARGET_SIMD_X86)
   ("SIMD",                      ignore,                                string(""), "SIMD extension to use (SCALAR, SSE41, SSE42, AVX, AVX2, AVX512), default: the highest supported extension\n")
 #endif
+
 #if JVET_AG0196_CABAC_RETRAIN
   ("ActivateCABACDumping",      m_activateDump,                        false,      "If true dump cabac bins in file")
 #endif

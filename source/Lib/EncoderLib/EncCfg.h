@@ -1174,6 +1174,10 @@ protected:
   bool      m_asymmetricILF;
 #endif
 
+#if JVET_AH0209_PDP
+  bool         m_pdp;
+#endif
+
 public:
   EncCfg()
   {
@@ -1951,6 +1955,10 @@ public:
   int       getMaxNumAddHypRefFrames()         const { return m_maxNumAddHypRefFrames; }
   void      setAddHypTries(int i) { m_addHypTries = i; }
   int       getAddHypTries()         const { return m_addHypTries; }
+#endif
+#if JVET_AH0209_PDP
+  void      setUsePDP( bool n )                             { m_pdp = n; }
+  bool      getUsePDP()                               const { return m_pdp; }
 #endif
 
   // ADD_NEW_TOOL : (encoder lib) add access functions here

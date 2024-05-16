@@ -3510,6 +3510,13 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
   } //trGrpIdx
   if(!adaptiveColorTrans)
   m_modeCtrl->setBestNonDCT2Cost(bestNonDCT2Cost);
+#if JVET_AH0209_PDP
+  for (int i = 0; i < NUM_LUMA_MODE; i++)
+  {
+    m_pcIntraSearch->m_pdpIntraPredReady[i] = false;
+  }
+#endif
+
   return foundZeroRootCbf;
 }
 

@@ -1095,6 +1095,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setInterCcpMergeZeroLumaCbfFastMode                  ( m_interCcpMergeZeroLumaCbfFastMode );
 #endif
 #endif
+#if JVET_AH0209_PDP
+  m_cEncLib.setUsePDP                                           ( m_pdp );
+#endif
 
   // ADD_NEW_TOOL : (encoder app) add setting of tool enabling flags and associated parameters here
   m_cEncLib.setVirtualBoundariesEnabledFlag                      ( m_virtualBoundariesEnabledFlag );

@@ -2126,6 +2126,9 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setUseInterCcpMergeZeroLumaCbf(m_interCcpMergeZeroLumaCbf);
 #endif
 #endif
+#if JVET_AH0209_PDP
+  sps.setUsePDP( m_pdp );
+#endif
   // ADD_NEW_TOOL : (encoder lib) set tool enabling flags and associated parameters here
   sps.setUseISP                             ( m_ISP );
   sps.setUseLmcs                            ( m_lmcsEnabled );

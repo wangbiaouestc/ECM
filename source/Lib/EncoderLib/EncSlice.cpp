@@ -2094,6 +2094,18 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
   }
 #endif
 
+#if JVET_AH0209_PDP
+  if( m_pcCuEncoder->getEncCfg()->getUsePDP() )
+  {
+    if( cs.slice->getPOC() == 0 || cs.slice->getSliceType() == I_SLICE ) // ensure sequential and parallel simulation generate same output
+    {
+      SPS* spsTmp = const_cast<SPS*>( cs.sps );
+      hashBlkHitPerc = ( hashBlkHitPerc == -1 ) ? m_pcCuEncoder->getIbcHashMap().calHashBlkMatchPerc( cs.area.Y() ) : hashBlkHitPerc;
+      bool isSCC = hashBlkHitPerc >= 20;
+      spsTmp->setUsePDP( !isSCC );
+    }
+  }
+#endif
 #if JVET_AD0188_CCP_MERGE
   if ((pCfg->getSwitchPOC() != pcPic->poc || -1 == pCfg->getDebugCTU()))
   {

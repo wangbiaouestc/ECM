@@ -123,7 +123,9 @@ int main(int argc, char* argv[])
 
   initROM();
   TComHash::initBlockSizeToIndex();
-
+#if JVET_AH0209_PDP
+  createPdpFilters();
+#endif
   char** layerArgv = new char*[argc];
 
   do
@@ -326,7 +328,9 @@ int main(int argc, char* argv[])
 
     delete encApp;
   }
-
+#if JVET_AH0209_PDP
+  destroyPdpFilters();
+#endif
   // destroy ROM
   destroyROM();
 

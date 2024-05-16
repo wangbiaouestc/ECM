@@ -1961,6 +1961,10 @@ private:
   unsigned int      m_tempCabacInitMode;
 #endif
 
+#if JVET_AH0209_PDP
+  bool              m_pdp;
+#endif
+
 public:
 
   SPS();
@@ -2702,6 +2706,11 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   void         setTempCabacInitMode( unsigned n )                                { m_tempCabacInitMode = n; }
   unsigned int getTempCabacInitMode()                                      const { return m_tempCabacInitMode; }
+#endif
+
+#if JVET_AH0209_PDP
+  void      setUsePDP( bool b )                                                 { m_pdp = b; }
+  bool      getUsePDP()                                                   const { return m_pdp; }
 #endif
 };
 

@@ -1342,6 +1342,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("ChromaBIFStrength",                                     m_chromaBIFStrength,                              1u, "chroma bilateral filter strength  (0: half, 1: full, 2: double)  [default: full]")
   ("ChromaBIFQPOffset",                                     m_chromaBIFQPOffset,                              0, "chroma bilateral filter QP offset (0: no offset)  [default: 0]")
 #endif
+#if JVET_AH0209_PDP
+  ("PDP",                                            m_pdp,                                             true, "PDP (0:off, 1:on)  [default: on]" )
+#endif
   // ADD_NEW_TOOL : (encoder app) add parsing parameters here
   ( "VirtualBoundariesPresentInSPSFlag",              m_virtualBoundariesPresentFlag,                    true, "Virtual Boundary position information is signalled in SPS or PH (1:SPS, 0:PH)  [default: on]" )
   ("NumVerVirtualBoundaries",                         m_numVerVirtualBoundaries,                           0u, "Number of vertical virtual boundaries (0-3, inclusive)")
@@ -5819,6 +5822,9 @@ void EncAppCfg::xPrintParameter()
   msg( VERBOSE, "\nECM TOOL CFG: " );
 
   //intra
+#if JVET_AH0209_PDP
+  msg( VERBOSE, "PDP:%d ", m_pdp );
+#endif
 #if ENABLE_DIMD
   msg( VERBOSE, "DIMD:%d ", m_dimd );
 #endif

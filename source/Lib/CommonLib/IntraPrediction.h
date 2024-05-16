@@ -269,6 +269,14 @@ public:
   uint8_t m_intraNonMPM[NUM_NON_MPM_MODES];
 #endif
 
+#if JVET_AH0209_PDP
+  Pel* m_pdpIntraPredBufIP[NUM_LUMA_MODE];
+  bool m_pdpIntraPredReady[NUM_LUMA_MODE];
+  Pel m_ref[256];
+  Pel m_refShort[256];
+  bool m_refAvailable;
+#endif
+
 protected:
 #if JVET_AC0094_REF_SAMPLES_OPT
   Pel m_refBuffer[MAX_NUM_COMPONENT][NUM_PRED_BUF][((MAX_CU_SIZE << 3) + 1 + MAX_REF_LINE_IDX) * 2];
@@ -437,7 +445,10 @@ protected:
   std::vector<PelStorage>   m_intraPredBuffer;
   Pel tempRefAbove[(MAX_CU_SIZE << 3) + 5 + 33 * MAX_REF_LINE_IDX];
   Pel tempRefLeft[(MAX_CU_SIZE << 3) + 5 + 33 * MAX_REF_LINE_IDX];
-
+#if JVET_AH0209_PDP
+  bool (*m_xPredIntraOpt)(PelBuf &pDst, const PredictionUnit &pu, const uint32_t modeIdx, const ClpRng& clpRng, Pel* refF, Pel* refS);
+  static bool xPredIntraOpt(PelBuf &pDst, const PredictionUnit &pu, const uint32_t modeIdx, const ClpRng& clpRng, Pel* refF, Pel* refS);
+#endif
 #if JVET_V0130_INTRA_TMP
   int          m_uiPartLibSize;
 #if JVET_AD0086_ENHANCED_INTRA_TMP
@@ -527,8 +538,12 @@ protected:
 #endif
 
   void xFillReferenceSamples      ( const CPelBuf &recoBuf,      Pel* refBufUnfiltered, const CompArea &area, const CodingUnit &cu );
+
 #if JVET_AH0136_CHROMA_REORDERING
   void xFillReferenceSamplesForCoLuma(const CPelBuf &recoBuf, Pel* refBufUnfiltered, const CompArea &area, const CodingUnit &cu);
+#endif
+#if JVET_AH0209_PDP
+  void xFillReferenceSamples2(const CPelBuf &recoBuf, const CompArea &area, const CodingUnit &cu);
 #endif
   void xFilterReferenceSamples(const Pel *refBufUnfiltered, Pel *refBufFiltered, const CompArea &area, const SPS &sps,
                                int multiRefIdx
@@ -935,7 +950,9 @@ public:
   void       clearPrefilledIntraGPMRefTemplate () {memset(&m_abFilledIntraGPMRefTpl[0], 0, sizeof(m_abFilledIntraGPMRefTpl));}
 #endif
   // Angular Intra
-#if JVET_AB0157_INTRA_FUSION
+#if JVET_AH0209_PDP
+  void predIntraAng(const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu, const bool applyFusion = true, const bool applyPDPFilter = true);
+#elif JVET_AB0157_INTRA_FUSION
   void predIntraAng               ( const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu, const bool applyFusion = true);
 #else
   void predIntraAng               ( const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu);
