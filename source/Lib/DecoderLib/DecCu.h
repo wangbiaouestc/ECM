@@ -84,7 +84,6 @@ protected:
 #if !REMOVE_PCM
   void xFillPCMBuffer     ( CodingUnit&      cu );
 #endif
-
   void xIntraRecBlk       ( TransformUnit&   tu, const ComponentID compID );
   void xIntraRecACTBlk(TransformUnit&   tu);
   void xDecodeInterTU     ( TransformUnit&   tu, const ComponentID compID );

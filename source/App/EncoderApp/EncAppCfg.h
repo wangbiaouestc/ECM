@@ -662,6 +662,9 @@ protected:
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   unsigned  m_tempCabacInitMode;
 #endif
+#if JVET_AH0209_PDP
+  bool      m_pdp;
+#endif
   
   // ADD_NEW_TOOL : (encoder app) add tool enabling flags and associated parameters here
   bool      m_virtualBoundariesEnabledFlag;

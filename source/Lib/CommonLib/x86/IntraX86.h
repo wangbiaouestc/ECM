@@ -2238,6 +2238,158 @@ void ibcCiipBlendingSIMD( Pel *pDst, int strideDst, const Pel *pSrc0, int stride
 }
 #endif
 
+#if JVET_AH0209_PDP
+template< X86_VEXT vext >
+bool xPredIntraOpt_SIMD(PelBuf &pDst, const PredictionUnit &pu, const uint32_t modeIdx, const ClpRng& clpRng, Pel* refF, Pel* refS)
+{
+  const uint32_t width = pDst.width;
+  const uint32_t height = pDst.height;
+  const int sizeKey = (width << 8) + height;
+  const int sizeIdx = g_size.find( sizeKey ) != g_size.end() ? g_size[sizeKey] : -1;
+
+  if( sizeIdx < 0 )
+  {
+    return false;
+  }
+  if (sizeIdx > 12 && modeIdx > 1 && (modeIdx % 4 != 2))
+  {
+    return false;
+  }
+
+  const uint32_t stride = pDst.stride;
+  Pel*           pred = pDst.buf;
+  const int xShift = g_sizeData[sizeIdx][8], yShift = g_sizeData[sizeIdx][9];
+
+  bool shortLen = modeIdx < PDP_SHORT_TH[0] || (modeIdx >= PDP_SHORT_TH[1] && modeIdx <= PDP_SHORT_TH[2]);
+  const int refLen = shortLen ? g_sizeData[sizeIdx][10] : g_sizeData[sizeIdx][7];
+  auto ref = shortLen ? refS : refF;
+
+  int16_t*** filter = g_pdpFilters[modeIdx][sizeIdx];
+  const int addShift = 1 << 13;
+
+  const __m128i offset = _mm_set1_epi32( addShift );
+  const __m128i max = _mm_set1_epi32( 1023 );
+  const __m128i zeros = _mm_setzero_si128();
+  __m128i vmat[ 4 ], vcoef[ 4 ], vsrc;
+
+  bool isHeightLarge = (height == 32);
+  int startY = isHeightLarge? 1 : 0;
+  int strideOffset = isHeightLarge ? (stride << 1) : stride;
+  int offsetY = isHeightLarge ? 2 : 1;
+  if (isHeightLarge)
+  {
+    pred += stride;
+  }
+
+  for (int y = startY; y < height; y+=offsetY, pred += strideOffset)
+  {
+    for (int x = 0; x < width; x+=4)
+    {
+      const int16_t* f0 = filter[y >> yShift][(x >> xShift)>>2];
+
+      vcoef[0] = _mm_setzero_si128();
+      vcoef[1] = _mm_setzero_si128();
+      vcoef[2] = _mm_setzero_si128();
+      vcoef[3] = _mm_setzero_si128();
+      int i;
+      for (i = 0; i < refLen; i+=8)
+      {
+        vsrc = _mm_loadu_si128( ( const __m128i* )&ref[i] );
+        //vsrc = _mm_unpacklo_epi64( vsrc, vsrc);
+
+        vmat[0] = _mm_loadu_si128( ( const __m128i* )f0 );
+        vmat[1] = _mm_loadu_si128( ( const __m128i* )(f0+8 ) );
+        vmat[2] = _mm_loadu_si128( ( const __m128i* )(f0+16) );
+        vmat[3] = _mm_loadu_si128( ( const __m128i* )(f0+24) );
+
+        vcoef[0] = _mm_add_epi32( _mm_madd_epi16( vsrc, vmat[0] ), vcoef[0] );
+        vcoef[1] = _mm_add_epi32( _mm_madd_epi16( vsrc, vmat[1] ), vcoef[1] );
+        vcoef[2] = _mm_add_epi32( _mm_madd_epi16( vsrc, vmat[2] ), vcoef[2] );
+        vcoef[3] = _mm_add_epi32( _mm_madd_epi16( vsrc, vmat[3] ), vcoef[3] );
+
+        f0 += 32;
+      }
+      vcoef[0] = _mm_hadd_epi32( vcoef[0], vcoef[1] );
+      vcoef[2] = _mm_hadd_epi32( vcoef[2], vcoef[3] );
+
+      vcoef[0] = _mm_hadd_epi32( vcoef[0], vcoef[2] );
+      //vcoef[2] = _mm_hadd_epi32( vcoef[2], vcoef[3] );
+      //vcoef[0] =  _mm_unpacklo_epi64(vcoef[0], vcoef[2]);
+      vcoef[0] = _mm_srai_epi32( _mm_add_epi32( vcoef[0], offset ), 14 );
+      vcoef[0] = _mm_min_epi32(vcoef[0], max);
+      vcoef[0] = _mm_max_epi32(vcoef[0], zeros);
+      //_mm_storeu_si128( ( __m128i * )&pred[x], vcoef[0] );
+      *((int64_t *)&pred[x]) = _mm_cvtsi128_si64(_mm_packs_epi32(vcoef[0], vcoef[0]));
+      //pred[x] = (Pel)Clip3(clpRng.min, clpRng.max, (std::max(0, sum) + addShift) >> 14);
+
+    }
+  }
+
+  if (sizeIdx > 12)
+  {
+    int sampFacHor = pDst.width / 16;
+    int sampFacVer = pDst.height / 16;
+
+    int numMRLLeft = g_sizeData[sizeIdx][5];
+    int numMRLTop = g_sizeData[sizeIdx][6];
+    int strideDst = ( pDst.width << 1 ) + numMRLLeft; //fetching from g_ref always.
+    Pel* ptrSrc = refF + ( strideDst * numMRLTop ) + numMRLLeft - 1;
+    Pel* ref2 = refF + ( strideDst*( numMRLTop - 1 ) ) + numMRLLeft;
+
+    pred = pDst.buf;
+    for( int y = 0; y < pDst.height; y++ )
+    {
+      if( 0 != ( sampFacHor - 1 ) && ( y%sampFacVer == ( sampFacVer - 1 ) ) )
+      {
+        pred[0] = ( ptrSrc[0] + pred[1] + 1 ) >> 1;
+      }
+
+      for( int x = 1; x < pDst.width; x++ )
+      {
+        if( ( x%sampFacHor != ( sampFacHor - 1 ) ) && ( y%sampFacVer == ( sampFacVer - 1 ) ) )
+        {
+          pred[x] = ( pred[x - 1] + pred[x + 1] + 1 ) >> 1;
+        }
+      }
+
+      pred += stride;
+      ptrSrc += numMRLLeft;
+    }
+
+    pred = pDst.buf;
+    Pel* pred1 = pred + stride;
+    if( 0 != ( sampFacVer - 1 ) )
+    {
+      for( int x = 0; x < pDst.width; x++ )
+      {
+        pred[x] = ( ref2[x] + pred1[x] + 1 ) >> 1;
+      }
+    }
+
+    pred += stride;
+    Pel* pred0 = pred - stride;
+    pred1 = pred + stride;
+
+    for( int y = 1; y < pDst.height; y++ )
+    {
+      if( ( y%sampFacVer != ( sampFacVer - 1 ) ) )
+      {
+        for( int x = 0; x < pDst.width; x++ )
+        {
+          pred[x] = ( pred0[x] + pred1[x] + 1 ) >> 1;
+        }
+      }
+
+      pred += stride;
+      pred0 += stride;
+      pred1 += stride;
+    }
+  }
+
+  return true;
+}
+#endif
+
 #if JVET_AG0058_EIP && INTRA_TRANS_ENC_OPT
 template< X86_VEXT vext >
 int64_t calcAeipGroupSumSIMD(const Pel* src1, const Pel* src2, const int numSamples)
@@ -2299,6 +2451,9 @@ void IntraPrediction::_initIntraX86()
 #endif
 #if JVET_AC0112_IBC_CIIP && INTRA_TRANS_ENC_OPT
   m_ibcCiipBlending = ibcCiipBlendingSIMD<vext>;
+#endif
+#if JVET_AH0209_PDP
+  m_xPredIntraOpt = xPredIntraOpt_SIMD<vext>;
 #endif
 #if JVET_AG0058_EIP && INTRA_TRANS_ENC_OPT
   m_calcAeipGroupSum = calcAeipGroupSumSIMD<vext>;

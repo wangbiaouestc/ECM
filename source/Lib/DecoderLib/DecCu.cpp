@@ -1304,6 +1304,7 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
         else
 #endif
         m_pcIntraPred->predIntraAng(COMPONENT_Cr, piPredCr, pu);
+
 #if JVET_Z0050_DIMD_CHROMA_FUSION
         if (pu.isChromaFusion)
         {

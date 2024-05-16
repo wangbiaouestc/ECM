@@ -326,7 +326,12 @@ static const int MIP_MAX_HEIGHT =                                  MAX_INTRA_SIZ
 static const int MIP_MAX_WIDTH =                                   MAX_TB_SIZEY;
 static const int MIP_MAX_HEIGHT =                                  MAX_TB_SIZEY;
 #endif
-
+#if JVET_AH0209_PDP
+static const int PDP_NUM_MODES =                                  67;
+static const int PDP_NUM_SIZES =                                  18;
+static const int PDP_NUM_GROUPS =                                 67;
+static const int PDP_SHORT_TH[3] =                     { 0, 19, 49 };
+#endif
 #if JVET_W0066_CCSAO
 #define          MAX_CCSAO_SET_NUM                                  4
 static const int MAX_CCSAO_CAND_POS_Y        =                      9;
@@ -410,7 +415,7 @@ static const int NUM_DB_PAD                  =                      1;
 #if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
 static const int MAX_NUM_ALF_LUMA_COEFF      =                     11 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF_NEW + NUM_RESI + 1 + NUM_GAUSS_FILTERED_COEFF;
 #elif JVET_AD0222_ALF_LONG_FIXFILTER
-static const int MAX_NUM_ALF_LUMA_COEFF      =                     11 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF_NEW + NUM_RESI + 1
+static const int MAX_NUM_ALF_LUMA_COEFF = 11 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF_NEW + NUM_RESI + 1;
 #elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
 static const int MAX_NUM_ALF_LUMA_COEFF      =                     21 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF + NUM_RESI + 1 + NUM_GAUSS_FILTERED_COEFF;
 #else

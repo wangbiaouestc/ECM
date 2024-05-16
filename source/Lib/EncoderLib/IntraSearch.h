@@ -628,7 +628,9 @@ private:
   uint8_t         m_intraModeReady[NUM_LUMA_MODE];
 #endif
 #endif
-
+#if JVET_AH0209_PDP
+  Pel* m_pdpIntraPredBuf[NUM_LUMA_MODE];
+#endif
 #if JVET_AG0058_EIP
   Pel* m_eipPredBuf[NUM_DERIVED_EIP];
   Pel* m_eipMergePredBuf[MAX_MERGE_EIP];
