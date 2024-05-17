@@ -2009,7 +2009,7 @@ void MergeCtx::copyMergeCtx(MergeCtx & orgMergeCtx)
   memcpy(interDirNeighbours, orgMergeCtx.interDirNeighbours, MRG_MAX_NUM_CANDS * sizeof(unsigned char));
   memcpy(mvFieldNeighbours, orgMergeCtx.mvFieldNeighbours, (MRG_MAX_NUM_CANDS << 1) * sizeof(MvField));
 #if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
-  for (int i = 0; i < MRG_MAX_NUM_CANDS; ++i)
+  for (int i = 0; i < orgMergeCtx.numValidMergeCand; ++i)
   {
     copyLICParamFromCtx(i, orgMergeCtx, i);
 #if JVET_AG0276_NLIC
