@@ -5634,10 +5634,8 @@ void IntraPrediction::xFillReferenceSamples2(const CPelBuf &recoBuf, const CompA
     const Position posRT = area.topRight();
     const Position posLB = area.bottomLeft();
 
-    bool neighborFlags[ 4 * MAX_NUM_PART_IDXS_IN_CTU_WIDTH + 1 ];
+    bool neighborFlags[4 * MAX_NUM_PART_IDXS_IN_CTU_WIDTH + 1] = { false };
     int numIntraNeighbor = 0;
-
-    memset( neighborFlags, 0, totalUnits );
 
     neighborFlags[ totalLeftUnits ] = isAboveLeftAvailable( cu, chType, posLT );
     numIntraNeighbor += neighborFlags[ totalLeftUnits ] ? 1 : 0;
