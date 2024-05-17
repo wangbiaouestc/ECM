@@ -504,10 +504,16 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
 #if JVET_V0094_BILATERAL_FILTER
     if (ctuRsAddr == 0)
     {
-      cabacReader.bif(COMPONENT_Y, cs);
+      if (cs.pps->getUseBIF())
+      {
+        cabacReader.bif(COMPONENT_Y, cs);
+      }
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-      cabacReader.bif( COMPONENT_Cb, cs );
-      cabacReader.bif( COMPONENT_Cr, cs );
+      if (cs.pps->getUseChromaBIF())
+      {
+        cabacReader.bif(COMPONENT_Cb, cs);
+        cabacReader.bif(COMPONENT_Cr, cs);
+      }
 #endif
     }
 #endif
