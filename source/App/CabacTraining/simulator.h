@@ -120,15 +120,22 @@ inline double cost1Db( const DataSequences &seqs, const ModelParameters &prms, S
   }
   return costr;
 }
-
+#if JVET_AH0176_LOW_DELAY_B_CTX
+inline double cost1Db( const DataSequences &seqs, const std::array<ModelParameters, kNbModels> &prms, const std::array<bool, kNbModels> &sliceActivation )
+#else
 inline double cost1Db( const DataSequences &seqs, const std::array<ModelParameters, 3> &prms, const std::array<bool, 3> &sliceActivation )
+#endif
 {
   double costr = 1;
   for( const auto &seq : seqs )
   {
     double costr2 = 0.;
 
+#if JVET_AH0176_LOW_DELAY_B_CTX
+    for( int i = 0; i < kNbModels; ++i )
+#else
     for( int i = 0; i < 3; ++i )
+#endif
     {
       if( sliceActivation[i] )
       {

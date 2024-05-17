@@ -1028,8 +1028,17 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("TTFastSkipThr",                                   m_ttFastSkipThr,                                  1.075, "Threshold value of fast skip method for TT split partition")
 #endif
   ("DualITree",                                       m_dualTree,                                       false, "Use separate QTBT trees for intra slice luma and chroma channel types")
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  ( "IntraLFNSTISlice",                               m_intraLFNSTISlice,                               false, "Enable intra-LFNST for I-Slice (0:off, 1:on)  [default: off]" )
+  ( "IntraLFNSTPBSlice",                              m_intraLFNSTPBSlice,                              false, "Enable intra-LFNST for P/B-Slice (0:off, 1:on)  [default: off]" )
+  ( "InterLFNST",                                     m_interLFNST,                                     false, "Enable inter-LFNST/NSPT (0:off, 1:on)  [default: off]" )
+#else
   ( "LFNST",                                          m_LFNST,                                          false, "Enable LFNST (0:off, 1:on)  [default: off]" )
+#endif
   ( "FastLFNST",                                      m_useFastLFNST,                                   false, "Fast methods for LFNST" )
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  ( "FastInterLFNST",                                 m_useFastInterLFNST,                              false, "Fast methods for inter-LFNST/NSPT" )
+#endif
   ("SbTMVP",                                          m_sbTmvpEnableFlag,                               false, "Enable Subblock Temporal Motion Vector Prediction (0: off, 1: on) [default: off]")
   ("MMVD",                                            m_MMVD,                                            true, "Enable Merge mode with Motion Vector Difference (0:off, 1:on)  [default: 1]")
   ("Affine",                                          m_Affine,                                         false, "Enable affine prediction (0:off, 1:on)  [default: off]")
@@ -1038,6 +1047,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("AffineTM",                                        m_useAffineTM,                                     true, "Enable TM-based subblock motion refinement (0:off, 1:on)  [default: on]")
 #if JVET_AG0276_NLIC
   ("AffAltLMTM",                                      m_useAffAltLMTM,                                   true, "Enable TM-based subblock motion refinement for affine AltLM")
+#endif
+#if JVET_AH0119_SUBBLOCK_TM
+  ("SbTmvpTM",                                        m_useSbTmvpTM,                                     true, "Enable TM-based subblock motion refinement for sbtmvp and affine (0:off, 1:on)  [default: on]")
 #endif
 #endif
 #if AFFINE_MMVD
@@ -1153,6 +1165,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #endif
 #if JVET_AD0085_MPM_SORTING
   ( "MPMSorting",                                     m_mpmSorting,                                      true,  "Enable template-based intra MPM list construction\n" )
+#endif
+#if JVET_AH0136_CHROMA_REORDERING
+  ("ChromaReordering",                                m_chromaReordering,                                true, "Enable template-based intra chroma list reordering\n")
 #endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   ( "CCCM",                                           m_cccm,                                               2,  "CCCM mode (0:off, 1:on, 2:on subsampling and no subsampling)  [default: 2]")
@@ -1279,6 +1294,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #endif
   ("WrapAround",                                      m_wrapAround,                                     false, "Enable horizontal wrap-around motion compensation for inter prediction (0:off, 1:on)  [default: off]")
   ("WrapAroundOffset",                                m_wrapAroundOffset,                                  0u, "Offset in luma samples used for computing the horizontal wrap-around position")
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  ("EnableMaxMttIncrease",                            m_enableMaxMttIncrease,                           false, "Enable Maximum MTT depth increase for temporal partitioning prediction")
+#endif
 #if MULTI_HYP_PRED
   ("NumMHPCandToTest",                                m_numMHPCandsToTest,                                  2, "number of MHP candidates to test at encoder")
   ("AdditionalInterHyps",                             m_maxNumAddHyps,                                      2, "number of additional inter prediction hypotheseis")
@@ -1309,6 +1327,10 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_AF0073_INTER_CCP_MERGE
   ("InterCcpMerge",                                   m_interCcpMerge,                                  true, "Cross-component prediction merge for inter prediction (0: off, 1:on)  [default: on]")
   ("InterCcpMergeFastMode",                           m_interCcpMergeFastMode,                             0, "Fast mode of cross-component prediction merge for inter prediction")
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  ("InterCcpMergeZeroLumaCbf",                        m_interCcpMergeZeroLumaCbf,                       true, "Cross-component prediction merge for inter prediction when lumaCbf equal to 0 (0: off, 1:on)  [default: on]")
+  ("InterCcpMergeZeroLumaCbfFastMode",                m_interCcpMergeZeroLumaCbfFastMode,               0, "Fast mode of cross-component prediction merge for inter prediction when lumaCbf equal to 0")
+#endif
 #endif
 #if JVET_V0094_BILATERAL_FILTER
   ("BIF",                                             m_BIF,                                            true, "bilateral filter   (0: off, 1:on)  [default: on]")
@@ -1319,6 +1341,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("ChromaBIF",                                             m_chromaBIF,                                      true, "chroma bilateral filter   (0: off, 1:on)  [default: on]")
   ("ChromaBIFStrength",                                     m_chromaBIFStrength,                              1u, "chroma bilateral filter strength  (0: half, 1: full, 2: double)  [default: full]")
   ("ChromaBIFQPOffset",                                     m_chromaBIFQPOffset,                              0, "chroma bilateral filter QP offset (0: no offset)  [default: 0]")
+#endif
+#if JVET_AH0209_PDP
+  ("PDP",                                            m_pdp,                                             true, "PDP (0:off, 1:on)  [default: on]" )
 #endif
   // ADD_NEW_TOOL : (encoder app) add parsing parameters here
   ( "VirtualBoundariesPresentInSPSFlag",              m_virtualBoundariesPresentFlag,                    true, "Virtual Boundary position information is signalled in SPS or PH (1:SPS, 0:PH)  [default: on]" )
@@ -1521,6 +1546,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #endif
 #if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
   ("AlfPrecision",                                    m_alfPrecision,                                    true, "Luma Alf with variable precision coefficients" )
+#endif
+#if JVET_AH0057_CCALF_COEFF_PRECISION
+  ("CCALFPrecision",                                  m_ccalfPrecision,                                  true, "Cross-component Alf with variable precision coefficients")
 #endif
   ("TestSAODisableAtPictureLevel",                    m_bTestSAODisableAtPictureLevel,                  false, "Enables the testing of disabling SAO at the picture level after having analysed all blocks")
   ("SaoEncodingRate",                                 m_saoEncodingRate,                                 0.75, "When >0 SAO early picture termination is enabled for luma and chroma")
@@ -3124,7 +3152,11 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #endif
 #if JVET_AF0073_INTER_CCP_MERGE
   m_interCcpMergeFastMode = (m_sourceHeight > 1080) ? 1 : 0;
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  m_interCcpMergeZeroLumaCbfFastMode = (m_sourceHeight < 1080) ? 1 : 0;
 #endif
+#endif
+
   if (m_chromaFormatIDC != CHROMA_420)
   {
     if (!m_horCollocatedChromaFlag)
@@ -4085,6 +4117,13 @@ bool EncAppCfg::xCheckParameter()
       m_mpmSorting = false;
     }
 #endif
+#if JVET_AH0136_CHROMA_REORDERING
+    if (m_chromaReordering)
+    {
+      msg(WARNING, "ChromaReordering is forcefully disabled since the enable flag of non-inter-TM tools is set off. \n");
+      m_chromaReordering = false;
+    }
+#endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
     if (m_tmibc)
     {
@@ -4119,8 +4158,14 @@ bool EncAppCfg::xCheckParameter()
     m_maxNumAffineMergeCand = m_sbTmvpEnableFlag ? 1 : 0;
     if (m_PROF) msg(WARNING, "PROF is forcefully disabled when Affine is off \n");
     m_PROF = false;
+#if JVET_AG0276_NLIC
+    if (m_affAltLM) msg(WARNING, "Affine AltLM is forcefully disabled when Affine is off \n");
+    m_affAltLM = false;
+#endif
 #if JVET_AG0276_LIC_FLAG_SIGNALING
     m_maxNumAffineOppositeLicMergeCand = 0;
+    if (m_mergeAffOppositeLic) msg(WARNING, "MergeAffOppositeLic is forcefully disabled when Affine is off \n");
+    m_mergeAffOppositeLic = false;
 #endif
   }
 #if MULTI_PASS_DMVR
@@ -4226,6 +4271,13 @@ bool EncAppCfg::xCheckParameter()
     {
       msg(WARNING, "MVD prediction is forcefully disabled since the enable flag of TM tools is set off. \n");
       m_mvdPred = false;
+    }
+#endif
+#if JVET_AH0119_SUBBLOCK_TM
+    if (m_useSbTmvpTM)
+    {
+      msg(WARNING, "Subblock TM is forcefully disabled since enable flag of TM tools is set off. \n");
+      m_useSbTmvpTM = false;
     }
 #endif
   }
@@ -5545,7 +5597,13 @@ void EncAppCfg::xPrintParameter()
   {
     msg( VERBOSE, "\nTOOL CFG: " );
     msg( VERBOSE, "GOP:%d ", m_iGOPSize );
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+    msg( VERBOSE, "IntraLFNSTISlice:%d ", m_intraLFNSTISlice );
+    msg( VERBOSE, "IntraLFNSTPBSlice:%d ", m_intraLFNSTPBSlice );
+    msg( VERBOSE, "InterLFNST:%d ", m_interLFNST );
+#else
     msg( VERBOSE, "LFNST:%d ", m_LFNST );
+#endif
     msg( VERBOSE, "MMVD:%d ", m_MMVD);
     msg( VERBOSE, "Affine:%d ", m_Affine );
     if ( m_Affine )
@@ -5703,7 +5761,16 @@ void EncAppCfg::xPrintParameter()
   if( m_ImvMode ) msg( VERBOSE, "IMV4PelFast:%d ", m_Imv4PelFast );
   if( m_MTS ) msg( VERBOSE, "MTSMaxCand: %1d(intra) %1d(inter) ", m_MTSIntraMaxCand, m_MTSInterMaxCand );
   if( m_ISP ) msg( VERBOSE, "ISPFast:%d ", m_useFastISP );
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  if( m_intraLFNSTISlice || m_intraLFNSTPBSlice ) msg( VERBOSE, "FastLFNST:%d ", m_useFastLFNST );
+#else
   if( m_LFNST ) msg( VERBOSE, "FastLFNST:%d ", m_useFastLFNST );
+#endif
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  bool lfnstEnabled = ( m_intraLFNSTISlice || m_intraLFNSTPBSlice );
+  lfnstEnabled |= m_interLFNST;
+  if( lfnstEnabled ) msg( VERBOSE, "FastInterLFNST:%d ", m_useFastInterLFNST );
+#endif
   msg( VERBOSE, "AMaxBT:%d ", m_useAMaxBT );
   msg( VERBOSE, "E0023FastEnc:%d ", m_e0023FastEnc );
   msg( VERBOSE, "ContentBasedFastQtbt:%d ", m_contentBasedFastQtbt );
@@ -5755,6 +5822,9 @@ void EncAppCfg::xPrintParameter()
   msg( VERBOSE, "\nECM TOOL CFG: " );
 
   //intra
+#if JVET_AH0209_PDP
+  msg( VERBOSE, "PDP:%d ", m_pdp );
+#endif
 #if ENABLE_DIMD
   msg( VERBOSE, "DIMD:%d ", m_dimd );
 #endif
@@ -5772,6 +5842,9 @@ void EncAppCfg::xPrintParameter()
 #endif
 #if JVET_AD0085_MPM_SORTING && !JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
   msg(VERBOSE, "MPMSorting:%d ", m_mpmSorting);
+#endif
+#if JVET_AH0136_CHROMA_REORDERING && !JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  msg(VERBOSE, "ChromaReordering:%d ", m_chromaReordering);
 #endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   msg(VERBOSE, "CCCM:%d ", m_cccm);
@@ -5826,6 +5899,9 @@ void EncAppCfg::xPrintParameter()
 #if JVET_AD0085_MPM_SORTING
   msg(VERBOSE, "MPMsorting:%d ", m_mpmSorting);
 #endif
+#if JVET_AH0136_CHROMA_REORDERING
+  msg(VERBOSE, "ChromaReordering:%d ", m_chromaReordering);
+#endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   msg(VERBOSE, "TM-IBC:%d ", m_tmibc);
 #endif
@@ -5874,6 +5950,9 @@ void EncAppCfg::xPrintParameter()
 #endif
 #if JVET_AF0073_INTER_CCP_MERGE
   msg( VERBOSE, "InterCcpMerge:%d ", m_interCcpMerge );
+#endif
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  msg( VERBOSE, "InterCcpMergeZeroLumaCbf:%d ", m_interCcpMergeZeroLumaCbf );
 #endif
 #if !JVET_AA0132_CONFIGURABLE_TM_TOOLS
 #if JVET_W0090_ARMC_TM

@@ -727,6 +727,9 @@ struct CcAlfFilterParam
   bool    ccAlfFilterEnabled[2];
   bool    ccAlfFilterIdxEnabled[2][MAX_NUM_CC_ALF_FILTERS];
   uint8_t ccAlfFilterCount[2];
+#if JVET_AH0057_CCALF_COEFF_PRECISION
+  int     ccAlfCoeffPrec[2];
+#endif
   short   ccAlfCoeff[2][MAX_NUM_CC_ALF_FILTERS][MAX_NUM_CC_ALF_CHROMA_COEFF];
   int     newCcAlfFilter[2];
   int     numberValidComponents;
@@ -739,6 +742,9 @@ struct CcAlfFilterParam
     std::memset( ccAlfFilterEnabled, false, sizeof( ccAlfFilterEnabled ) );
     std::memset( ccAlfFilterIdxEnabled, false, sizeof( ccAlfFilterIdxEnabled ) );
     std::memset( ccAlfCoeff, 0, sizeof( ccAlfCoeff ) );
+#if JVET_AH0057_CCALF_COEFF_PRECISION
+    ccAlfCoeffPrec[0] = ccAlfCoeffPrec[1] = 0;
+#endif
     ccAlfFilterCount[0] = ccAlfFilterCount[1] = MAX_NUM_CC_ALF_FILTERS;
     numberValidComponents = 3;
     newCcAlfFilter[0] = newCcAlfFilter[1] = 0;
@@ -753,6 +759,10 @@ struct CcAlfFilterParam
     numberValidComponents = src.numberValidComponents;
     newCcAlfFilter[0] = src.newCcAlfFilter[0];
     newCcAlfFilter[1] = src.newCcAlfFilter[1];
+#if JVET_AH0057_CCALF_COEFF_PRECISION
+    ccAlfCoeffPrec[0] = src.ccAlfCoeffPrec[0];
+    ccAlfCoeffPrec[1] = src.ccAlfCoeffPrec[1];
+#endif
     return *this;
   }
 };

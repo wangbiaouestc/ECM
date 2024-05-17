@@ -59,7 +59,7 @@ struct Position
   void     relativeTo  (const Position origin)              { x -= origin.x; y -= origin.y; }
 
   Position operator-( const Position &other )         const { return{ x - other.x, y - other.y }; }
-#if JVET_AA0096_MC_BOUNDARY_PADDING
+#if JVET_AA0096_MC_BOUNDARY_PADDING || JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   PosType getX() { return x; }
   PosType getY() { return y; }
 #endif
@@ -158,6 +158,40 @@ struct UnitScale
   Size     scale( const Size     &size ) const { return { size.width >> posx, size.height >> posy }; }
   Area     scale( const Area    &_area ) const { return Area( scale( _area.pos() ), scale( _area.size() ) ); }
 };
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+
+struct SplitPred
+{
+  uint8_t  minqtDetphCol;
+  uint8_t  qtDetphCol;
+  uint8_t  maxBtDetphCol;
+  uint8_t  mttDetphCol;
+
+  SplitPred() : minqtDetphCol(0),
+                qtDetphCol(0),
+                maxBtDetphCol(0),
+                mttDetphCol(0)
+  { }
+  SplitPred(int i) : minqtDetphCol((uint8_t)i),
+                     qtDetphCol((uint8_t)i),
+                     maxBtDetphCol((uint8_t)i),
+                     mttDetphCol((uint8_t)i)
+  { }
+  bool operator==(const SplitPred& sp) const
+  {
+    if (minqtDetphCol != sp.minqtDetphCol) return false;
+    if (qtDetphCol != sp.qtDetphCol) return false;
+    if (maxBtDetphCol != sp.maxBtDetphCol) return false;
+    if (mttDetphCol != sp.mttDetphCol) return false;
+    return true;
+  }
+
+  bool operator!=(const SplitPred& sp) const
+  {
+    return !(*this == sp);
+  }
+};
+#endif
 namespace std
 {
   template<> struct hash<Position>
@@ -314,9 +348,9 @@ enum CCPType
 
 struct CCPModelCandidate
 {
-  int64_t params[2][NUM_CCP_PARAMS] = { 0 };
+  int64_t params[2][NUM_CCP_PARAMS] = { { 0 } };
 #if MMLM
-  int64_t params2[2][NUM_CCP_PARAMS] = { 0 };
+  int64_t params2[2][NUM_CCP_PARAMS] = { { 0 } };
   int     shift2[2] = { 0 };
   int     yThres = 0;
 #endif

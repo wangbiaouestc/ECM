@@ -407,8 +407,17 @@ protected:
   bool      m_SBT;                                ///< Sub-Block Transform for inter blocks
   int       m_SBTFast64WidthTh;                   ///< Enable size-64 SBT in encoder RDO check for HD and above sequences
 
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  bool      m_intraLFNSTISlice;
+  bool      m_intraLFNSTPBSlice;
+  bool      m_interLFNST;
+#else
   bool      m_LFNST;
+#endif
   bool      m_useFastLFNST;
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  bool      m_useFastInterLFNST;
+#endif
   bool      m_sbTmvpEnableFlag;
   bool      m_Affine;
   bool      m_AffineType;
@@ -416,6 +425,9 @@ protected:
   bool      m_useAffineTM; 
 #if JVET_AG0276_NLIC
   bool      m_useAffAltLMTM;
+#endif
+#if JVET_AH0119_SUBBLOCK_TM
+  bool      m_useSbTmvpTM;
 #endif
 #endif
 #if JVET_AG0135_AFFINE_CIIP
@@ -508,6 +520,9 @@ protected:
 #endif
 #if JVET_AD0085_MPM_SORTING
   bool      m_mpmSorting;
+#endif
+#if JVET_AH0136_CHROMA_REORDERING
+  bool      m_chromaReordering;
 #endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   int       m_cccm;
@@ -604,6 +619,9 @@ protected:
 
   bool      m_wrapAround;
   unsigned  m_wrapAroundOffset;
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  bool      m_enableMaxMttIncrease;
+#endif
 #if MULTI_HYP_PRED
   int       m_numMHPCandsToTest;
   int       m_maxNumAddHyps;
@@ -674,6 +692,9 @@ protected:
 #endif
 #if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
   bool      m_alfPrecision;
+#endif
+#if JVET_AH0057_CCALF_COEFF_PRECISION
+  bool      m_ccalfPrecision;
 #endif
   bool      m_bTestSAODisableAtPictureLevel;
   double    m_saoEncodingRate;       // When non-0 SAO early picture termination is enabled for luma and chroma
@@ -1044,7 +1065,12 @@ protected:
 #if JVET_AF0073_INTER_CCP_MERGE
   bool m_interCcpMerge;
   int  m_interCcpMergeFastMode;
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  bool m_interCcpMergeZeroLumaCbf;
+  int m_interCcpMergeZeroLumaCbfFastMode;
 #endif
+#endif
+
 #if JVET_AE0100_BVGCCCM
   bool m_bvgCccm;
 #endif
@@ -1146,6 +1172,10 @@ protected:
 
 #if JVET_AB0171_ASYMMETRIC_DB_FOR_GDR  
   bool      m_asymmetricILF;
+#endif
+
+#if JVET_AH0209_PDP
+  bool         m_pdp;
 #endif
 
 public:
@@ -1521,10 +1551,23 @@ public:
   bool      getSubPicIdMappingInSpsFlag                 ()                          { return m_subPicIdMappingInSpsFlag; }
   uint32_t  getSubPicIdLen                              ()                          { return m_subPicIdLen; }
   uint32_t  getSubPicId                                 (int i)                     { return m_subPicId[i]; }
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  void      setIntraLFNSTISlice             ( bool b )       { m_intraLFNSTISlice = b; }
+  bool      getIntraLFNSTISlice()                      const { return m_intraLFNSTISlice; }
+  void      setIntraLFNSTPBSlice            ( bool b )       { m_intraLFNSTPBSlice = b; }
+  bool      getIntraLFNSTPBSlice()                     const { return m_intraLFNSTPBSlice; }
+  void      setInterLFNST                   ( bool b )       { m_interLFNST = b; }
+  bool      getInterLFNST()                            const { return m_interLFNST; }
+#else
   void      setLFNST                        ( bool b )       { m_LFNST = b; }
   bool      getLFNST()                                 const { return m_LFNST; }
+#endif
   void      setUseFastLFNST                 ( bool b )       { m_useFastLFNST = b; }
   bool      getUseFastLFNST()                          const { return m_useFastLFNST; }
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  void      setUseFastInterLFNST            ( bool b )       { m_useFastInterLFNST = b; }
+  bool      getUseFastInterLFNST()                     const { return m_useFastInterLFNST; }
+#endif
 
   void      setUseLMChroma                  ( int n )        { m_LMChroma = n; }
   int       getUseLMChroma()                           const { return m_LMChroma; }
@@ -1545,6 +1588,10 @@ public:
 #if JVET_AG0276_NLIC
   void      setUseAffAltLMTM( bool b )                       { m_useAffAltLMTM = b; }
   bool      getUseAffAltLMTM()                         const { return  m_useAffAltLMTM; }
+#endif
+#if JVET_AH0119_SUBBLOCK_TM 
+  void      setUseSbTmvpTM(bool b)                           { m_useSbTmvpTM = b; }
+  bool      getUseSbTmvpTM()                           const { return  m_useSbTmvpTM; }
 #endif
 #endif
 #if JVET_AG0135_AFFINE_CIIP
@@ -1653,18 +1700,13 @@ public:
   bool      getAML()                                   const { return m_AML; }
 #if JVET_AG0276_NLIC
   void      setAltLM(bool b)                                 { m_altLM = b; }
-  bool      getAltLM()                                 const { return m_altLM; }
   void      setAffAltLM(bool b)                              { m_affAltLM = b; }
-  bool      getAffAltLM()                              const { return m_affAltLM; }
 #endif
 #endif
 #if JVET_AG0276_LIC_FLAG_SIGNALING
   void      setMergeOppositeLic( bool b )                    { m_mergeOppositeLic = b; }
-  bool      setMergeOppositeLic()                      const { return m_mergeOppositeLic; }
   void      setMergeTMOppositeLic( bool b )                  { m_mergeTMOppositeLic = b; }
-  bool      setMergeTMOppositeLic()                    const { return m_mergeTMOppositeLic; }
   void      setMergeAffOppositeLic( bool b )                 { m_mergeAffOppositeLic = b; }
-  bool      setMergeAffOppositeLic()                   const { return m_mergeAffOppositeLic; }
 #endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   void      setArmcRefinedMotion(bool b)                     { m_armcRefinedMotion = b; }
@@ -1746,6 +1788,10 @@ public:
 #if JVET_AD0085_MPM_SORTING
   void      setUseMpmSorting             (bool b)         { m_mpmSorting = b; }
   bool      getUseMpmSorting             () const         { return m_mpmSorting; }
+#endif
+#if JVET_AH0136_CHROMA_REORDERING
+  void      setUseChromaReordering       (bool b)         { m_chromaReordering = b; }
+  bool      getUseChromaReordering       () const         { return m_chromaReordering; }
 #endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   void      setUseCccm                   (int i)          { m_cccm = i; }
@@ -1870,7 +1916,14 @@ public:
   bool getUseInterCcpMerge() const { return m_interCcpMerge; }
   void setInterCcpMergeFastMode(int currMode) { m_interCcpMergeFastMode = currMode; }
   int  getInterCcpMergeFastMode() const { return m_interCcpMergeFastMode; }
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  void setUseInterCcpMergeZeroLumaCbf(bool b) { m_interCcpMergeZeroLumaCbf = b; }
+  bool getUseInterCcpMergeZeroLumaCbf() const { return m_interCcpMergeZeroLumaCbf; }
+  void setInterCcpMergeZeroLumaCbfFastMode(int currMode) { m_interCcpMergeZeroLumaCbfFastMode = currMode; }
+  bool getInterCcpMergeZeroLumaCbfFastMode() const { return m_interCcpMergeZeroLumaCbfFastMode; }
 #endif
+#endif
+
 #if JVET_V0094_BILATERAL_FILTER
   void      setUseBIF                       ( bool b )       { m_BIF = b; }
   bool      getUseBIF                       ()         const { return m_BIF; }
@@ -1887,6 +1940,10 @@ public:
   void      setChromaBIFQPOffset            ( int val )       { m_chromaBIFQPOffset = val; }
   int       getChromaBIFQPOffset            ()         const { return m_chromaBIFQPOffset; }
 #endif
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  void      setEnableMaxMttIncrease         ( bool b )       { m_enableMaxMttIncrease = b; }
+  bool      getEnableMaxMttIncrease         ()         const { return m_enableMaxMttIncrease; }
+#endif
 #if MULTI_HYP_PRED
   void      setNumMHPCandsToTest(int i) { m_numMHPCandsToTest = i; }
   int       getNumMHPCandsToTest() { return m_numMHPCandsToTest; }
@@ -1898,6 +1955,10 @@ public:
   int       getMaxNumAddHypRefFrames()         const { return m_maxNumAddHypRefFrames; }
   void      setAddHypTries(int i) { m_addHypTries = i; }
   int       getAddHypTries()         const { return m_addHypTries; }
+#endif
+#if JVET_AH0209_PDP
+  void      setUsePDP( bool n )                             { m_pdp = n; }
+  bool      getUsePDP()                               const { return m_pdp; }
 #endif
 
   // ADD_NEW_TOOL : (encoder lib) add access functions here
@@ -2272,6 +2333,10 @@ public:
 #if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
   void      setUseAlfPrecision( bool b )                             { m_alfPrecision = b; }
   bool      getUseAlfPrecision()                               const { return m_alfPrecision; }
+#endif
+#if JVET_AH0057_CCALF_COEFF_PRECISION
+  void      setUseCCALFPrecision(bool b)                             { m_ccalfPrecision = b; }
+  bool      getUseCCALFPrecision()                             const { return m_ccalfPrecision; }
 #endif
   void  setTestSAODisableAtPictureLevel (bool bVal)                  { m_bTestSAODisableAtPictureLevel = bVal; }
   bool  getTestSAODisableAtPictureLevel ( ) const                    { return m_bTestSAODisableAtPictureLevel; }

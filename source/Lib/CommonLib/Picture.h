@@ -251,6 +251,9 @@ public:
 #if JVET_S0124_UNAVAILABLE_REFERENCE
   bool nonReferencePictureFlag;
 #endif
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  uint8_t maxTemporalBtDepth;
+#endif
 
   int  poc;
 #if JVET_AG0145_ADAPTIVE_CLIPPING

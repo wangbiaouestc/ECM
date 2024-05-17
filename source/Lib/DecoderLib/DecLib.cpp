@@ -986,7 +986,11 @@ void DecLib::finishPicture(int& poc, PicList*& rpcListPic, MsgLevel msgl )
     c += 32;  // tolower
   }
 #if JVET_AG0196_CABAC_RETRAIN
+#if JVET_AH0176_LOW_DELAY_B_CTX
+  CabacRetrain::endFrame(pcSlice->getPOC(), pcSlice->getSliceQp(), pcSlice->getCabacInitFlag(), pcSlice->isIntra() ? I_SLICE : pcSlice->isInterP() ? P_SLICE : pcSlice->isInterB() && pcSlice->getCheckLDC() ? L_SLICE : B_SLICE);
+#else
   CabacRetrain::endFrame(pcSlice->getPOC(),pcSlice->getSliceQp(),pcSlice->getCabacInitFlag(),pcSlice->isIntra()?I_SLICE:pcSlice->isInterP()?P_SLICE:B_SLICE);
+#endif
 #endif
   if (pcSlice->isDRAP()) c = 'D';
 
@@ -1090,6 +1094,13 @@ void DecLib::finishPicture(int& poc, PicList*& rpcListPic, MsgLevel msgl )
   m_maxDecSliceAddrInSubPic = -1;
 
   m_pcPic->destroyTempBuffers();
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  m_pcPic->cs->destroyCoeffs();
+  if (!(!pcSlice->isIntra() && !((m_pcPic->temporalId == 0) || (pcSlice->getSPS()->getNumReorderPics(m_pcPic->temporalId) != m_pcPic->temporalId))))
+  {
+    m_pcPic->cs->SetSplitPred();
+  }
+#endif
   m_pcPic->cs->destroyTemporaryCsData();
 #if JVET_AA0096_MC_BOUNDARY_PADDING
   m_cFrameMcPadPrediction.init(&m_cRdCost, pcSlice->getSPS()->getChromaFormatIdc(), pcSlice->getSPS()->getMaxCUHeight(),
@@ -1710,7 +1721,9 @@ void activateAPS(PicHeader* picHeader, Slice* pSlice, ParameterSetManager& param
 
       CHECK( aps->getTemporalId() > pSlice->getTLayer(), "TemporalId shall be less than or equal to the TemporalId of the coded slice NAL unit" );
       //ToDO: APS NAL unit containing the APS RBSP shall have nuh_layer_id either equal to the nuh_layer_id of a coded slice NAL unit that referrs it, or equal to the nuh_layer_id of a direct dependent layer of the layer containing a coded slice NAL unit that referrs it.
-
+#if JVET_AH0057_CCALF_COEFF_PRECISION
+      filterParam.ccAlfCoeffPrec[COMPONENT_Cb - 1] = aps->getCcAlfAPSParam().ccAlfCoeffPrec[COMPONENT_Cb - 1];
+#endif
       filterParam.ccAlfFilterCount[COMPONENT_Cb - 1] = aps->getCcAlfAPSParam().ccAlfFilterCount[COMPONENT_Cb - 1];
       for (int filterIdx=0; filterIdx < filterParam.ccAlfFilterCount[COMPONENT_Cb - 1]; filterIdx++ )
       {
@@ -1738,7 +1751,9 @@ void activateAPS(PicHeader* picHeader, Slice* pSlice, ParameterSetManager& param
 
       CHECK( aps->getTemporalId() > pSlice->getTLayer(), "TemporalId shall be less than or equal to the TemporalId of the coded slice NAL unit" );
       //ToDO: APS NAL unit containing the APS RBSP shall have nuh_layer_id either equal to the nuh_layer_id of a coded slice NAL unit that referrs it, or equal to the nuh_layer_id of a direct dependent layer of the layer containing a coded slice NAL unit that referrs it.
-
+#if JVET_AH0057_CCALF_COEFF_PRECISION
+      filterParam.ccAlfCoeffPrec[COMPONENT_Cr - 1] = aps->getCcAlfAPSParam().ccAlfCoeffPrec[COMPONENT_Cr - 1];
+#endif
       filterParam.ccAlfFilterCount[COMPONENT_Cr - 1] = aps->getCcAlfAPSParam().ccAlfFilterCount[COMPONENT_Cr - 1];
       for (int filterIdx=0; filterIdx < filterParam.ccAlfFilterCount[COMPONENT_Cr - 1]; filterIdx++ )
       {
@@ -3032,6 +3047,12 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
 #if JVET_Y0128_NON_CTC
     //---------------
     pcSlice->setRefPOCList();
+#endif
+#if JVET_AH0069_CMVP
+    if (pcSlice->getPicHeader()->getEnableTMVPFlag())
+    {
+      pcSlice->setRefRefIdxList();
+    }
 #endif
 #if JVET_AG0145_ADAPTIVE_CLIPPING
     int clipDeltaShift = 0;

@@ -72,13 +72,22 @@ public:
   static inline bool getSwitchCondition(const CodingUnit &cu,ChannelType channelType) {
     bool            condition     =
       cu.predMode == MODE_INTRA && cu.slice->getSliceType() != I_SLICE &&
-      ((!cu.tmpFlag && channelType == CHANNEL_TYPE_LUMA)||(channelType == CHANNEL_TYPE_CHROMA && cu.firstPU->intraDir[1] != DBV_CHROMA_IDX));
+      ((!cu.tmpFlag && channelType == CHANNEL_TYPE_LUMA)||(channelType == CHANNEL_TYPE_CHROMA 
+#if JVET_AH0136_CHROMA_REORDERING
+        && !(cu.firstPU->intraDir[1] >= DBV_CHROMA_IDX && cu.firstPU->intraDir[1] <= DBV_CHROMA_IDX9)
+#else
+        && cu.firstPU->intraDir[1] != DBV_CHROMA_IDX
+#endif
+        ));
     assert(cu.slice->getSliceType() != I_SLICE || channelType == cu.chType);
     int tmpMaxSize = cu.cs->sps->getIntraTMPMaxSize();
     condition = condition || (cu.predMode == MODE_IBC && channelType == CHANNEL_TYPE_LUMA && cu.slice->getSliceType() == I_SLICE)
                 || (cu.predMode == MODE_INTRA && ((channelType == CHANNEL_TYPE_LUMA && cu.tmpFlag && !cu.bdpcmMode && !cu.dimd
-                                                && cu.lwidth() <= tmpMaxSize && cu.lheight() <= tmpMaxSize) ||
-                                               (channelType == CHANNEL_TYPE_CHROMA && cu.firstPU->intraDir[1] == DBV_CHROMA_IDX)) && cu.slice->getSliceType() == I_SLICE);
+                                                && cu.lwidth() <= tmpMaxSize && cu.lheight() <= tmpMaxSize)
+#if !JVET_AH0136_CHROMA_REORDERING
+                  || (channelType == CHANNEL_TYPE_CHROMA && cu.firstPU->intraDir[1] == DBV_CHROMA_IDX)
+#endif
+                  ) && cu.slice->getSliceType() == I_SLICE);
     return condition;
   }
 #endif
@@ -775,6 +784,11 @@ public:
   uint8_t       bcwIdx[NUM_MERGE_CANDS];
 #if INTER_LIC
   bool          licFlags[NUM_MERGE_CANDS];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  bool          licInheritPara[NUM_MERGE_CANDS];
+  int16_t       licScale[NUM_MERGE_CANDS][2][3];
+  int16_t       licOffset[NUM_MERGE_CANDS][2][3];
+#endif
 #endif
 #if JVET_AC0112_IBC_LIC
   bool          ibcLicFlags[NUM_MERGE_CANDS];
@@ -805,6 +819,11 @@ public:
   uint8_t       bcwIdx            [ MRG_MAX_NUM_CANDS      ];
 #if INTER_LIC
   bool          licFlags          [ MRG_MAX_NUM_CANDS      ];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  bool          licInheritPara[MRG_MAX_NUM_CANDS];
+  int16_t       licScale[MRG_MAX_NUM_CANDS][2][3];
+  int16_t       licOffset[MRG_MAX_NUM_CANDS][2][3];
+#endif
 #endif
 #if JVET_AC0112_IBC_LIC
   bool          ibcLicFlags       [ MRG_MAX_NUM_CANDS      ];
@@ -869,8 +888,33 @@ public:
   void saveMergeInfo(PredictionUnit& puTmp, PredictionUnit pu);
 #endif
   void setMergeInfo( PredictionUnit& pu, int candIdx );
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  template <typename MergeCtxType> static void setLICParamToPu         (const MergeCtxType& src,       PredictionUnit& pu, int candIdx, bool hasLIC);
+  template <typename MergeCtxType> static void loadLICParamFromPu      (      MergeCtxType& dst, const PredictionUnit* pu, int candIdx, bool allowAltModel, bool hasLIC);
+  template <typename MergeCtxType> static void loadLICParamFromMotInfo (      MergeCtxType& dst, const MotionInfo*     mi, int candIdx, bool allowAltModel, bool hasLIC);
+  template <typename MergeCtxType> static void copyLICParamFromCtx     (      MergeCtxType& dst, int candIdxDst, const MergeCtxType& src, int candIdxSrc);
+  template <typename MergeCtxType> static void setDefaultLICParamToCtx (      MergeCtxType& dst, int candIdx);
+  template <typename MergeCtxType> static void setInheritAndLICFlags   (      MergeCtxType& dst, int candIdx);
+#if JVET_AG0276_NLIC
+  template <typename MergeCtxType> static void setLICParamUsingAltLM   (      MergeCtxType& dst, int candIdx);
+#endif
+
+  void setLICParamToPu         (      PredictionUnit& pu, int candIdx, bool hasLIC);
+  void loadLICParamFromPu      (const PredictionUnit* pu, int candIdx, bool allowAltModel, bool hasLIC);
+  void loadLICParamFromMotInfo (const MotionInfo*     mi, int candIdx, bool allowAltModel, bool hasLIC);
+  void copyLICParamFromCtx     (int candIdx, const MergeCtx& src, int candIdxSrc);
+  void setDefaultLICParamToCtx (int candIdx);
+  void setInheritAndLICFlags   (int candIdx);
+#if JVET_AG0276_NLIC
+  void setLICParamUsingAltLM   (int candIdx);
+#endif
+#endif
 #if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
-  int8_t getDir( Slice* slice, int candIdx, MvField* mvField );
+  int8_t getDir( Slice* slice, int candIdx, MvField* mvField 
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+               , int* scale, int* offset
+#endif
+  );
 #endif
 #if JVET_AE0169_BIPREDICTIVE_IBC
   void setIbcL1Info( PredictionUnit& pu, int candIdx );
@@ -938,6 +982,11 @@ public:
 #endif
 #if INTER_LIC
   bool          licFlags[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  bool          licInheritPara[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
+  int16_t       licScale[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE][2][3];
+  int16_t       licOffset[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE][2][3];
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
   bool          obmcFlags[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
@@ -963,6 +1012,21 @@ public:
 #if JVET_AG0276_NLIC
   bool          xCheckSimilarMotion1(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1, bool isAltLM = false) const;
 #endif
+#if JVET_AH0119_SUBBLOCK_TM
+  bool          xCheckSimilarSbTMVP(PredictionUnit pu, int mergeCandIndex, uint32_t mvdSimilarityThresh = 1) const;
+#endif
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  void          setLICParamToPu         (      PredictionUnit& pu, int candIdx, bool hasLIC);
+  void          setLICParamToPu         (      PredictionUnit& pu, int candIdx, bool hasLIC) const;
+  void          loadLICParamFromPu      (const PredictionUnit* pu, int candIdx, bool allowAltModel, bool hasLIC);
+  void          loadLICParamFromMotInfo (const MotionInfo*     mi, int candIdx, bool allowAltModel, bool hasLIC);
+  void          copyLICParamFromCtx     (int candIdx, const AffineMergeCtx& src, int candIdxSrc);
+  void          setDefaultLICParamToCtx (int candIdx);
+  void          setInheritAndLICFlags   (int candIdx);
+#if JVET_AG0276_NLIC
+  void          setLICParamUsingAltLM   (int candIdx);
+#endif
+#endif
 };
 #else
 class AffineMergeCtx
@@ -976,6 +1040,11 @@ public:
   EAffineModel  affineType[AFFINE_MRG_MAX_NUM_CANDS];
 #if INTER_LIC
   bool          licFlags[AFFINE_MRG_MAX_NUM_CANDS];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  bool          licInheritPara[AFFINE_MRG_MAX_NUM_CANDS];
+  int16_t       licScale[AFFINE_MRG_MAX_NUM_CANDS][2][3];
+  int16_t       licOffset[AFFINE_MRG_MAX_NUM_CANDS][2][3];
+#endif
 #endif
   uint8_t       bcwIdx[AFFINE_MRG_MAX_NUM_CANDS];
   int           numValidMergeCand;
@@ -989,19 +1058,35 @@ public:
 #if JVET_AB0112_AFFINE_DMVR
   bool          xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1) const;
 #endif
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  void          setLICParamToPu         (      PredictionUnit& pu, int candIdx, bool hasLIC);
+  void          loadLICParamFromPu      (const PredictionUnit* pu, int candIdx, bool allowAltModel, bool hasLIC);
+  void          loadLICParamFromMotInfo (const MotionInfo*     mi, int candIdx, bool allowAltModel, bool hasLIC);
+  void          copyLICParamFromCtx     (int candIdx, const AffineMergeCtx& src, int candIdxSrc);
+  void          setDefaultLICParamToCtx (int candIdx);
+  void          setInheritAndLICFlags   (int candIdx);
+#if JVET_AG0276_NLIC
+  void          setLICParamUsingAltLM   (int candIdx);
+#endif
+#endif
 };
 #endif
 
 #if JVET_AG0276_NLIC
 class AltLMMergeCtx
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+: public MergeCtx
+#endif
 {
 public:
   AltLMInterUnit altLMParaNeighbours[ALT_MRG_MAX_NUM_CANDS];
+#if !JVET_AH0314_LIC_INHERITANCE_FOR_MRG
   MvField        mvFieldNeighbours[ALT_MRG_MAX_NUM_CANDS << 1];
   uint8_t        bcwIdx[ALT_MRG_MAX_NUM_CANDS];
   unsigned char  interDirNeighbours[ALT_MRG_MAX_NUM_CANDS];
   bool           useAltHpelIf[ALT_MRG_MAX_NUM_CANDS];
   int            numValidMergeCand;
+#endif
 
   void           initAltLMMergeCtx(int idx);
   bool           xCheckSameMotion(int cnt, uint32_t mvdSimilarityThresh);

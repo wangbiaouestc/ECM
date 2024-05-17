@@ -105,6 +105,9 @@ Slice::Slice()
 , m_pcPicHeader                   ( NULL )
 , m_colFromL0Flag                 ( true )
 , m_colRefIdx                     ( 0 )
+#if JVET_AG0098_AMVP_WITH_SBTMVP
+, m_amvpSbTmvpAmvrEnabledFlag     (false)
+#endif
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
 , m_costForARMC                   ( MAX_UINT )
 #endif
@@ -221,7 +224,6 @@ void Slice::initSlice()
   m_biDirPred = false;
   m_symRefIdx[0] = -1;
   m_symRefIdx[1] = -1;
-
   for (uint32_t component = 0; component < MAX_NUM_COMPONENT; component++)
   {
     m_iSliceChromaQpDelta[component] = 0;
@@ -788,6 +790,43 @@ void Slice::setRefPOCList       ()
     setMultiHypRefPicList();
 #endif
 }
+
+#if JVET_AH0069_CMVP
+void Slice::setRefRefIdxList()
+{
+  memset(m_aiRefRefIdxList, -1, sizeof(int)*NUM_REF_PIC_LIST_01*MAX_NUM_REF*NUM_REF_PIC_LIST_01*(MAX_NUM_REF+1)*NUM_REF_PIC_LIST_01);
+  for (int iDir = 0; iDir < NUM_REF_PIC_LIST_01; iDir++)
+  {
+    for (int iNumRefIdx = 0; iNumRefIdx < m_aiNumRefIdx[iDir]; iNumRefIdx++)
+    {
+      const Picture* const refPic = getRefPic(RefPicList(iDir), iNumRefIdx);
+      const Slice* const refSlice = refPic->slices[0];
+      for (int iRefDir = 0; iRefDir < NUM_REF_PIC_LIST_01; iRefDir++)
+      {
+        for (int iNumRefRefIdx = 0; iNumRefRefIdx < refSlice->getNumRefIdx(RefPicList(iRefDir)) + (refSlice->getUseIBC() ? 1 : 0); iNumRefRefIdx++)
+        {
+          if (iNumRefRefIdx == refSlice->getNumRefIdx(RefPicList(iRefDir)))
+          {
+            iNumRefRefIdx = MAX_NUM_REF;
+          }
+          int refRefPOC = refSlice->getRefPOC(RefPicList(iRefDir), iNumRefRefIdx);
+          for (int iCurrDir = 0; iCurrDir < NUM_REF_PIC_LIST_01; iCurrDir++)
+          {
+            for (int iCurrRefIdx = 0; iCurrRefIdx < m_aiNumRefIdx[iCurrDir]; iCurrRefIdx++)
+            {
+              if (refRefPOC == getRefPOC(RefPicList(iCurrDir), iCurrRefIdx))
+              {
+                m_aiRefRefIdxList[iDir][iNumRefIdx][iRefDir][iNumRefRefIdx][iCurrDir] = iCurrRefIdx;
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+#endif
 
 void Slice::setList1IdxToList0Idx()
 {
@@ -3724,6 +3763,7 @@ SPS::SPS()
 #endif
 #if JVET_AG0136_INTRA_TMP_LIC
   , m_itmpLicExtension        ( false )
+  , m_itmpLicMode             ( false )
 #endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
  , m_DMVDMode                 ( false )
@@ -3767,6 +3807,9 @@ SPS::SPS()
 #endif
 #if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
   , m_useGeoBlend(true)
+#endif
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  , m_enableMaxMttIncrease(false)
 #endif
 #endif
 , m_SBT                       ( false )
@@ -3857,13 +3900,22 @@ SPS::SPS()
 , m_verCollocatedChromaFlag   ( false )
 , m_IntraMTS                  ( false )
 , m_InterMTS                  ( false )
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+, m_intraLFNSTISlice          ( false )
+, m_intraLFNSTPBSlice         ( false )
+, m_interLFNST                ( false )
+#else
 , m_LFNST                     ( false )
+#endif
 , m_Affine                    ( false )
 , m_AffineType                ( false )
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
 , m_useAffineTM               ( false )
 #if JVET_AG0276_NLIC
 , m_useAffAltLMTM             ( false )
+#endif
+#if JVET_AH0119_SUBBLOCK_TM 
+, m_useSbTmvpTM               ( false )
 #endif
 #endif
 , m_PROF                      ( false )
@@ -3886,6 +3938,9 @@ SPS::SPS()
 #endif
 #if JVET_AD0085_MPM_SORTING
 , m_mpmSorting                      ( false )
+#endif
+#if JVET_AH0136_CHROMA_REORDERING
+, m_chromaReordering                ( false )
 #endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
 , m_cccm                      ( false )

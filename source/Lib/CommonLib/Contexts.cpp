@@ -715,7 +715,9 @@ CtxSet ContextSetCfg::addCtxSet( std::initializer_list<std::initializer_list<uin
 
 #define CNU 35
 #if SLICE_TYPE_WIN_SIZE
-#if JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE
+#if JVET_AH0176_LOW_DELAY_B_CTX
+std::vector<std::vector<uint8_t>> ContextSetCfg::sm_InitTables( NUMBER_OF_SLICE_TYPES * 3 + 2 + 4 + 2);
+#elif JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE
 std::vector<std::vector<uint8_t>> ContextSetCfg::sm_InitTables( NUMBER_OF_SLICE_TYPES * 3 + 2 + 4 );
 #elif JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
 std::vector<std::vector<uint8_t>> ContextSetCfg::sm_InitTables( NUMBER_OF_SLICE_TYPES * 3 + 2);
@@ -726,7 +728,9 @@ std::vector<std::vector<uint8_t>> ContextSetCfg::sm_InitTables(NUMBER_OF_SLICE_T
 std::vector<std::vector<uint8_t>> ContextSetCfg::sm_InitTables(NUMBER_OF_SLICE_TYPES + 1);
 #endif
 
-#if JVET_ECM12_CABAC_RETRAIN
+#if JVET_AH0176_LOW_DELAY_B_CTX
+#include "Contexts_ecm13.inl"
+#elif JVET_ECM12_CABAC_RETRAIN
 #include "Contexts_ecm12.inl"
 #elif JVET_AF0133_RETRAINING_ISLICE_CTX
 #include "Contexts_ecm11.inl"

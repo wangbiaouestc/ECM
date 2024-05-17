@@ -761,6 +761,9 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
 #if JVET_AE0159_FIBC || JVET_AE0059_INTER_CCCM || JVET_AE0078_IBC_LIC_EXTENSION || JVET_AF0073_INTER_CCP_MERGE
   m_cInterSearch.setIntraPrediction(&m_cIntraSearch);
 #endif
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+  m_cIntraSearch.setInterPrediction(&m_cInterSearch);
+#endif
   m_iMaxRefPicNum = 0;
 
 #if ER_CHROMA_QP_WCG_PPS
@@ -1806,7 +1809,13 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setLog2SignPredArea                    (m_log2SignPredArea);
 #endif
 #endif
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  sps.setUseIntraLFNSTISlice                 ( m_intraLFNSTISlice );
+  sps.setUseIntraLFNSTPBSlice                ( m_intraLFNSTPBSlice );
+  sps.setUseInterLFNST                       ( m_interLFNST );
+#else
   sps.setUseLFNST                            ( m_LFNST );
+#endif
   sps.setSbTMVPEnabledFlag(m_sbTmvpEnableFlag);
   sps.setAMVREnabledFlag                ( m_ImvMode != IMV_OFF );
   sps.setBDOFEnabledFlag                    ( m_BIO );
@@ -1886,6 +1895,14 @@ void EncLib::xInitSPS( SPS& sps )
     {
       sps.setUseAltLM(false);
     }
+  }
+#endif
+#if JVET_AH0119_SUBBLOCK_TM
+  sps.setUseSbTmvpTM(m_useSbTmvpTM);
+  if (getBaseQP() < 27)
+  {
+    sps.setUseSbTmvpTM(false);
+    sps.setUseAffineTM(false);
   }
 #endif
 #endif
@@ -1977,6 +1994,9 @@ void EncLib::xInitSPS( SPS& sps )
 #endif
 #if JVET_AD0085_MPM_SORTING
   sps.setUseMpmSorting      ( m_mpmSorting );
+#endif
+#if JVET_AH0136_CHROMA_REORDERING
+  sps.setUseChromaReordering (m_chromaReordering);
 #endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   sps.setUseCccm            ( m_cccm );
@@ -2079,6 +2099,9 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setItmpLicMode                        ( m_itmpLicMode );
 #endif
   sps.setWrapAroundEnabledFlag                      ( m_wrapAround );
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  sps.setEnableMaxMttIncrease               ( m_enableMaxMttIncrease );
+#endif
 #if MULTI_HYP_PRED
   sps.setMaxNumAddHyps(m_maxNumAddHyps);
   sps.setNumAddHypWeights(m_numAddHypWeights);
@@ -2099,6 +2122,12 @@ void EncLib::xInitSPS( SPS& sps )
 #endif
 #if JVET_AF0073_INTER_CCP_MERGE
   sps.setUseInterCcpMerge(m_interCcpMerge);
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  sps.setUseInterCcpMergeZeroLumaCbf(m_interCcpMergeZeroLumaCbf);
+#endif
+#endif
+#if JVET_AH0209_PDP
+  sps.setUsePDP( m_pdp );
 #endif
   // ADD_NEW_TOOL : (encoder lib) set tool enabling flags and associated parameters here
   sps.setUseISP                             ( m_ISP );
@@ -2137,6 +2166,9 @@ void EncLib::xInitSPS( SPS& sps )
 #endif
 #if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
   sps.setAlfPrecisionFlag( m_alfPrecision );
+#endif
+#if JVET_AH0057_CCALF_COEFF_PRECISION
+  sps.setCCALFPrecisionFlag( m_ccalfPrecision );
 #endif
   sps.setJointCbCrEnabledFlag( m_JointCbCrMode );
   sps.setMaxTLayers( m_maxTempLayer );

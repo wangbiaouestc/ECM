@@ -89,6 +89,9 @@ namespace CabacRetrain
       case B_SLICE: file << "B "; break;
       case P_SLICE: file << "P "; break;
       case I_SLICE: file << "I "; break;
+#if JVET_AH0176_LOW_DELAY_B_CTX
+      case L_SLICE: file << "L "; break;
+#endif
       default: file << "? "; break;
       }
       file << qp << " " << ( int ) switchBp << ' ' << ( int ) report << ' ';
@@ -97,6 +100,9 @@ namespace CabacRetrain
       case B_SLICE: file << "B "; break;
       case P_SLICE: file << "P "; break;
       case I_SLICE: file << "I "; break;
+#if JVET_AH0176_LOW_DELAY_B_CTX
+      case L_SLICE: file << "L "; break;
+#endif
       default: file << "? "; break;
       }
 
@@ -159,7 +165,9 @@ namespace CabacRetrain
         std::cerr << "[ERROR] ctx idx out or range ([0-" << ContextSetCfg::getInitTable( 0 ).size() << "[ )" << std::endl;
         exit( -1 );
       }
-#if JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE
+#if JVET_AH0176_LOW_DELAY_B_CTX
+      constexpr int N=4*3+4*2;
+#elif JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE
       constexpr int N=3*3+3*2;
 #else
       constexpr int N=3*3+2;

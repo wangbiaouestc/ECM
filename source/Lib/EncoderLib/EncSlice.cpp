@@ -1668,6 +1668,7 @@ void EncSlice::compressSlice( Picture* pcPic, const bool bCompressEntireSlice, c
     if (minPoc > 4)
     {
       pcSlice->setAmvpSbTmvpEnabledFlag(false);
+      pcSlice->setAmvpSbTmvpAmvrEnabledFlag(false);
     }
     else
     {
@@ -2014,7 +2015,7 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
 
     prevQP[0] = prevQP[1] = pcSlice->getSliceQp();
 
-#if (JVET_AC0335_CONTENT_ADAPTIVE_OBMC_ENABLING && ENABLE_OBMC) || JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
+#if (JVET_AC0335_CONTENT_ADAPTIVE_OBMC_ENABLING && ENABLE_OBMC) || JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS || JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
     int hashBlkHitPerc = -1;
 #endif
 
@@ -2058,6 +2059,7 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
     }
   }
 #endif
+
 #if JVET_AE0159_FIBC
   if (m_pcCuEncoder->getEncCfg()->getIbcFilter())
   {
@@ -2077,6 +2079,31 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
       spsTmp->setMaxNumGpmAffCand(m_pcCuEncoder->getEncCfg()->getMaxNumGpmAffCand());
     }
 #endif
+  }
+#endif
+
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  if (m_pcCuEncoder->getEncCfg()->getUseInterCcpMerge())
+  {
+    if (cs.slice->getPOC() == 0 || cs.slice->getSliceType() == I_SLICE) // ensure sequential and parallel simulation generate same output
+    {
+      hashBlkHitPerc = (hashBlkHitPerc == -1) ? m_pcCuEncoder->getIbcHashMap().calHashBlkMatchPerc(cs.area.Y()) : hashBlkHitPerc;
+      SPS* spsTmp = const_cast<SPS*>(cs.sps);
+      spsTmp->setUseInterCcpMergeZeroLumaCbf(hashBlkHitPerc > 40);
+    }
+  }
+#endif
+
+#if JVET_AH0209_PDP
+  if( m_pcCuEncoder->getEncCfg()->getUsePDP() )
+  {
+    if( cs.slice->getPOC() == 0 || cs.slice->getSliceType() == I_SLICE ) // ensure sequential and parallel simulation generate same output
+    {
+      SPS* spsTmp = const_cast<SPS*>( cs.sps );
+      hashBlkHitPerc = ( hashBlkHitPerc == -1 ) ? m_pcCuEncoder->getIbcHashMap().calHashBlkMatchPerc( cs.area.Y() ) : hashBlkHitPerc;
+      bool isSCC = hashBlkHitPerc >= 20;
+      spsTmp->setUsePDP( !isSCC );
+    }
   }
 #endif
 #if JVET_AD0188_CCP_MERGE

@@ -2936,6 +2936,12 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
       {
         picHeader->setEnableTMVPFlag(0);
       }
+#if JVET_AH0069_CMVP
+      if (picHeader->getEnableTMVPFlag())
+      {
+        pcSlice->setRefRefIdxList();
+      }
+#endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
       if (picHeader->getEnableTMVPFlag())
       {
@@ -3855,6 +3861,7 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
         if (minPoc > 4)
         {
           pcSlice->setAmvpSbTmvpEnabledFlag(false);
+          pcSlice->setAmvpSbTmvpAmvrEnabledFlag(false);
         }
         else
         {
@@ -4600,6 +4607,9 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
     }
 
     pcPic->destroyTempBuffers();
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+    pcPic->cs->SetSplitPred();
+#endif
     pcPic->cs->destroyTemporaryCsData();
 #if JVET_AA0096_MC_BOUNDARY_PADDING
     m_pcFrameMcPadPrediction->init(m_pcEncLib->getRdCost(), pcSlice->getSPS()->getChromaFormatIdc(),

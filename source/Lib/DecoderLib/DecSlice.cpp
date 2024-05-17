@@ -256,6 +256,7 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
     if (minPoc > 4)
     {
       slice->setAmvpSbTmvpEnabledFlag(false);
+      slice->setAmvpSbTmvpAmvrEnabledFlag(false);
     }
     else
     {

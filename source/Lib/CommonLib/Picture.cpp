@@ -188,6 +188,9 @@ Picture::Picture()
 #if JVET_S0124_UNAVAILABLE_REFERENCE
   nonReferencePictureFlag = false;
 #endif
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  maxTemporalBtDepth   = 0;
+#endif
 
   for( int i = 0; i < MAX_NUM_CHANNEL_TYPE; i++ )
   {

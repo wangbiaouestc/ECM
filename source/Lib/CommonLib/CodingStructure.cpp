@@ -115,6 +115,9 @@ CodingStructure::CodingStructure(CUCache& cuCache, PUCache& puCache, TUCache& tu
 #else
   m_motionBuf     = nullptr;
 #endif
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  currQtDepthBuf  = nullptr;
+#endif
 
 #if JVET_AE0043_CCP_MERGE_TEMPORAL
   m_ccpmIdxBuf = nullptr;
@@ -195,6 +198,10 @@ void CodingStructure::destroy()
   delete[] m_motionBuf;
   m_motionBuf = nullptr;
 #endif
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  delete[] currQtDepthBuf;
+  currQtDepthBuf = nullptr;
+#endif 
 
 #if JVET_AE0043_CCP_MERGE_TEMPORAL
   if (m_ccpmIdxBuf)
@@ -1111,6 +1118,47 @@ CodingUnit* CodingStructure::getCU( const Position &pos, const ChannelType effCh
   }
 }
 
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+CodingUnit* CodingStructure::getCUTempo(const Position& pos, const ChannelType effChType)
+{
+  const CompArea& _blk = area.blocks[effChType];
+#if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+  if (!_blk.contains(pos))
+#else
+  if (!_blk.contains(pos) || (treeType == TREE_C && effChType == CHANNEL_TYPE_LUMA))
+#endif
+  {
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+    //keep this check, which is helpful to identify bugs
+    if (treeType == TREE_C && effChType == CHANNEL_TYPE_LUMA)
+    {
+      CHECK(parent == nullptr, "parent shall be valid; consider using function getLumaCU()");
+      CHECK(parent->treeType != TREE_D, "wrong parent treeType ");
+    }
+#endif
+    if (parent)
+    {
+      return parent->getCU(pos, effChType);
+    }
+    else
+    {
+      return nullptr;
+    }
+  }
+  else
+  {
+    const unsigned idx = m_cuIdx[effChType][rsAddr(pos, _blk.pos(), _blk.width, unitScale[effChType])];
+    if (idx != 0)
+    {
+      return cus[idx - 1];
+    }
+    else
+    {
+      return nullptr;
+    }
+  }
+}
+#endif
 const CodingUnit* CodingStructure::getCU( const Position &pos, const ChannelType effChType ) const
 {
 #if JVET_Z0118_GDR
@@ -1902,6 +1950,9 @@ void CodingStructure::createInternals(const UnitArea& _unit, const bool isTopLay
   m_motionBuf       = new MotionInfo[_lumaAreaScaled];
 #endif
 
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  currQtDepthBuf = new SplitPred[_lumaAreaScaled];
+#endif 
 #if JVET_AE0043_CCP_MERGE_TEMPORAL
   m_ccpmIdxBuf = new int[_lumaAreaScaled];
   m_ccpModelLUT.resize(0);
@@ -2216,7 +2267,7 @@ void CodingStructure::rebindPicBufs()
   }
   if( pcv->isEncoder )
   {
-    if (!picture->M_BUFS(0, PIC_RESIDUAL).bufs.empty())
+    if (!picture->M_BUFS(0, PIC_ORG_RESI).bufs.empty())
     {
       m_orgr.create(area.chromaFormat, area.blocks[0], pcv->maxCUWidth);
     }
@@ -2819,6 +2870,9 @@ void CodingStructure::initStructData( const int &QP, const bool &skipMotBuf )
 #endif
   }
 
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  getQTDepthBuf().memset(0);
+#endif
 #if JVET_W0123_TIMD_FUSION
 #if JVET_Z0118_GDR
   getIpmBuf(PIC_RECONSTRUCTION_0).memset(0);
@@ -2936,6 +2990,168 @@ const CMotionBuf CodingStructure::getMotionBuf( const Area& _area ) const
 #endif
 }
 
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+void CodingStructure::SetSplitPred()
+{
+  const Picture* pic = picture->unscaledPic;
+  const int width = pic->getPicWidthInLumaSamples();
+  const int height = pic->getPicHeightInLumaSamples();
+  Position pos;
+  CodingUnit* cuColAll = NULL;
+  QTDepthBuf mb; 
+  SplitPred sp;
+
+  int offset = slice->getPPS()->getCtuSize() >> 1;
+  picture->maxTemporalBtDepth = slice->getPicHeader()->getMaxMTTHierarchyDepth(slice->getSliceType(), CHANNEL_TYPE_LUMA);
+  const uint32_t roundVal = ((slice->getPPS()->getCtuSize() >> 2) * (slice->getPPS()->getCtuSize() >> 2))
+   * (slice->getPPS()->getCtuSize()  >> LOG2__BLOCK_RESOLUTION) * (slice->getPPS()->getCtuSize() >> LOG2__BLOCK_RESOLUTION);
+
+  uint32_t sumQtdetphColArea = 0;
+  uint32_t nbSamples = 0;
+  uint32_t nbSamplesMTT = 0;
+
+  const uint8_t nbPos = (offset << 1) >> LOG2__BLOCK_RESOLUTION;
+  bool parsedPositions[256 >> LOG2__BLOCK_RESOLUTION][256 >> LOG2__BLOCK_RESOLUTION];
+  for (int h = 0; h < height; h = h + QTBTTT_TEMPO_PRED_BUFFER_SIZE)
+  {
+    for (int w = 0; w < width; w = w + QTBTTT_TEMPO_PRED_BUFFER_SIZE)
+    {
+      sumQtdetphColArea = 0;
+      nbSamples = 0;
+
+      uint8_t maxBtdetphColArea = 0;
+      uint32_t sumMttdetphColArea = 0;
+      nbSamplesMTT = 0;
+      uint8_t minQtdetphColArea = UINT8_MAX;
+
+      pos = Position{ PosType(w), PosType(h) };
+
+      int topLeftWindowx = pos.x - offset;
+      int topLeftWindowy = pos.y - offset;
+      int BottomRightWindowx = pos.x + offset;
+      int BottomRightWindowy = pos.y + offset;
+      for (int i = 0; i < nbPos; i++)
+      {
+        for (int j = 0; j < nbPos; j++)
+        {
+          parsedPositions[i][j] = false;
+        }
+      }
+
+      if ((topLeftWindowx < 0)
+        || (topLeftWindowy < 0)
+        || (BottomRightWindowx >= width)
+        || (BottomRightWindowy >= height)
+        )
+      {
+        for (int i = 0; i < nbPos; i++)
+        {
+          for (int j = 0; j < nbPos; j++)
+          {
+            if (topLeftWindowx + i * QTBTTT_TEMPO_PRED_BLOCK_RESOLUTION < 0)
+            {
+              parsedPositions[i][j] = true;
+            }
+            if (topLeftWindowy + j * QTBTTT_TEMPO_PRED_BLOCK_RESOLUTION < 0)
+            {
+              parsedPositions[i][j] = true;
+            }
+            if (topLeftWindowx + i * QTBTTT_TEMPO_PRED_BLOCK_RESOLUTION >= width)
+            {
+              parsedPositions[i][j] = true;
+            }
+            if (topLeftWindowy + j * QTBTTT_TEMPO_PRED_BLOCK_RESOLUTION >= height)
+            {
+              parsedPositions[i][j] = true;
+            }
+          }
+        }
+      }
+
+      for (int x = 0; x < 0 + (offset << 1); x = x + QTBTTT_TEMPO_PRED_BLOCK_RESOLUTION)
+      {
+        for (int y = 0; y < 0 + (offset << 1); y = y + QTBTTT_TEMPO_PRED_BLOCK_RESOLUTION)
+        {
+          if (!parsedPositions[x >> LOG2__BLOCK_RESOLUTION][y >> LOG2__BLOCK_RESOLUTION])
+          {
+            cuColAll = getCUTempo(pos.offset(x - offset, y - offset), CHANNEL_TYPE_LUMA);
+                   
+            int widthBlockRes  = (cuColAll->lumaPos().x - (pos.x + x - offset) + cuColAll->lwidth() + QTBTTT_TEMPO_PRED_BLOCK_RESOLUTION - 1 ) >> LOG2__BLOCK_RESOLUTION;
+            int heightBlockRes = (cuColAll->lumaPos().y - (pos.y + y - offset) + cuColAll->lheight() + QTBTTT_TEMPO_PRED_BLOCK_RESOLUTION - 1) >> LOG2__BLOCK_RESOLUTION;
+
+            if (((x >> LOG2__BLOCK_RESOLUTION) + widthBlockRes > ((offset << 1) >> LOG2__BLOCK_RESOLUTION)))
+            {
+              widthBlockRes = ((offset << 1) >> LOG2__BLOCK_RESOLUTION) - (x >> LOG2__BLOCK_RESOLUTION);
+            }
+            if(((y >> LOG2__BLOCK_RESOLUTION) + heightBlockRes > ((offset << 1) >> LOG2__BLOCK_RESOLUTION)))
+            {
+              heightBlockRes = ((offset << 1) >> LOG2__BLOCK_RESOLUTION) - (y >> LOG2__BLOCK_RESOLUTION);
+            }
+                
+            for (int i = x >> LOG2__BLOCK_RESOLUTION; i < (x >> LOG2__BLOCK_RESOLUTION)  + widthBlockRes; i++)
+            {
+              for (int j = y >> LOG2__BLOCK_RESOLUTION; j < (y >> LOG2__BLOCK_RESOLUTION) + heightBlockRes; j++)
+              {
+                parsedPositions[i][j] = true;
+              }
+            }
+
+            int sizeBlock = (cuColAll->lheight() ) * (cuColAll->lwidth() );
+            sumQtdetphColArea += cuColAll->qtDepth * ((roundVal * (heightBlockRes * widthBlockRes) )/ sizeBlock);
+            nbSamples += ((roundVal * (heightBlockRes * widthBlockRes)) / sizeBlock);
+
+            if (cuColAll->mtDepth - cuColAll->mtImplicitDepth > maxBtdetphColArea)
+            {
+              maxBtdetphColArea = cuColAll->mtDepth - cuColAll->mtImplicitDepth;
+            }
+
+            if (cuColAll->mtImplicitDepth == 0)
+            {
+              sumMttdetphColArea += (cuColAll->mtDepth - cuColAll->mtImplicitDepth) * ((roundVal * (heightBlockRes * widthBlockRes)) / sizeBlock);
+              nbSamplesMTT += ((roundVal * (heightBlockRes * widthBlockRes)) / sizeBlock);
+            }
+
+            if (cuColAll->qtDepth < minQtdetphColArea)
+            {
+              minQtdetphColArea = cuColAll->qtDepth;
+            }
+          }
+        }
+      }
+      if (nbSamples > 0)
+      {
+        sumQtdetphColArea = (sumQtdetphColArea + (nbSamples >> 1)) / nbSamples;
+      }
+      sp.qtDetphCol = (uint8_t)sumQtdetphColArea;
+      sp.maxBtDetphCol = maxBtdetphColArea;
+
+      if (nbSamplesMTT > 0)
+      {
+        sumMttdetphColArea = (sumMttdetphColArea + (nbSamplesMTT >> 1)) / nbSamplesMTT;
+      }
+      sp.mttDetphCol = (uint8_t)sumMttdetphColArea;
+
+      sp.minqtDetphCol = minQtdetphColArea;
+
+      mb = getQtDepthBuf(Area(pos.getX(), pos.getY(), std::min(width - w, QTBTTT_TEMPO_PRED_BUFFER_SIZE), std::min(height - h, QTBTTT_TEMPO_PRED_BUFFER_SIZE)));
+      mb.fill(sp);
+    }
+  }
+}
+
+QTDepthBuf CodingStructure::getQtDepthBuf(const Area& _area)
+{
+  const CompArea& _luma = area.Y();
+  CHECKD(!_luma.contains(_area), "Trying to access motion information outside of this coding structure");
+
+  const Area miArea = g_miScaling.scale(_area);
+  const Area selfArea = g_miScaling.scale(_luma);
+
+  return QTDepthBuf(currQtDepthBuf + rsAddr(miArea.pos(), selfArea.pos(), selfArea.width), selfArea.width, miArea.size());
+}
+
+#endif 
+
 #if JVET_W0123_TIMD_FUSION && RPR_ENABLE
 bool  CodingStructure::picContain(const Position _pos)
 {
@@ -2988,6 +3204,16 @@ const MotionInfo& CodingStructure::getMotionInfo( const Position& pos ) const
   return *( m_motionBuf + miPos.y * stride + miPos.x );
 #endif
 }
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+SplitPred& CodingStructure::getQtDepthInfo(const Position& pos)
+{
+  CHECKD(!area.Y().contains(pos), "Trying to access TEMPORAL partitionning information outside of this coding structure");
+  const unsigned stride = g_miScaling.scaleHor(area.lumaSize().width);
+  const Position miPos = g_miScaling.scale(pos - area.lumaPos());
+
+  return *(currQtDepthBuf + miPos.y * stride + miPos.x);
+}
+#endif 
 #if JVET_Z0118_GDR
 MotionBuf CodingStructure::getMotionBuf(const Area& _area, PictureType pt)
 {

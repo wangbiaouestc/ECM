@@ -153,7 +153,12 @@ public:
   virtual void copyState                  ( const Partitioner& other );
 
 public:
-  virtual void canSplit                   ( const CodingStructure &cs, bool& canNo, bool& canQt, bool& canBh, bool& canBv, bool& canTh, bool& canTv ) = 0;
+  virtual void canSplit                   ( const CodingStructure &cs, bool& canNo, bool& canQt, bool& canBh, bool& canBv, bool& canTh, bool& canTv 
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+    , unsigned& maxMtt
+#endif 
+  ) = 0;
+
   virtual bool canSplit                   ( const PartSplit split,                          const CodingStructure &cs ) = 0;
   virtual bool isSplitImplicit            ( const PartSplit split,                          const CodingStructure &cs ) = 0;
   virtual PartSplit getImplicitSplit      (                                                 const CodingStructure &cs ) = 0;
@@ -182,7 +187,12 @@ public:
   bool nextPart                   ( const CodingStructure &cs, bool autoPop = false );
   bool hasNextPart                ();
 
-  void canSplit                   ( const CodingStructure &cs, bool& canNo, bool& canQt, bool& canBh, bool& canBv, bool& canTh, bool& canTv );
+  void canSplit                   ( const CodingStructure &cs, bool& canNo, bool& canQt, bool& canBh, bool& canBv, bool& canTh, bool& canTv 
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+    , unsigned& maxMtt
+#endif
+  );
+
   bool canSplit                   ( const PartSplit split,                          const CodingStructure &cs );
   bool isSplitImplicit            ( const PartSplit split,                          const CodingStructure &cs );
   PartSplit getImplicitSplit      (                                                 const CodingStructure &cs );
@@ -216,7 +226,12 @@ public:
   void exitCurrSplit         ();
   bool nextPart              (const CodingStructure &cs, bool autoPop = false);
   bool hasNextPart           ();
-  void canSplit              (const CodingStructure &cs, bool& canNo, bool& canQt, bool& canBh, bool& canBv, bool& canTh, bool& canTv) {};
+  void canSplit              (const CodingStructure &cs, bool& canNo, bool& canQt, bool& canBh, bool& canBv, bool& canTh, bool& canTv
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+    , unsigned& maxMtt
+#endif
+  ) {};
+
   bool canSplit              (const PartSplit split, const CodingStructure &cs);
   bool isSplitImplicit       (const PartSplit split, const CodingStructure &cs) { return false; }; //not needed
   PartSplit getImplicitSplit (const CodingStructure &cs) { return CU_DONT_SPLIT; }; //not needed

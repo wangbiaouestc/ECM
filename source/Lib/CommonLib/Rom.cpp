@@ -44,9 +44,434 @@
 #include <math.h>
 #include <iomanip>
 
+#if JVET_AH0209_PDP
+#include "RomMIPFIlters.h"
+#endif
 // ====================================================================================================================
 // Initialize / destroy functions
 // ====================================================================================================================
+#if JVET_AH0209_PDP
+const int g_sizeData[PDP_NUM_SIZES][11] =
+{
+  { 16,	    4,	  4,	 4,	 4,	 2,	 2,	   36,	0, 0,	  20 },
+  { 32,	    4,	  8,	 4,	 8,	 2,	 2,	   52,	0, 0,	  28 },
+  { 32,	    8,	  4,	 8,	 4,	 2,	 2,	   52,	0, 0,	  28 },
+  { 64,	    8,	  8,	 8,	 8,	 2,	 2,	   68,	0, 0,	  36 },
+  { 64,	    4,	 16,	 4,	16,	 2,	 2,	   84,	0, 0,	  44 },
+  { 64,	   16,	  4,	16,	 4,	 2,	 2,	   84,	0, 0,	  44 },
+  { 128,	  4,   32,	 4,	32,	 2,	 2,	  148,	0, 0,	  76 },
+  { 128,	 32,	  4,	32,	 4,	 2,	 2,	  148,	0, 0,	  76 },
+  { 128,	  8,	 16,	 8,	16,	 2,	 2,	  100,	0, 0,	  52 },
+  { 128,	 16,	  8,	16,	 8,	 2,	 2,	  100,	0, 0,	  52 },
+  { 256,	 16,	 16,	16,	16,	 2,	 2,	  132,	0, 0,	  68 },
+  { 256,	  8,   32,	 8,	32,	 2,	 2,	  164,	0, 0,	  84 },
+  { 256,	 32,	  8,	32,	 8,	 2,	 2,	  164,	0, 0,	  84 },
+  { 512,	 16,	 32,	16,	32,	 1,	 1,	   97,	0, 0,	  49 },
+  { 512,	 32,	 16,	32,	16,	 1,	 1,	   97,	0, 0,	  49 },
+  {1024,	 32,	 32,	32,	32,	 1,	 1,	  129,	0, 0,	  65 },
+  { 1024,	 64,	 64,	32,	32,	 2,	 2,	  516,	1, 1,  260 }, //dont use anything more than 64x64 at this point
+  { 1024,	128,	128,	32,	32,	 2,	 2,	 1028,	2, 2,  516 }
+};
+
+std::unordered_map<int, int> g_size
+{
+  { 1028, 0 },
+  { 1032, 1 },
+  { 2052, 2 },
+  { 2056, 3 },
+  { 1040, 4 },
+  { 4100, 5 },
+  { 1056, 6 },
+  { 8196, 7 },
+  { 2064, 8 },
+  { 4104, 9 },
+  { 4112,10 },
+  { 2080,11 },
+  { 8200,12 },
+  { 4128,13 },
+  { 8208,14 },
+  { 8224,15 },
+  { 16448,16 },
+  { 32896,17 }
+};
+
+const int g_modeGroupSym[PDP_NUM_MODES] = { 0, 1, 66, 65, 64, 63, 62, 61, 60, 59, 58, 57, 56, 55, 54, 53, 52, 51, 50, 49, 48, 47, 46, 45, 44, 43, 42, 41, 40, 39, 38, 37, 36, 35, 34}; //BR
+const int g_modeGroup[PDP_NUM_MODES] = { 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66 }; //BR
+int16_t*** g_pdpFilters[PDP_NUM_GROUPS][PDP_NUM_SIZES] = { nullptr };
+int g_validSize[PDP_NUM_SIZES] = { 0 };
+
+void createPdpFilters()
+{
+  for (int sizeID = 0; sizeID < 16; sizeID++)
+  {
+    if (sizeID == 6 || sizeID == 7 || sizeID == 11 || sizeID == 12)
+    {
+      continue;
+    }
+
+    int dsWidth = g_sizeData[sizeID][3], dsHeight = g_sizeData[sizeID][4];
+    g_validSize[sizeID] = 1;
+
+    for (int groupID = 0; groupID < 35; groupID++)
+    {
+      if (groupID > 1 && groupID % 2 == 1) continue;
+      if (sizeID > 12 && groupID > 1 && groupID % 4 != 2) continue;
+      bool shortLen = (groupID < PDP_SHORT_TH[0]) || (groupID >= PDP_SHORT_TH[1] && groupID <= PDP_SHORT_TH[2]);
+      int len = shortLen ? g_sizeData[sizeID][10] : g_sizeData[sizeID][7];
+      int16_t***& f = g_pdpFilters[groupID][sizeID];
+      int16_t***& fSym = g_pdpFilters[g_modeGroupSym[groupID]][g_size[(dsHeight << 8) + dsWidth]];
+
+      if( !f )
+      {
+        f = new int16_t**[dsHeight];
+        for (int h = 0; h < dsHeight; ++h)
+        {
+          f[h] = new int16_t*[dsWidth];
+          for (int w = 0; w < dsWidth/4; w+=1)
+          {
+            auto len4 = (((len+7)/8)*8)*4;
+            f[h][w] = new int16_t[len4];
+            ::memset(f[h][w], 0, sizeof(int16_t)*len4);
+          }
+        }
+      }
+
+      if( !fSym && groupID > 1 && groupID < 34 )
+      {
+        fSym = new int16_t**[dsWidth];
+        for (int h = 0; h < dsWidth; ++h)
+        {
+          fSym[h] = new int16_t*[dsHeight];
+          for (int w = 0; w < dsHeight/4; w+=1)
+          {
+            auto len4 = (((len+7)/8)*8)*4;
+            fSym[h][w] = new int16_t[len4];
+            ::memset(fSym[h][w], 0, sizeof(int16_t)*len4);
+          }
+        }
+      }
+    }
+  }
+
+  int val = -1;
+  for (int sizeID = 0; sizeID < 11; sizeID++)
+  {
+    if (sizeID == 6 || sizeID == 7)
+    {
+      continue;
+    }
+
+    int dsWidth = g_sizeData[sizeID][3], dsHeight = g_sizeData[sizeID][4];
+    bool shortLen = false;
+    int len = shortLen ? g_sizeData[sizeID][10] : g_sizeData[sizeID][7];
+
+    for (int groupID = 0; groupID < 19; groupID++)
+    {
+      if (groupID > 1 && groupID % 2 == 1)
+      {
+        continue;
+      }
+
+      int16_t***& f = g_pdpFilters[groupID][sizeID];
+      int16_t***& fSym = g_pdpFilters[g_modeGroupSym[groupID]][g_size[(dsHeight << 8) + dsWidth]];
+
+      int dsMode = (groupID > 2) ? ((groupID - 2) >> 1) + 2 : groupID;
+      for (int y = 0; y < dsHeight; y++)
+      {
+        for (int x = 0; x < dsWidth; x++)
+        {
+          for (int i = 0; i < len; i++)
+          {
+            if (dsWidth == 4 && dsHeight == 4)
+            {
+              val = g_weights4x4[dsMode][y*dsWidth + x][i];
+            }
+            else if (dsWidth == 4 && dsHeight == 8)
+            {
+              val = g_weights4x8[dsMode][y*dsWidth + x][i];
+            }
+            else if (dsWidth == 8 && dsHeight == 4)
+            {
+              val = g_weights8x4[dsMode][y*dsWidth + x][i];
+            }
+            else if (dsWidth == 8 && dsHeight == 8)
+            {
+              val = g_weights8x8[dsMode][y*dsWidth + x][i];
+            }
+            else if (dsWidth == 4 && dsHeight == 16)
+            {
+              val = g_weights4x16[dsMode][y*dsWidth + x][i];
+            }
+            else if (dsWidth == 16 && dsHeight == 4)
+            {
+              val = g_weights16x4[dsMode][y*dsWidth + x][i];
+            }
+            else if (dsWidth == 8 && dsHeight == 16)
+            {
+              val = g_weights8x16[dsMode][y*dsWidth + x][i];
+            }
+            else if (dsWidth == 16 && dsHeight == 8)
+            {
+              val = g_weights16x8[dsMode][y*dsWidth + x][i];
+            }
+            else if (dsWidth == 16 && dsHeight == 16)
+            {
+              val = g_weights16x16[dsMode][y*dsWidth + x][i];
+            }
+
+            auto ii = i - (i%8);
+            auto ij = i%8;
+            f[y][x>>2][( ii * 4 + 8 * (x%4)) + ij] = val;
+
+            if(fSym && (groupID > 1 && groupID < 34))
+            {
+              int templateX = g_sizeData[sizeID][5];
+              int templateY = g_sizeData[sizeID][6];
+              int stride1 = dsWidth * ( (shortLen || dsWidth == 128) ? 1 : 2) + templateX;
+              int stride2 = templateX;
+              int stride1Sym = dsHeight * ( (shortLen || dsHeight == 128) ? 1 : 2) + templateY;
+              int stride2Sym = templateY;
+              int lenZone1 = stride1 * templateY;
+              int x1 = (i >= lenZone1) ? (( i - lenZone1 ) % stride2) : (i % stride1);
+              int y1 = (i >= lenZone1) ? (( i - lenZone1 ) / stride2) + templateY : (i / stride1);
+              int iSym = y1 + ( x1 > templateX ? ( templateX * stride1Sym + (x1 - templateX) * stride2Sym) : x1 * stride1Sym);
+              int iSymInterleave = (iSym / 8) * 4 * 8 + (y%4) * 8 + (iSym % 8);
+              fSym[x][y>>2][iSymInterleave] = val;
+            }
+          }
+        }
+      }
+    }
+    shortLen = true;
+    len = shortLen ? g_sizeData[sizeID][10] : g_sizeData[sizeID][7];
+    for (int groupID2 = 20; groupID2 < 35; groupID2++)
+    {
+      if (groupID2 > 1 && groupID2 % 2 == 1) continue;
+      int16_t***& f = g_pdpFilters[groupID2][sizeID];
+      int16_t***& fSym = g_pdpFilters[g_modeGroupSym[groupID2]][g_size[(dsHeight << 8) + dsWidth]];
+
+      int dsMode = ((groupID2 - 20) >> 1);
+      for (int y = 0; y < dsHeight; y++)
+      {
+        for (int x = 0; x < dsWidth; x++)
+        {
+          for (int i = 0; i < len; i++)
+          {
+            if (dsWidth == 4 && dsHeight == 4)
+            {
+              val = g_weightsShort4x4[dsMode][y*dsWidth + x][i];
+            }
+            else if (dsWidth == 4 && dsHeight == 8)
+            {
+              val = g_weightsShort4x8[dsMode][y*dsWidth + x][i];
+            }
+            else if (dsWidth == 8 && dsHeight == 4)
+            {
+              val = g_weightsShort8x4[dsMode][y*dsWidth + x][i];
+            }
+            else if (dsWidth == 8 && dsHeight == 8)
+            {
+              val = g_weightsShort8x8[dsMode][y*dsWidth + x][i];
+            }
+            else if (dsWidth == 4 && dsHeight == 16)
+            {
+              val = g_weightsShort4x16[dsMode][y*dsWidth + x][i];
+            }
+            else if (dsWidth == 16 && dsHeight == 4)
+            {
+              val = g_weightsShort16x4[dsMode][y*dsWidth + x][i];
+            }
+            else if (dsWidth == 8 && dsHeight == 16)
+            {
+              val = g_weightsShort8x16[dsMode][y*dsWidth + x][i];
+            }
+            else if (dsWidth == 16 && dsHeight == 8)
+            {
+              val = g_weightsShort16x8[dsMode][y*dsWidth + x][i];
+            }
+            else if (dsWidth == 16 && dsHeight == 16)
+            {
+              val = g_weightsShort16x16[dsMode][y*dsWidth + x][i];
+            }
+
+            auto ii = i - (i%8);
+            auto ij = i%8;
+            f[y][x>>2][( ii * 4 + 8 * (x%4)) + ij] = val;
+
+            if(fSym && (groupID2 > 1 && groupID2 < 34))
+            {
+              int templateX = g_sizeData[sizeID][5];
+              int templateY = g_sizeData[sizeID][6];
+              int stride1 = dsWidth * ( (shortLen || dsWidth == 128) ? 1 : 2) + templateX;
+              int stride2 = templateX;
+              int stride1Sym = dsHeight * ( (shortLen || dsHeight == 128) ? 1 : 2) + templateY;
+              int stride2Sym = templateY;
+              int lenZone1 = stride1 * templateY;
+              int x1 = (i >= lenZone1) ? (( i - lenZone1 ) % stride2) : (i % stride1);
+              int y1 = (i >= lenZone1) ? (( i - lenZone1 ) / stride2) + templateY : (i / stride1);
+              int iSym = y1 + ( x1 > templateX ? ( templateX * stride1Sym + (x1 - templateX) * stride2Sym) : x1 * stride1Sym);
+              int iSymInterleave = (iSym / 8) * 4 * 8 + (y%4) * 8 + (iSym % 8);
+              fSym[x][y>>2][iSymInterleave] = val;
+            }
+          }
+        }
+      }
+    }
+  }
+  /////////////////////////Big blocks filter value loading///////////////////////////////////////////////////////////////
+  val = -1;
+  for (int sizeID = 13; sizeID < 16; sizeID++)
+  {
+    int dsWidth = g_sizeData[sizeID][3], dsHeight = g_sizeData[sizeID][4];
+    int sampFacHor = dsWidth / 16;
+    int sampFacVer = dsHeight / 16;
+    int dx, dy;
+    int dsWidth2 = dsWidth / sampFacHor; //modified width at downsampled domain..nneded for picking up correct values using raster scan order.
+    bool shortLen = false;
+    int len = shortLen ? g_sizeData[sizeID][10] : g_sizeData[sizeID][7];
+    for (int groupID = 0; groupID < 19; groupID++)
+    {
+      if( groupID > 1 && groupID % 4 != 2 )
+      {
+        continue;
+      }
+
+      int16_t***& f = g_pdpFilters[groupID][sizeID];
+      int16_t***& fSym = g_pdpFilters[g_modeGroupSym[groupID]][g_size[(dsHeight << 8) + dsWidth]];
+      int dsMode = groupID > 2 ? ((groupID - 2) >> 2) + 2 : groupID;
+
+      for (int y = 0; y < dsHeight; y++)
+      {
+        for (int x = 0; x < dsWidth; x++)
+        {
+          if ((x%sampFacHor != (sampFacHor - 1)) || (y%sampFacVer != (sampFacVer - 1)))
+          {
+            continue;
+          }
+          dx = x / sampFacHor;
+          dy = y / sampFacVer;
+
+          for (int i = 0; i < len; i++)
+          {
+            if (dsWidth == 16 && dsHeight == 32)
+            {
+              val = g_weights16x32[dsMode][dy*dsWidth2 + dx][i];
+            }
+            else if (dsWidth == 32 && dsHeight == 16)
+            {
+              val = g_weights32x16[dsMode][dy*dsWidth2 + dx][i];
+            }
+            else if (dsWidth == 32 && dsHeight == 32)
+            {
+              val = g_weights32x32[dsMode][dy*dsWidth2 + dx][i];
+            }
+
+            f[y][x>>2][( (i/8) * 32 + 8 * (x%4)) + (i%8)] = val;
+
+            if(fSym && (groupID > 1 && groupID < 34))
+            {
+              int templateX = g_sizeData[sizeID][5];
+              int templateY = g_sizeData[sizeID][6];
+              int stride1 = dsWidth * ( (shortLen || dsWidth == 128) ? 1 : 2) + templateX;
+              int stride2 = templateX;
+              int stride1Sym = dsHeight * ( (shortLen || dsHeight == 128) ? 1 : 2) + templateY;
+              int stride2Sym = templateY;
+              int lenZone1 = stride1 * templateY;
+              int x1 = (i >= lenZone1) ? (( i - lenZone1 ) % stride2) : (i % stride1);
+              int y1 = (i >= lenZone1) ? (( i - lenZone1 ) / stride2) + templateY : (i / stride1);
+              int iSym = y1 + ( x1 > templateX ? ( templateX * stride1Sym + (x1 - templateX) * stride2Sym) : x1 * stride1Sym);
+              int iSymInterleave = (iSym / 8) * 4 * 8 + (y%4) * 8 + (iSym % 8);
+              fSym[x][y>>2][iSymInterleave] = val;
+            }
+          }
+        }
+      }
+    }
+
+    shortLen = true;
+    len = shortLen ? g_sizeData[sizeID][10] : g_sizeData[sizeID][7];
+
+    for (int groupID2 = 20; groupID2 < 35; groupID2++)
+    {
+      if (groupID2 > 1 && groupID2 % 4 != 2) continue;
+      int16_t***& f = g_pdpFilters[groupID2][sizeID];
+      int16_t***& fSym = g_pdpFilters[g_modeGroupSym[groupID2]][g_size[(dsHeight << 8) + dsWidth]];
+      int dsMode = ((groupID2 - 22) >> 2);
+
+      for (int y = 0; y < dsHeight; y++)
+      {
+        for (int x = 0; x < dsWidth; x++)
+        {
+          if ((x%sampFacHor != (sampFacHor - 1)) || (y%sampFacVer != (sampFacVer - 1)))
+          {
+            continue;
+          }
+
+          dx = x / sampFacHor;
+          dy = y / sampFacVer;
+
+          for (int i = 0; i < len; i++)
+          {
+            if (dsWidth == 16 && dsHeight == 32)
+            {
+              val = g_weightsShort16x32[dsMode][dy*dsWidth2 + dx][i];
+            }
+            else if (dsWidth == 32 && dsHeight == 16)
+            {
+              val = g_weightsShort32x16[dsMode][dy*dsWidth2 + dx][i];
+            }
+            else if (dsWidth == 32 && dsHeight == 32)
+            {
+              val = g_weightsShort32x32[dsMode][dy*dsWidth2 + dx][i];
+            }
+
+            f[y][x>>2][( (i/8) * 32 + 8 * (x%4)) + (i%8)] = val;
+
+            if(fSym && (groupID2 > 1 && groupID2 < 34))
+            {
+              int templateX = g_sizeData[sizeID][5];
+              int templateY = g_sizeData[sizeID][6];
+              int stride1 = dsWidth * ( (shortLen || dsWidth == 128) ? 1 : 2) + templateX;
+              int stride2 = templateX;
+              int stride1Sym = dsHeight * ( (shortLen || dsHeight == 128) ? 1 : 2) + templateY;
+              int stride2Sym = templateY;
+              int lenZone1 = stride1 * templateY;
+              int x1 = (i >= lenZone1) ? (( i - lenZone1 ) % stride2) : (i % stride1);
+              int y1 = (i >= lenZone1) ? (( i - lenZone1 ) / stride2) + templateY : (i / stride1);
+              int iSym = y1 + ( x1 > templateX ? ( templateX * stride1Sym + (x1 - templateX) * stride2Sym) : x1 * stride1Sym);
+              int iSymInterleave = (iSym / 8) * 4 * 8 + (y%4) * 8 + (iSym % 8);
+              fSym[x][y>>2][iSymInterleave] = val;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+void destroyPdpFilters()
+{
+  for (int size = 0; size < PDP_NUM_SIZES; ++size)
+  {
+    int currWidth = g_sizeData[size][3], currHeight = g_sizeData[size][4];
+    for (int group = 0; group < PDP_NUM_GROUPS; ++group)
+    {
+      if (g_pdpFilters[group][size])
+      {
+        for (int h = 0; h < currHeight; ++h)
+        {
+
+          for (int w = 0; w < currWidth/4; ++w)
+          {
+            delete[] g_pdpFilters[group][size][h][w];
+          }
+          delete[] g_pdpFilters[group][size][h];
+        }
+        delete[] g_pdpFilters[group][size];
+      }
+    }
+  }
+}
+#endif
 
 #if JVET_AC0130_NSPT
 #include "RomNSPT.h"
@@ -4266,14 +4691,23 @@ const uint8_t g_aucTrSet[80][4] =
 #endif
 
 #if JVET_AG0058_EIP
+#if JVET_AH0086_EIP_BIAS_AND_CLIP
+// Note: Positions here are identical to the definition in the #else branch, just omitting the last position from each array
+const Position g_eipFilter[NUM_EIP_SHAPE][EIP_FILTER_TAP - 1] =
+{
+  { Position(-1,  0), Position(-2,  0), Position(-3,  0), Position( 0, -1), Position(-1, -1), Position(-2, -1), Position(-3, -1), Position( 0, -2), Position(-1, -2), Position(-2, -2), Position(-3, -2), Position( 0, -3), Position(-1, -3), Position(-2, -3) },
+  { Position(-1,  0), Position( 0, -1), Position(-1, -1), Position( 0, -2), Position(-1, -2), Position( 0, -3), Position(-1, -3), Position( 0, -4), Position(-1, -4), Position( 0, -5), Position(-1, -5), Position( 0, -6), Position(-1, -6), Position( 0, -7) },
+  { Position( 0, -1), Position(-1,  0), Position(-1, -1), Position(-2,  0), Position(-2, -1), Position(-3,  0), Position(-3, -1), Position(-4,  0), Position(-4, -1), Position(-5,  0), Position(-5, -1), Position(-6,  0), Position(-6, -1), Position(-7,  0) },
+};
+#else
 const Position g_eipFilter[NUM_EIP_SHAPE][EIP_FILTER_TAP] =
 {
   { Position(-1,  0), Position(-2,  0), Position(-3,  0), Position( 0, -1), Position(-1, -1), Position(-2, -1), Position(-3, -1), Position( 0, -2), Position(-1, -2), Position(-2, -2), Position(-3, -2), Position( 0, -3), Position(-1, -3), Position(-2, -3), Position(-3, -3) },
   { Position(-1,  0), Position( 0, -1), Position(-1, -1), Position( 0, -2), Position(-1, -2), Position( 0, -3), Position(-1, -3), Position( 0, -4), Position(-1, -4), Position( 0, -5), Position(-1, -5), Position( 0, -6), Position(-1, -6), Position( 0, -7), Position(-1, -7) },
   { Position( 0, -1), Position(-1,  0), Position(-1, -1), Position(-2,  0), Position(-2, -1), Position(-3,  0), Position(-3, -1), Position(-4,  0), Position(-4, -1), Position(-5,  0), Position(-5, -1), Position(-6,  0), Position(-6, -1), Position(-7,  0), Position(-7, -1) },
 };
-
-const EIPInfo g_eipInfoLut[4][4][9] = 
+#endif
+const EIPInfo g_eipInfoLut[4][4][9] =
 {
   {
     { EIPInfo(EIP_AL_A_L, EIP_FILTER_S), EIPInfo(EIP_AL_A_L, EIP_FILTER_V), EIPInfo(EIP_AL_A_L, EIP_FILTER_H), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo(), EIPInfo() }, // 4x4, 3modes

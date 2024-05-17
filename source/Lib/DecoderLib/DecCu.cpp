@@ -122,6 +122,9 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
 #if JVET_AE0159_FIBC || JVET_AE0059_INTER_CCCM || JVET_AE0078_IBC_LIC_EXTENSION || JVET_AF0073_INTER_CCP_MERGE
   m_pcInterPred->setIntraPrediction( m_pcIntraPred );
 #endif
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+  m_pcIntraPred->setInterPrediction(m_pcInterPred);
+#endif
 #if JVET_Z0118_GDR
   // reset current IBC Buffer only when VB pass through
   if (cs.isGdrEnabled() && cs.isInGdrIntervalOrRecoveryPoc())
@@ -270,6 +273,7 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
         }
 #endif
       }
+
       switch( currCU.predMode )
       {
       case MODE_INTER:
@@ -321,7 +325,14 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
         if (currCU.dimd || currCU.sgpm || (chType == CHANNEL_TYPE_LUMA && currCU.tmpFlag))
         {
           m_pcIntraPred->m_bvBasedMergeCandidates.clear();
-          PU::getItmpMergeCandidate(*currCU.firstPU, m_pcIntraPred->m_bvBasedMergeCandidates);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+          m_pcIntraPred->m_sgpmMvBasedMergeCandidates.clear();
+#endif
+          PU::getItmpMergeCandidate(*currCU.firstPU, m_pcIntraPred->m_bvBasedMergeCandidates
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+             , m_pcIntraPred->m_sgpmMvBasedMergeCandidates
+#endif          
+          );
         }
 #endif
 #if ENABLE_DIMD
@@ -333,6 +344,13 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
           pu->intraDir[0] = currCU.dimdMode;
 #if JVET_AG0146_DIMD_ITMP_IBC
           m_pcIntraPred->getBestNonAnglularMode(currCU.cs->picture->getRecoBuf(area), area, currCU, m_pcIntraPred->m_bvBasedMergeCandidates);
+#endif
+#if JVET_AH0076_OBIC
+          if (currCU.obicFlag)
+          {
+            m_pcIntraPred->deriveObicMode(currCU.cs->picture->getRecoBuf(area), area, currCU);
+            pu->intraDir[0] = currCU.obicMode[0];
+          }
 #endif
         }
 #if JVET_W0123_TIMD_FUSION
@@ -461,7 +479,11 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
 #endif
           }
         }
+#if JVET_AH0136_CHROMA_REORDERING
+        if (currCU.firstPU->parseChromaMode && (!CS::isDualITree(cs) || !currCU.cs->sps->getUseChromaReordering()))
+#else
         if (currCU.firstPU->parseChromaMode)
+#endif
         {
           unsigned chromaCandModes[NUM_CHROMA_MODE];
           PU::getIntraChromaCandModes(*currCU.firstPU, chromaCandModes);
@@ -559,7 +581,6 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
         THROW( "Invalid prediction mode" );
         break;
       }
-
       m_pcInterPred->xFillIBCBuffer(currCU);
 #if JVET_Z0118_GDR // decompressCtu
       cs.updateReconMotIPM( currCU ); // decompressCtu : need
@@ -620,7 +641,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 #endif
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
 #if JVET_AG0059_CCP_MERGE_ENHANCEMENT
+#if JVET_AH0136_CHROMA_REORDERING
+  if (((!PU::isLMCMode(pu.intraDir[1]) && compID == COMPONENT_Cb && !pu.cu->bdpcmModeChroma) && CS::isDualITree(cs) && pu.cs->sps->getUseChromaReordering()) || ((pu.intraDir[1] == DIMD_CHROMA_IDX || pu.ccpMergeFusionType == 1) && compID == COMPONENT_Cb))
+#else
   if ((pu.intraDir[1] == DIMD_CHROMA_IDX || pu.ccpMergeFusionType == 1) && compID == COMPONENT_Cb)
+#endif
 #else
   if (pu.intraDir[1] == DIMD_CHROMA_IDX && compID == COMPONENT_Cb)
 #endif
@@ -644,6 +669,57 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 #endif
   }
 #endif
+#if JVET_AH0136_CHROMA_REORDERING
+  if ((!PU::isLMCMode(pu.intraDir[1]) && compID == COMPONENT_Cb && !pu.cu->bdpcmModeChroma) && CS::isDualITree(cs) && pu.cs->sps->getUseChromaReordering())
+  {
+    CompArea areaCb = pu.Cb();
+    CompArea areaCr = pu.Cr();
+    CompArea lumaArea = CompArea(COMPONENT_Y, pu.chromaFormat, areaCb.lumaPos(), recalcSize(pu.chromaFormat, CHANNEL_TYPE_CHROMA, CHANNEL_TYPE_LUMA, areaCb.size()));
+    m_pcIntraPred->deriveNonCcpChromaModes(cs.picture->getRecoBuf(lumaArea), cs.picture->getRecoBuf(areaCb), cs.picture->getRecoBuf(areaCr), lumaArea, areaCb, areaCr, *pu.cu, pu, m_pcInterPred);
+    int chromaIdx = -1;
+#if JVET_AC0071_DBV
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+    if (cs.slice->getSPS()->getUseDimd())
+    {
+      chromaIdx = pu.intraDir[1] == DBV_CHROMA_IDX ? 0 : (pu.intraDir[1] == DM_CHROMA_IDX ? 1 : (pu.intraDir[1] == DIMD_CHROMA_IDX ? 2 : pu.candId + 3));
+    }
+    else
+    {
+      chromaIdx = pu.intraDir[1] == DBV_CHROMA_IDX ? 0 : (pu.intraDir[1] == DM_CHROMA_IDX ? 1 : pu.candId + 2);
+    }
+#else
+    chromaIdx = pu.intraDir[1] == DBV_CHROMA_IDX ? 0 : (pu.intraDir[1] == DM_CHROMA_IDX ? 1 : pu.candId + 2);
+#endif
+    if (!PU::hasChromaBvFlag(pu))
+    {
+      chromaIdx--;
+    }
+#else
+#if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
+    if (cs.slice->getSPS()->getUseDimd())
+    {
+      chromaIdx = pu.intraDir[1] == DM_CHROMA_IDX ? 0 : (pu.intraDir[1] == DIMD_CHROMA_IDX ? 1 : pu.candId + 2);
+    }
+    else
+    {
+      chromaIdx = pu.intraDir[1] == DM_CHROMA_IDX ? 0 : pu.candId + 1;
+    }
+#else
+    chromaIdx = pu.intraDir[1] == DM_CHROMA_IDX ? 0 : pu.candId + 1;
+#endif
+#endif
+    pu.intraDir[1] = pu.cu->chromaList[chromaIdx];
+#if JVET_AC0071_DBV
+    if (PU::isDbvMode(pu.intraDir[1]) && CS::isDualITree(cs))
+    {
+      pu.bv = pu.cu->bvs[pu.intraDir[1] - DBV_CHROMA_IDX];
+      pu.mv[0] = pu.cu->mvs[pu.intraDir[1] - DBV_CHROMA_IDX];
+      pu.cu->rribcFlipType = pu.cu->rribcTypes[pu.intraDir[1] - DBV_CHROMA_IDX];
+    }
+#endif
+    CHECK(pu.intraDir[1] < 0, "wrong intraDir");
+  }
+#endif
 #if JVET_AE0100_BVGCCCM
   if (pu.bvgCccmFlag && compID == COMPONENT_Cb)
   {
@@ -653,7 +729,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
   }
 #endif
 #if JVET_AC0071_DBV
-  if (pu.intraDir[1] == DBV_CHROMA_IDX && compID == COMPONENT_Cb)
+  if (pu.intraDir[1] == DBV_CHROMA_IDX && compID == COMPONENT_Cb
+#if JVET_AH0136_CHROMA_REORDERING
+    && !pu.cs->sps->getUseChromaReordering()
+#endif
+    )
   {
     PU::deriveChromaBv(pu);
   }
@@ -936,6 +1016,21 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
                                             , false
 #endif
                                             );
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+        if(!tu.cu->tmpFlmFlag && !tu.cu->tmpFusionFlag)
+        {
+          if(pu.lwidth() * pu.lheight() > TMP_SKIP_REFINE_THRESHOLD)
+          {
+            tu.cu->tmpIsSubPel  = 0;
+            tu.cu->tmpSubPelIdx = 0;
+          } 
+          else
+          {
+            m_pcIntraPred->searchFracCandidate(tu.cu, m_pcIntraPred->getTargetPatch(floorLog2(std::max(pu.lwidth(), pu.lheight())) - 2), tempType);
+          }
+        }
+#endif		
+
 #if JVET_AG0136_INTRA_TMP_LIC
         if (tu.cu->tmpLicFlag)
         {
@@ -960,9 +1055,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
           }
           else
           {
+#if !JVET_AH0200_INTRA_TMP_BV_REORDER
             m_pcIntraPred->setBvMvFromMemory(*(tu.cu), (tu.cu)->tmpIdx, true);
             m_pcInterPred->LicItmp(pu, bufDumb, false);
             m_pcIntraPred->getMemLicParams((tu.cu)->ibcLicIdx, (tu.cu)->tmpIdx) = m_pcInterPred->getArrayLicParams();
+#endif
           }
         }
 #endif
@@ -979,10 +1076,12 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 #endif
                                                   );
         }
+#if !JVET_AH0200_INTRA_TMP_BV_REORDER
         if (pu.cu->tmpIsSubPel)
         {
           m_pcIntraPred->xPadForInterpolation(pu.cu);
         }
+#endif
 #endif
 #if JVET_AB0061_ITMP_BV_FOR_IBC
         m_pcIntraPred->generateTMPrediction(piPred.buf, piPred.stride, foundCandiNum, pu
@@ -1002,7 +1101,13 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
         {
           if (!(tu.cu)->tmpFusionFlag)
           {
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+            PelBuf bufDumb;
+            m_pcInterPred->LicItmp(pu, bufDumb, false);
+            const auto& arrayLicParams = m_pcInterPred->getArrayLicParams();
+#else
             const auto& arrayLicParams = m_pcIntraPred->getMemLicParams((tu.cu)->ibcLicIdx, (tu.cu)->tmpIdx);
+#endif
             if ((tu.cu)->ibcLicIdx == IBC_LIC_IDX_M)
             {
               piPred.linearTransforms(arrayLicParams[1], arrayLicParams[0], arrayLicParams[2], arrayLicParams[4], arrayLicParams[3], arrayLicParams[5], arrayLicParams[6], true, (tu.cu)->cs->slice->clpRng(COMPONENT_Y));
@@ -1056,7 +1161,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
     {
       m_pcIntraPred->initIntraMip( pu, area );
 #if JVET_AB0067_MIP_DIMD_LFNST
+#if JVET_AH0076_OBIC
+      m_pcIntraPred->predIntraMip( compID, piPred, pu, true);
+#else
       m_pcIntraPred->predIntraMip( compID, piPred, pu, pu.cu->lfnstIdx > 0 ? true : false);
+#endif
 #else
       m_pcIntraPred->predIntraMip( compID, piPred, pu );
 #endif
@@ -1109,7 +1218,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
       }
       else
 #if JVET_AC0071_DBV
+#if JVET_AH0136_CHROMA_REORDERING
+        if (compID != COMPONENT_Y && PU::isDbvMode(uiChFinalMode))
+#else
       if (compID != COMPONENT_Y && uiChFinalMode == DBV_CHROMA_IDX)
+#endif
       {
         m_pcIntraPred->predIntraDbv(compID, piPred, pu
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
@@ -1123,7 +1236,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 #if JVET_Z0050_DIMD_CHROMA_FUSION
       if (compID != COMPONENT_Y && pu.isChromaFusion)
       {
-        m_pcIntraPred->geneChromaFusionPred(compID, piPred, pu);
+        m_pcIntraPred->geneChromaFusionPred(compID, piPred, pu
+#if JVET_AH0136_CHROMA_REORDERING
+          , m_pcInterPred
+#endif
+        );
       }
 #endif
     }
@@ -1172,7 +1289,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
       else
       {
 #if JVET_AC0071_DBV
+#if JVET_AH0136_CHROMA_REORDERING
+        if (PU::isDbvMode(uiChFinalMode))
+#else
         if (uiChFinalMode == DBV_CHROMA_IDX)
+#endif
         {
           m_pcIntraPred->predIntraDbv(COMPONENT_Cr, piPredCr, pu
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
@@ -1183,10 +1304,15 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
         else
 #endif
         m_pcIntraPred->predIntraAng(COMPONENT_Cr, piPredCr, pu);
+
 #if JVET_Z0050_DIMD_CHROMA_FUSION
         if (pu.isChromaFusion)
         {
-          m_pcIntraPred->geneChromaFusionPred(COMPONENT_Cr, piPredCr, pu);
+          m_pcIntraPred->geneChromaFusionPred(COMPONENT_Cr, piPredCr, pu
+#if JVET_AH0136_CHROMA_REORDERING
+            , m_pcInterPred
+#endif
+          );
         }
 #endif
       }
@@ -1261,7 +1387,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
   if( !tu.cu->ispMode || !isLuma( compID ) )
   {
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AC0071_DBV
+#if JVET_AH0136_CHROMA_REORDERING
+    if (!(PU::isDbvMode(uiChFinalMode) && compID == COMPONENT_Cb))
+#else
     if (!(uiChFinalMode == DBV_CHROMA_IDX && compID == COMPONENT_Cb))
+#endif
 #endif
     cs.setDecomp( area );
   }
@@ -1309,7 +1439,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
   pReco.copyFrom( piPred );
 #endif
 #if JVET_AC0071_DBV && JVET_AA0070_RRIBC
+#if JVET_AH0136_CHROMA_REORDERING
+  if (compID != COMPONENT_Y && PU::isDbvMode(uiChFinalMode) && tu.cu->rribcFlipType)
+#else
   if (compID != COMPONENT_Y && uiChFinalMode == DBV_CHROMA_IDX && tu.cu->rribcFlipType)
+#endif
   {
     pReco.flipSignal(tu.cu->rribcFlipType == 1);
   }
@@ -1390,7 +1524,11 @@ void DecCu::xIntraRecACTBlk(TransformUnit& tu)
     {
       m_pcIntraPred->initIntraMip(pu, area);
 #if JVET_AB0067_MIP_DIMD_LFNST
+#if JVET_AH0076_OBIC
+      m_pcIntraPred->predIntraMip(compID, piPred, pu, true);
+#else
       m_pcIntraPred->predIntraMip(compID, piPred, pu, pu.cu->lfnstIdx > 0 ? true : false);
+#endif
 #else
       m_pcIntraPred->predIntraMip(compID, piPred, pu);
 #endif
@@ -1970,6 +2108,9 @@ void DecCu::xReconInter(CodingUnit &cu)
               cu.licOffset[list][comp] = 0;
             }
             else
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+            if (!cu.licInheritPara)
+#endif
             {
               m_pcInterPred->setLicParam(list, comp, cu.licScale[list][comp], cu.licOffset[list][comp]);
             }
@@ -1993,12 +2134,19 @@ void DecCu::xReconInter(CodingUnit &cu)
 #if INTER_LIC
             bool orgLicFlag = cu.licFlag;
             cu.licFlag = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+            bool orgLicInheritedFlag = cu.licInheritPara;
+            cu.licInheritPara = false;
+#endif
 #endif
             bool orgCiipFlag = cu.firstPU->ciipFlag;
             cu.firstPU->ciipFlag = false;
             m_pcInterPred->xPredWoRefinement(*cu.firstPU, predBeforeMCAdjBuffer);
 #if INTER_LIC
             cu.licFlag = orgLicFlag;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+            cu.licInheritPara = orgLicInheritedFlag;
+#endif
 #endif
             cu.firstPU->ciipFlag = orgCiipFlag;
           }
@@ -2234,8 +2382,15 @@ void DecCu::xReconInter(CodingUnit &cu)
     }
     else
     {
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+      cu.secAltLMParaUnit.resetAltLinearModel();
+#else
       cu.secAltLMParaUnit = cu.altLMParaUnit;
+#endif
     }
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+    cu.altLMParaUnit.resetAltLinearModel();
+#endif
     if (CU::isSecLicParaNeeded(cu) && CU::isAllowSecLicPara(cu))
     {
       UnitArea localUnitArea(cu.chromaFormat, Area(0, 0, cu.lumaSize().width, cu.lumaSize().height));
@@ -2446,7 +2601,6 @@ void DecCu::xDecodeInterTexture(CodingUnit &cu)
     {
       cs.getRecoBuf(cu).get(COMPONENT_Y).rspSignal(m_pcReshape->getFwdLUT());
     }
-
 #if JVET_AG0145_ADAPTIVE_CLIPPING
     ClpRng clpRng = cs.slice->clpRng(COMPONENT_Y);
     if (cs.slice->getSPS()->getUseLmcs() && cs.slice->getLmcsEnabledFlag())
@@ -2462,10 +2616,33 @@ void DecCu::xDecodeInterTexture(CodingUnit &cu)
     }
     cs.getRecoBuf(cu).get(COMPONENT_Y).reconstruct(cs.getRecoBuf(cu).get(COMPONENT_Y), cs.getResiBuf(cu).get(COMPONENT_Y), clpRng);
 #endif
-#if JVET_AA0070_RRIBC
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
     if (CU::isIBC(cu) && cu.rribcFlipType)
     {
       cu.cs->getRecoBuf(cu).get(COMPONENT_Y).flipSignal(cu.rribcFlipType == 1);
+    }
+    if (cu.interCcpMergeZeroRootCbfIdc)
+    {
+      int validNum = 0;
+      CCPModelCandidate interCcpMergeList[MAX_CCP_CAND_LIST_SIZE];
+      m_pcIntraPred->xAddOnTheFlyCalcCCPCands4InterBlk(*cu.firstPU, cu.blocks[COMPONENT_Cb], interCcpMergeList, validNum);
+      PelBuf bufCb = cs.getPredBuf( cu.blocks[COMPONENT_Cb] );
+      PelBuf bufCr = cs.getPredBuf( cu.blocks[COMPONENT_Cr] );
+      const bool valid = m_pcInterPred->deriveInterCcpMergePrediction(cu.firstTU, cs.getRecoBuf(cu.blocks[COMPONENT_Y]), bufCb, bufCr, bufCb, bufCr, interCcpMergeList, validNum);
+      CHECK( !valid, "invalid inter ccp merge for rootCbf = 0" );
+      cs.getRecoBuf(cu.blocks[COMPONENT_Cb]).copyClip(cs.getPredBuf(cu.blocks[COMPONENT_Cb]), cs.slice->clpRng(COMPONENT_Cb));
+      cs.getRecoBuf(cu.blocks[COMPONENT_Cr]).copyClip(cs.getPredBuf(cu.blocks[COMPONENT_Cr]), cs.slice->clpRng(COMPONENT_Cr));
+      cu.firstPU->idxNonLocalCCP = 0;
+      cu.firstTU->curCand ={};
+      cu.firstTU->curCand.type = CCP_TYPE_NONE;
+    }
+#endif
+#if JVET_AA0070_RRIBC
+    if (CU::isIBC(cu) && cu.rribcFlipType)
+    {
+#if !JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+      cu.cs->getRecoBuf(cu).get(COMPONENT_Y).flipSignal(cu.rribcFlipType == 1);
+#endif
       if (isChromaEnabled(cu.chromaFormat) && cu.Cb().valid())
       {
         cu.cs->getRecoBuf(cu).get(COMPONENT_Cb).flipSignal(cu.rribcFlipType == 1);
@@ -2474,8 +2651,6 @@ void DecCu::xDecodeInterTexture(CodingUnit &cu)
     }
 #endif
 #endif
-
-
     return;
   }
 
@@ -2773,6 +2948,14 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
 #endif
 #if INTER_LIC
             m_geoTmMrgCtx0.licFlags[pu.geoMergeIdx0] = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+            m_geoTmMrgCtx0.copyLICParamFromCtx(pu.geoMergeIdx0, m_geoMrgCtx, pu.geoMergeIdx0);
+            m_geoTmMrgCtx0.licFlags[pu.geoMergeIdx0] = m_geoTmMrgCtx0.licInheritPara[pu.geoMergeIdx0];
+#else
+            m_geoTmMrgCtx0.setDefaultLICParamToCtx(pu.geoMergeIdx0);
+#endif
+#endif
 #endif
 #if MULTI_HYP_PRED
             m_geoTmMrgCtx0.addHypNeighbours[pu.geoMergeIdx0] = m_geoMrgCtx.addHypNeighbours[pu.geoMergeIdx0];
@@ -2831,6 +3014,14 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
 #endif
 #if INTER_LIC
             m_geoTmMrgCtx1.licFlags[pu.geoMergeIdx1] = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+            m_geoTmMrgCtx1.copyLICParamFromCtx(pu.geoMergeIdx1, m_geoMrgCtx, pu.geoMergeIdx1);
+            m_geoTmMrgCtx1.licFlags[pu.geoMergeIdx1] = m_geoTmMrgCtx1.licInheritPara[pu.geoMergeIdx1];
+#else
+            m_geoTmMrgCtx1.setDefaultLICParamToCtx(pu.geoMergeIdx1);
+#endif
+#endif
 #endif
 #if MULTI_HYP_PRED
             m_geoTmMrgCtx1.addHypNeighbours[pu.geoMergeIdx1] = m_geoMrgCtx.addHypNeighbours[pu.geoMergeIdx1];
@@ -3043,6 +3234,9 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
 #endif
 #if INTER_LIC                                                   
                   affineMergeCtx.licFlags[cnt] = !affineRMVFCtxOppositeLic.licFlags[i];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                  affineMergeCtx.licInheritPara[cnt] = false;
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
                   affineMergeCtx.obmcFlags[cnt] = affineRMVFCtxOppositeLic.obmcFlags[i];
@@ -3081,6 +3275,9 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
 #endif
 #if INTER_LIC
             pu.cu->licFlag = affineMergeCtx.licFlags[pu.mergeIdx];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG && JVET_AG0164_AFFINE_GPM
+            affineMergeCtx.setLICParamToPu(pu, pu.mergeIdx, pu.cu->licFlag);
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
             pu.cu->obmcFlag = affineMergeCtx.obmcFlags[pu.mergeIdx];
@@ -3113,7 +3310,11 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
             {
               if (PU::checkBDMVR4Affine(pu))
               {
-                m_pcInterPred->processBDMVR4Affine(pu);
+                m_pcInterPred->processBDMVR4Affine(pu
+#if JVET_AH0119_SUBBLOCK_TM
+                  , affineMergeCtx, false
+#endif
+                );
               }
               for (int i = 0; i < 2; ++i)
               {
@@ -3319,6 +3520,9 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
 #endif
 #if INTER_LIC
           pu.cu->licFlag = affineMergeCtx.licFlags[pu.mergeIdx];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG && JVET_AG0164_AFFINE_GPM
+          affineMergeCtx.setLICParamToPu(pu, pu.mergeIdx, pu.cu->licFlag);
+#endif
 #endif
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
           pu.colIdx = affineMergeCtx.colIdx[pu.mergeIdx];
@@ -3386,10 +3590,24 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
               else
               {
 #endif
+#if JVET_AH0119_SUBBLOCK_TM
+                for (int i = 0; i < 3; i++)
+                {
+                  m_mvBufBDMVR[0][i].setZero();
+                  m_mvBufBDMVR[1][i].setZero();
+                }
+                m_pcInterPred->setBdmvrSubPuMvBuf(m_mvBufBDMVR[0], m_mvBufBDMVR[1]);
+#endif
 #if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
                 if (PU::checkBDMVR4Affine(pu))
 #endif
-                m_pcInterPred->processBDMVR4Affine(pu);
+
+                m_pcInterPred->processBDMVR4Affine(pu
+#if JVET_AH0119_SUBBLOCK_TM
+                  , affineMergeCtx
+                  , !pu.affineOppositeLic
+#endif
+                );
 #if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
               }
 #endif
@@ -3402,6 +3620,40 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
               pu.mvAffi[1][2] += m_mvBufBDMVR[1][0];
 #endif
             }
+          }
+#endif
+#if JVET_AH0119_SUBBLOCK_TM
+          else if (pu.cs->sps->getUseAffineTM()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+            && pu.cs->sps->getTMToolsEnableFlag()
+#endif          
+#if JVET_AG0276_NLIC
+            && (pu.cs->sps->getUseAffAltLMTM() || !pu.cu->altLMFlag)
+#endif
+            && !pu.afMmvdFlag&&pu.mergeType != MRG_TYPE_SUBPU_ATMVP && pu.interDir == 3 && PU::checkBDMVR4Affine(pu) && !pu.affBMMergeFlag &&
+#if JVET_AG0276_NLIC
+            ((!pu.cu->altLMFlag && !affineMergeCtx.xCheckSimilarMotion1(pu.mergeIdx, PU::getBDMVRMvdThreshold(pu), false)) ||
+            (pu.cu->altLMFlag && !affineMergeCtx.xCheckSimilarMotion1(pu.mergeIdx, PU::getBDMVRMvdThreshold(pu), true)))
+#else
+            !affineMergeCtx.xCheckSimilarMotion(pu.mergeIdx, PU::getBDMVRMvdThreshold(pu))
+#endif
+            && !pu.affineOppositeLic
+            )
+          {
+            for (int i = 0; i < 3; i++)
+            {
+              m_mvBufBDMVR[0][i].setZero();
+              m_mvBufBDMVR[1][i].setZero();
+            }
+            m_pcInterPred->setBdmvrSubPuMvBuf(m_mvBufBDMVR[0], m_mvBufBDMVR[1]);
+            pu.bdmvrRefine = false;
+            m_pcInterPred->processTM4Affine(pu, affineMergeCtx, -1, false);//bi
+            pu.mvAffi[0][0] += m_mvBufBDMVR[0][0];
+            pu.mvAffi[0][1] += m_mvBufBDMVR[0][1];
+            pu.mvAffi[0][2] += m_mvBufBDMVR[0][2];
+            pu.mvAffi[1][0] += m_mvBufBDMVR[1][0];
+            pu.mvAffi[1][1] += m_mvBufBDMVR[1][1];
+            pu.mvAffi[1][2] += m_mvBufBDMVR[1][2];
           }
 #endif
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
@@ -3430,14 +3682,38 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
             if (!affineMergeCtx.xCheckSimilarMotion(pu.mergeIdx, PU::getBDMVRMvdThreshold(pu)))
 #endif
             {
-              m_pcInterPred->processTM4Affine(pu, affineMergeCtx, isAdditional ? 0 : -1, false);
+              m_pcInterPred->processTM4Affine(pu, affineMergeCtx, isAdditional ? 0 : -1, false
+#if JVET_AH0119_SUBBLOCK_TM              
+                , !pu.affineOppositeLic
+#endif
+              );//uni
+#if JVET_AH0119_SUBBLOCK_TM
+              pu.mvAffi[0][0] += m_mvBufBDMVR[0][0];
+              pu.mvAffi[0][1] += m_mvBufBDMVR[0][1];
+              pu.mvAffi[0][2] += m_mvBufBDMVR[0][2];
+              pu.mvAffi[1][0] += m_mvBufBDMVR[1][0];
+              pu.mvAffi[1][1] += m_mvBufBDMVR[1][1];
+              pu.mvAffi[1][2] += m_mvBufBDMVR[1][2];
+#else
               pu.mvAffi[0][0] += m_mvBufBDMVR[0][0];
               pu.mvAffi[0][1] += m_mvBufBDMVR[0][0];
               pu.mvAffi[0][2] += m_mvBufBDMVR[0][0];
               pu.mvAffi[1][0] += m_mvBufBDMVR[1][0];
               pu.mvAffi[1][1] += m_mvBufBDMVR[1][0];
               pu.mvAffi[1][2] += m_mvBufBDMVR[1][0];
+#endif
             }
+          }
+#endif
+#if JVET_AH0119_SUBBLOCK_TM
+          if (pu.cs->sps->getUseSbTmvpTM()
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+            && pu.cs->sps->getTMToolsEnableFlag()
+#endif
+            &&  PU::checkAffineTMCondition(pu)
+            &&  pu.mergeType== MRG_TYPE_SUBPU_ATMVP)
+          {
+            m_pcInterPred->processTM4SbTmvp(pu, affineMergeCtx, -1, false);
           }
 #endif
 #if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
@@ -3824,6 +4100,9 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                       pu.cu->bcwIdx = mrgCtx.bcwIdx[candIdx];
 #if JVET_AD0213_LIC_IMP
                       pu.cu->licFlag = mrgCtx.licFlags[candIdx];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                      mrgCtx.setLICParamToPu(pu, candIdx, mrgCtx.licInheritPara[candIdx]);
+#endif
 #endif
                       pu.mv[0] = mrgCtx.mvFieldNeighbours[candIdx << 1].mv;
                       pu.mv[1] = mrgCtx.mvFieldNeighbours[(candIdx << 1) + 1].mv;
@@ -3907,6 +4186,9 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                       pu.cu->bcwIdx = mrgCtx.bcwIdx[candIdx];
 #if JVET_AD0213_LIC_IMP
                       pu.cu->licFlag = mrgCtx.licFlags[candIdx];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                      mrgCtx.setLICParamToPu(pu, candIdx, mrgCtx.licInheritPara[candIdx]);
+#endif
 #endif
                       pu.mv[0] = mrgCtx.mvFieldNeighbours[candIdx << 1].mv;
                       pu.mv[1] = mrgCtx.mvFieldNeighbours[(candIdx << 1) + 1].mv;
@@ -4028,6 +4310,9 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                   for (int i = 0; i < mrgCtx.numValidMergeCand; i++)
                   {
                     mrgCtx.licFlags[i] = !mrgCtx.licFlags[i];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                    mrgCtx.licInheritPara[i] = false;
+#endif
                   }
                 }
 #endif
@@ -4058,6 +4343,9 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                     for (int i = 0; i < mrgCtx.numValidMergeCand; i++)
                     {
                       mrgCtx.licFlags[i] = !mrgCtx.licFlags[i];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                      mrgCtx.licInheritPara[i] = false;
+#endif
                     }
                   }
 #endif
@@ -4103,6 +4391,9 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
 #endif
 #if INTER_LIC
                     mrgCtx.licFlags[ui] = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                    mrgCtx.setDefaultLICParamToCtx(ui);
+#endif
 #endif
                     mrgCtx.interDirNeighbours[ui] = 0;
                     mrgCtx.mvFieldNeighbours[(ui << 1)].refIdx = NOT_VALID;
@@ -4170,10 +4461,13 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                   for (int i = 0; i < mrgCtx.numValidMergeCand; i++)
                   {
                     mrgCtx.licFlags[i] = !mrgCtx.licFlags[i];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                    mrgCtx.licInheritPara[i] = false;
+#endif
                   }
                 }
 #endif
-#if JVET_AG0276_NLIC
+#if JVET_AG0276_NLIC || JVET_AH0314_LIC_INHERITANCE_FOR_MRG
                 if (pu.tmMergeFlag || pu.ciipFlag)
                 {
 #endif
@@ -4198,19 +4492,55 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
 #endif
                     AltLMMergeCtx altLMMrgCtx;
                     PU::getAltMergeCandidates(pu, altLMMrgCtx);
-                    m_pcInterPred->adjustMergeCandidates(pu, mrgCtx, altLMMrgCtx, pu.cs->sps->getMaxNumMergeCand());
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                    AltLMMergeCtx mrgCtxInherited;
+                    PU::getAltMergeCandidates(pu, mrgCtxInherited, true);
+#endif
+                    m_pcInterPred->adjustMergeCandidates(pu, mrgCtx
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                                                       , &altLMMrgCtx
+                                                       , &mrgCtxInherited
+#else
+                                                       , altLMMrgCtx
+#endif
+                                                       , pu.cs->sps->getMaxNumMergeCand());
 #if JVET_AG0276_LIC_FLAG_SIGNALING
                   }
                   else
                   {
                     AltLMMergeCtx altLMBRMrgCtx;
                     PU::getAltBRMergeCandidates(pu, altLMBRMrgCtx);
-                    m_pcInterPred->adjustMergeCandidates(pu, mrgCtx, altLMBRMrgCtx, pu.cs->sps->getMaxNumMergeCand());
+                    m_pcInterPred->adjustMergeCandidates(pu, mrgCtx
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                                                       , &altLMBRMrgCtx
+                                                       , nullptr
+#else
+                                                       , altLMBRMrgCtx
+#endif
+                                                       , pu.cs->sps->getMaxNumMergeCand());
                   }
 #endif
                   }
                   else
                   {
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+                    if (!PU::isOppositeLIC(pu))
+#else
+                    if(true)
+#endif
+                    {
+                      AltLMMergeCtx mrgCtxInherited;
+                      PU::getAltMergeCandidates(pu, mrgCtxInherited, true);
+                      m_pcInterPred->adjustMergeCandidates(pu, mrgCtx, nullptr, &mrgCtxInherited,
+#if TM_MRG
+                                                           pu.tmMergeFlag ? pu.cs->sps->getMaxNumTMMergeCand() : 
+#endif
+                                                           pu.cs->sps->getMaxNumMergeCand());
+                    }
+                    else
+                    {
+#endif
 #if JVET_Z0102_NO_ARMC_FOR_ZERO_CAND
                     m_pcInterPred->adjustMergeCandidates(pu, mrgCtx, 
 #if TM_MRG
@@ -4220,7 +4550,18 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
 #else
                     m_pcInterPred->adjustMergeCandidatesInOneCandidateGroup(pu, mrgCtx, pu.mergeIdx + 1, pu.mergeIdx);
 #endif
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                    }
+#endif
                   }
+                }
+#elif JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                }
+                else
+                {
+                  AltLMMergeCtx mrgCtxInherited;
+                  PU::getAltMergeCandidates(pu, mrgCtxInherited, true);
+                  m_pcInterPred->adjustMergeCandidates(pu, mrgCtx, nullptr, &mrgCtxInherited, pu.cs->sps->getMaxNumMergeCand());
                 }
 #endif
 #if JVET_AB0079_TM_BCW_MRG
@@ -4268,6 +4609,9 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                   for (int i = 0; i < mrgCtx.numValidMergeCand; i++)
                   {
                     mrgCtx.licFlags[i] = !mrgCtx.licFlags[i];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                    mrgCtx.licInheritPara[i] = false;
+#endif
                   }
                 }
 #endif
@@ -4292,6 +4636,9 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
 #endif
 #if INTER_LIC
                   mrgCtx.licFlags[ui] = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                  mrgCtx.setDefaultLICParamToCtx(ui);
+#endif
 #endif
                   mrgCtx.interDirNeighbours[ui] = 0;
                   mrgCtx.mvFieldNeighbours[(ui << 1)].refIdx = NOT_VALID;
@@ -4359,6 +4706,9 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                   for (int i = 0; i < mrgCtx.numValidMergeCand; i++)
                   {
                     mrgCtx.licFlags[i] = !mrgCtx.licFlags[i];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                    mrgCtx.licInheritPara[i] = false;
+#endif
                   }
                 }
 #endif

@@ -560,7 +560,7 @@ void HLSyntaxReader::parsePPS( PPS* pcPPS )
     {
       pcPPS->setSingleSlicePerSubPicFlag(0);
     }
-    if (pcPPS->getRectSliceFlag() & !(pcPPS->getSingleSlicePerSubPicFlag()))
+    if (pcPPS->getRectSliceFlag() && !(pcPPS->getSingleSlicePerSubPicFlag()))
     {
       int32_t tileIdx = 0;
 
@@ -1242,6 +1242,11 @@ void HLSyntaxReader::parseAlfAps( APS* aps )
   {
     if (ccAlfParam.newCcAlfFilter[ccIdx])
     {
+#if JVET_AH0057_CCALF_COEFF_PRECISION
+      READ_CODE(2, code,
+        ccIdx == 0 ? "alf_cc_cb_frame_precision_idx" : "alf_cc_cr_frame_precision_idx");
+      ccAlfParam.ccAlfCoeffPrec[ccIdx] = code + MIN_CCALF_PREC;
+#endif
       if (MAX_NUM_CC_ALF_FILTERS > 1)
       {
         READ_UVLC(code, ccIdx == 0 ? "alf_cc_cb_filters_signalled_minus1" : "alf_cc_cr_filters_signalled_minus1");
@@ -2080,7 +2085,13 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
     }
 #endif
   }
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  READ_FLAG( uiCode, "sps_intra_lfnst_intra_slice_enabled_flag" );               pcSPS->setUseIntraLFNSTISlice( uiCode != 0 );
+  READ_FLAG( uiCode, "sps_intra_lfnst_inter_slice_enabled_flag" );               pcSPS->setUseIntraLFNSTPBSlice( uiCode != 0 );
+  READ_FLAG( uiCode, "sps_inter_lfnst_enabled_flag" );            pcSPS->setUseInterLFNST( uiCode != 0 );
+#else
   READ_FLAG(uiCode, "sps_lfnst_enabled_flag");                    pcSPS->setUseLFNST(uiCode != 0);
+#endif
 #endif
 
 #if JVET_S0052_RM_SEPARATE_COLOUR_PLANE
@@ -2145,7 +2156,16 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   {
     pcSPS->setCCALFEnabledFlag(false);
   }
-
+#if JVET_AH0057_CCALF_COEFF_PRECISION
+  if (pcSPS->getCCALFEnabledFlag())
+  {
+    READ_FLAG(uiCode, "sps_ccalf_precision_flag");                  pcSPS->setCCALFPrecisionFlag(uiCode ? true : false);
+  }
+  else
+  {
+    pcSPS->setCCALFPrecisionFlag(false);
+  }
+#endif
 #if SIGN_PREDICTION
   READ_CODE(4, uiCode, "num_predicted_coef_signs");
   pcSPS->setNumPredSigns(uiCode);
@@ -2411,7 +2431,7 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_AG0276_LIC_FLAG_SIGNALING
   if (pcSPS->getUseMergeOppositeLic())
   {
-    READ_UVLC(uiCode, "five_max_num_oppolic_merge_cand");
+    READ_UVLC(uiCode, "five_minus_max_num_oppositelic_merge_cand");
     pcSPS->setMaxNumOppositeLicMergeCand(REG_MRG_MAX_NUM_CANDS_OPPOSITELIC - uiCode);
   }
 #endif
@@ -2536,6 +2556,16 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
       pcSPS->setUseAffAltLMTM(false);
     }
 #endif
+#if JVET_AH0119_SUBBLOCK_TM
+    if (pcSPS->getTMToolsEnableFlag())
+    {
+      READ_FLAG(uiCode, "sps_tm_sbtmvp_flag");       pcSPS->setUseSbTmvpTM(uiCode != 0);
+    }
+    else
+    {
+      pcSPS->setUseSbTmvpTM(false);
+    }
+#endif
 #endif
   }
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED
@@ -2622,6 +2652,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
     pcSPS->setUseGeo(0);
     pcSPS->setMaxNumGeoCand(0);
   }
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  READ_FLAG(uiCode, "inter_enable_max_mtt_depth_increase");            pcSPS->setEnableMaxMttIncrease(uiCode);
+#endif
 #if MULTI_HYP_PRED
   READ_FLAG(uiCode, "inter_multi_hyp_enable_flag");                  pcSPS->setMaxNumAddHyps(uiCode);
   if (pcSPS->getUseInterMultiHyp())
@@ -2644,6 +2677,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   READ_FLAG(uiCode, "sps_isp_enabled_flag");                        pcSPS->setUseISP( uiCode != 0 );
   READ_FLAG(uiCode, "sps_mrl_enabled_flag");                        pcSPS->setUseMRL( uiCode != 0 );
   READ_FLAG(uiCode, "sps_mip_enabled_flag");                        pcSPS->setUseMIP( uiCode != 0 );
+#if JVET_AH0209_PDP
+  READ_FLAG( uiCode, "sps_pdp_enabled_flag" );                      pcSPS->setUsePDP( uiCode != 0 );
+#endif
 #if ENABLE_DIMD
   READ_FLAG(uiCode, "sps_dimd_enabled_flag");                           pcSPS->setUseDimd(uiCode != 0);
 #endif
@@ -2655,6 +2691,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #endif
 #if JVET_AG0058_EIP
   READ_FLAG(uiCode, "sps_eip_enabled_flag");                        pcSPS->setUseEip(uiCode != 0);
+#endif
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  READ_FLAG(uiCode, "sps_inter_ccp_merge_zero_luma_cbf");           pcSPS->setUseInterCcpMergeZeroLumaCbf( uiCode != 0 );
 #endif
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
   if (pcSPS->getTMnoninterToolsEnableFlag())
@@ -2692,6 +2731,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_AD0085_MPM_SORTING
   READ_FLAG(uiCode, "sps_mpm_sorting_enabled_flag");                pcSPS->setUseMpmSorting(uiCode != 0);
 #endif
+#if JVET_AH0136_CHROMA_REORDERING
+  READ_FLAG(uiCode, "sps_chroma_reordering_enabled_flag");          pcSPS->setUseChromaReordering(uiCode != 0);
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   READ_UVLC(uiCode, "sps_cccm_cand");                               pcSPS->setUseCccm(uiCode);
 #endif
@@ -2702,7 +2744,14 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   READ_UVLC(uiCode, "sps_ccp_merge");                               pcSPS->setUseCcpMerge(uiCode);
 #endif
 #if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
-  READ_UVLC(uiCode, "sps_ddccp_fusion");                            pcSPS->setUseDdCcpFusion(uiCode);
+  if (pcSPS->getUseCccm())
+  {
+    READ_UVLC(uiCode, "sps_ddccp_fusion");                            pcSPS->setUseDdCcpFusion(uiCode);
+  }
+  else
+  {
+    pcSPS->setUseDdCcpFusion(0);
+  }
 #endif
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
   }
@@ -2896,7 +2945,13 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   }
 #endif
 
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  bool spsLfnstEnabled = ( pcSPS->getUseIntraLFNSTISlice() || pcSPS->getUseIntraLFNSTPBSlice() );
+  spsLfnstEnabled |= pcSPS->getUseInterLFNST();
+  if( spsLfnstEnabled && pcSPS->getScalingListFlag() )
+#else
   if (pcSPS->getUseLFNST() && pcSPS->getScalingListFlag())
+#endif
   {
     READ_FLAG(uiCode, "scaling_matrix_for_lfnst_disabled_flag"); pcSPS->setDisableScalingMatrixForLfnstBlks(uiCode ? true : false);
   }

@@ -272,7 +272,9 @@ public:
   int32_t m_bmSubBlkH;
   std::vector<BMSubBlkInfo> m_bmSubBlkList;
 #endif
-
+#if JVET_AH0119_SUBBLOCK_TM
+  MotionInfo            m_sbMiBuf[3][(MAX_CU_SIZE * MAX_CU_SIZE) >> (MIN_CU_LOG2 << 1)];
+#endif
 protected:
   InterpolationFilter  m_if;
 
@@ -1134,7 +1136,9 @@ public:
 #endif
 );
 #endif
-
+#if JVET_AH0119_SUBBLOCK_TM 
+  void getAffAndSbtmvpRefTemplate(PredictionUnit& pu, PelUnitBuf& pcBufPredRefTop, PelUnitBuf& pcBufPredRefLeft,bool isBilinear, AffineMergeCtx affMrgCtx, int interpolationIdx = 2, bool isStore = false, Mv mvOffset = Mv(0, 0), int targetList = 0);
+#endif
 #if JVET_AD0140_MVD_PREDICTION
   template <int iAbove1Left2All3 = 3>
   bool    getAffAMLRefTemplateMvdPredUni(PredictionUnit& pu, PelUnitBuf& pcBufPredRefTop, PelUnitBuf& pcBufPredRefLeft,
@@ -1153,8 +1157,15 @@ public:
 #if JVET_Z0102_NO_ARMC_FOR_ZERO_CAND
   void adjustMergeCandidates(PredictionUnit& pu, MergeCtx& smvpMergeCandCtx, int numRetrievedMergeCand);
 #endif
-#if JVET_AG0276_NLIC
-  void adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMergeCandCtx, AltLMMergeCtx& altLMMrgCtx, int numRetrievedMergeCand);
+#if JVET_AG0276_NLIC || JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  void adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMergeCandCtx
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                           , AltLMMergeCtx* pMrgCtxAlt
+                           , AltLMMergeCtx* pMrgCtxInherit
+#else
+                          , AltLMMergeCtx& altLMMrgCtx
+#endif
+                          , int numRetrievedMergeCand);
 #endif
 #if JVET_AB0079_TM_BCW_MRG
   void adjustMergeCandidatesBcwIdx(PredictionUnit& pu, MergeCtx& mrgCtx, const int mergeIdx = -1);
@@ -1164,7 +1175,13 @@ public:
 #endif
 #if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
   Distortion  deriveBcwBlending( PredictionUnit& pu, bool bUniDir[2] );
-  Distortion  deriveBcwBlendingBiDir( PredictionUnit& pu, MvField mvfld0[2], MvField mvfld1[2] );
+  Distortion  deriveBcwBlendingBiDir( PredictionUnit& pu, MvField mvfld0[2], MvField mvfld1[2] 
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                                    , bool isLicA, bool isLicB
+                                    , int scaleA[2], int scaleB[2]
+                                    , int offsetA[2], int offsetB[2]
+#endif
+  );
 #endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
   void    adjustMergeCandidatesInOneCandidateGroup(PredictionUnit &pu, MergeCtx& smvpMergeCandCtx, int numRetrievedMergeCand, int mrgCandIdx = -1);
@@ -1173,9 +1190,13 @@ public:
   void    updateCandInTwoCandidateGroups(MergeCtx& mrgCtx, uint32_t* rdCandList, int numCandInCategory, MergeCtx mrgCtx2);
 #endif
 #endif
-#if JVET_AG0276_NLIC
+#if JVET_AG0276_NLIC || JVET_AH0314_LIC_INHERITANCE_FOR_MRG
   void    updateCandList(uint32_t uiCand, uint32_t uiCandGrp, Distortion uiCost, uint32_t uiMrgCandNum, uint32_t* rdCandList, uint32_t* rdCandGrpList, Distortion* candCostList);
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  void    updateCandInMultiCandidateGroups(uint32_t* rdCandList, uint32_t* rdCandGrpList, int numCandInCategory, MergeCtx& mrgCtx, const MergeCtx** mrgCtx2toN = nullptr, int N = 1);
+#else
   void    updateCandInThreeCandidateGroups(MergeCtx& mrgCtx, MergeCtx mrgCtx2, MergeCtx mrgCtx3, uint32_t* rdCandList, uint32_t* rdCandGrpList, int numCandInCategory);
+#endif
 #endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   void    adjustMergeCandidatesInOneCandidateGroup(PredictionUnit &pu, MergeCtx& smvpMergeCandCtx, bool* applyBDMVR, Mv** mvBufBDMVR, Mv** mvBufBDMVRTmp, int numRetrievedMergeCand, bool subRefineList[][2] = NULL, bool subRefineListTmp[][2] = NULL, int mrgCandIdx = -1);
@@ -1495,10 +1516,28 @@ public:
   bool      processBDMVR              (PredictionUnit& pu);
 #endif
 #if JVET_AB0112_AFFINE_DMVR
-  bool      processBDMVR4Affine(PredictionUnit& pu);
+  bool      processBDMVR4Affine(PredictionUnit& pu
+#if JVET_AH0119_SUBBLOCK_TM
+    , AffineMergeCtx &affineMergeCtx, bool doTM
+#endif
+  );
+#endif
+#if JVET_AH0119_SUBBLOCK_TM
+  bool processTM4SbTmvpBaseMV(PredictionUnit& pu, AffineMergeCtx &affineMergeCtx, int uiAffMergeCand, Distortion& uiCostOri, Distortion& uiCostBest, uint32_t targetList);
+  bool processTM4SbTmvp(PredictionUnit& pu, AffineMergeCtx &affineMergeCtx, int uiAffMergeCand, bool isEncoder);
 #endif
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
-  bool      processTM4Affine(PredictionUnit& pu, AffineMergeCtx &affineMergeCtx, int uiAffMergeCand, bool isEncoder);
+  bool      processTM4Affine(PredictionUnit& pu, AffineMergeCtx &affineMergeCtx, int uiAffMergeCand, bool isEncoder
+#if JVET_AH0119_SUBBLOCK_TM
+    , bool isTmPara = true
+#endif
+  );
+#if JVET_AH0119_SUBBLOCK_TM
+  Distortion xGetTemplateMatchingError(PredictionUnit& pu, AffineMergeCtx &affineMergeCtx, int interpolationIdx=2 , bool isStore=false);
+  bool processTM4AffineBaseMV(PredictionUnit& pu, AffineMergeCtx &affineMergeCtx, int uiAffMergeCand, Mv(&bestCPMV)[2][3], Distortion& uiCostOri, Distortion& uiCostBest, uint32_t targetList);
+  void xUpdateCPMV(PredictionUnit &pu, int32_t targetRefList, const Mv(&curCPMV)[2][3], const int deltaMvHorX, const int deltaMvHorY, const int deltaMvVerX, const int deltaMvVerY, const int baseCP);
+  bool processTM4AffinePara(PredictionUnit& pu, AffineMergeCtx &affineMergeCtx, int uiAffMergeCand, int32_t targetRefList, Mv(&cpBestMVF)[2][3], Distortion& uiCostOri, Distortion& uiCostBest);
+#endif
 #endif
 #if JVET_X0049_ADAPT_DMVR
   bool      processBDMVRPU2Dir        (PredictionUnit& pu, bool subPURefine[2], Mv(&finalMvDir)[2]);
@@ -1643,7 +1682,7 @@ public:
 #else
       int& scale = cu.altLMParaUnit.scale[compID];
       int& offset = cu.altLMParaUnit.offset[compID];
-      cntShift = (dimShift << 1); CHECK(!cntShift, "cntShift == 0");
+      int cntShift = (dimShift << 1); CHECK(!cntShift, "cntShift == 0");
 #endif
       const int cropShift = std::max(0, bitDepth - precShift + cntShift - 15);
       const int xzOffset = (xx >> m_LICRegShift);
@@ -1679,15 +1718,15 @@ public:
                          PredictionUnit *blkDataTmp, PelStorage *pPadYUVContainerDyn, const UnitArea blkUnitAreaBuff,
                          PelStorage *pCurBuffYUV, PictureType pt);
   void mcFramePadRepExt(Picture *pcCurPic, Slice &slice, PictureType pt);
-#if JVET_AD0123_REF_PICTURE_PADDING_FOR_GDR
-  void padDirtyArea(Picture* pcCurPic, Slice& slice, PictureType pt);
-#endif
 #else
   void mcFramePadOneSide(Picture *pcCurPic, Slice &slice, PadDirection padDir, PelStorage *pPadBuffYUV,
                          PredictionUnit *blkDataTmp, PelStorage *pPadYUVContainerDyn, const UnitArea blkUnitAreaBuff,
                          PelStorage *pCurBuffYUV);
   void mcFramePadRepExt(Picture *pcCurPic, Slice &slice);
 #endif
+#endif
+#if JVET_Z0118_GDR && JVET_AD0123_REF_PICTURE_PADDING_FOR_GDR
+  void padDirtyArea(Picture* pcCurPic, Slice& slice, PictureType pt);
 #endif
 
 #if JVET_AE0059_INTER_CCCM
@@ -1799,6 +1838,9 @@ public:
   Distortion getMinCost            () { return m_minCost; }
   Mv         getFinalMv            () { return m_mvFinal; }
   static int getDeltaMean          (const PelBuf& bufCur, const PelBuf& bufRef, const int rowSubShift, const int bd);
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  void       inverseCurTemplateLIC (int shift, int scale, int offset);
+#endif
 
   template <int tplSize> void deriveMvUni    ();
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
@@ -1818,7 +1860,7 @@ private:
 #endif
   template <int tplSize, bool trueAfalseL>         void       xRemoveHighFreq    (const Picture& otherRefPic, const Mv& otherRefMv, const uint8_t curRefBcwWeight);
 #if JVET_AD0213_LIC_IMP
-  template <int tplSize, bool trueAfalseL>         void       xRemoveHighFreqLIC(const Picture& otherRefPic, const Mv& otherRefMv, const uint8_t curRefBcwWeight, int shift, int scale, int offet);
+  template <int tplSize, bool trueAfalseL>         void       xRemoveHighFreqLIC  (const Picture& otherRefPic, const Mv& otherRefMv, const uint8_t curRefBcwWeight, int shift, int scale, int offet);
 #endif
   template <int tplSize, int searchPattern>         void       xRefineMvSearch    (int maxSearchRounds, int searchStepShift);
 #if MULTI_PASS_DMVR

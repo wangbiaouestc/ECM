@@ -52,7 +52,6 @@
 #include <cstdint>
 
 
-
 #define BASE_ENCODER                                      1
 #define BASE_NORMATIVE                                    1
 #define TOOLS                                             1
@@ -142,6 +141,8 @@
 #define JVET_AG0151_INTRA_TMP_MERGE_MODE                  1 // JVET-AG0151: Intra TMP with merge candidates
 #define JVET_AG0152_SGPM_ITMP_IBC                         1 // JVET-AG0152: SGPM with Intra TMP and IBC
 #define JVET_AG0146_DIMD_ITMP_IBC                         1 // JVET-AG0146: DIMD with Intra TMP and IBC
+#define JVET_AH0055_INTRA_TMP_ARBVP                       1 // JVET-AH0055: AR-BVP for intra TMP merge candidates
+#define JVET_AH0200_INTRA_TMP_BV_REORDER                  1 // JVET-AH0200: Intra TMP BV reordering
 #endif
 
 #define JVET_W0123_TIMD_FUSION                            1 // JVET-W0123: Template based intra mode derivation and fusion
@@ -152,6 +153,7 @@
 
 #if ENABLE_DIMD
 #define JVET_AC0098_LOC_DEP_DIMD                          1 // JVET-AC0098: Location-dependent Decoder-side Intra Mode Derivation
+#define JVET_AH0076_OBIC                                  1 // JVET_AH0076: OBIC
 #endif
 
 #endif
@@ -204,7 +206,11 @@
 #define JVET_AG0058_EIP                                   1 // JVET-AG0058: Extrapolation filter-based intra prediction mode
 #define JVET_AG0154_DECODER_DERIVED_CCP_FUSION            1 // JVET-AG0154: Decoder derived CCP mode with fusion candidates
 #define JVET_AG0059_CCP_MERGE_ENHANCEMENT                 1 // JVET-AG0059: Enhancements on CCP merge for chroma intra coding
-
+#define JVET_AH0065_RELAX_LINE_BUFFER                     1 // JVET-AH0065: Relaxing line buffer restriction
+#define JVET_AH0086_EIP_BIAS_AND_CLIP                     1 // JVET-AH0086: EIP with bias and clipping
+#define JVET_AH0136_CHROMA_REORDERING                     1 // JVET-AH0136: Non-CCP intra chroma mode reordering
+#define JVET_AH0135_TEMPORAL_PARTITIONING                 1 // JVET_AH0135: Temporal partitioning prediction
+#define JVET_AH0209_PDP                                   1 // JVET_AH0209: Matrix based position dependent intra prediction replacing conventional intra modes
 //IBC
 #define JVET_Y0058_IBC_LIST_MODIFY                        1 // JVET-Y0058: Modifications of IBC merge/AMVP list construction, ARMC-TM-IBC part is included under JVET_W0090_ARMC_TM
 #define JVET_Z0075_IBC_HMVP_ENLARGE                       1 // JVET-Z0075: Enlarged HMVP table for IBC
@@ -259,6 +265,7 @@
 #define JVET_AG0276_LIC_FLAG_SIGNALING                    1 // JVET-AG0276: signal LIC flag for merge mode
 #define JVET_AG0276_LIC_BDOF_BDMVR                        1 // JVET-AG0276: LIC BDOF and BDMVR
 #define JVET_AG0276_LIC_SLOPE_ADJUST                      1 // JVET-AG0276: LIC with slope adjustment
+#define JVET_AH0314_LIC_INHERITANCE_FOR_MRG               1 // JVET-AH0314: LIC model inheritance for merge modes (regular merge and GPM)
 #endif
 #define NON_ADJACENT_MRG_CAND                             1 // Add non-adjacent merge candidates
 #define MULTI_HYP_PRED                                    1 // Multiple hypothesis prediction
@@ -328,7 +335,11 @@
 #define JVET_AG0164_AFFINE_GPM                            1 // JVET-AG0164: GPM with affine prediction
 #define JVET_AG0098_AMVP_WITH_SBTMVP                      1 // JVET-AG0098: AMVP with SbTMVP mode
 #define JVET_AG0067_DMVR_EXTENSIONS                       1 // JVET-AG0067: On DMVR Extensions
-
+#define JVET_AH0069_CMVP                                  1 // JVET-AH0069: Chained motion vector prediction
+#define JVET_AH0314_ADAPTIVE_GPM_BLENDING_IMPROV          1 // JVET-AH0314: Adaptive GPM blending
+#define JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0        1 // JVET-AH0066 & JVET-AH0202: Inter CCP merge mode with zero luma CBF
+#define JVET_AH0068_RM_TEMP_BUFF_CONSTRAINT               1 // JVET-AH0068 test a: Removing the one-CTU-row temporal buffer constraint for all relevant tools
+#define JVET_AH0119_SUBBLOCK_TM                           1 // JVET-AH0119 extend affine TM and apply sbtmvp TM
 // Inter template matching tools
 #define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction
 #if ENABLE_INTER_TEMPLATE_MATCHING
@@ -392,6 +403,7 @@
 #define JVET_AG0061_INTER_LFNST_NSPT                      1 // JVET-AG0061: 3.3 Utilizing LFNST/NSPT for inter coding
 #define JVET_AG0100_TRANSFORM_COEFFICIENT_CODING          1 // JVET_AG0100: 3.2b Transform coefficient coding
 #define JVET_AG0143_INTER_INTRA                           1 // JVET_AG0143: 3.1c CABAC inter/intra model switch
+#define JVET_AH0103_LOW_DELAY_LFNST_NSPT                  1 // JVET_AH0103: Low-delay configurations for LFNST/NSPT
 
 // Entropy Coding
 #define EC_HIGH_PRECISION                                 1 // CABAC high precision
@@ -403,6 +415,7 @@
 #define JVET_AG0196_CABAC_RETRAIN                         1 // JVET-AG0196 5.1 bin dumper
 #define JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE             1 // JVET-AG0196 5.2: window offsets per slice type
 #define JVET_AG0117_CABAC_SPATIAL_TUNING                  1 // JVET-AG0117 5.3: spatial CABAC tuning
+#define JVET_AH0176_LOW_DELAY_B_CTX                       1 // JVET-AH0176 6.1: context initialization for B-slice
 
 // Loop filters
 #define ALF_IMPROVEMENT                                   1 // ALF improvement
@@ -429,6 +442,7 @@
 #define JVET_AG0157_ALF_CHROMA_FIXED_FILTER               1 // JVET-AG0157: Fixed filter for chroma ALF
 #define JVET_AG0158_ALF_LUMA_COEFF_PRECISION              1 // JVET-AG0158: adaptive precision for luma ALF coefficients
 #define JVET_AG0145_ADAPTIVE_CLIPPING                     1 // JVET-AG0145: Adaptive clipping with signalled lower and upper bounds
+#define JVET_AH0057_CCALF_COEFF_PRECISION                 1 // JVET-AH0057: adaptive precision for CCALF coefficients
 
 // SIMD optimizations
 #if IF_12TAP
@@ -967,7 +981,12 @@ enum SliceType
   B_SLICE               = 0,
   P_SLICE               = 1,
   I_SLICE               = 2,
+#if JVET_AH0176_LOW_DELAY_B_CTX
+  L_SLICE               = 3,
+  NUMBER_OF_SLICE_TYPES = 4
+#else
   NUMBER_OF_SLICE_TYPES = 3
+#endif
 };
 
 /// chroma formats (according to how the monochrome or the color planes are intended to be coded)

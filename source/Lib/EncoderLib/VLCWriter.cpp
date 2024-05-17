@@ -349,7 +349,7 @@ void HLSWriter::codePPS( const PPS* pcPPS )
     {
       WRITE_FLAG(pcPPS->getSingleSlicePerSubPicFlag( ) ? 1 : 0, "single_slice_per_subpic_flag");
     }
-    if (pcPPS->getRectSliceFlag() & !(pcPPS->getSingleSlicePerSubPicFlag()))
+    if (pcPPS->getRectSliceFlag() && !(pcPPS->getSingleSlicePerSubPicFlag()))
     {
       WRITE_UVLC( pcPPS->getNumSlicesInPic( ) - 1, "num_slices_in_pic_minus1" );
       if ((pcPPS->getNumSlicesInPic() - 1) > 1)
@@ -776,6 +776,10 @@ void HLSWriter::codeAlfAps( APS* pcAPS )
   {
     if (paramCcAlf.newCcAlfFilter[ccIdx])
     {
+#if JVET_AH0057_CCALF_COEFF_PRECISION
+      WRITE_CODE(paramCcAlf.ccAlfCoeffPrec[ccIdx] - MIN_CCALF_PREC, 2,
+        ccIdx == 0 ? "alf_cc_cb_frame_precision_idx" : "alf_cc_cr_frame_precision_idx");
+#endif
       const int filterCount = paramCcAlf.ccAlfFilterCount[ccIdx];
       CHECK(filterCount > MAX_NUM_CC_ALF_FILTERS, "CC ALF Filter count is too large");
       CHECK(filterCount == 0, "CC ALF Filter count is too small");
@@ -1269,7 +1273,13 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
     }
 #endif
   }
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  WRITE_FLAG( pcSPS->getUseIntraLFNSTISlice() ? 1 : 0, "sps_intra_lfnst_intra_slice_enabled_flag" );
+  WRITE_FLAG( pcSPS->getUseIntraLFNSTPBSlice() ? 1 : 0, "sps_intra_lfnst_inter_slice_enabled_flag" );
+  WRITE_FLAG( pcSPS->getUseInterLFNST() ? 1 : 0, "sps_inter_lfnst_enabled_flag" );
+#else
   WRITE_FLAG(pcSPS->getUseLFNST() ? 1 : 0, "sps_lfnst_enabled_flag");
+#endif
 #endif
 
 #if JVET_S0052_RM_SEPARATE_COLOUR_PLANE
@@ -1312,7 +1322,12 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
   {
     WRITE_FLAG( pcSPS->getCCALFEnabledFlag(),                                            "sps_ccalf_enabled_flag" );
   }
-
+#if JVET_AH0057_CCALF_COEFF_PRECISION
+  if (pcSPS->getCCALFEnabledFlag())
+  {
+    WRITE_FLAG(pcSPS->getCCALFPrecisionFlag(),                                           "sps_ccalf_precision_flag" );
+  }
+#endif
 #if SIGN_PREDICTION
   WRITE_CODE(pcSPS->getNumPredSigns(), 4, "num_predicted_coef_signs");
 #if JVET_Y0141_SIGN_PRED_IMPROVE
@@ -1589,6 +1604,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
         WRITE_FLAG(pcSPS->getUseAffAltLMTM() ? 1 : 0,                                          "sps_affine_alt_lm_tm_flag");
       }
 #endif
+#if JVET_AH0119_SUBBLOCK_TM
+      WRITE_FLAG(pcSPS->getUseSbTmvpTM() ? 1 : 0, "sps_JVET_AH0119_SUBBLOCK_TM_flag");
+#endif
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
     }
 #endif
@@ -1665,6 +1683,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
     }
 #endif
   }
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  WRITE_FLAG(pcSPS->getEnableMaxMttIncrease() ? 1 : 0, "inter_enable_max_mtt_depth_increase");
+#endif
 #if MULTI_HYP_PRED
   WRITE_FLAG(pcSPS->getUseInterMultiHyp() ? 1 : 0, "inter_multi_hyp_enable_flag");
   if (pcSPS->getUseInterMultiHyp())
@@ -1684,6 +1705,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
   WRITE_FLAG( pcSPS->getUseISP() ? 1 : 0,                                             "sps_isp_enabled_flag");
   WRITE_FLAG( pcSPS->getUseMRL() ? 1 : 0,                                             "sps_mrl_enabled_flag");
   WRITE_FLAG( pcSPS->getUseMIP() ? 1 : 0,                                             "sps_mip_enabled_flag");
+#if JVET_AH0209_PDP
+  WRITE_FLAG( pcSPS->getUsePDP() ? 1 : 0,                                             "sps_pdp_enabled_flag");
+#endif
 #if ENABLE_DIMD
   WRITE_FLAG( pcSPS->getUseDimd() ? 1 : 0,                                             "sps_dimd_enabled_flag");
 #endif
@@ -1695,6 +1719,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #endif
 #if JVET_AG0058_EIP
   WRITE_FLAG(pcSPS->getUseEip() ? 1 : 0, "sps_eip_enabled_flag");
+#endif
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  WRITE_FLAG( pcSPS->getUseInterCcpMergeZeroLumaCbf() ? 1 : 0,                         "sps_inter_ccp_merge_zero_luma_cbf");
 #endif
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
   if (pcSPS->getTMnoninterToolsEnableFlag())
@@ -1729,6 +1756,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if JVET_AD0085_MPM_SORTING
   WRITE_FLAG(pcSPS->getUseMpmSorting() ? 1 : 0, "sps_mpm_sorting_enabled_flag");
 #endif
+#if JVET_AH0136_CHROMA_REORDERING
+  WRITE_FLAG(pcSPS->getUseChromaReordering() ? 1 : 0, "sps_chroma_reordering_enabled_flag");
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   WRITE_UVLC(pcSPS->getUseCccm() , "sps_cccm_cand");
 #endif
@@ -1739,7 +1769,10 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
   WRITE_UVLC(pcSPS->getUseCcpMerge(), "sps_ccp_merge");
 #endif
 #if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
-  WRITE_UVLC(pcSPS->getUseDdCcpFusion(), "sps_ddccp_fusion");
+  if (pcSPS->getUseCccm())
+  {
+    WRITE_UVLC(pcSPS->getUseDdCcpFusion(), "sps_ddccp_fusion");
+  }
 #endif
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
   }
@@ -1869,7 +1902,13 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
   }
 #if !JVET_S0074_SPS_REORDER
   WRITE_FLAG(pcSPS->getUseLmcs() ? 1 : 0, "sps_lmcs_enable_flag");
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  WRITE_FLAG( pcSPS->getUseIntraLFNSTISlice() ? 1 : 0, "sps_intra_lfnst_intra_slice_enabled_flag" );
+  WRITE_FLAG( pcSPS->getUseIntraLFNSTPBSlice() ? 1 : 0, "sps_intra_lfnst_inter_slice_enabled_flag" );
+  WRITE_FLAG( pcSPS->getUseInterLFNST() ? 1 : 0, "sps_inter_lfnst_enabled_flag" );
+#else
   WRITE_FLAG( pcSPS->getUseLFNST() ? 1 : 0,                                                    "sps_lfnst_enabled_flag" );
+#endif
 #endif
 #if LUMA_ADAPTIVE_DEBLOCKING_FILTER_QP_OFFSET
   WRITE_FLAG( pcSPS->getLadfEnabled() ? 1 : 0,                                                 "sps_ladf_enabled_flag" );
@@ -1909,7 +1948,13 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
   // KJS: remove scaling lists?
   WRITE_FLAG( pcSPS->getScalingListFlag() ? 1 : 0,                                   "sps_explicit_scaling_list_enabled_flag" );
 
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  bool spsLfnstEnabled = ( pcSPS->getUseIntraLFNSTISlice() || pcSPS->getUseIntraLFNSTPBSlice() );
+  spsLfnstEnabled |= pcSPS->getUseInterLFNST();
+  if( spsLfnstEnabled && pcSPS->getScalingListFlag() )
+#else
   if (pcSPS->getUseLFNST() && pcSPS->getScalingListFlag())
+#endif
   {
     WRITE_FLAG(pcSPS->getDisableScalingMatrixForLfnstBlks(), "scaling_matrix_for_lfnst_disabled_flag");
   }

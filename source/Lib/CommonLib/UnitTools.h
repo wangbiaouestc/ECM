@@ -192,14 +192,27 @@ namespace CU
 #if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
   bool isGeoBlendAvailable(const CodingUnit& cu);
 #endif
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  bool interCcpMergeZeroRootCbfAllowed(const CodingUnit& cu);
+#endif
 }
 // PU tools
 namespace PU
 {
 #if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
-  int  getItmpMergeCandidate      (const PredictionUnit& pu, std::vector<Mv>& pBvs);
+  int  getItmpMergeCandidate      (const PredictionUnit& pu, std::vector<Mv>& pBvs
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+    , std::vector<Mv>& pSgpmMvs
+#endif
+  );
   bool validItmpBv                (const PredictionUnit& pu, int tmpXdisp, int tmpYdisp);
   bool checkValidIntraTmpMergeCand(const PredictionUnit& pu, Mv Bv);
+#if JVET_AH0055_INTRA_TMP_ARBVP
+  bool CheckBvAvailable(std::vector<Mv> &pBv, Mv curBv);
+#endif
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+  bool validIBCItmpMv(const PredictionUnit& pu, Mv curMv, int templateSize);
+#endif
 #endif
 #if JVET_AD0184_REMOVAL_OF_DIVISION_OPERATIONS
   int getMeanValue(int sum, int div);
@@ -271,6 +284,9 @@ namespace PU
   uint32_t getCoLocatedIntraLumaMode      (const PredictionUnit &pu);
 #endif
 #if JVET_AC0071_DBV
+#if JVET_AH0136_CHROMA_REORDERING
+  bool isDbvMode(int mode);
+#endif
   bool dbvModeAvail(const PredictionUnit &pu);
   void deriveChromaBv(PredictionUnit &pu);
 #if JVET_AA0070_RRIBC
@@ -289,6 +305,9 @@ namespace PU
                                    , const Mv chromaBv
 #endif
                                    , bool isRefTemplate = false, bool isRefAbove = false);
+#endif
+#if JVET_AH0136_CHROMA_REORDERING
+  bool checkIsChromaBvCandidateValidChromaTm(const PredictionUnit &pu, const Mv mv, int filterIdx = 0, bool isRefTemplate = false, bool isRefAbove = false);
 #endif
   int      getWideAngle                   ( const TransformUnit &tu, const uint32_t dirMode, const ComponentID compID );
 #if MULTI_PASS_DMVR || JVET_W0097_GPM_MMVD_TM
@@ -314,13 +333,25 @@ namespace PU
     , bool enableTh4Gpm = false
 #endif
   );
-#if JVET_AG0276_NLIC
-  void     getAltMergeCandidates    (const PredictionUnit &pu, AltLMMergeCtx& cMrgCtx);
+#if JVET_AG0276_NLIC || JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  void     getAltMergeCandidates    (const PredictionUnit &pu, AltLMMergeCtx& cMrgCtx
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                                   , bool isLicInheritCand = false
+#endif
+  );
 #if JVET_AG0276_LIC_FLAG_SIGNALING
   void     getAltBRMergeCandidates  (const PredictionUnit &pu, AltLMMergeCtx& cMrgCtx);
-  bool     isValidAltMergeCandidate (const PredictionUnit &pu, bool isBRCand = false);
+  bool     isValidAltMergeCandidate (const PredictionUnit &pu, bool isBRCand = false
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                                   , bool isLicInheritCand = false
+#endif
+  );
 #else
-  bool     isValidAltMergeCandidate (const PredictionUnit &pu);
+  bool     isValidAltMergeCandidate (const PredictionUnit &pu
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                                   , bool isLicInheritCand = false
+#endif
+  );
 #endif
   uint32_t getAltMergeMvdThreshold  (const PredictionUnit &pu);
 #endif
@@ -668,6 +699,9 @@ namespace PU
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
     , int subIdx, MergeCtx mergeCtxIn
     , int col = 0
+#if JVET_AH0119_SUBBLOCK_TM
+    , bool fixRefIdx = false
+#endif
 #else
     , int mmvdList
 #endif
@@ -734,7 +768,11 @@ namespace PU
 #endif
 
 #if JVET_AG0164_AFFINE_GPM
-  void getGeoAffMergeCandidates(PredictionUnit& pu, AffineMergeCtx& gpmAffMrgCtx, InterPrediction* pcInterPred, AffineMergeCtx* affMergeCtx = NULL);
+  void getGeoAffMergeCandidates(PredictionUnit& pu, AffineMergeCtx& gpmAffMrgCtx, InterPrediction* pcInterPred
+#if !JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                              , AffineMergeCtx* affMergeCtx = NULL
+#endif
+  );
   bool isAffineGPMValid(const PredictionUnit& pu);
   bool isAffineGPMSizeValid(const PredictionUnit& pu);
 
@@ -937,6 +975,10 @@ namespace PU
 #if JVET_AG0276_LIC_FLAG_SIGNALING
   bool isOppositeLIC(const PredictionUnit &pu);
   bool hasOppositeLICFlag(const PredictionUnit &pu);
+#endif
+#if JVET_AH0076_OBIC
+  bool isObicAvail(const PredictionUnit &pu);
+  bool checkAvailBlocks(const PredictionUnit &pu);
 #endif
 }
 

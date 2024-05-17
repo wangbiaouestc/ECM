@@ -238,6 +238,9 @@ private:
 #endif
     int      tmpIsSubPel;
     int      tmpSubPelIdx;
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+    int      tmpFracIdx;
+#endif
 #endif
 #endif
 #if JVET_AB0155_SGPM
@@ -257,6 +260,9 @@ private:
 #if JVET_AD0086_ENHANCED_INTRA_TMP
 #if JVET_AG0136_INTRA_TMP_LIC
       , tmpIdx(0) , tmpFusionFlag(false) , tmpFlmFlag(false) , tmpLicFlag(false) , tmpLicIdc(0), tmpIsSubPel(0), tmpSubPelIdx(0)
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+      , tmpFracIdx(-1)
+#endif
 #else
       , tmpIdx(0) , tmpFusionFlag(false) , tmpFlmFlag(false) , tmpIsSubPel(0), tmpSubPelIdx(0)
 #endif
@@ -271,6 +277,9 @@ private:
 #if JVET_AD0086_ENHANCED_INTRA_TMP
 #if JVET_AG0136_INTRA_TMP_LIC
       , const int tmpi = 0 , const bool tmpff = 0  , const int tmpflmf = 0 , const int tmpLic = 0 , const int tmpLicIdc = 0 , const int tmpsp = 0, const int tmpspi = 0
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+    , const int tmpfi = -1
+#endif
 #else
       , const int tmpi = 0 , const bool tmpff = 0  , const int tmpflmf = 0 , const int tmpsp = 0, const int tmpspi = 0
 #endif
@@ -296,6 +305,9 @@ private:
 #if JVET_AD0086_ENHANCED_INTRA_TMP
 #if JVET_AG0136_INTRA_TMP_LIC
       , tmpIdx(tmpi) , tmpFusionFlag(tmpff) , tmpFlmFlag(tmpflmf) , tmpLicFlag(tmpLic) , tmpLicIdc(tmpLicIdc) ,tmpIsSubPel(tmpsp) , tmpSubPelIdx(tmpspi)
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+      , tmpFracIdx(tmpfi)
+#endif
 #else
       , tmpIdx(tmpi) , tmpFusionFlag(tmpff) , tmpFlmFlag(tmpflmf) , tmpIsSubPel(tmpsp) , tmpSubPelIdx(tmpspi)
 #endif
@@ -331,6 +343,9 @@ private:
 #endif
       tmpIsSubPel   = other.tmpIsSubPel;    // CU::tmpIsSubPel
       tmpSubPelIdx  = other.tmpSubPelIdx;   // CU::tmpSubPelIdx
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+      tmpFracIdx   = other.tmpFracIdx;
+#endif
 #endif
       sgpmFlag     = other.sgpmFlag;   // CU::sgpmFlag
       sgpmSplitDir = other.sgpmSplitDir;
@@ -360,6 +375,9 @@ private:
 #endif
                 && tmpIsSubPel == cmp.tmpIsSubPel
                 && tmpSubPelIdx == cmp.tmpSubPelIdx
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+                && tmpFracIdx == cmp.tmpFracIdx
+#endif
 #endif
                 && sgpmFlag == cmp.sgpmFlag
                 && sgpmSplitDir == cmp.sgpmSplitDir); // sgpmMode0 and sgpmMode1 seems no need
@@ -383,6 +401,9 @@ private:
 #if JVET_AD0086_ENHANCED_INTRA_TMP
 #if JVET_AG0136_INTRA_TMP_LIC
       const int tmpi, const bool tmpff, const int tmpflmf,  const int tmpLicItmp, const int tmpLicIdc, const int tmpsp, const int tmpspi,
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+                     const int tmpfi,
+#endif
 #else
                      const int tmpi, const bool tmpff, const int tmpflmf,  const int tmpsp, const int tmpspi,
 #endif
@@ -392,6 +413,9 @@ private:
 #if JVET_AD0086_ENHANCED_INTRA_TMP
 #if JVET_AG0136_INTRA_TMP_LIC
         ,tmpi ,tmpff ,tmpflmf , tmpLicItmp, tmpLicIdc, tmpsp, tmpspi
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+        ,tmpfi
+#endif
 #else
         ,tmpi ,tmpff ,tmpflmf , tmpsp, tmpspi
 #endif
@@ -413,6 +437,9 @@ private:
 #endif
       && tmpIsSubPel == cmp.tmpIsSubPel
       && tmpSubPelIdx == cmp.tmpSubPelIdx
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+      && tmpFracIdx == cmp.tmpFracIdx
+#endif
 #endif
 			   && rdCost == cmp.rdCost && sgpmFlag == cmp.sgpmFlag
               && sgpmSplitDir == cmp.sgpmSplitDir);   // sgpmMode0 and sgpmMode1 seems no need
@@ -601,7 +628,9 @@ private:
   uint8_t         m_intraModeReady[NUM_LUMA_MODE];
 #endif
 #endif
-
+#if JVET_AH0209_PDP
+  Pel* m_pdpIntraPredBuf[NUM_LUMA_MODE];
+#endif
 #if JVET_AG0058_EIP
   Pel* m_eipPredBuf[NUM_DERIVED_EIP];
   Pel* m_eipMergePredBuf[MAX_MERGE_EIP];
@@ -609,6 +638,10 @@ private:
   static_vector<ModeInfo, NUM_DERIVED_EIP + MAX_MERGE_EIP> m_uiSavedHadModeListEip;
   static_vector<double, NUM_DERIVED_EIP + MAX_MERGE_EIP>   m_dSavedModeCostEip;
   static_vector<double, NUM_DERIVED_EIP + MAX_MERGE_EIP>   m_dSavedHadListEip;
+#endif
+#if JVET_AH0076_OBIC
+  Pel* m_dimdPredBuf;
+  Pel* m_obicPredBuf;
 #endif
   PelStorage      m_tmpStorageLCU;
   PelStorage      m_colorTransResiBuf;
@@ -690,6 +723,10 @@ protected:
 public:
 #if INTRA_TRANS_ENC_OPT
   bool            m_skipTimdLfnstMtsPass;
+#endif
+#if JVET_AH0076_OBIC
+  bool            m_skipObicLfnstMtsPass;
+  bool            m_skipDimdLfnstMtsPass;
 #endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   bool            m_skipCCCMSATD;

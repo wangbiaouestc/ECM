@@ -298,6 +298,9 @@ struct CodingUnit : public UnitArea
   // a triple split would increase the mtDepth by 1, but the qtDepth by 2 in the first and last part and by 1 in the middle part (because of the 1-2-1 split proportions)
   uint8_t        btDepth; // number of applied binary splits, after switching to the mtt (or it's equivalent)
   uint8_t        mtDepth; // the actual number of splits after switching to mtt (equals btDepth if only binary splits are allowed)
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  uint8_t        mtImplicitDepth;
+#endif
   int8_t         chromaQpAdj;
   int8_t         qp;
   SplitSeries    splitSeries;
@@ -307,6 +310,9 @@ struct CodingUnit : public UnitArea
   ModeTypeSeries modeTypeSeries;
 #endif
   bool           skip;
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  int8_t         interCcpMergeZeroRootCbfIdc;
+#endif
   bool           mmvdSkip;
   bool           affine;
   int8_t         affineType;
@@ -325,6 +331,12 @@ struct CodingUnit : public UnitArea
   uint8_t        plIdx;
 #endif
 #if ENABLE_DIMD
+#if JVET_AH0076_OBIC
+  bool obicFlag;
+  bool obicIsBlended;
+  int obicMode[OBIC_FUSION_NUM];
+  int obicFusionWeight[OBIC_FUSION_NUM];
+#endif
 #if JVET_AG0146_DIMD_ITMP_IBC
   bool           isBvDimd;
   Mv             bvDimd;
@@ -353,6 +365,14 @@ struct CodingUnit : public UnitArea
   int8_t         dimdRelWeight[3]; // max number of predictions to blend
 #endif
 #endif
+#if JVET_AH0136_CHROMA_REORDERING
+  int8_t         dimdBlendModeChroma[DIMD_FUSION_NUM - 1];
+  uint8_t        chromaList[7];
+  Mv             mvs[10];
+  Mv             bvs[10];
+  int            rribcTypes[10];
+  int            mvsNum;
+#endif
 #if TMP_FAST_ENC
 #if JVET_AD0086_ENHANCED_INTRA_TMP
 #if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
@@ -367,6 +387,9 @@ struct CodingUnit : public UnitArea
   bool               tmpFusionFlag;
   int                tmpIsSubPel;
   int                tmpSubPelIdx;
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+  int                tmpFracIdx;
+#endif
 #endif
 #endif
 #if JVET_W0123_TIMD_FUSION
@@ -443,6 +466,9 @@ struct CodingUnit : public UnitArea
 #endif
 #if INTER_LIC
   bool           licFlag;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  bool           licInheritPara;
+#endif
 #if JVET_AD0213_LIC_IMP
   int            licScale[2][3];
   int            licOffset[2][3];
@@ -534,7 +560,7 @@ struct CodingUnit : public UnitArea
 
 struct IntraPredictionData
 {
-#if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
+#if ENABLE_DIMD || JVET_W0123_TIMD_FUSION || JVET_AH0136_CHROMA_REORDERING
   bool      parseLumaMode = false;
   int8_t    candId = -1;
   bool      parseChromaMode = false;
@@ -838,6 +864,10 @@ struct GeoBlendInfo
   Distortion  uiCostTmp;  // uicost template
   MvField     mvFieldA[2];
   MvField     mvFieldB[2];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  int         scaleA[2], scaleB[2];
+  int         offsetA[2], offsetB[2];
+#endif
   int         dir[2];     // 0,1 or 2 (bi-dir)
   int         mergeCand[2];
   Distortion  sad = 0;    // sad of CU prediction
@@ -846,10 +876,19 @@ struct GeoBlendInfo
   int         iOrder;     // before re-ordering
   int         iMergeIdx;
 
-  bool isSame( MvField mvOtherFieldA[2], MvField mvOtherFieldB[2] )
+  bool isSame( MvField mvOtherFieldA[2], MvField mvOtherFieldB[2] 
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+             , int scaleOtherA [2], int scaleOtherB [2]
+             , int offsetOtherA[2], int offsetOtherB[2]
+#endif
+  )
   {
     bool  bSameA = (mvFieldA[0] == mvOtherFieldA[0]) && (mvFieldA[1] == mvOtherFieldA[1]);
     bool  bSameB = (mvFieldB[0] == mvOtherFieldB[0]) && (mvFieldB[1] == mvOtherFieldB[1]);
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+    bSameA &= (scaleA[0] == scaleOtherA[0] && offsetA[0] == offsetOtherA[0]) && (scaleA[1] == scaleOtherA[1] && offsetA[1] == offsetOtherA[1]);
+    bSameB &= (scaleB[0] == scaleOtherB[0] && offsetB[0] == offsetOtherB[0]) && (scaleB[1] == scaleOtherB[1] && offsetB[1] == offsetOtherB[1]);
+#endif
     return bSameA && bSameB;
   }
 };

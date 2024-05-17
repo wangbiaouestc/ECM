@@ -121,12 +121,22 @@
 #define NGTXCTX                                           7
 #endif
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+#if JVET_AH0119_SUBBLOCK_TM
+static const double REFINE_THRESHOLD_AFFINE_MERGE = 0.80;
+static const double REFINE_THRESHOLD_SBTMVP_MERGE = 0.80;
+#else
 static const double REFINE_THRESHOLD_AFFINE_MERGE = 0.75;
+#endif
 #endif
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
 static const int SUB_TMVP_CANDIDATE_NUM = 10;
 static const int SUB_TMVP_INDEX = 3;  // 1: 2 subtmvp; 2: 4 subtmvp
+#if JVET_AH0119_SUBBLOCK_TM
+static const int SUB_TMVP_NUM = 2 * SUB_TMVP_INDEX * 2 - 5;
+static const int COLIDX_MAP[2 * SUB_TMVP_INDEX * 2] = { 0,1,2,3,7,5,4,9,8,6,10,11 };
+#else
 static const int SUB_TMVP_NUM = 2 * SUB_TMVP_INDEX;
+#endif
 static const int SUB_TMVP_MV_THRESHOLD = 2;
 static const int AMVP_TMVP_INDEX = 1;  // 1: 2 AMVP tmvp; 2: 4 AMVP tmvp
 #endif
@@ -271,6 +281,11 @@ static const double LAMBDA_DEC_SIDE[MAX_QP+1] = {
 };
 #endif
 
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+static const int QTBTTT_TEMPO_PRED_BUFFER_SIZE      =              16;
+static const int QTBTTT_TEMPO_PRED_BLOCK_RESOLUTION =              16;
+static const int LOG2__BLOCK_RESOLUTION             =               4;
+#endif
 #if JVET_AG0145_ADAPTIVE_CLIPPING
 static const int ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_1 =                5;
 static const int ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_0 =                1;
@@ -311,7 +326,12 @@ static const int MIP_MAX_HEIGHT =                                  MAX_INTRA_SIZ
 static const int MIP_MAX_WIDTH =                                   MAX_TB_SIZEY;
 static const int MIP_MAX_HEIGHT =                                  MAX_TB_SIZEY;
 #endif
-
+#if JVET_AH0209_PDP
+static const int PDP_NUM_MODES =                                  67;
+static const int PDP_NUM_SIZES =                                  18;
+static const int PDP_NUM_GROUPS =                                 67;
+static const int PDP_SHORT_TH[3] =                     { 0, 19, 49 };
+#endif
 #if JVET_W0066_CCSAO
 #define          MAX_CCSAO_SET_NUM                                  4
 static const int MAX_CCSAO_CAND_POS_Y        =                      9;
@@ -395,7 +415,7 @@ static const int NUM_DB_PAD                  =                      1;
 #if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
 static const int MAX_NUM_ALF_LUMA_COEFF      =                     11 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF_NEW + NUM_RESI + 1 + NUM_GAUSS_FILTERED_COEFF;
 #elif JVET_AD0222_ALF_LONG_FIXFILTER
-static const int MAX_NUM_ALF_LUMA_COEFF      =                     11 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF_NEW + NUM_RESI + 1
+static const int MAX_NUM_ALF_LUMA_COEFF = 11 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF_NEW + NUM_RESI + 1;
 #elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
 static const int MAX_NUM_ALF_LUMA_COEFF      =                     21 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF + NUM_RESI + 1 + NUM_GAUSS_FILTERED_COEFF;
 #else
@@ -433,6 +453,10 @@ static const int MAX_ALF_FILTER_LENGTH       =                      9;
 static const int MAX_NUM_ALF_CHROMA_COEFF    =                     21 + 5;
 #else
 static const int MAX_NUM_ALF_CHROMA_COEFF    =                     21;
+#endif
+#if JVET_AH0057_CCALF_COEFF_PRECISION
+static const int MAX_NUM_CCALF_PREC          =                     4;
+static const int MIN_CCALF_PREC              =                     7;
 #endif
 #else
 static const int MAX_NUM_ALF_LUMA_COEFF      =                     13;
@@ -593,6 +617,11 @@ static const int LM_CHROMA_IDX = NUM_LUMA_MODE; ///< chroma mode index for deriv
 #if ENABLE_DIMD
 static const int DIMD_IDX =                                        99; ///< index for intra DIMD mode
 #endif
+#if JVET_AH0076_OBIC
+static const int OBIC_IDX =                                       250;
+static const int OBIC_FUSION_NUM =                                  6;
+static const int NUM_OBIC_CUS    =                            13 + 18; // (13: adjacent, 18: non-adjacent)
+#endif
 #if JVET_AB0155_SGPM
 static const int SGPM_IDX =                                       200;   ///< index for SGPM mode
 #endif
@@ -654,8 +683,24 @@ static const int MDLM_T_IDX =                          LM_CHROMA_IDX + 2; ///< M
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
 static const int DIMD_CHROMA_IDX =                     NUM_INTRA_MODE; ///< chroma mode index for derived by DIMD method
 #if JVET_AC0071_DBV
+#if JVET_AH0136_CHROMA_REORDERING
+static const int DBV_CHROMA_IDX = NUM_INTRA_MODE + 1;
+static const int DBV_CHROMA_IDX1 = NUM_INTRA_MODE + 2;
+static const int DBV_CHROMA_IDX2 = NUM_INTRA_MODE + 3;
+static const int DBV_CHROMA_IDX3 = NUM_INTRA_MODE + 4;
+static const int DBV_CHROMA_IDX4 = NUM_INTRA_MODE + 5;
+static const int DBV_CHROMA_IDX5 = NUM_INTRA_MODE + 6;
+static const int DBV_CHROMA_IDX6 = NUM_INTRA_MODE + 7;
+static const int DBV_CHROMA_IDX7 = NUM_INTRA_MODE + 8;
+static const int DBV_CHROMA_IDX8 = NUM_INTRA_MODE + 9;
+static const int DBV_CHROMA_IDX9 = NUM_INTRA_MODE + 10;
+static const int DM_CHROMA_IDX = NUM_INTRA_MODE + 11; ///< chroma mode index for derived from luma intra mode
+static const int NUM_CHROMA_TM_LINES_IN_REORDERING = 1;
+static const int NUM_CHROMA_LIST_MODE = 7 + 4 + 5 + 10; /// 7 orginal modes + 4 collocated modes + 5 neighboring modes + 10 DBV modes
+#else
 static const int DBV_CHROMA_IDX = NUM_INTRA_MODE + 1;
 static const int DM_CHROMA_IDX = NUM_INTRA_MODE + 2; ///< chroma mode index for derived from luma intra mode
+#endif
 #else
 static const int DM_CHROMA_IDX =                       NUM_INTRA_MODE + 1; ///< chroma mode index for derived from luma intra mode
 #endif
@@ -1164,8 +1209,20 @@ static const int ADAPTIVE_SUB_GROUP_SIZE_MMVD_AFF = AF_MMVD_MAX_REFINE_NUM;
 #endif
 
 #if JVET_AG0276_NLIC
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+static const int CFG_ALT_MRG_MAX_NUM_CANDS = 16;
+#if (JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM) || JVET_Z0075_IBC_HMVP_ENLARGE
+static const int ALT_MRG_MAX_NUM_CANDS = std::min(CFG_ALT_MRG_MAX_NUM_CANDS, NUM_MERGE_CANDS);
+#else
+static const int ALT_MRG_MAX_NUM_CANDS = std::min(CFG_ALT_MRG_MAX_NUM_CANDS, MRG_MAX_NUM_CANDS);
+#endif
+#else
 static const int ALT_MRG_MAX_NUM_CANDS     = 16;
+#endif
 static const int ALT_AFF_MRG_MAX_NUM_CANDS = 6;
+#endif
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+static const int LIC_INHERIT_ALT_MRG_MAX_NUM_CANDS = 10;
 #endif
 #if JVET_AG0276_LIC_SLOPE_ADJUST
 static const int LIC_SLOPE_MAX_NUM_DELTA  = 2;
@@ -1422,7 +1479,9 @@ static const int TOTAL_GEO_BLENDING_NUM =                           6; // GPM 0~
 #define GET_SGPM_BLD_IDX(a, b)                                                                                           \
   (std::min(a, b) <= 4 ? 1 : std::min(a, b) <= 8 ? 2 : std::min(a, b) <= 16 ? 3 : std::min(a, b) <= 32 ? 4 : 5)
 #endif
-
+#if JVET_AH0314_ADAPTIVE_GPM_BLENDING_IMPROV
+static const int GPM_BLENDING_SIZE_THRESHOLD = 32;
+#endif
 #if ENABLE_OBMC
 static const unsigned int defaultWeight[2][4] = { {27, 16, 6, 0}, {27, 0, 0, 0} };
 #endif
@@ -1618,6 +1677,9 @@ static const int NUM_CCP_PARAMS = CCCM_NO_SUB_NUM_PARAMS;
 #else
 static const int NUM_CCP_PARAMS = CCCM_NUM_PARAMS;
 #endif
+#endif
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+static const int MAX_CCP_MERGE_WEIGHT_IDX = 2;
 #endif
 #if JVET_AD0140_MVD_PREDICTION
 static const int MVD_PREDICTION_SIGN_SUFFIX_BIN_THR =            2;
@@ -2037,9 +2099,16 @@ static const int FIX_FILTER_NUM_COEFF    = 42;
 static const int TMP_TEMPLATE_SIZE =            4; // must be multiple of 4 for SIMD
 static const int TMP_MAXSIZE_DEPTH =            6; // should be log2(TMP_TEMPLATE_SIZE): keep as 6 to avoid any error
 static const int USE_MORE_BLOCKSIZE_DEPTH_MAX = TMP_MAXSIZE_DEPTH - 1;
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+static const int INIT_THRESHOULD_SHIFTBITS =    0;
+#if JVET_AG0136_INTRA_TMP_LIC
+static const int INIT_THRESHOLD_SHIFTBITS_SUPP = 0;
+#endif
+#else
 static const int INIT_THRESHOULD_SHIFTBITS =    2;  ///< (default 2) Early skip threshold for checking distance.
 #if JVET_AG0136_INTRA_TMP_LIC
 static const int INIT_THRESHOLD_SHIFTBITS_SUPP = 4;
+#endif
 #endif
 static const int TMP_SEARCH_RANGE_MULT_FACTOR = 5;
 #if JVET_AD0086_ENHANCED_INTRA_TMP
@@ -2048,6 +2117,15 @@ static const int TMP_GROUP_IDX       = 3;
 static const int FUSION_IDX_NUM      = TMP_FUSION_NUM * TMP_GROUP_IDX;
 static const int MTMP_NUM            = 19;
 static const int MTMP_NUM_SPARSE     = 30;
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+static const int TMP_BV_REORDER_MAX   = 2;
+static const int TMP_REFINE_NONLIC_BV_NUM  = 0;
+static const int TMP_REFINE_LIC_BV_NUM     = 0;
+static const int TMP_SKIP_REFINE_THRESHOLD = 128;
+static const int TMP_TEMPLATE_COST_SHIFT   = 3;
+static const double TMP_INT_BV_COST_SCALE = 0.85;
+static const double TMP_ENC_REFINE_THRESHOLD = 1.1;
+#endif
 #if JVET_AG0136_INTRA_TMP_LIC 
 static const int MTMP_NUM_SPARSE_FOR_LIC = 15;
 #endif
@@ -2091,6 +2169,10 @@ static const int TMP_SAMPLING = 1 << LOG2_TMP_SAMPLING;
 
 #if JVET_AG0151_INTRA_TMP_MERGE_MODE
 static const int TMP_NUM_MERGE_CANDS = 10;
+#endif
+#if JVET_AH0055_INTRA_TMP_ARBVP
+static const int NUM_TMP_ARBVP = 20;
+static const int EBVP_RANGE = 1;
 #endif
 #if JVET_AG0152_SGPM_ITMP_IBC
 static const int SGPM_NUM_BVS = 6; // maximum BVs to be considered into the list for Itmp-Sgpm

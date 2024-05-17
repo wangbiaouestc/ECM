@@ -130,6 +130,9 @@ public:
 #if ENABLE_DIMD
   void        cu_dimd_flag              ( const CodingUnit&             cu );
 #endif
+#if JVET_AH0076_OBIC
+  void        cu_obic_flag              ( const CodingUnit&             cu );
+#endif
 #if JVET_W0123_TIMD_FUSION
   void        cu_timd_flag              ( const CodingUnit&             cu );
 #endif
@@ -160,6 +163,9 @@ public:
 
   void        cu_residual               ( const CodingUnit&             cu,       Partitioner&      pm,         CUCtx& cuCtx );
   void        rqt_root_cbf              ( const CodingUnit&             cu );
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  void        inter_ccp_merge_root_cbf_zero(const CodingUnit&           cu);
+#endif
   void        adaptive_color_transform(const CodingUnit&             cu);
   void        sbt_mode                  ( const CodingUnit&             cu );
   void        end_of_ctu                ( const CodingUnit&             cu,       CUCtx&            cuCtx );
@@ -249,8 +255,13 @@ public:
   uint64_t    geo_affFlag_est(const TempCtx& ctxStart, const int flag, int ctxOffset);
 #endif
 #if JVET_AA0058_GPM_ADAPTIVE_BLENDING
+#if JVET_AH0314_ADAPTIVE_GPM_BLENDING_IMPROV
+  uint64_t    geoBldFlagEst             (const PredictionUnit& pu, const TempCtx& ctxStart, const int flag);
+  void        geoAdaptiveBlendingIdx    (const PredictionUnit& pu, const int idx);
+#else
   uint64_t    geoBldFlagEst             (const TempCtx& ctxStart, const int flag);
   void        geoAdaptiveBlendingIdx    (const int idx);
+#endif
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   void        geoModeIdx                ( const PredictionUnit&         pu);

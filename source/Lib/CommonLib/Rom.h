@@ -43,7 +43,10 @@
 
 #include <stdio.h>
 #include <iostream>
-
+#if JVET_AH0209_PDP
+#include <fstream>
+#include <unordered_map>
+#endif
 
 //! \ingroup CommonLib
 //! \{
@@ -51,14 +54,22 @@
 // ====================================================================================================================
 // Initialize / destroy functions
 // ====================================================================================================================
-
 void         initROM();
 void         destroyROM();
 
 // ====================================================================================================================
 // Data structure related table & variable
 // ====================================================================================================================
+#if JVET_AH0209_PDP
+extern const int g_sizeData[PDP_NUM_SIZES][11];
+extern std::unordered_map<int, int> g_size;
 
+extern const int g_modeGroup[PDP_NUM_MODES];
+extern int16_t*** g_pdpFilters[PDP_NUM_GROUPS][PDP_NUM_SIZES];
+extern int g_validSize[PDP_NUM_SIZES];
+void createPdpFilters();
+void destroyPdpFilters();
+#endif
 
 #if SIGN_PREDICTION
 #if JVET_Y0141_SIGN_PRED_IMPROVE
@@ -247,7 +258,33 @@ extern const     int8_t   g_nspt8x32[ 35 ][ 3 ][ 24 ][ 256 ];
 extern const     int8_t   g_nspt32x8[ 35 ][ 3 ][ 24 ][ 256 ];
 #endif
 #endif
+#if JVET_AH0209_PDP
+extern int16_t g_weights4x4[11][16][36];
+extern int16_t g_weightsShort4x4[8][16][20];
+extern int16_t g_weights4x8[11][32][52];
+extern int16_t g_weightsShort4x8[8][32][28];
+extern int16_t g_weights8x4[11][32][52];
+extern int16_t g_weightsShort8x4[8][32][28];
+extern int16_t g_weights8x8[11][64][68];
+extern int16_t g_weightsShort8x8[8][64][36];
+extern int16_t g_weights4x16[11][64][84];
+extern int16_t g_weightsShort4x16[8][64][44];
+extern int16_t g_weights16x4[11][64][84];
+extern int16_t g_weightsShort16x4[8][64][44];
+extern int16_t g_weights8x16[11][128][100];
+extern int16_t g_weightsShort8x16[8][128][52];
+extern int16_t g_weights16x8[11][128][100];
+extern int16_t g_weightsShort16x8[8][128][52];
+extern int16_t g_weights16x16[11][256][132];
+extern int16_t g_weightsShort16x16[8][256][68];
 
+extern int16_t g_weights16x32[7][256][97];
+extern int16_t g_weightsShort16x32[4][256][49];
+extern int16_t g_weights32x16[7][256][97];
+extern int16_t g_weightsShort32x16[4][256][49];
+extern int16_t g_weights32x32[7][256][129];
+extern int16_t g_weightsShort32x32[4][256][65];
+#endif
 // ====================================================================================================================
 // Misc.
 // ====================================================================================================================
@@ -447,7 +484,11 @@ extern const int8_t g_amvpSbTmvp_mvd_offset[6];
 extern uint32_t g_picAmvpSbTmvpEnabledArea;
 #endif
 #if JVET_AG0058_EIP
+#if JVET_AH0086_EIP_BIAS_AND_CLIP
+extern const Position g_eipFilter[NUM_EIP_SHAPE][EIP_FILTER_TAP - 1];
+#else
 extern const Position g_eipFilter[NUM_EIP_SHAPE][EIP_FILTER_TAP];
+#endif
 extern const EIPInfo  g_eipInfoLut[4][4][9];
 #endif
 #if JVET_AG0276_LIC_SLOPE_ADJUST

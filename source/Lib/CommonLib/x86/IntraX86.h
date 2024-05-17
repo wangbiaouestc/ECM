@@ -483,9 +483,23 @@ void calcTemplateDiffJointSadMrsadSIMD(const Pel* const ref, const unsigned int 
         const short* const pSrc1 = (const short*) refPatchRowTemp;
         const short* const pSrc2 = (const short*) tarPatch[iY];
         calcDiffDelta4Joint<vext>(pSrc1, pSrc2, topMeanDelta, 0, TMP_TEMPLATE_SIZE, iSumSad, iSumMrsad);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+        if (iY == (TMP_TEMPLATE_SIZE - 1))
+        {
+          iSumSad <<= TMP_TEMPLATE_COST_SHIFT;
+          iSumMrsad <<= TMP_TEMPLATE_COST_SHIFT;
+        }
+#endif
         diffSumSad += iSumSad;
         diffSumMrsad += iSumMrsad;
         calcDiffDelta16Joint<vext>(pSrc1, pSrc2, topMeanDelta256, TMP_TEMPLATE_SIZE, uiPatchWidth, iSumSad, iSumMrsad);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+        if (iY == (TMP_TEMPLATE_SIZE - 1))
+        {
+          iSumSad <<= TMP_TEMPLATE_COST_SHIFT;
+          iSumMrsad <<= TMP_TEMPLATE_COST_SHIFT;
+        }
+#endif
         diffSumSad += iSumSad;
         diffSumMrsad += iSumMrsad;
         topDiffSad += iSumSad;
@@ -507,9 +521,23 @@ void calcTemplateDiffJointSadMrsadSIMD(const Pel* const ref, const unsigned int 
         const short* const pSrc1 = (const short*) refPatchRowTemp;
         const short* const pSrc2 = (const short*) tarPatch[iY];
         calcDiffDelta4Joint<vext>(pSrc1, pSrc2, topMeanDelta, 0, TMP_TEMPLATE_SIZE, iSumSad, iSumMrsad);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+        if (iY == (TMP_TEMPLATE_SIZE - 1))
+        {
+          iSumSad <<= TMP_TEMPLATE_COST_SHIFT;
+          iSumMrsad <<= TMP_TEMPLATE_COST_SHIFT;
+        }
+#endif
         diffSumSad += iSumSad;
         diffSumMrsad += iSumMrsad;
         calcDiffDelta8Joint<vext>(pSrc1, pSrc2, topMeanDelta, TMP_TEMPLATE_SIZE, uiPatchWidth, iSumSad, iSumMrsad);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+        if (iY == (TMP_TEMPLATE_SIZE - 1))
+        {
+          iSumSad <<= TMP_TEMPLATE_COST_SHIFT;
+          iSumMrsad <<= TMP_TEMPLATE_COST_SHIFT;
+        }
+#endif
         diffSumSad += iSumSad;
         diffSumMrsad += iSumMrsad;
         topDiffSad += iSumSad;
@@ -528,9 +556,23 @@ void calcTemplateDiffJointSadMrsadSIMD(const Pel* const ref, const unsigned int 
         const short* const pSrc1 = (const short*) refPatchRowTemp;
         const short* const pSrc2 = (const short*) tarPatch[iY];
         calcDiffDelta4Joint<vext>(pSrc1, pSrc2, topMeanDelta, 0, TMP_TEMPLATE_SIZE, iSumSad, iSumMrsad);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+        if (iY == (TMP_TEMPLATE_SIZE - 1))
+        {
+          iSumSad <<= TMP_TEMPLATE_COST_SHIFT;
+          iSumMrsad <<= TMP_TEMPLATE_COST_SHIFT;
+        }
+#endif
         diffSumSad += iSumSad;
         diffSumMrsad += iSumMrsad;
         calcDiffDelta4Joint<vext>(pSrc1, pSrc2, topMeanDelta, TMP_TEMPLATE_SIZE, uiPatchWidth, iSumSad, iSumMrsad);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+        if (iY == (TMP_TEMPLATE_SIZE - 1))
+        {
+          iSumSad <<= TMP_TEMPLATE_COST_SHIFT;
+          iSumMrsad <<= TMP_TEMPLATE_COST_SHIFT;
+        }
+#endif
         diffSumSad += iSumSad;
         diffSumMrsad += iSumMrsad;
         topDiffSad += iSumSad;
@@ -542,10 +584,21 @@ void calcTemplateDiffJointSadMrsadSIMD(const Pel* const ref, const unsigned int 
       }
     }
     const __m128i leftMeanDelta = calcMeanRefLeftSIMD<vext>(ref, uiPatchHeight, uiStride, log2SizeLeft, leftTargetMean);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+    const short leftMeanDeltaVal = (short)_mm_cvtsi128_si32(leftMeanDelta);
+#endif	
     refPatchRow = ref - TMP_TEMPLATE_SIZE;
     for (int iY = TMP_TEMPLATE_SIZE; iY < uiPatchHeight; iY++, refPatchRow += uiStride)
     {
       calcDiffDelta4Joint<vext>((const short*) refPatchRow, (const short*) tarPatch[iY], leftMeanDelta, 0, TMP_TEMPLATE_SIZE, iSumSad, iSumMrsad);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+      const short *pSrc1 = (const short *) refPatchRow;
+      const short *pSrc2 = (const short *) tarPatch[iY];
+      iSumSad +=
+        (abs(pSrc1[TMP_TEMPLATE_SIZE - 1] - pSrc2[TMP_TEMPLATE_SIZE - 1]) * ((1 <<TMP_TEMPLATE_COST_SHIFT)-1));
+      iSumMrsad += (abs(pSrc1[TMP_TEMPLATE_SIZE - 1] - pSrc2[TMP_TEMPLATE_SIZE - 1] - leftMeanDeltaVal)
+                    * ((1 << TMP_TEMPLATE_COST_SHIFT) - 1));
+#endif
       diffSumSad += iSumSad;
       diffSumMrsad += iSumMrsad;
       leftDiffSad += iSumSad;
@@ -565,6 +618,13 @@ void calcTemplateDiffJointSadMrsadSIMD(const Pel* const ref, const unsigned int 
       for (int iY = 0; iY < TMP_TEMPLATE_SIZE; iY++, refPatchRow += uiStride)
       {
         calcDiffDelta16Joint<vext>((const short*) refPatchRow, (const short*) tarPatch[iY], topMeanDelta256, 0, iCols, iSumSad, iSumMrsad);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+        if (iY == (TMP_TEMPLATE_SIZE - 1))
+        {
+          iSumSad <<= TMP_TEMPLATE_COST_SHIFT;
+          iSumMrsad <<= TMP_TEMPLATE_COST_SHIFT;
+        }
+#endif
         diffSumSad += iSumSad;
         diffSumMrsad += iSumMrsad;
         if (diffSumSad > iMaxSad[0] && diffSumMrsad > iMaxMrsad[0])
@@ -581,6 +641,13 @@ void calcTemplateDiffJointSadMrsadSIMD(const Pel* const ref, const unsigned int 
       for (int iY = 0; iY < TMP_TEMPLATE_SIZE; iY++, refPatchRow += uiStride)
       {
         calcDiffDelta8Joint<vext>((const short*) refPatchRow, (const short*) tarPatch[iY], topMeanDelta, 0, iCols, iSumSad, iSumMrsad);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+        if (iY == (TMP_TEMPLATE_SIZE - 1))
+        {
+          iSumSad <<= TMP_TEMPLATE_COST_SHIFT;
+          iSumMrsad <<= TMP_TEMPLATE_COST_SHIFT;
+        }
+#endif
         diffSumSad += iSumSad;
         diffSumMrsad += iSumMrsad;
         if (diffSumSad > iMaxSad[0] && diffSumMrsad > iMaxMrsad[0])
@@ -594,6 +661,13 @@ void calcTemplateDiffJointSadMrsadSIMD(const Pel* const ref, const unsigned int 
       for (int iY = 0; iY < TMP_TEMPLATE_SIZE; iY++, refPatchRow += uiStride)
       {
         calcDiffDelta4Joint<vext>((const short*) refPatchRow, (const short*) tarPatch[iY], topMeanDelta, 0, iCols, iSumSad, iSumMrsad);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+        if (iY == (TMP_TEMPLATE_SIZE - 1))
+        {
+          iSumSad <<= TMP_TEMPLATE_COST_SHIFT;
+          iSumMrsad <<= TMP_TEMPLATE_COST_SHIFT;
+        }
+#endif
         diffSumSad += iSumSad;
         diffSumMrsad += iSumMrsad;
         if (diffSumSad > iMaxSad[0] && diffSumMrsad > iMaxMrsad[0])
@@ -606,9 +680,20 @@ void calcTemplateDiffJointSadMrsadSIMD(const Pel* const ref, const unsigned int 
   else if (tempType == LEFT_TEMPLATE)
   {
     const __m128i leftMeanDelta = calcMeanRefLeftSIMD<vext>(ref, uiPatchHeight, uiStride, log2SizeLeft, leftTargetMean);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+    const short leftMeanDeltaVal = (short)_mm_cvtsi128_si32(leftMeanDelta);
+#endif	
     for (int iY = TMP_TEMPLATE_SIZE; iY < uiPatchHeight; iY++, refPatchRow += uiStride)
     {
       calcDiffDelta4Joint<vext>((const short*) refPatchRow, (const short*) tarPatch[iY], leftMeanDelta, 0, TMP_TEMPLATE_SIZE, iSumSad, iSumMrsad);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+      const short *pSrc1 = (const short *) refPatchRow;
+      const short *pSrc2 = (const short *) tarPatch[iY];
+      iSumSad += (abs(pSrc1[TMP_TEMPLATE_SIZE - 1] - pSrc2[TMP_TEMPLATE_SIZE - 1])
+                  * ((1 << TMP_TEMPLATE_COST_SHIFT) - 1));
+      iSumMrsad += (abs(pSrc1[TMP_TEMPLATE_SIZE - 1] - pSrc2[TMP_TEMPLATE_SIZE - 1] - leftMeanDeltaVal)
+                    * ((1 << TMP_TEMPLATE_COST_SHIFT) - 1));
+#endif
       diffSumSad += iSumSad;
       diffSumMrsad += iSumMrsad;
       if (diffSumSad > iMaxSad[0] && diffSumMrsad > iMaxMrsad[0])
@@ -749,8 +834,23 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
           {
             const short* const pSrc1 = (const short*) refPatchRowTemp;
             const short* const pSrc2 = (const short*) tarPatch[iY];
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+            uiSum = calcDiffDelta4<vext>(pSrc1, pSrc2, topMeanDelta, 0, TMP_TEMPLATE_SIZE);
+            if (iY == (TMP_TEMPLATE_SIZE-1)) 
+            {
+              uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+            }
+            diffSum += uiSum;
+#else
             diffSum += calcDiffDelta4<vext>(pSrc1, pSrc2, topMeanDelta, 0, TMP_TEMPLATE_SIZE);
+#endif
             uiSum = calcDiffDelta16<vext>(pSrc1, pSrc2, topMeanDelta256, TMP_TEMPLATE_SIZE, uiPatchWidth);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+            if (iY == (TMP_TEMPLATE_SIZE-1)) 
+            {
+              uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+            }
+#endif
             diffSum += uiSum;
             topDiff += uiSum;
             if (diffSum > iMax[0] && topDiff > iMax[1])
@@ -769,8 +869,23 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
           {
             const short* const pSrc1 = (const short*) refPatchRowTemp;
             const short* const pSrc2 = (const short*) tarPatch[iY];
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+            uiSum = calcDiffDelta4<vext>(pSrc1, pSrc2, topMeanDelta, 0, TMP_TEMPLATE_SIZE);
+            if (iY == (TMP_TEMPLATE_SIZE-1)) 
+            {
+              uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+            }
+            diffSum += uiSum;
+#else
             diffSum += calcDiffDelta4<vext>(pSrc1, pSrc2, topMeanDelta, 0, TMP_TEMPLATE_SIZE);
+#endif
             uiSum = calcDiffDelta8<vext>(pSrc1, pSrc2, topMeanDelta, TMP_TEMPLATE_SIZE, uiPatchWidth);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+            if (iY == (TMP_TEMPLATE_SIZE-1)) 
+            {
+              uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+            }
+#endif
             diffSum += uiSum;
             topDiff += uiSum;
             if (diffSum > iMax[0] && topDiff > iMax[1])
@@ -786,8 +901,23 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
           {
             const short* const pSrc1 = (const short*) refPatchRowTemp;
             const short* const pSrc2 = (const short*) tarPatch[iY];
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+            uiSum = calcDiffDelta4<vext>(pSrc1, pSrc2, topMeanDelta, 0, TMP_TEMPLATE_SIZE);
+            if (iY == (TMP_TEMPLATE_SIZE-1)) 
+            {
+              uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+            }
+            diffSum += uiSum;
+#else
             diffSum += calcDiffDelta4<vext>(pSrc1, pSrc2, topMeanDelta, 0, TMP_TEMPLATE_SIZE);
+#endif
             uiSum = calcDiffDelta4<vext>(pSrc1, pSrc2, topMeanDelta, TMP_TEMPLATE_SIZE, uiPatchWidth);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+            if (iY == (TMP_TEMPLATE_SIZE-1)) 
+            {
+              uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+            }
+#endif
             diffSum += uiSum;
             topDiff += uiSum;
             if (diffSum > iMax[0] && topDiff > iMax[1])
@@ -797,10 +927,19 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
           }
         }
         const __m128i leftMeanDelta = calcMeanRefLeftSIMD<vext>(ref, uiPatchHeight, uiStride, log2SizeLeft, leftTargetMean);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+        const short leftMeanDeltaVal = (short)_mm_cvtsi128_si32(leftMeanDelta);
+#endif
         refPatchRow = ref - TMP_TEMPLATE_SIZE;
         for (iY = TMP_TEMPLATE_SIZE; iY < uiPatchHeight; iY++, refPatchRow += uiStride)
         {
           uiSum = calcDiffDelta4<vext>((const short*) refPatchRow, (const short*) tarPatch[iY], leftMeanDelta, 0, TMP_TEMPLATE_SIZE);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+          const short *pSrc1 = (const short *) refPatchRow;
+          const short *pSrc2 = (const short *) tarPatch[iY];
+          uiSum += (abs(pSrc1[TMP_TEMPLATE_SIZE - 1] - pSrc2[TMP_TEMPLATE_SIZE - 1] - leftMeanDeltaVal)
+                    * ((1 << TMP_TEMPLATE_COST_SHIFT) - 1));
+#endif
           diffSum += uiSum;
           leftDiff += uiSum;
           if (diffSum > iMax[0] && leftDiff > iMax[2])
@@ -819,8 +958,23 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
           {
             const short* const pSrc1 = (const short*) refPatchRow;
             const short* const pSrc2 = (const short*) tarPatch[iY];
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+            uiSum = calcDiffDelta4<vext>(pSrc1, pSrc2, topMeanDelta, 0, TMP_TEMPLATE_SIZE);
+            if (iY == (TMP_TEMPLATE_SIZE-1)) 
+            {
+              uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+            }
+            diffSum += uiSum;
+            uiSum = calcDiffDelta16<vext>(pSrc1, pSrc2, topMeanDelta256, TMP_TEMPLATE_SIZE, uiPatchWidth);
+            if (iY == (TMP_TEMPLATE_SIZE-1)) 
+            {
+              uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+            }
+            diffSum += uiSum;
+#else
             diffSum += calcDiffDelta4<vext>(pSrc1, pSrc2, topMeanDelta, 0, TMP_TEMPLATE_SIZE);
             diffSum += calcDiffDelta16<vext>(pSrc1, pSrc2, topMeanDelta256, TMP_TEMPLATE_SIZE, uiPatchWidth);
+#endif
             if (diffSum > iMax[0])
             {
               isAboveLeftSkipped = true;
@@ -837,8 +991,23 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
           {
             const short* const pSrc1 = (const short*) refPatchRow;
             const short* const pSrc2 = (const short*) tarPatch[iY];
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+            uiSum = calcDiffDelta4<vext>(pSrc1, pSrc2, topMeanDelta, 0, TMP_TEMPLATE_SIZE);
+            if (iY == (TMP_TEMPLATE_SIZE-1)) 
+            {
+              uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+            }
+            diffSum += uiSum;
+            uiSum = calcDiffDelta8<vext>(pSrc1, pSrc2, topMeanDelta, TMP_TEMPLATE_SIZE, uiPatchWidth);
+            if (iY == (TMP_TEMPLATE_SIZE-1)) 
+            {
+              uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+            }
+            diffSum += uiSum;
+#else
             diffSum += calcDiffDelta4<vext>(pSrc1, pSrc2, topMeanDelta, 0, TMP_TEMPLATE_SIZE);
             diffSum += calcDiffDelta8<vext>(pSrc1, pSrc2, topMeanDelta, TMP_TEMPLATE_SIZE, uiPatchWidth);
+#endif
             if (diffSum > iMax[0])
             {
               isAboveLeftSkipped = true;
@@ -850,7 +1019,16 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
         {
           for (iY = 0; iY < TMP_TEMPLATE_SIZE; iY++, refPatchRow += uiStride)
           {
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+            uiSum = calcDiffDelta8<vext>((const short*) refPatchRow, (const short*) tarPatch[iY], topMeanDelta, 0, uiPatchWidth);
+            if (iY == (TMP_TEMPLATE_SIZE-1)) 
+            {
+              uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+            }
+            diffSum += uiSum;
+#else
             diffSum += calcDiffDelta8<vext>((const short*) refPatchRow, (const short*) tarPatch[iY], topMeanDelta, 0, uiPatchWidth);
+#endif
             if (diffSum > iMax[0])
             {
               isAboveLeftSkipped = true;
@@ -861,10 +1039,19 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
         if (!isAboveLeftSkipped)
         {
           const __m128i leftMeanDelta = calcMeanRefLeftSIMD<vext>(ref, uiPatchHeight, uiStride, log2SizeLeft, leftTargetMean);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+          const short leftMeanDeltaVal = (short)_mm_cvtsi128_si32(leftMeanDelta);
+#endif
           refPatchRow = ref - TMP_TEMPLATE_SIZE;
           for (iY = TMP_TEMPLATE_SIZE; iY < uiPatchHeight; iY++, refPatchRow += uiStride)
           {
             diffSum += calcDiffDelta4<vext>((const short*) refPatchRow, (const short*) tarPatch[iY], leftMeanDelta, 0, TMP_TEMPLATE_SIZE);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+            const short *pSrc1 = (const short *) refPatchRow;
+            const short *pSrc2 = (const short *) tarPatch[iY];
+            diffSum += (abs(pSrc1[TMP_TEMPLATE_SIZE - 1] - pSrc2[TMP_TEMPLATE_SIZE - 1] - leftMeanDeltaVal)
+                        * ((1 << TMP_TEMPLATE_COST_SHIFT) - 1));
+#endif
             if (diffSum > iMax[0])
             {
               break;
@@ -879,7 +1066,16 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
         {
           for (iY = 0; iY < TMP_TEMPLATE_SIZE; iY++, refPatchRow += uiStride)
           {
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+            uiSum = calcDiffDelta16<vext>((const short*) refPatchRow, (const short*) tarPatch[iY], topMeanDelta256, TMP_TEMPLATE_SIZE, uiPatchWidth);
+            if (iY == (TMP_TEMPLATE_SIZE-1)) 
+            {
+              uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+            }
+            topDiff += uiSum;
+#else
             topDiff += calcDiffDelta16<vext>((const short*) refPatchRow, (const short*) tarPatch[iY], topMeanDelta256, TMP_TEMPLATE_SIZE, uiPatchWidth);
+#endif
             if (topDiff > iMax[1])
             {
               break;
@@ -893,7 +1089,16 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
         {
           for (iY = 0; iY < TMP_TEMPLATE_SIZE; iY++, refPatchRow += uiStride)
           {
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+            uiSum = calcDiffDelta8<vext>((const short*) refPatchRow, (const short*) tarPatch[iY], topMeanDelta, TMP_TEMPLATE_SIZE, uiPatchWidth);
+            if (iY == (TMP_TEMPLATE_SIZE-1)) 
+            {
+              uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+            }
+            topDiff += uiSum;
+#else
             topDiff += calcDiffDelta8<vext>((const short*) refPatchRow, (const short*) tarPatch[iY], topMeanDelta, TMP_TEMPLATE_SIZE, uiPatchWidth);
+#endif
             if (topDiff > iMax[1])
             {
               break;
@@ -904,7 +1109,16 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
         {
           for (iY = 0; iY < TMP_TEMPLATE_SIZE; iY++, refPatchRow += uiStride)
           {
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+            uiSum = calcDiffDelta4<vext>((const short*) refPatchRow, (const short*) tarPatch[iY], topMeanDelta, TMP_TEMPLATE_SIZE, uiPatchWidth);
+            if (iY == (TMP_TEMPLATE_SIZE-1)) 
+            {
+              uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+            }
+            topDiff += uiSum;
+#else
             topDiff += calcDiffDelta4<vext>((const short*) refPatchRow, (const short*) tarPatch[iY], topMeanDelta, TMP_TEMPLATE_SIZE, uiPatchWidth);
+#endif
             if (topDiff > iMax[1])
             {
               break;
@@ -915,10 +1129,19 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
       else
       {
         const __m128i leftMeanDelta = calcMeanRefLeftSIMD<vext>(ref, uiPatchHeight, uiStride, log2SizeLeft, leftTargetMean);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+        const short leftMeanDeltaVal = (short)_mm_cvtsi128_si32(leftMeanDelta);
+#endif
         refPatchRow = ref - TMP_TEMPLATE_SIZE;
         for (iY = TMP_TEMPLATE_SIZE; iY < uiPatchHeight; iY++, refPatchRow += uiStride)
         {
           leftDiff += calcDiffDelta4<vext>((const short*) refPatchRow, (const short*) tarPatch[iY], leftMeanDelta, 0, TMP_TEMPLATE_SIZE);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+          const short *pSrc1 = (const short *) refPatchRow;
+          const short *pSrc2 = (const short *) tarPatch[iY];
+          leftDiff += (abs(pSrc1[TMP_TEMPLATE_SIZE - 1] - pSrc2[TMP_TEMPLATE_SIZE - 1] - leftMeanDeltaVal)
+                       * ((1 << TMP_TEMPLATE_COST_SHIFT) - 1));
+#endif
           if (leftDiff > iMax[2])
           {
             break;
@@ -934,7 +1157,16 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
       {
         for (iY = 0; iY < TMP_TEMPLATE_SIZE; iY++, refPatchRow += uiStride)
         {
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+          uiSum = calcDiffDelta16<vext>((const short*) refPatchRow, (const short*) tarPatch[iY], topMeanDelta256, 0, iCols);
+          if (iY == (TMP_TEMPLATE_SIZE-1)) 
+          {
+            uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+          }
+          diffSum += uiSum;
+#else
           diffSum += calcDiffDelta16<vext>((const short*) refPatchRow, (const short*) tarPatch[iY], topMeanDelta256, 0, iCols);
+#endif
           if (diffSum > iMax[0])
           {
             break;
@@ -948,7 +1180,16 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
       {
         for (iY = 0; iY < TMP_TEMPLATE_SIZE; iY++, refPatchRow += uiStride)
         {
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+          uiSum = calcDiffDelta8<vext>((const short*) refPatchRow, (const short*) tarPatch[iY], topMeanDelta, 0, iCols);
+          if (iY == (TMP_TEMPLATE_SIZE-1)) 
+          {
+            uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+          }
+          diffSum += uiSum;
+#else
           diffSum += calcDiffDelta8<vext>((const short*) refPatchRow, (const short*) tarPatch[iY], topMeanDelta, 0, iCols);
+#endif
           if (diffSum > iMax[0])
           {
             break;
@@ -959,7 +1200,16 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
       {
         for (iY = 0; iY < TMP_TEMPLATE_SIZE; iY++, refPatchRow += uiStride)
         {
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+          uiSum = calcDiffDelta4<vext>((const short*) refPatchRow, (const short*) tarPatch[iY], topMeanDelta, 0, iCols);
+          if (iY == (TMP_TEMPLATE_SIZE-1)) 
+          {
+            uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+          }
+          diffSum += uiSum;
+#else
           diffSum += calcDiffDelta4<vext>((const short*) refPatchRow, (const short*) tarPatch[iY], topMeanDelta, 0, iCols);
+#endif
           if (diffSum > iMax[0])
           {
             break;
@@ -970,9 +1220,18 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
     else if (tempType == LEFT_TEMPLATE)
     {
       const __m128i leftMeanDelta = calcMeanRefLeftSIMD<vext>(ref, uiPatchHeight, uiStride, log2SizeLeft, leftTargetMean);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+      const short leftMeanDeltaVal = (short)_mm_cvtsi128_si32(leftMeanDelta);
+#endif
       for (iY = TMP_TEMPLATE_SIZE; iY < uiPatchHeight; iY++, refPatchRow += uiStride)
       {
         diffSum += calcDiffDelta4<vext>((const short*) refPatchRow, (const short*) tarPatch[iY], leftMeanDelta, 0, TMP_TEMPLATE_SIZE);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+        const short *pSrc1 = (const short *) refPatchRow;
+        const short *pSrc2 = (const short *) tarPatch[iY];
+        diffSum += (abs(pSrc1[TMP_TEMPLATE_SIZE - 1] - pSrc2[TMP_TEMPLATE_SIZE - 1] - leftMeanDeltaVal)
+                    * ((1 << TMP_TEMPLATE_COST_SHIFT) - 1));
+#endif
         if (diffSum > iMax[0])
         {
           break;
@@ -1001,8 +1260,23 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
         {
           const short* pSrc1 = (const short*) tarPatch[iY];
           const short* pSrc2 = (const short*) refPatchRow;
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+          uiSum = calcDiff4<vext>(pSrc1, pSrc2, 0, TMP_TEMPLATE_SIZE);
+          if (iY == (TMP_TEMPLATE_SIZE-1)) 
+          {
+            uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+          }
+          diffSum += uiSum;
+#else
           diffSum += calcDiff4<vext>(pSrc1, pSrc2, 0, TMP_TEMPLATE_SIZE);
+#endif
           uiSum = calcDiff16<vext>(pSrc1, pSrc2, TMP_TEMPLATE_SIZE, uiPatchWidth);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+          if (iY == (TMP_TEMPLATE_SIZE-1)) 
+          {
+            uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+          }
+#endif
           diffSum += uiSum;
           topDiff += uiSum;
           if (diffSum > iMax[0] && topDiff > iMax[1])
@@ -1020,8 +1294,23 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
         {
           const short* pSrc1 = (const short*) tarPatch[iY];
           const short* pSrc2 = (const short*) refPatchRow;
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+          uiSum = calcDiff4<vext>(pSrc1, pSrc2, 0, TMP_TEMPLATE_SIZE);
+          if (iY == (TMP_TEMPLATE_SIZE-1)) 
+          {
+            uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+          }
+          diffSum += uiSum;
+#else
           diffSum += calcDiff4<vext>(pSrc1, pSrc2, 0, TMP_TEMPLATE_SIZE);
+#endif
           uiSum = calcDiff8<vext>(pSrc1, pSrc2, TMP_TEMPLATE_SIZE, uiPatchWidth);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+          if (iY == (TMP_TEMPLATE_SIZE-1)) 
+          {
+            uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+          }
+#endif
           diffSum += uiSum;
           topDiff += uiSum;
           if (diffSum > iMax[0] && topDiff > iMax[1])
@@ -1036,8 +1325,23 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
         {
           const short* pSrc1 = (const short*) tarPatch[iY];
           const short* pSrc2 = (const short*) refPatchRow;
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+          uiSum = calcDiff4<vext>(pSrc1, pSrc2, 0, TMP_TEMPLATE_SIZE);
+          if (iY == (TMP_TEMPLATE_SIZE-1)) 
+          {
+            uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+          }
+          diffSum += uiSum;
+#else
           diffSum += calcDiff4<vext>(pSrc1, pSrc2, 0, TMP_TEMPLATE_SIZE);
+#endif
           uiSum = calcDiff4<vext>(pSrc1, pSrc2, TMP_TEMPLATE_SIZE, uiPatchWidth);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+          if (iY == (TMP_TEMPLATE_SIZE-1)) 
+          {
+            uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+          }
+#endif
           diffSum += uiSum;
           topDiff += uiSum;
           if (diffSum > iMax[0] && topDiff > iMax[1])
@@ -1058,6 +1362,12 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
 
         // TopLeft
         uiSum = calcDiff4(pSrc1, pSrc2, 0, TMP_TEMPLATE_SIZE);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+        if (iY == (TMP_TEMPLATE_SIZE-1)) 
+        {
+          uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+        }
+#endif
         diffSum += uiSum;
 
         if (((iCols - TMP_TEMPLATE_SIZE) & 7) == 0)
@@ -1068,6 +1378,12 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
         {
           uiSum = calcDiff4(pSrc1, pSrc2, TMP_TEMPLATE_SIZE, iCols);
         }
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+        if (iY == (TMP_TEMPLATE_SIZE - 1))
+        {
+          uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+        }
+#endif
         diffSum += uiSum;
         topDiff += uiSum;
 
@@ -1098,6 +1414,10 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
                          <vext>
 #endif
                          (pSrc1, pSrc2, 0, iCols);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+        uiSum += (abs(pSrc1[TMP_TEMPLATE_SIZE - 1] - pSrc2[TMP_TEMPLATE_SIZE - 1])
+                  * ((1 << TMP_TEMPLATE_COST_SHIFT) - 1));
+#endif
 
         diffSum += uiSum;
         leftDiff += uiSum;
@@ -1121,8 +1441,23 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
         {
           const short* pSrc1 = (const short*) tarPatch[iY];
           const short* pSrc2 = (const short*) refPatchRow;
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+          uiSum = calcDiff4<vext>(pSrc1, pSrc2, 0, TMP_TEMPLATE_SIZE);
+          if (iY == (TMP_TEMPLATE_SIZE-1)) 
+          {
+            uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+          }
+          diffSum += uiSum;
+          uiSum = calcDiff16<vext>(pSrc1, pSrc2, TMP_TEMPLATE_SIZE, uiPatchWidth);
+          if (iY == (TMP_TEMPLATE_SIZE-1)) 
+          {
+            uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+          }
+          diffSum += uiSum;
+#else
           diffSum += calcDiff4<vext>(pSrc1, pSrc2, 0, TMP_TEMPLATE_SIZE);
           diffSum += calcDiff16<vext>(pSrc1, pSrc2, TMP_TEMPLATE_SIZE, uiPatchWidth);
+#endif
           if (diffSum > iMax[0])
           {
             isAboveLeftSkipped = true;
@@ -1139,8 +1474,23 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
         {
           const short* pSrc1 = (const short*) tarPatch[iY];
           const short* pSrc2 = (const short*) refPatchRow;
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+          uiSum = calcDiff4<vext>(pSrc1, pSrc2, 0, TMP_TEMPLATE_SIZE);
+          if (iY == (TMP_TEMPLATE_SIZE-1)) 
+          {
+            uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+          }
+          diffSum += uiSum;
+          uiSum = calcDiff8<vext>(pSrc1, pSrc2, TMP_TEMPLATE_SIZE, uiPatchWidth);
+          if (iY == (TMP_TEMPLATE_SIZE-1)) 
+          {
+            uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+          }
+          diffSum += uiSum;
+#else
           diffSum += calcDiff4<vext>(pSrc1, pSrc2, 0, TMP_TEMPLATE_SIZE);
           diffSum += calcDiff8<vext>(pSrc1, pSrc2, TMP_TEMPLATE_SIZE, uiPatchWidth);
+#endif
           if (diffSum > iMax[0])
           {
             isAboveLeftSkipped = true;
@@ -1152,7 +1502,16 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
       {
         for (iY = 0; iY < TMP_TEMPLATE_SIZE; iY++, refPatchRow += uiStride)
         {
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+          uiSum = calcDiff8<vext>((const short*) tarPatch[iY], (const short*) refPatchRow, 0, uiPatchWidth);
+          if (iY == (TMP_TEMPLATE_SIZE-1)) 
+          {
+            uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+          }
+          diffSum += uiSum;
+#else
           diffSum += calcDiff8<vext>((const short*) tarPatch[iY], (const short*) refPatchRow, 0, uiPatchWidth);
+#endif
           if (diffSum > iMax[0])
           {
             isAboveLeftSkipped = true;
@@ -1180,6 +1539,12 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
         {
           uiSum = calcDiff4(pSrc1, pSrc2, 0, iCols);
         }
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+        if (iY == (TMP_TEMPLATE_SIZE - 1))
+        {
+          uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+        }
+#endif
         diffSum += uiSum;
 
         if (diffSum > iMax[0])
@@ -1206,6 +1571,10 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
                          <vext>
 #endif
                          (pSrc1, pSrc2, 0, iCols);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+        uiSum += (abs(pSrc1[TMP_TEMPLATE_SIZE - 1] - pSrc2[TMP_TEMPLATE_SIZE - 1])
+                  * ((1 << TMP_TEMPLATE_COST_SHIFT) - 1));
+#endif
 
         diffSum += uiSum;
 
@@ -1228,7 +1597,16 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
       {
         for (iY = 0; iY < TMP_TEMPLATE_SIZE; iY++, refPatchRow += uiStride)
         {
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+          uiSum = calcDiff16<vext>((const short*) tarPatch[iY], (const short*) refPatchRow, TMP_TEMPLATE_SIZE, uiPatchWidth);
+          if (iY == (TMP_TEMPLATE_SIZE-1)) 
+          {
+            uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+          }
+          topDiff += uiSum;
+#else
           topDiff += calcDiff16<vext>((const short*) tarPatch[iY], (const short*) refPatchRow, TMP_TEMPLATE_SIZE, uiPatchWidth);
+#endif
           if (topDiff > iMax[1])
           {
             break;
@@ -1242,7 +1620,16 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
       {
         for (iY = 0; iY < TMP_TEMPLATE_SIZE; iY++, refPatchRow += uiStride)
         {
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+          uiSum = calcDiff8<vext>((const short*) tarPatch[iY], (const short*) refPatchRow, TMP_TEMPLATE_SIZE, uiPatchWidth);
+          if (iY == (TMP_TEMPLATE_SIZE-1)) 
+          {
+            uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+          }
+          topDiff += uiSum;
+#else
           topDiff += calcDiff8<vext>((const short*) tarPatch[iY], (const short*) refPatchRow, TMP_TEMPLATE_SIZE, uiPatchWidth);
+#endif
           if (topDiff > iMax[1])
           {
             break;
@@ -1253,7 +1640,16 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
       {
         for (iY = 0; iY < TMP_TEMPLATE_SIZE; iY++, refPatchRow += uiStride)
         {
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+          uiSum = calcDiff4<vext>((const short*) tarPatch[iY], (const short*) refPatchRow, TMP_TEMPLATE_SIZE, uiPatchWidth);
+          if (iY == (TMP_TEMPLATE_SIZE-1)) 
+          {
+            uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+          }
+          topDiff += uiSum;
+#else
           topDiff += calcDiff4<vext>((const short*) tarPatch[iY], (const short*) refPatchRow, TMP_TEMPLATE_SIZE, uiPatchWidth);
+#endif
           if (topDiff > iMax[1])
           {
             break;
@@ -1278,6 +1674,12 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
         {
           uiSum = calcDiff4(pSrc1, pSrc2, TMP_TEMPLATE_SIZE, iCols);
         }
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+        if (iY == (TMP_TEMPLATE_SIZE - 1))
+        {
+          uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+        }
+#endif
         topDiff += uiSum;
 
         if (topDiff > iMax[1])
@@ -1309,6 +1711,10 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
                          <vext>
 #endif
                          (pSrc1, pSrc2, 0, iCols);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+        uiSum += (abs(pSrc1[TMP_TEMPLATE_SIZE - 1] - pSrc2[TMP_TEMPLATE_SIZE - 1])
+                  * ((1 << TMP_TEMPLATE_COST_SHIFT) - 1));
+#endif
 
         leftDiff += uiSum;
 
@@ -1332,7 +1738,16 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
     {
       for (iY = 0; iY < TMP_TEMPLATE_SIZE; iY++, refPatchRow += uiStride)
       {
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+        uiSum = calcDiff16<vext>((const short*) tarPatch[iY], (const short*) refPatchRow, 0, iCols);
+        if (iY == (TMP_TEMPLATE_SIZE-1)) 
+        {
+          uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+        }
+        diffSum += uiSum;
+#else
         diffSum += calcDiff16<vext>((const short*) tarPatch[iY], (const short*) refPatchRow, 0, iCols);
+#endif
         if (diffSum > iMax[0])
         {
           break;
@@ -1346,7 +1761,16 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
     {
       for (iY = 0; iY < TMP_TEMPLATE_SIZE; iY++, refPatchRow += uiStride)
       {
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+        uiSum = calcDiff8<vext>((const short*) tarPatch[iY], (const short*) refPatchRow, 0, iCols);
+        if (iY == (TMP_TEMPLATE_SIZE-1)) 
+        {
+          uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+        }
+        diffSum += uiSum;
+#else
         diffSum += calcDiff8<vext>((const short*) tarPatch[iY], (const short*) refPatchRow, 0, iCols);
+#endif
         if (diffSum > iMax[0])
         {
           break;
@@ -1357,7 +1781,16 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
     {
       for (iY = 0; iY < TMP_TEMPLATE_SIZE; iY++, refPatchRow += uiStride)
       {
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+        uiSum = calcDiff4<vext>((const short*) tarPatch[iY], (const short*) refPatchRow, 0, iCols);
+        if (iY == (TMP_TEMPLATE_SIZE-1)) 
+        {
+          uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+        }
+        diffSum += uiSum;
+#else
         diffSum += calcDiff4<vext>((const short*) tarPatch[iY], (const short*) refPatchRow, 0, iCols);
+#endif
         if (diffSum > iMax[0])
         {
           break;
@@ -1383,6 +1816,12 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
       {
         uiSum = calcDiff4(pSrc1, pSrc2, 0, iCols);
       }
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+      if (iY == (TMP_TEMPLATE_SIZE - 1))
+      {
+        uiSum <<= TMP_TEMPLATE_COST_SHIFT;
+      }
+#endif
       diffSum += uiSum;
 
       if (diffSum > iMax[0])   // for speeding up
@@ -1413,6 +1852,10 @@ void calcTemplateDiffSIMD(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsig
                         <vext>
 #endif
                         (pSrc1, pSrc2, 0, iCols);
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+      uiSum += (abs(pSrc1[TMP_TEMPLATE_SIZE - 1] - pSrc2[TMP_TEMPLATE_SIZE - 1])
+                * ((1 << TMP_TEMPLATE_COST_SHIFT) - 1));
+#endif
 
       diffSum += uiSum;
 
@@ -1795,6 +2238,158 @@ void ibcCiipBlendingSIMD( Pel *pDst, int strideDst, const Pel *pSrc0, int stride
 }
 #endif
 
+#if JVET_AH0209_PDP
+template< X86_VEXT vext >
+bool xPredIntraOpt_SIMD(PelBuf &pDst, const PredictionUnit &pu, const uint32_t modeIdx, const ClpRng& clpRng, Pel* refF, Pel* refS)
+{
+  const uint32_t width = pDst.width;
+  const uint32_t height = pDst.height;
+  const int sizeKey = (width << 8) + height;
+  const int sizeIdx = g_size.find( sizeKey ) != g_size.end() ? g_size[sizeKey] : -1;
+
+  if( sizeIdx < 0 )
+  {
+    return false;
+  }
+  if (sizeIdx > 12 && modeIdx > 1 && (modeIdx % 4 != 2))
+  {
+    return false;
+  }
+
+  const uint32_t stride = pDst.stride;
+  Pel*           pred = pDst.buf;
+  const int xShift = g_sizeData[sizeIdx][8], yShift = g_sizeData[sizeIdx][9];
+
+  bool shortLen = modeIdx < PDP_SHORT_TH[0] || (modeIdx >= PDP_SHORT_TH[1] && modeIdx <= PDP_SHORT_TH[2]);
+  const int refLen = shortLen ? g_sizeData[sizeIdx][10] : g_sizeData[sizeIdx][7];
+  auto ref = shortLen ? refS : refF;
+
+  int16_t*** filter = g_pdpFilters[modeIdx][sizeIdx];
+  const int addShift = 1 << 13;
+
+  const __m128i offset = _mm_set1_epi32( addShift );
+  const __m128i max = _mm_set1_epi32( 1023 );
+  const __m128i zeros = _mm_setzero_si128();
+  __m128i vmat[ 4 ], vcoef[ 4 ], vsrc;
+
+  bool isHeightLarge = (height == 32);
+  int startY = isHeightLarge? 1 : 0;
+  int strideOffset = isHeightLarge ? (stride << 1) : stride;
+  int offsetY = isHeightLarge ? 2 : 1;
+  if (isHeightLarge)
+  {
+    pred += stride;
+  }
+
+  for (int y = startY; y < height; y+=offsetY, pred += strideOffset)
+  {
+    for (int x = 0; x < width; x+=4)
+    {
+      const int16_t* f0 = filter[y >> yShift][(x >> xShift)>>2];
+
+      vcoef[0] = _mm_setzero_si128();
+      vcoef[1] = _mm_setzero_si128();
+      vcoef[2] = _mm_setzero_si128();
+      vcoef[3] = _mm_setzero_si128();
+      int i;
+      for (i = 0; i < refLen; i+=8)
+      {
+        vsrc = _mm_loadu_si128( ( const __m128i* )&ref[i] );
+        //vsrc = _mm_unpacklo_epi64( vsrc, vsrc);
+
+        vmat[0] = _mm_loadu_si128( ( const __m128i* )f0 );
+        vmat[1] = _mm_loadu_si128( ( const __m128i* )(f0+8 ) );
+        vmat[2] = _mm_loadu_si128( ( const __m128i* )(f0+16) );
+        vmat[3] = _mm_loadu_si128( ( const __m128i* )(f0+24) );
+
+        vcoef[0] = _mm_add_epi32( _mm_madd_epi16( vsrc, vmat[0] ), vcoef[0] );
+        vcoef[1] = _mm_add_epi32( _mm_madd_epi16( vsrc, vmat[1] ), vcoef[1] );
+        vcoef[2] = _mm_add_epi32( _mm_madd_epi16( vsrc, vmat[2] ), vcoef[2] );
+        vcoef[3] = _mm_add_epi32( _mm_madd_epi16( vsrc, vmat[3] ), vcoef[3] );
+
+        f0 += 32;
+      }
+      vcoef[0] = _mm_hadd_epi32( vcoef[0], vcoef[1] );
+      vcoef[2] = _mm_hadd_epi32( vcoef[2], vcoef[3] );
+
+      vcoef[0] = _mm_hadd_epi32( vcoef[0], vcoef[2] );
+      //vcoef[2] = _mm_hadd_epi32( vcoef[2], vcoef[3] );
+      //vcoef[0] =  _mm_unpacklo_epi64(vcoef[0], vcoef[2]);
+      vcoef[0] = _mm_srai_epi32( _mm_add_epi32( vcoef[0], offset ), 14 );
+      vcoef[0] = _mm_min_epi32(vcoef[0], max);
+      vcoef[0] = _mm_max_epi32(vcoef[0], zeros);
+      //_mm_storeu_si128( ( __m128i * )&pred[x], vcoef[0] );
+      *((int64_t *)&pred[x]) = _mm_cvtsi128_si64(_mm_packs_epi32(vcoef[0], vcoef[0]));
+      //pred[x] = (Pel)Clip3(clpRng.min, clpRng.max, (std::max(0, sum) + addShift) >> 14);
+
+    }
+  }
+
+  if (sizeIdx > 12)
+  {
+    int sampFacHor = pDst.width / 16;
+    int sampFacVer = pDst.height / 16;
+
+    int numMRLLeft = g_sizeData[sizeIdx][5];
+    int numMRLTop = g_sizeData[sizeIdx][6];
+    int strideDst = ( pDst.width << 1 ) + numMRLLeft; //fetching from g_ref always.
+    Pel* ptrSrc = refF + ( strideDst * numMRLTop ) + numMRLLeft - 1;
+    Pel* ref2 = refF + ( strideDst*( numMRLTop - 1 ) ) + numMRLLeft;
+
+    pred = pDst.buf;
+    for( int y = 0; y < pDst.height; y++ )
+    {
+      if( 0 != ( sampFacHor - 1 ) && ( y%sampFacVer == ( sampFacVer - 1 ) ) )
+      {
+        pred[0] = ( ptrSrc[0] + pred[1] + 1 ) >> 1;
+      }
+
+      for( int x = 1; x < pDst.width; x++ )
+      {
+        if( ( x%sampFacHor != ( sampFacHor - 1 ) ) && ( y%sampFacVer == ( sampFacVer - 1 ) ) )
+        {
+          pred[x] = ( pred[x - 1] + pred[x + 1] + 1 ) >> 1;
+        }
+      }
+
+      pred += stride;
+      ptrSrc += numMRLLeft;
+    }
+
+    pred = pDst.buf;
+    Pel* pred1 = pred + stride;
+    if( 0 != ( sampFacVer - 1 ) )
+    {
+      for( int x = 0; x < pDst.width; x++ )
+      {
+        pred[x] = ( ref2[x] + pred1[x] + 1 ) >> 1;
+      }
+    }
+
+    pred += stride;
+    Pel* pred0 = pred - stride;
+    pred1 = pred + stride;
+
+    for( int y = 1; y < pDst.height; y++ )
+    {
+      if( ( y%sampFacVer != ( sampFacVer - 1 ) ) )
+      {
+        for( int x = 0; x < pDst.width; x++ )
+        {
+          pred[x] = ( pred0[x] + pred1[x] + 1 ) >> 1;
+        }
+      }
+
+      pred += stride;
+      pred0 += stride;
+      pred1 += stride;
+    }
+  }
+
+  return true;
+}
+#endif
+
 #if JVET_AG0058_EIP && INTRA_TRANS_ENC_OPT
 template< X86_VEXT vext >
 int64_t calcAeipGroupSumSIMD(const Pel* src1, const Pel* src2, const int numSamples)
@@ -1856,6 +2451,9 @@ void IntraPrediction::_initIntraX86()
 #endif
 #if JVET_AC0112_IBC_CIIP && INTRA_TRANS_ENC_OPT
   m_ibcCiipBlending = ibcCiipBlendingSIMD<vext>;
+#endif
+#if JVET_AH0209_PDP
+  m_xPredIntraOpt = xPredIntraOpt_SIMD<vext>;
 #endif
 #if JVET_AG0058_EIP && INTRA_TRANS_ENC_OPT
   m_calcAeipGroupSum = calcAeipGroupSumSIMD<vext>;

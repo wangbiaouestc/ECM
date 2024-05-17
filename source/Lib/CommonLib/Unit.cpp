@@ -260,8 +260,14 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   depth             = other.depth;
   btDepth           = other.btDepth;
   mtDepth           = other.mtDepth;
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  mtImplicitDepth   = other.mtImplicitDepth;
+#endif
   splitSeries       = other.splitSeries;
   skip              = other.skip;
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  interCcpMergeZeroRootCbfIdc = other.interCcpMergeZeroRootCbfIdc;
+#endif
   mmvdSkip = other.mmvdSkip;
   affine            = other.affine;
   affineType        = other.affineType;
@@ -287,6 +293,15 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   plIdx = other.plIdx;
 #endif
 #if ENABLE_DIMD
+#if JVET_AH0076_OBIC
+  obicFlag = other.obicFlag;
+  obicIsBlended = other.obicIsBlended;
+  for (int i = 0; i < OBIC_FUSION_NUM; i++)
+  {
+    obicMode[i] = other.obicMode[i];
+    obicFusionWeight[i] = other.obicFusionWeight[i];
+  }
+#endif
 #if JVET_AG0146_DIMD_ITMP_IBC
   isBvDimd = other.isBvDimd;
   bvDimd = other.bvDimd;
@@ -333,6 +348,23 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   }
 #endif
 #endif
+#if JVET_AH0136_CHROMA_REORDERING
+  for (uint32_t i = 0; i < 7; i++)
+  {
+    chromaList[i] = other.chromaList[i];
+  }
+  for (int i = 0; i < 5; i++)
+  {
+    dimdBlendModeChroma[i] = other.dimdBlendModeChroma[i];
+  }
+  for (int i = 0; i < 10; i++)
+  {
+    mvs[i] = other.mvs[i];
+    bvs[i] = other.bvs[i];
+    rribcTypes[i] = other.rribcTypes[i];
+  }
+  mvsNum = other.mvsNum;
+#endif
 #if TMP_FAST_ENC
 #if JVET_AD0086_ENHANCED_INTRA_TMP
 #if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
@@ -347,6 +379,9 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #endif
   tmpIsSubPel  = other.tmpIsSubPel;
   tmpSubPelIdx = other.tmpSubPelIdx;
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+  tmpFracIdx    = other.tmpFracIdx;
+#endif
 #endif
 #endif
 #if JVET_W0123_TIMD_FUSION
@@ -425,6 +460,9 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #endif
 #if INTER_LIC
   licFlag           = other.licFlag;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  licInheritPara    = other.licInheritPara;
+#endif
 #if JVET_AD0213_LIC_IMP
   for (int i = 0; i < 2; i++)
   {
@@ -503,8 +541,14 @@ void CodingUnit::initData()
   depth             = 0;
   btDepth           = 0;
   mtDepth           = 0;
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  mtImplicitDepth   = 0;
+#endif
   splitSeries       = 0;
   skip              = false;
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  interCcpMergeZeroRootCbfIdc = 0;
+#endif
   mmvdSkip = false;
   affine            = false;
   affineType        = 0;
@@ -529,6 +573,15 @@ void CodingUnit::initData()
   plIdx = 0;
 #endif
 #if ENABLE_DIMD
+#if JVET_AH0076_OBIC
+  obicFlag = false;
+  obicIsBlended = false;
+  for (int i = 0; i < OBIC_FUSION_NUM; i++)
+  {
+    obicMode[i] = -1;
+    obicFusionWeight[i] = 0;
+  }
+#endif
 #if JVET_AG0146_DIMD_ITMP_IBC
   isBvDimd  = 0;
   bvDimd    = Mv(0, 0);
@@ -575,6 +628,23 @@ void CodingUnit::initData()
   }
 #endif
 #endif
+#if JVET_AH0136_CHROMA_REORDERING
+  for (uint32_t i = 0; i < 7; i++)
+  {
+    chromaList[i] = -1;
+  }
+  for (int i = 0; i < 5; i++)
+  {
+    dimdBlendModeChroma[i] = -1;
+  }
+  for (int i = 0; i < 10; i++)
+  {
+    mvs[i].setZero();
+    bvs[i].setZero();
+    rribcTypes[i] = 0;
+  }
+  mvsNum = 0;
+#endif
 #if TMP_FAST_ENC
 #if JVET_AD0086_ENHANCED_INTRA_TMP
 #if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
@@ -586,6 +656,9 @@ void CodingUnit::initData()
   tmpFlmFlag    = false;
   tmpIsSubPel  = 0;
   tmpSubPelIdx = -1;
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+  tmpFracIdx    = -1;
+#endif
 #if JVET_AG0136_INTRA_TMP_LIC
   tmpLicFlag   = false;
 #endif
@@ -668,13 +741,21 @@ void CodingUnit::initData()
 #endif
 #if INTER_LIC
   licFlag = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  licInheritPara = false;
+#endif
 #if JVET_AD0213_LIC_IMP
   for (int i = 0; i < 2; i++)
   {
     for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
     {
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+      licScale[i][comp] = 32;
+      licOffset[i][comp] = 0;
+#else
       licScale[i][comp] = MAX_INT;
       licOffset[i][comp] = MAX_INT;
+#endif
     }
   }
 #endif

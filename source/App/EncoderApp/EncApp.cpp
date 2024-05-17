@@ -493,7 +493,13 @@ void EncApp::xInitLibCfg()
     CHECK(m_noMipConstraintFlag && m_MIP, "MIP shall be deactivated when m_noMipConstraintFlag is equal to 1");
 
     m_cEncLib.setNoLfnstConstraintFlag(m_noLfnstConstraintFlag);
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+    bool spsLfnstEnabled = ( m_intraLFNSTISlice || m_intraLFNSTPBSlice );
+    spsLfnstEnabled |= m_interLFNST;
+    CHECK( m_noLfnstConstraintFlag && spsLfnstEnabled, "LFNST shall be deactivated when m_noLfnstConstraintFlag is equal to 1" );
+#else
     CHECK(m_noLfnstConstraintFlag && m_LFNST, "LFNST shall be deactivated when m_noLfnstConstraintFlag is equal to 1");
+#endif
 
     m_cEncLib.setNoMmvdConstraintFlag(m_noMmvdConstraintFlag);
     CHECK(m_noMmvdConstraintFlag && m_MMVD, "MMVD shall be deactivated when m_noMmvdConstraintFlag is equal to 1");
@@ -804,8 +810,17 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setLog2SignPredArea                                  (m_log2SignPredArea);
 #endif
 #endif
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  m_cEncLib.setIntraLFNSTISlice                                  ( m_intraLFNSTISlice );
+  m_cEncLib.setIntraLFNSTPBSlice                                 ( m_intraLFNSTPBSlice );
+  m_cEncLib.setInterLFNST                                        ( m_interLFNST );
+#else
   m_cEncLib.setLFNST                                             ( m_LFNST );
+#endif
   m_cEncLib.setUseFastLFNST                                      ( m_useFastLFNST );
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  m_cEncLib.setUseFastInterLFNST                                 ( m_useFastInterLFNST );
+#endif
   m_cEncLib.setSbTmvpEnabledFlag(m_sbTmvpEnableFlag);
   m_cEncLib.setAffine                                            ( m_Affine );
   m_cEncLib.setAffineType                                        ( m_AffineType );
@@ -813,6 +828,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setUseAffineTM                                       ( m_useAffineTM );
 #if JVET_AG0276_NLIC
   m_cEncLib.setUseAffAltLMTM                                     ( m_useAffAltLMTM );
+#endif
+#if JVET_AH0119_SUBBLOCK_TM
+  m_cEncLib.setUseSbTmvpTM                                       ( m_useSbTmvpTM );
 #endif
 #endif
 #if AFFINE_MMVD
@@ -932,6 +950,9 @@ void EncApp::xInitLibCfg()
 #if JVET_AD0085_MPM_SORTING
   m_cEncLib.setUseMpmSorting                                     ( m_mpmSorting );
 #endif
+#if JVET_AH0136_CHROMA_REORDERING
+  m_cEncLib.setUseChromaReordering                               (m_chromaReordering);
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   m_cEncLib.setUseCccm                                           ( m_cccm );
 #endif
@@ -939,7 +960,7 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setUseCcpMerge                                       ( m_ccpMerge );
 #endif
 #if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
-  m_cEncLib.setUseDdCcpFusion                                    ( m_ddCcpFusion );
+  m_cEncLib.setUseDdCcpFusion                                    ( m_cccm ? m_ddCcpFusion : false );
 #endif
 #if ENABLE_OBMC
   m_cEncLib.setUseObmc                                           ( m_OBMC );
@@ -1069,7 +1090,15 @@ void EncApp::xInitLibCfg()
 #if JVET_AF0073_INTER_CCP_MERGE
   m_cEncLib.setUseInterCcpMerge                                  ( m_interCcpMerge );
   m_cEncLib.setInterCcpMergeFastMode                             ( m_interCcpMergeFastMode );
+#if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
+  m_cEncLib.setUseInterCcpMergeZeroLumaCbf                       ( m_interCcpMergeZeroLumaCbf );
+  m_cEncLib.setInterCcpMergeZeroLumaCbfFastMode                  ( m_interCcpMergeZeroLumaCbfFastMode );
 #endif
+#endif
+#if JVET_AH0209_PDP
+  m_cEncLib.setUsePDP                                           ( m_pdp );
+#endif
+
   // ADD_NEW_TOOL : (encoder app) add setting of tool enabling flags and associated parameters here
   m_cEncLib.setVirtualBoundariesEnabledFlag                      ( m_virtualBoundariesEnabledFlag );
   if( m_cEncLib.getVirtualBoundariesEnabledFlag() )
@@ -1201,6 +1230,9 @@ void EncApp::xInitLibCfg()
 #endif
 #if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
   m_cEncLib.setUseAlfPrecision                                   ( m_alfPrecision );
+#endif
+#if JVET_AH0057_CCALF_COEFF_PRECISION
+  m_cEncLib.setUseCCALFPrecision                                 ( m_ccalfPrecision );
 #endif
   m_cEncLib.setTestSAODisableAtPictureLevel                      ( m_bTestSAODisableAtPictureLevel );
   m_cEncLib.setSaoEncodingRate                                   ( m_saoEncodingRate );
@@ -1353,6 +1385,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setSliceLevelWp                                      ( m_sliceLevelWp );
   m_cEncLib.setSliceLevelDeltaQp                                 ( m_sliceLevelDeltaQp );
   m_cEncLib.setSliceLevelAlf                                     ( m_sliceLevelAlf  );
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  m_cEncLib.setEnableMaxMttIncrease                              ( m_enableMaxMttIncrease );
+#endif
 #if MULTI_HYP_PRED
   m_cEncLib.setNumMHPCandsToTest(m_numMHPCandsToTest);
   m_cEncLib.setMaxNumAddHyps(m_maxNumAddHyps);
