@@ -2747,6 +2747,23 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
                   updateCandList(modeInfo, double(minSadHad * 0.8), m_uiSavedHadModeListEip, m_dSavedHadListEip, numRdEIP);
                 }
               }
+              for(const auto& modeInfo: m_uiSavedRdModeListEip)
+              {
+                CHECK(modeInfo.modeId < EIP_IDX || modeInfo.modeId >= EIP_IDX + std::max(NUM_DERIVED_EIP, MAX_MERGE_EIP), "A non-EIP mode is in EIP mode list") 
+                const auto modeIdx = modeInfo.modeId - EIP_IDX;
+                if(modeInfo.mipTrFlg)
+                {
+                  PelBuf eipSaveBuf(m_eipMergePredBuf[modeIdx], pu.Y());
+                  m_eipMergeModel[modeIdx].eipDimdMode = deriveDimdMipMode(eipSaveBuf, piPred.width, piPred.height, cu);
+                  CHECK(modeIdx >= NUM_EIP_MERGE_SIGNAL, "modeIdx >= NUM_EIP_MERGE_SIGNAL");
+                }
+                else
+                {
+                  PelBuf eipSaveBuf(m_eipPredBuf[modeIdx], pu.Y());
+                  m_eipModel[modeIdx].eipDimdMode = deriveDimdMipMode(eipSaveBuf, piPred.width, piPred.height, cu);
+                  CHECK(modeIdx >= NUM_DERIVED_EIP, "modeIdx >= NUM_DERIVED_EIP");
+                }
+              }
               cu.eipFlag = false;
               cu.eipMerge = false;
             }
@@ -2770,28 +2787,6 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
               uiRdModeList.pop_back();
               candCostList.pop_back();
               numModesForFullRD = int(uiRdModeList.size());
-            }
-            if (eipSaveFlag)
-            {
-              for(const auto& modeInfo: uiRdModeList)
-              {
-                if (modeInfo.modeId >= EIP_IDX && modeInfo.modeId < EIP_IDX + std::max(NUM_DERIVED_EIP, MAX_MERGE_EIP)) 
-                {
-                  const auto modeIdx = modeInfo.modeId - EIP_IDX;
-                  if(modeInfo.mipTrFlg)
-                  {
-                    PelBuf eipSaveBuf(m_eipMergePredBuf[modeIdx], pu.Y());
-                    m_eipMergeModel[modeIdx].eipDimdMode = deriveDimdMipMode(eipSaveBuf, piPred.width, piPred.height, cu);
-                    CHECK(modeIdx >= NUM_EIP_MERGE_SIGNAL, "modeIdx >= NUM_EIP_MERGE_SIGNAL");
-                  }
-                  else
-                  {
-                    PelBuf eipSaveBuf(m_eipPredBuf[modeIdx], pu.Y());
-                    m_eipModel[modeIdx].eipDimdMode = deriveDimdMipMode(eipSaveBuf, piPred.width, piPred.height, cu);
-                    CHECK(modeIdx >= NUM_DERIVED_EIP, "modeIdx >= NUM_DERIVED_EIP");
-                  }
-                }
-              }
             }
           }
 #endif
