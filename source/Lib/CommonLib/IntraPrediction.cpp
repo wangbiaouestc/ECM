@@ -11275,7 +11275,7 @@ void IntraPrediction::predChromaTM(const CompArea &areaCb, const CompArea &areaC
 #endif
       mvTop += mvCurr;
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
-      if (!PU::checkIsChromaBvCandidateValidChromaTm(pu, mvTop, filterIdx, true, true))
+      if (!PU::checkIsChromaBvCandidateValidChromaTm(pu, mvTop, line, filterIdx, true, true))
       {
 #if JVET_AA0070_RRIBC
         if (pu.cu->rribcFlipType == 2)
@@ -11376,7 +11376,7 @@ void IntraPrediction::predChromaTM(const CompArea &areaCb, const CompArea &areaC
 #endif
       mvLeft += mvCurr;
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
-      if (!PU::checkIsChromaBvCandidateValidChromaTm(pu, mvLeft, filterIdx, true, false))
+      if (!PU::checkIsChromaBvCandidateValidChromaTm(pu, mvLeft, line, filterIdx, true, false))
       {
 #if JVET_AA0070_RRIBC
         if (pu.cu->rribcFlipType == 1)
@@ -23571,7 +23571,7 @@ bool IntraPrediction::xCflmCreateChromaPred(const PredictionUnit& pu, const Comp
 #endif
       mvTop += mvCurr;
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
-      if (!PU::checkIsChromaBvCandidateValidChromaTm(pu, mvTop, filterIdx, true, true))
+      if (!PU::checkIsChromaBvCandidateValidChromaTm(pu, mvTop, tmpSize, filterIdx, true, true))
       {
 #if JVET_AA0070_RRIBC
         if (pu.cu->rribcFlipType == 2)
@@ -23663,7 +23663,7 @@ bool IntraPrediction::xCflmCreateChromaPred(const PredictionUnit& pu, const Comp
 #endif
       mvLeft += mvCurr;
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
-      if (!PU::checkIsChromaBvCandidateValidChromaTm(pu, mvLeft, filterIdx, true, false))
+      if (!PU::checkIsChromaBvCandidateValidChromaTm(pu, mvLeft, tmpSize, filterIdx, true, false))
       {
 #if JVET_AA0070_RRIBC
         if (pu.cu->rribcFlipType == 1)
