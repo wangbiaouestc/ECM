@@ -307,7 +307,7 @@ namespace PU
                                    , bool isRefTemplate = false, bool isRefAbove = false);
 #endif
 #if JVET_AH0136_CHROMA_REORDERING
-  bool checkIsChromaBvCandidateValidChromaTm(const PredictionUnit &pu, const Mv mv, int filterIdx = 0, bool isRefTemplate = false, bool isRefAbove = false);
+  bool checkIsChromaBvCandidateValidChromaTm(const PredictionUnit &pu, const Mv mv, const int tmpSize, int filterIdx = 0, bool isRefTemplate = false, bool isRefAbove = false);
 #endif
   int      getWideAngle                   ( const TransformUnit &tu, const uint32_t dirMode, const ComponentID compID );
 #if MULTI_PASS_DMVR || JVET_W0097_GPM_MMVD_TM

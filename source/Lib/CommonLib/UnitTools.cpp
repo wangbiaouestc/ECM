@@ -5634,11 +5634,11 @@ bool PU::checkIsChromaBvCandidateValid(const PredictionUnit &pu
 #endif
 
 #if JVET_AH0136_CHROMA_REORDERING
-bool PU::checkIsChromaBvCandidateValidChromaTm(const PredictionUnit &pu, const Mv mv, int filterIdx, bool isRefTemplate, bool isRefAbove)
+bool PU::checkIsChromaBvCandidateValidChromaTm(const PredictionUnit &pu, const Mv mv, const int tmpSize, int filterIdx, bool isRefTemplate, bool isRefAbove)
 {
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
-  int roiWidth = (isRefTemplate && !isRefAbove) ? 2 : pu.Cb().width;
-  int roiHeight = (isRefTemplate && isRefAbove) ? 2 : pu.Cb().height;
+  int roiWidth = (isRefTemplate && !isRefAbove) ? tmpSize : pu.Cb().width;
+  int roiHeight = (isRefTemplate && isRefAbove) ? tmpSize : pu.Cb().height;
   uint32_t validType = checkValidBv(pu, COMPONENT_Cb, roiWidth, roiHeight, mv, true, filterIdx);
   return validType != IBC_BV_INVALID;
 #else
