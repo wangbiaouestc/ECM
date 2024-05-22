@@ -62,7 +62,7 @@ namespace CabacRetrain
 #endif
   extern std::vector<int>                            vweight;
   extern int                                         ctx;
-  extern bool                                        report;
+  extern bool                                        tempCABAC;
   extern bool                                        activate;
   static std::vector<std::vector<char>>              vbins;
   uint64_t                                           filesize = 0;
@@ -73,13 +73,21 @@ namespace CabacRetrain
 
   static void dumpBin( int bin, int ctx_ )
   {
-    if (!activate) return;
+    if( !activate )
+    {
+      return;
+    }
+
     vbins[ctx_].push_back( bin );
   }
 
   void endFrame( int poc, int qp, bool switchBp, SliceType st )
   {
-    if (!activate) return;
+    if( !activate )
+    {
+      return;
+    }
+
     for( int ctxi = startctx; ctxi < endctx; ++ctxi )
     {
       auto &file = *files[ctxi];
@@ -94,7 +102,7 @@ namespace CabacRetrain
 #endif
       default: file << "? "; break;
       }
-      file << qp << " " << ( int ) switchBp << ' ' << ( int ) report << ' ';
+      file << qp << " " << ( int ) switchBp << ' ' << ( int ) tempCABAC << ' ';
       switch( sliceReport )
       {
       case B_SLICE: file << "B "; break;
@@ -121,13 +129,17 @@ namespace CabacRetrain
       vbins[ctxi].clear();
       vprobaInit[ctxi] = { 0,0 };
     }
-    report = false;
+
+    tempCABAC = false;
   }
 
   void init( const std::string &fn, bool iactivate )
   {
     activate = iactivate;
-    if (!activate) return;
+    if( !activate )
+    {
+      return;
+    }
     // get file size
     std::ifstream file( fn, std::ios::binary );
     file.seekg( 0, std::ios_base::end );
@@ -178,7 +190,7 @@ namespace CabacRetrain
       }
       file << "\n";
       file << "# SIZE " << filesize << '\n';
-      file << "# POC SLICETYPE QP SWITCHBP REPORT SLICEREPORT S0 S1 RATE WEIGHT DRATE0 DRATE1 BINS[]\n";
+      file << "# POC SLICETYPE QP SWITCHBP TEMPCABAC SLICEREPORT S0 S1 RATE WEIGHT DRATE0 DRATE1 BINS[]\n";
     }
   }
 }
