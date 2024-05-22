@@ -27,7 +27,7 @@ struct DataFrame
   SliceType type;
   SliceType reportslice;
   int poc;
-  bool report;
+  bool tempCABAC;
   bool switchBp;
   QP qp;
 

@@ -127,7 +127,7 @@ static DataDb addDataFrame( istream &in, DataDb &db )
     DataFrame d;
     char slicetype;
     char reportslice;
-    while( c != 'c' && in >> d.poc >> slicetype >> d.qp >> d.switchBp >> d.report >> reportslice >> d.p0 >> d.p1 >> d.rate >> d.weight
+    while( c != 'c' && in >> d.poc >> slicetype >> d.qp >> d.switchBp >> d.tempCABAC >> reportslice >> d.p0 >> d.p1 >> d.rate >> d.weight
 #if JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE
             >> d.drate0>>d.drate1
 #endif
