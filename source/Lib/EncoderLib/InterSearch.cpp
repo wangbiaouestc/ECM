@@ -14809,7 +14809,7 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
       clpRngs.comp[COMPONENT_Y].min = cu.cs->slice->getLumaPelMin();
       clpRngs.comp[COMPONENT_Y].max = cu.cs->slice->getLumaPelMax();
     }
-    cs.getRecoBuf().copyClip(cs.getRecoBuf(), clpRngs);
+    cs.getRecoBuf().copyClip(cs.getRecoBuf(), clpRngs, luma && !chroma, !luma && chroma);
 #endif
 
     // add empty TU(s)
