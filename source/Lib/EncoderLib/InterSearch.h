@@ -567,6 +567,7 @@ struct SrchCostBv
 #endif
 #if JVET_AE0078_IBC_LIC_EXTENSION
       bvLicIdx[idxDst] = bvLicIdx[idxSrc];
+      skipLicSrch[idxDst] = skipLicSrch[idxSrc];
 #endif
     }
   }
