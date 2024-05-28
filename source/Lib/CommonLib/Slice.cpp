@@ -786,8 +786,10 @@ void Slice::setRefPOCList       ()
     }
   }
 #if MULTI_HYP_PRED
-  if (getSPS()->getUseInterMultiHyp())
+  if( getSPS()->getUseInterMultiHyp() )
+  {
     setMultiHypRefPicList();
+  }
 #endif
 }
 
@@ -1115,8 +1117,12 @@ void Slice::constructRefPicList(PicList& rcListPic)
 void Slice::setMultiHypRefPicList()
 {
   m_multiHypRefPics.clear();
-  if (getNumMultiHypRefPics() == 0)
+
+  if( getNumMultiHypRefPics() == 0 )
+  {
     return;
+  }
+
   std::set<int> usedRefPOCs;
 
   const int iNumRefIdx[2] = { getNumRefIdx(REF_PIC_LIST_0), getNumRefIdx(REF_PIC_LIST_1) };
@@ -1134,8 +1140,12 @@ void Slice::setMultiHypRefPicList()
           entry.refList = eRefPicList;
           entry.refIdx = i;
           m_multiHypRefPics.push_back(entry);
-          if (m_multiHypRefPics.size() == getNumMultiHypRefPics())
+
+          if( m_multiHypRefPics.size() == getNumMultiHypRefPics() )
+          {
             return;
+          }
+
           usedRefPOCs.insert(iRefPOC);
         }
       }

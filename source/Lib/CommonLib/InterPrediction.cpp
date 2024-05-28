@@ -7453,8 +7453,10 @@ void InterPrediction::xPredAffineTpl(const PredictionUnit &pu, const RefPicList 
     const bool subblkMVSpreadOverLimit = isSubblockVectorSpreadOverLimit(iDMvHorX, iDMvHorY, iDMvVerX, iDMvVerY, pu.interDir);
 #endif
 #if AFFINE_RM_CONSTRAINTS_AND_OPT
-    if (iDMvHorX == 0 && iDMvHorY == 0)
+    if( iDMvHorX == 0 && iDMvHorY == 0 )
+    {
       blockWidth = width;
+    }
     else
     {
       int maxDmv = std::max(abs(iDMvHorX), abs(iDMvHorY)) * blockWidth;
@@ -7465,8 +7467,10 @@ void InterPrediction::xPredAffineTpl(const PredictionUnit &pu, const RefPicList 
         maxDmv <<= 1;
       }
     }
-    if (iDMvVerX == 0 && iDMvVerY == 0)
+    if( iDMvVerX == 0 && iDMvVerY == 0 )
+    {
       blockHeight = height;
+    }
     else
     {
       int maxDmv = std::max(abs(iDMvVerX), abs(iDMvVerY)) * blockHeight;
@@ -31782,21 +31786,21 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
     CHECK(3 != pu.interDir, "Bi prediction expected but something different was specified");
     for (int8_t refList = 0; refList < 2; ++refList)
     {
-        const RefPicList& eRefList = static_cast<RefPicList>(refList);
-        if (pu.cu->affine)
+      const RefPicList& eRefList = static_cast< RefPicList >( refList );
+      if( pu.cu->affine )
+      {
+        const auto& motionModel = MotionModel::BiAffine;
+        for( int i = 0; i < 2 + ( pu.cu->affineType == AFFINEMODEL_6PARAM ); ++i )
         {
-          const auto& motionModel = MotionModel::BiAffine;
-          for (int i = 0; i < 2 + (pu.cu->affineType == AFFINEMODEL_6PARAM); ++i)
-          {
-            pu.mvdSuffixInfo.initPrefixesMvd(i, eRefList, pu.mvdAffi[refList][i], pu.cu->imv, true, motionModel);
-          }
+          pu.mvdSuffixInfo.initPrefixesMvd( i, eRefList, pu.mvdAffi[ refList ][ i ], pu.cu->imv, true, motionModel );
         }
-        else
-        {
-          const auto& motionModel = MotionModel::BiTranslational;
-          CHECK(0 != pu.cu->smvdMode, "SMVD mode in reorderRefPairList");
-          pu.mvdSuffixInfo.initPrefixesMvd(0, eRefList, pu.mvd[refList], pu.cu->imv, true, motionModel);
-        }
+      }
+      else
+      {
+        const auto& motionModel = MotionModel::BiTranslational;
+        CHECK( 0 != pu.cu->smvdMode, "SMVD mode in reorderRefPairList" );
+        pu.mvdSuffixInfo.initPrefixesMvd( 0, eRefList, pu.mvd[ refList ], pu.cu->imv, true, motionModel );
+      }
     }
 
     pu.mvdSuffixInfo.getMergedBinBudgetForMv(MvdSuffixInfoMv::getBinBudgetForPrediction(pu.Y().width, pu.Y().height, pu.cu->imv));
@@ -32356,7 +32360,6 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
       rplIdxs[0].insert(refPairList[idx].refIdx[0]);
       rplIdxs[1].insert(refPairList[idx].refIdx[1]);
     }
-
     
     for (int refList = 0; refList < 2; refList++)
     {
@@ -32508,8 +32511,6 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
           }
           else
           {
-
-
             // buffer setting
             CPelBuf srcRecAboveTemplate(m_acYuvCurAMLTemplate[0][0], Size(cWidth, 1));
             PelBuf dstRecAboveTemplate(m_pcLICRecAboveTemplate[0], Size(cWidth, 1));
@@ -33408,9 +33409,9 @@ void InterPrediction::deriveMVDcandAffineSingleMv(const PredictionUnit& pu, RefP
   
     CHECK(patternsNum != cMvdCandList.size(), "THROW wrong list");
 
-    for (auto& mvd_cand : cMvdCandList)
+    for (auto& mvdCand : cMvdCandList)
     {
-      mvd_cand.changeAffinePrecAmvr2Internal(pu.cu->imv);
+      mvdCand.changeAffinePrecAmvr2Internal(pu.cu->imv);
     }
   }
   else // we use this case when mvdAffi = (0, 1) or (1, 0) or (1, 1) so both prefixes = -1
@@ -35578,7 +35579,7 @@ void InterPrediction::applyOffsetsAffineMvd(const PredictionUnit& pu, RefPicList
   bool firstValidUpdated = false;
   for (int i = 0; i < patternsCount; ++i)
   {
-      isCandValid[i] = SIGN(cMvdDerived[0][i].getHor()) == SIGN(cMvdInput[0].getHor()) && SIGN(cMvdDerived[0][i].getVer()) == SIGN(cMvdInput[0].getVer()) 
+    isCandValid[i] = SIGN(cMvdDerived[0][i].getHor()) == SIGN(cMvdInput[0].getHor()) && SIGN(cMvdDerived[0][i].getVer()) == SIGN(cMvdInput[0].getVer()) 
                     && SIGN(cMvdDerived[1][i].getHor()) == SIGN(cMvdInput[1].getHor()) && SIGN(cMvdDerived[1][i].getVer()) == SIGN(cMvdInput[1].getVer()) 
                     && (pu.cu->affineType == AFFINEMODEL_6PARAM ? (SIGN(cMvdDerived[2][i].getHor()) == SIGN(cMvdInput[2].getHor()) && SIGN(cMvdDerived[2][i].getVer()) == SIGN(cMvdInput[2].getVer())) : true);
     if (isCandValid[i] && !firstValidUpdated)
@@ -35623,7 +35624,8 @@ void InterPrediction::applyOffsetsAffineMvd(const PredictionUnit& pu, RefPicList
     return ((x - high) * (x - low) <= 0);
   };
 
-  typedef enum {
+  typedef enum
+  {
     MV_HOR_COMPONENT,
     MV_VER_COMPONENT
   } MvComp;
@@ -35654,7 +35656,6 @@ void InterPrediction::applyOffsetsAffineMvd(const PredictionUnit& pu, RefPicList
   
   int baseVal = 0;
   bool bitPresent = false;
-
 
   for (int i = posMostSignificant; i > posLeastSignificant; --i)
   {
@@ -36960,9 +36961,9 @@ std::vector<Mv> InterPrediction::deriveMVDFromMVSDIdxAffineSI(PredictionUnit& pu
       }
     }
 
-    for (auto& bvd_cand : cMvdDerived)
+    for (auto& bvdCand : cMvdDerived)
     {
-      bvd_cand.changeIbcPrecAmvr2Internal(pu.cu->imv);
+      bvdCand.changeIbcPrecAmvr2Internal(pu.cu->imv);
     }
 
     if (!pu.lumaPos().x && !pu.lumaPos().y)
@@ -37080,7 +37081,6 @@ std::vector<Mv> InterPrediction::deriveMVDFromMVSDIdxAffineSI(PredictionUnit& pu
       }
     }
 
-
     std::stable_sort(aMvCostVec.begin(), aMvCostVec.end(), [](const std::pair<Mv, Distortion>& l, const std::pair<Mv, Distortion>& r) {return l.second < r.second; });
 
     for (int n = 0; n < patternsNum; ++n)
@@ -37121,7 +37121,6 @@ std::vector<Mv> InterPrediction::deriveMVDFromMVSDIdxAffineSI(PredictionUnit& pu
     Mv tmp = cMvdInput;
     tmp.changeIbcPrecInternal2Amvr(imv);
 
-
     const int horSuffixMSBpos = si.iBinsInHorSuffix - 1;
     const int verSuffixMSBpos = si.iBinsInVerSuffix - 1;
 
@@ -37146,7 +37145,8 @@ std::vector<Mv> InterPrediction::deriveMVDFromMVSDIdxAffineSI(PredictionUnit& pu
       return ((x - high) * (x - low) <= 0);
     };
 
-    typedef enum {
+    typedef enum
+    {
       MV_HOR_COMPONENT,
       MV_VER_COMPONENT
     } MvComp;
@@ -37365,7 +37365,6 @@ std::vector<Mv> InterPrediction::deriveMVDFromMVSDIdxAffineSI(PredictionUnit& pu
       }
     );
 
-
     int numMSBhor = si.horOffsetPredictionNumBins;
     int numMSBver = si.verOffsetPredictionNumBins;
 
@@ -37394,7 +37393,6 @@ std::vector<Mv> InterPrediction::deriveMVDFromMVSDIdxAffineSI(PredictionUnit& pu
       posLeastSignificant = std::min(posLeastSignificant, verSuffixMSBpos - numMSBver);
       posMostSignificant = std::max(posMostSignificant, verSuffixMSBpos);
     }
-
 
     // Check if x is in [low..high]
     auto inRange = [](int low, int high, int x)
