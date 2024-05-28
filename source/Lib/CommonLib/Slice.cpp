@@ -807,11 +807,16 @@ void Slice::setRefRefIdxList()
       {
         for (int iNumRefRefIdx = 0; iNumRefRefIdx < refSlice->getNumRefIdx(RefPicList(iRefDir)) + (refSlice->getUseIBC() ? 1 : 0); iNumRefRefIdx++)
         {
+          int refRefPOC;
           if (iNumRefRefIdx == refSlice->getNumRefIdx(RefPicList(iRefDir)))
           {
             iNumRefRefIdx = MAX_NUM_REF;
+            refRefPOC = refSlice->getPOC();
           }
-          int refRefPOC = refSlice->getRefPOC(RefPicList(iRefDir), iNumRefRefIdx);
+          else
+          {
+            refRefPOC = refSlice->getRefPOC(RefPicList(iRefDir), iNumRefRefIdx);
+          }
           for (int iCurrDir = 0; iCurrDir < NUM_REF_PIC_LIST_01; iCurrDir++)
           {
             for (int iCurrRefIdx = 0; iCurrRefIdx < m_aiNumRefIdx[iCurrDir]; iCurrRefIdx++)
