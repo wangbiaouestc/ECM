@@ -950,12 +950,14 @@ void DecLib::adaptiveClipToRealRange()
   int height = m_pcPic->cs->pps->getPicHeightInLumaSamples();
   Pel* reconPel = m_pcPic->getRecoBuf().get(compID).buf;
   int stride = m_pcPic->getRecoBuf().get(compID).stride;
+
   for (uint32_t yPos = 0; yPos < height; yPos++)
   {
     for (uint32_t xPos = 0; xPos < width; xPos++)
     {
-      reconPel[yPos * stride + xPos] = ClipPel(reconPel[yPos * stride + xPos], clpRng);
+      reconPel[xPos] = ClipPel(reconPel[xPos], clpRng);
     }
+    reconPel += stride;
   }
 }
 #endif
