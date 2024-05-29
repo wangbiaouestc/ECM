@@ -4519,6 +4519,11 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
 #if JVET_AH0136_CHROMA_REORDERING && JVET_AC0071_DBV
           if (cu.cs->sps->getUseChromaReordering() && CS::isDualITree(cs) && PU::isDbvMode(mode))
           {
+            if (cu.mvs[mode - DBV_CHROMA_IDX] == Mv())
+            {
+              satdSortedCost[idx] = INT64_MAX;
+              continue;
+            }
             pu.bv = cu.bvs[mode - DBV_CHROMA_IDX];
             pu.mv[0] = cu.mvs[mode - DBV_CHROMA_IDX];
             pu.cu->rribcFlipType = cu.rribcTypes[mode - DBV_CHROMA_IDX];
@@ -4583,12 +4588,6 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
         sadCr = distParamSad.distFunc(distParamSad) * 2;
         satdCr = distParamSatd.distFunc(distParamSatd);
         sad += std::min(sadCr, satdCr);
-#if JVET_AH0136_CHROMA_REORDERING && JVET_AC0071_DBV
-        if (cu.cs->sps->getUseChromaReordering() && CS::isDualITree(*pu.cs) && PU::isDbvMode(mode) && cu.mvs[mode - DBV_CHROMA_IDX] == Mv())
-        {
-          sad = INT64_MAX;
-        }
-#endif
         satdSortedCost[idx] = sad;
 #if JVET_AD0120_LBCCP && MMLM
         if(mode == MMLM_CHROMA_IDX)

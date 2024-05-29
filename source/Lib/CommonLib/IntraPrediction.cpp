@@ -10756,6 +10756,14 @@ void IntraPrediction::deriveNonCcpChromaModes(const CPelBuf &recoBufY, const CPe
     {
       x = i == 0 ? 16 : 0;
     }
+#if JVET_AC0071_DBV
+    if (PU::isDbvMode(chromaList[x]) && cu.mvs[chromaList[x] - DBV_CHROMA_IDX] == Mv())
+    {
+      costPre[i] = UINT64_MAX;
+      modePre[i] = chromaList[x];
+      continue;
+    }
+#endif
 
     Distortion cost = 0;
     Distortion costL = 0;
@@ -10763,19 +10771,10 @@ void IntraPrediction::deriveNonCcpChromaModes(const CPelBuf &recoBufY, const CPe
     Distortion costCbL = 0;
     Distortion costCrA = 0;
     Distortion costCrL = 0;
-    bool isBad = false;
 
     // pred co-located luma area
     predCoLuma(areaY, recoBufY, lumaPU, chromaList[x], predY, pcInterPred, cu);
 
-    if (PU::isDbvMode(chromaList[x]))
-    {
-      int idx = chromaList[x] - DBV_CHROMA_IDX;
-      if (cu.mvs[idx] == Mv())
-      {
-        isBad = true;
-      }
-    }
     costL += cDistParamSatd.distFunc(cDistParamSatd);
     pu.intraDir[1] = chromaList[x];
     if (eTplType != NO_NEIGHBOR)
@@ -10814,10 +10813,6 @@ void IntraPrediction::deriveNonCcpChromaModes(const CPelBuf &recoBufY, const CPe
 
     pu.intraDir[1] = intraDir;
 
-    if (isBad)
-    {
-      cost = MAX_INT;
-    }
     costPre[i] = cost;
     modePre[i] = chromaList[x];
   }
@@ -10851,28 +10846,23 @@ void IntraPrediction::deriveNonCcpChromaModes(const CPelBuf &recoBufY, const CPe
       updateCandList(chromaList[x], chromaList[x] == modePre[0] ? costPre[0] : costPre[1], uiModeList, uiCostList, existNum);
       continue;
     }
-    Distortion cost = 0;
+#if JVET_AC0071_DBV
+    if (PU::isDbvMode(chromaList[x]) && cu.mvs[chromaList[x] - DBV_CHROMA_IDX] == Mv())
+    {
+      updateCandList(chromaList[x], UINT64_MAX, uiModeList, uiCostList, existNum);
+      continue;
+    }
+#endif
 
+    Distortion cost = 0;
     Distortion costL = 0;
     Distortion costCbA = 0;
     Distortion costCbL = 0;
     Distortion costCrA = 0;
     Distortion costCrL = 0;
-    bool isBad = false;
 
     // pred co-located luma area
     predCoLuma(areaY, recoBufY, lumaPU, chromaList[x], predY, pcInterPred, cu);
-
-#if JVET_AC0071_DBV
-    if (PU::isDbvMode(chromaList[x]))
-    {
-      int idx = chromaList[x] - DBV_CHROMA_IDX;
-      if (cu.mvs[idx] == Mv())
-      {
-        isBad = true;
-      }
-    }
-#endif
 
     costL += cDistParamSatd.distFunc(cDistParamSatd);
 
@@ -10914,12 +10904,6 @@ void IntraPrediction::deriveNonCcpChromaModes(const CPelBuf &recoBufY, const CPe
     }
 
     pu.intraDir[1] = intraDir;
-
-    if (isBad)
-    {
-      cost = MAX_INT;
-    }
-
     updateCandList(chromaList[x], cost, uiModeList, uiCostList, existNum);
   }
 
