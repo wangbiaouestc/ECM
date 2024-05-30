@@ -1446,9 +1446,9 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
   if (!pu.ciipPDPC)
   {
 #endif
+#if JVET_AH0209_PDP
     const uint32_t width = pu.lwidth();
     const uint32_t height = pu.lheight();
-#if JVET_AH0209_PDP
     const int sizeKey = (width << 8) + height;
     const int sizeIdx = g_size.find( sizeKey ) != g_size.end() ? g_size[sizeKey] : -1;
     auto modeIdx = g_modeGroup[uiDirMode];
