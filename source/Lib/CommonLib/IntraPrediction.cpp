@@ -1451,34 +1451,33 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
     const uint32_t height = pu.lheight();
     const int sizeKey = (width << 8) + height;
     const int sizeIdx = g_size.find( sizeKey ) != g_size.end() ? g_size[sizeKey] : -1;
-    auto modeIdx = g_modeGroup[uiDirMode];
     
     if ( isLuma( compId ) && sizeIdx >= 0 && applyPDPFilter && m_refAvailable && !pu.cu->ispMode && uiDirMode != BDPCM_IDX
       && pu.cu->cs->sps->getUsePDP()
       && !pu.cu->plIdx && !pu.cu->sgpm
-      && !pu.cu->timd && !pu.cu->tmrlFlag && !pu.multiRefIdx
-      && g_pdpFilters[modeIdx][sizeIdx]
-      && !( modeIdx > 1 && (modeIdx % 2) )
-      )
+      && !pu.cu->timd && !pu.cu->tmrlFlag && !pu.multiRefIdx)
     {
-      if (pu.cu->cs->pcv->isEncoder && m_pdpIntraPredReady[uiDirMode])
+      auto modeIdx = g_modeGroup[uiDirMode];
+      if (g_pdpFilters[modeIdx][sizeIdx] && !(modeIdx > 1 && (modeIdx % 2)))
       {
-        PelBuf predBuf(m_pdpIntraPredBufIP[uiDirMode], pu.Y());
-        piPred.copyFrom(predBuf);
-        if (!pu.cu->dimd)
+        if (pu.cu->cs->pcv->isEncoder && m_pdpIntraPredReady[uiDirMode])
         {
-          return;
+          PelBuf predBuf(m_pdpIntraPredBufIP[uiDirMode], pu.Y());
+          piPred.copyFrom(predBuf);
+          if (!pu.cu->dimd)
+          {
+            return;
+          }
+          pdpWasApplied = true;
         }
-        pdpWasApplied = true;
-      }
-      else if (m_xPredIntraOpt(piPred, pu, g_modeGroup[uiDirMode], clpRng, m_ref, m_refShort))
-      {
-        if( !pu.cu->dimd )
+        else if (m_xPredIntraOpt(piPred, pu, g_modeGroup[uiDirMode], clpRng, m_ref, m_refShort))
         {
-          return;
+          if (!pu.cu->dimd)
+          {
+            return;
+          }
+          pdpWasApplied = true;
         }
-        
-        pdpWasApplied = true;
       }
     }
 
