@@ -16968,6 +16968,9 @@ void InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMerg
     altLMAffMergeCand.altLMFlag[altLMAffMergeCand.numValidMergeCand] = true;
     altLMAffMergeCand.altLMParaNeighbours[altLMAffMergeCand.numValidMergeCand] = altLMAffMrgCtx.altLMParaNeighbours[mrgIdx];
     altLMAffMergeCand.licFlags[altLMAffMergeCand.numValidMergeCand] = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG && JVET_AG0164_AFFINE_GPM
+    altLMAffMergeCand.setDefaultLICParamToCtx(altLMAffMergeCand.numValidMergeCand);
+#endif
     altLMAffMergeCand.interDirNeighbours[altLMAffMergeCand.numValidMergeCand] = altLMAffMrgCtx.interDirNeighbours[mrgIdx];
     for (uint32_t refList = 0; refList < NUM_REF_PIC_LIST_01; refList++)
     {
@@ -17003,6 +17006,9 @@ void InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMerg
     altLMRMVFCand.altLMFlag[altLMRMVFCand.numValidMergeCand] = true;
     altLMRMVFCand.altLMParaNeighbours[altLMRMVFCand.numValidMergeCand] = altLMRMVFMrgCtx.altLMParaNeighbours[mrgIdx];
     altLMRMVFCand.licFlags[altLMRMVFCand.numValidMergeCand] = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG && JVET_AG0164_AFFINE_GPM
+    altLMRMVFCand.setDefaultLICParamToCtx(altLMRMVFCand.numValidMergeCand);
+#endif
     altLMRMVFCand.interDirNeighbours[altLMRMVFCand.numValidMergeCand] = altLMRMVFMrgCtx.interDirNeighbours[mrgIdx];
     for (uint32_t refList = 0; refList < NUM_REF_PIC_LIST_01; refList++)
     {

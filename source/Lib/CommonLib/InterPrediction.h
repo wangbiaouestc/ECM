@@ -225,7 +225,7 @@ private:
   Pel* m_curLICRecAboveTemplate[MAX_NUM_COMPONENT];
 
   int  m_numTemplate[MAX_NUM_COMPONENT][2];
-  int  m_shift[2][3], m_scale[2][3], m_offset[2][3];
+  int  m_shift[2][3] = {{0}}, m_scale[2][3] = {{0}}, m_offset[2][3] = {{0}};
   bool m_fillLicTpl[MAX_NUM_COMPONENT];
 #else
   Pel* m_pcLICRefLeftTemplate;
