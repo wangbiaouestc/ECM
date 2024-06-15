@@ -790,9 +790,6 @@ public:
 #endif
 
 #if ENABLE_DIMD
-#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
-  static int deriveDimdIntraTmpModePred(const CodingUnit cu, CPelBuf predBuf); // using prediction samples
-#endif
   static void deriveDimdMode      (const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu);
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
   static void deriveDimdChromaMode(const CPelBuf &recoBufY, const CPelBuf &recoBufCb, const CPelBuf &recoBufCr, const CompArea &areaY, const CompArea &areaCb, const CompArea &areaCr, CodingUnit &cu);
@@ -803,8 +800,8 @@ public:
    void predChromaTM(const CompArea &areaCb, const CompArea &areaCr, PredictionUnit &pu, uint8_t predMode, PelBuf predCb, PelBuf predCr, TemplateType eTplType, InterPrediction *pcInterPred);
 #endif
 #endif
-#if JVET_AB0067_MIP_DIMD_LFNST && ENABLE_DIMD
-  static int deriveDimdMipMode(PelBuf& reducedPred, int width, int height, CodingUnit& cu);
+#if ENABLE_DIMD && (JVET_AB0067_MIP_DIMD_LFNST || JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST || JVET_AG0058_EIP || JVET_AG0061_INTER_LFNST_NSPT)
+  static int deriveIpmForTransform(CPelBuf predBuf, CodingUnit& cu);
 #endif
 #if !JVET_AG0061_INTER_LFNST_NSPT
   static int  buildHistogram      ( const Pel *pReco, int iStride, uint32_t uiHeight, uint32_t uiWidth, int* piHistogram, int direction, int bw, int bh );
