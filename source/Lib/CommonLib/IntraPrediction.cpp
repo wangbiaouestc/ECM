@@ -9926,36 +9926,6 @@ void IntraPrediction::ibcCiipBlending(Pel *pDst, int strideDst, const Pel *pSrc0
 #endif
 
 #if ENABLE_DIMD
-
-#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
-int IntraPrediction::deriveDimdIntraTmpModePred(const CodingUnit cu, CPelBuf predBuf)
-{
-  const Pel* pPred = predBuf.buf;
-  const int iStride = predBuf.stride;
-  int height = predBuf.height;
-  int width = predBuf.width;
-
-  int piHistogramClean[NUM_LUMA_MODE] = { 0 };
-
-  pPred = pPred + iStride + 1;
-  buildHistogram(pPred, iStride, height - 2, width - 2, piHistogramClean, 0, width - 2, height - 2);
-
-  int firstAmp = 0, curAmp = 0;
-  int firstMode = 0, curMode = 0;
-  for (int i = 0; i < NUM_LUMA_MODE; i++)
-  {
-    curAmp = piHistogramClean[i];
-    curMode = i;
-    if (curAmp > firstAmp)
-    {
-      firstAmp = curAmp;
-      firstMode = curMode;
-    }
-  }
-  return firstMode;
-}
-#endif
-
 void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu)
 {
   if( !cu.slice->getSPS()->getUseDimd() )
@@ -11493,15 +11463,17 @@ void IntraPrediction::predChromaTM(const CompArea &areaCb, const CompArea &areaC
 }
 #endif
 
-#if JVET_AB0067_MIP_DIMD_LFNST && ENABLE_DIMD
-int IntraPrediction::deriveDimdMipMode(PelBuf& reducedPred, int width, int height, CodingUnit& cu)
+#if ENABLE_DIMD && (JVET_AB0067_MIP_DIMD_LFNST || JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST || JVET_AG0058_EIP || JVET_AG0061_INTER_LFNST_NSPT)
+int IntraPrediction::deriveIpmForTransform(CPelBuf predBuf, CodingUnit& cu)
 {
   if (!cu.slice->getSPS()->getUseDimd())
   {
     return PLANAR_IDX;
   }
-  const Pel* pPred = reducedPred.buf;
-  const int iStride = reducedPred.stride;
+  const Pel* pPred = predBuf.buf;
+  const int iStride = predBuf.stride;
+  const int width = predBuf.width;
+  const int height = predBuf.height;
 
   int histogram[NUM_LUMA_MODE] = { 0 };
 
@@ -13549,7 +13521,7 @@ void IntraPrediction::predIntraMip( const ComponentID compId, PelBuf &piPred, co
       }
       pReducePred += reducedPredTemp.stride;
     }
-    int iMode = deriveDimdMipMode(reducedPredTemp, reducedPredSize, reducedPredSize, *pu.cu);
+    int iMode = deriveIpmForTransform(reducedPredTemp, *pu.cu);
     pu.cu->mipDimdMode = iMode;
   }
   else
@@ -16661,7 +16633,7 @@ void IntraPrediction::xTMPFusionApplyModel(PelBuf &piPred, unsigned int uiBlkWid
   if (bDeriveDimdMode)
   {
     CPelBuf predBuf      = piPred;
-    cu->intraTmpDimdMode = deriveDimdIntraTmpModePred(*cu, predBuf);
+    cu->intraTmpDimdMode = deriveIpmForTransform(predBuf, *cu);
   }
 #endif
   return;
@@ -16713,7 +16685,7 @@ void IntraPrediction::xGenerateTmpFlmPred(PelBuf &piPred, unsigned int uiBlkWidt
   if (bDeriveDimdMode)
   {
     CPelBuf predBuf      = piPred;
-    cu->intraTmpDimdMode = deriveDimdIntraTmpModePred(*cu, predBuf);
+    cu->intraTmpDimdMode = deriveIpmForTransform(predBuf, *cu);
   }
 #endif
   return;
@@ -16915,7 +16887,7 @@ bool IntraPrediction::generateTMPrediction( Pel* piPred, unsigned int uiStride, 
 
 #if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
   CPelBuf predBuf(pPred, uiStride, uiWidth, uiHeight);
-  cu->intraTmpDimdMode = deriveDimdIntraTmpModePred(*cu, predBuf);
+  cu->intraTmpDimdMode = deriveIpmForTransform(predBuf, *cu);
 #endif
   return bSucceedFlag;
 }
@@ -17277,7 +17249,7 @@ bool IntraPrediction::generateTMPrediction(Pel *piPred, unsigned int uiStride, i
   {
 #endif
     CPelBuf predBuf(pPred, uiStride, uiWidth, uiHeight);
-    pu.cu->intraTmpDimdMode = deriveDimdIntraTmpModePred(*pu.cu, predBuf);
+    pu.cu->intraTmpDimdMode = deriveIpmForTransform(predBuf, *pu.cu);
 #if JVET_AD0086_ENHANCED_INTRA_TMP
   }
 #endif
@@ -17692,7 +17664,7 @@ bool IntraPrediction::generateTmDcPrediction( Pel* piPred, unsigned int uiStride
   }
 #if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
   CPelBuf predBuf(pPred, uiStride, uiBlkWidth, uiBlkHeight);
-  cu->intraTmpDimdMode = deriveDimdIntraTmpModePred(*cu, predBuf);
+  cu->intraTmpDimdMode = deriveIpmForTransform(predBuf, *cu);
 #endif
   return bSucceedFlag;
 }

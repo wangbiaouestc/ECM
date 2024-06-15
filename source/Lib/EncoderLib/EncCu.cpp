@@ -22236,7 +22236,7 @@ void EncCu::xEncodeInterResidual(   CodingStructure *&tempCS
           bestCost = bestCS->cost;
           cu       = tempCS->getCU(partitioner.chType);
         }
-        cu->dimdDerivedIntraDir = m_pcInterSearch->deriveInterDimdMode(*cu, cu->cs->getPredBuf(*cu->firstPU).Y());
+        cu->dimdDerivedIntraDir = m_pcIntraSearch->deriveIpmForTransform(cu->cs->getPredBuf(*cu->firstPU).Y(), *cu);
         // we need to restart the distortion for the new tempCS, the bit count and the cost
         tempCS->dist         = 0;
         tempCS->fracBits     = 0;

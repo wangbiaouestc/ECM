@@ -1194,15 +1194,7 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
       m_pcIntraPred->eipPred(pu, piPred);
       if (!isEncoder)
       {
-        pu.cu->eipModel.eipDimdMode = IntraPrediction::deriveDimdMipMode(piPred, piPred.width, piPred.height, *pu.cu);
-
-        // const CodingUnit& cu = *pu.cu;
-        // printf("pos(%d, %d), size(%d, %d), merge(%d), ", cu.lx(), cu.ly(), cu.lwidth(), cu.lheight(), int(cu.eipMerge));
-        // for (int i = 0; i < 15; i++)
-        // {
-        // printf("%d ", int(cu.eipModel.params[i]));
-        // }
-        // printf("\n");
+        pu.cu->eipModel.eipDimdMode = IntraPrediction::deriveIpmForTransform(piPred, *pu.cu);
       }
     }
 #endif
@@ -2657,7 +2649,7 @@ void DecCu::xDecodeInterTexture(CodingUnit &cu)
 #if JVET_AG0061_INTER_LFNST_NSPT
   if (cu.lfnstIdx)
   {
-    cu.dimdDerivedIntraDir = m_pcInterPred->deriveInterDimdMode(cu, cu.cs->getPredBuf(*cu.firstPU).Y());
+    cu.dimdDerivedIntraDir = m_pcIntraPred->deriveIpmForTransform(cu.cs->getPredBuf(*cu.firstPU).Y(), cu);
   }
 #endif
 

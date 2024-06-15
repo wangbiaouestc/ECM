@@ -189,9 +189,6 @@ public:
   bool isMvOOB(const Mv& rcMv, const struct Position pos, const struct Size size, const SPS* sps, const PPS* pps, bool *mcMask, bool *mcMaskChroma, bool lumaOnly = false);
   bool isMvOOBSubBlk(const Mv& rcMv, const struct Position pos, const struct Size size, const SPS* sps, const PPS* pps, bool *mcMask, int mcStride, bool *mcMaskChroma, int mcCStride, bool lumaOnly = false);
 #endif
-#if JVET_AG0061_INTER_LFNST_NSPT
-  static int deriveInterDimdMode(const CodingUnit cu, CPelBuf predBuf);
-#endif
 #if INTER_LIC || (TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC // note: already refactor
   Reshape*          m_pcReshape;
 #endif
