@@ -188,6 +188,12 @@ IntraPrediction::IntraPrediction()
     m_cflmBuf[i] = nullptr;
   }
 #endif
+#if JVET_AH0209_PDP
+  for (int i = 0; i < NUM_LUMA_MODE; i++)
+  {
+    m_pdpIntraPredReady[i] = false;
+  }
+#endif
 }
 
 IntraPrediction::~IntraPrediction()
