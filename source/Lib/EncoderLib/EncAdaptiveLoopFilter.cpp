@@ -1349,6 +1349,13 @@ void EncAdaptiveLoopFilter::ALFProcess( CodingStructure& cs, const double *lambd
   m_lambda[COMPONENT_Y] = lambdas[COMPONENT_Y] * double( 1 << shiftLuma );
   m_lambda[COMPONENT_Cb] = lambdas[COMPONENT_Cb] * double( 1 << shiftChroma );
   m_lambda[COMPONENT_Cr] = lambdas[COMPONENT_Cr] * double( 1 << shiftChroma );
+#if JVET_AI0058_ALF_RELAXED_RDO_LUMA
+  if (pcPic->temporalId > 0)
+  {
+    double lambdaModifierLuma = 0.75;
+    m_lambda[COMPONENT_Y] *= lambdaModifierLuma;
+  }
+#endif
 
 #if ALF_SAO_TRUE_ORG
   PelUnitBuf orgYuv = cs.getTrueOrgBuf();
