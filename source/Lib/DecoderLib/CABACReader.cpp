@@ -9670,6 +9670,7 @@ void CABACReader::tmp_flag(CodingUnit& cu)
       cu.tmpLicFlag = m_BinDecoder.decodeBin(Ctx::TmpLic(0));
       cu.ibcLicFlag = cu.tmpLicFlag;
       cu.ibcLicIdx = 0;
+      DTRACE(g_trace_ctx, D_SYNTAX, "tmpLicFlag pos=(%d,%d) value=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.tmpLicFlag);
 #endif
     }
     else
@@ -9754,6 +9755,7 @@ void CABACReader::tmp_flag(CodingUnit& cu)
         }
         cu.tmpIsSubPel  = 0;
         cu.tmpSubPelIdx = -1;
+        DTRACE(g_trace_ctx, D_SYNTAX, "tmpFracIdx pos=(%d,%d) value=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.tmpFracIdx);
 #else
         cu.tmpIsSubPel = m_BinDecoder.decodeBin(Ctx::TmpFlag(4));
         if (cu.tmpIsSubPel)
@@ -9765,8 +9767,8 @@ void CABACReader::tmp_flag(CodingUnit& cu)
           }
           cu.tmpSubPelIdx = m_BinDecoder.decodeBinsEP(3);
         }
-#endif
         DTRACE(g_trace_ctx, D_SYNTAX, "tmp_is_subpel() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.tmpIsSubPel);
+#endif
       }
       else
       {

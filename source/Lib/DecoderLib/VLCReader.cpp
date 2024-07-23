@@ -2490,7 +2490,7 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   pcSPS->setUseAffMergeOppositeLic(false);
   if (pcSPS->getUseAffine())
   {
-    READ_FLAG(uiCode, "sps_affine_oppolic_merge_enabled_flag");            pcSPS->setUseAffMergeOppositeLic(uiCode != 0);
+    READ_FLAG(uiCode, "sps_affine_oppositelic_merge_enabled_flag");            pcSPS->setUseAffMergeOppositeLic(uiCode != 0);
   }
 #endif
   if ( pcSPS->getUseAffine() )
@@ -2514,7 +2514,7 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_AG0276_LIC_FLAG_SIGNALING
     if (pcSPS->getUseAffMergeOppositeLic())
     {
-      READ_UVLC(uiCode, "eight_minus_max_num_aff_oppolic_merge_cand");
+      READ_UVLC(uiCode, "eight_minus_max_num_aff_oppositelic_merge_cand");
       pcSPS->setMaxNumAffineOppositeLicMergeCand(AFF_MRG_MAX_NUM_CANDS_OPPOSITELIC - uiCode);
     }
 #endif
