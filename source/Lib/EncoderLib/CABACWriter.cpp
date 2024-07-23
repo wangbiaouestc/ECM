@@ -2652,8 +2652,13 @@ void CABACWriter::intra_chroma_pred_mode(const PredictionUnit& pu)
         m_BinEncoder.encodeBin(isFusion ? 1 : 0, Ctx::ChromaFusionMode());
 #endif
       }
+#if JVET_AH0136_CHROMA_REORDERING
+      DTRACE(g_trace_ctx, D_SYNTAX, "intra_chroma_pred_modes() pos=(%d,%d) dir=%d\n", pu.blocks[CHANNEL_TYPE_CHROMA].x,
+             pu.blocks[CHANNEL_TYPE_CHROMA].y, isDbvChromaMode ? DBV_CHROMA_IDX : pu.intraDir[CHANNEL_TYPE_CHROMA]);
+#else
       DTRACE(g_trace_ctx, D_SYNTAX, "intra_chroma_pred_modes() pos=(%d,%d) dir=%d\n",
         pu.blocks[CHANNEL_TYPE_CHROMA].x, pu.blocks[CHANNEL_TYPE_CHROMA].y, pu.intraDir[CHANNEL_TYPE_CHROMA]);
+#endif
       return;
     }
   }
@@ -9498,10 +9503,11 @@ void CABACWriter::tmp_flag(const CodingUnit& cu)
       {
         m_BinEncoder.encodeBinEP(tmpFusionIdx > 1 ? 1 : 0);
       }
+      DTRACE(g_trace_ctx, D_SYNTAX, "tmp_fusion_idx() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.tmpIdx);
 #if JVET_AG0136_INTRA_TMP_LIC
       m_BinEncoder.encodeBin(cu.tmpLicFlag, Ctx::TmpLic(0));
+      DTRACE(g_trace_ctx, D_SYNTAX, "tmpLicFlag pos=(%d,%d) value=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.tmpLicFlag);
 #endif
-      DTRACE(g_trace_ctx, D_SYNTAX, "tmp_fusion_idx() pos=(%d,%d) mode=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.tmpIdx);
     }
     else
     {
@@ -9570,6 +9576,7 @@ void CABACWriter::tmp_flag(const CodingUnit& cu)
             m_BinEncoder.encodeBin(0, Ctx::TmpFlag(7));
           }
         }
+        DTRACE(g_trace_ctx, D_SYNTAX, "tmpFracIdx pos=(%d,%d) value=%d\n", cu.lumaPos().x, cu.lumaPos().y, cu.tmpFracIdx);
 #else
         m_BinEncoder.encodeBin(cu.tmpIsSubPel != 0 ? 1 : 0, Ctx::TmpFlag(4));
         if (cu.tmpIsSubPel)

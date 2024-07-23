@@ -1577,7 +1577,7 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if JVET_AG0276_LIC_FLAG_SIGNALING
     if (pcSPS->getUseAffMergeOppositeLic())
     {
-      WRITE_UVLC(AFF_MRG_MAX_NUM_CANDS_OPPOSITELIC - pcSPS->getMaxNumAffineOppositeLicMergeCand(), "eight_minus_max_num_oppositelic_subblock_merge_cand");
+      WRITE_UVLC(AFF_MRG_MAX_NUM_CANDS_OPPOSITELIC - pcSPS->getMaxNumAffineOppositeLicMergeCand(), "eight_minus_max_num_aff_oppositelic_merge_cand");
     }
 #endif
     if (pcSPS->getAMVREnabledFlag())
