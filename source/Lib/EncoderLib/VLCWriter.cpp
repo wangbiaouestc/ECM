@@ -1577,7 +1577,7 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if JVET_AG0276_LIC_FLAG_SIGNALING
     if (pcSPS->getUseAffMergeOppositeLic())
     {
-      WRITE_UVLC(AFF_MRG_MAX_NUM_CANDS_OPPOSITELIC - pcSPS->getMaxNumAffineOppositeLicMergeCand(), "eight_minus_max_num_oppositelic_subblock_merge_cand");
+      WRITE_UVLC(AFF_MRG_MAX_NUM_CANDS_OPPOSITELIC - pcSPS->getMaxNumAffineOppositeLicMergeCand(), "eight_minus_max_num_aff_oppositelic_merge_cand");
     }
 #endif
     if (pcSPS->getAMVREnabledFlag())
@@ -1895,11 +1895,11 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
     WRITE_FLAG(pcSPS->getUseIbcNonAdjCand() ? 1 : 0, "sps_ibc_non_adjacent_spatial_candidates_enabled_flag");
 #endif
-#if JVET_AG0136_INTRA_TMP_LIC
-    WRITE_FLAG( pcSPS->getItmpLicExtension ( ) ? 1 : 0 , "sps_itmp_lic_extension_flag" );
-    WRITE_FLAG( pcSPS->getItmpLicMode ( ) ? 1 : 0 , "sps_itmp_lic_mode_flag" );
-#endif
   }
+#if JVET_AG0136_INTRA_TMP_LIC
+  WRITE_FLAG( pcSPS->getItmpLicExtension ( ) ? 1 : 0 , "sps_itmp_lic_extension_flag" );
+  WRITE_FLAG( pcSPS->getItmpLicMode ( ) ? 1 : 0 , "sps_itmp_lic_mode_flag" );
+#endif
 #if !JVET_S0074_SPS_REORDER
   WRITE_FLAG(pcSPS->getUseLmcs() ? 1 : 0, "sps_lmcs_enable_flag");
 #if JVET_AH0103_LOW_DELAY_LFNST_NSPT

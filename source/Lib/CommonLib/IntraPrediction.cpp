@@ -14679,7 +14679,7 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
   static_vector<TempLibFast, MTMP_NUM_SPARSE> sparseMtmpCandList[3];
   static_vector<uint64_t, MTMP_NUM_SPARSE>    sparseMtmpCostList[3];
 #if JVET_AG0136_INTRA_TMP_LIC
-  static const int TMP_SAMPLING = pcCU->slice->getSPS()->getItmpLicMode() ? TMP_SAMPLING_LIC_MODE_1 : TMP_SAMPLING_LIC_MODE_0;
+  const int TMP_SAMPLING = pcCU->slice->getSPS()->getItmpLicMode() ? TMP_SAMPLING_LIC_MODE_1 : TMP_SAMPLING_LIC_MODE_0;
   static_vector<TempLibFast, MTMP_NUM_SPARSE> sparseMtmpCandListSupp[3];
   static_vector<uint64_t, MTMP_NUM_SPARSE> sparseMtmpCostListSupp[3];
   int mtmpNumSparse[3];
