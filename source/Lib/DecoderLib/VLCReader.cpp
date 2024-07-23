@@ -2896,13 +2896,15 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES
     READ_FLAG( uiCode, "sps_ibc_non_adjacent_spatial_candidates_enabled_flag");    pcSPS->setUseIbcNonAdjCand(uiCode != 0);
 #endif
-#if JVET_AG0136_INTRA_TMP_LIC
-    READ_FLAG( uiCode, "sps_itmp_lic_extension_flag" );                    pcSPS->setItmpLicExtension ( uiCode != 0 );
-    READ_FLAG( uiCode, "sps_itmp_lic_mode_flag" );                              pcSPS->setItmpLicMode ( uiCode != 0 );
-#endif
   }
   else
+  {
     pcSPS->setMaxNumIBCMergeCand(0);
+  }
+#if JVET_AG0136_INTRA_TMP_LIC
+  READ_FLAG( uiCode, "sps_itmp_lic_extension_flag" );                    pcSPS->setItmpLicExtension ( uiCode != 0 );
+  READ_FLAG( uiCode, "sps_itmp_lic_mode_flag" );                              pcSPS->setItmpLicMode ( uiCode != 0 );
+#endif
 
 #if !JVET_S0074_SPS_REORDER
   READ_FLAG(uiCode, "sps_lmcs_enable_flag");                   pcSPS->setUseLmcs(uiCode == 1);
