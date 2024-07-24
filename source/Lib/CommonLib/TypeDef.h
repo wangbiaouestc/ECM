@@ -416,6 +416,7 @@
 #define JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE             1 // JVET-AG0196 5.2: window offsets per slice type
 #define JVET_AG0117_CABAC_SPATIAL_TUNING                  1 // JVET-AG0117 5.3: spatial CABAC tuning
 #define JVET_AH0176_LOW_DELAY_B_CTX                       1 // JVET-AH0176 6.1: context initialization for B-slice
+#define JVET_AI0281_CABAC_RETRAIN                         1 // JVET-AI0281: context initialization training
 
 // Loop filters
 #define ALF_IMPROVEMENT                                   1 // ALF improvement

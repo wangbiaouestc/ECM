@@ -29,9 +29,11 @@ The resulting parameters are in the file:
 ``
 821 A 26 41 35 7 7 8 4 4 18 99 115 99 115 99 115
 ``
-821 is the context number, ``A`` can be ignored. Following numbers are the cabac parameters.
+821 is the context number, ``A`` can be ignored. Following numbers are the initialization parameters.
 
 All contexts can be trained in parallel.
 
+## Troubleshooting
 
-
+If there is an error that the bin file is not opened, one of the reasons can be that the limit of opened files is not enough.
+In Linux, use ulimit to increase that number, for example, ulimit -n 2048 (assuming the total number of contexts is less than 2048).
