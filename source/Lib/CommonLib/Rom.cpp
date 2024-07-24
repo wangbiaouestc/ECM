@@ -4991,8 +4991,27 @@ void initROM()
       }
     }
   }
+#if JVET_AI0046_HIGH_PRECISION_BDOF_SAMPLE
+  int weight8x8[] = {
+    4,     5,     6,     7,     8,     8,     8,     8,     7,     6,     5,     4,
+    5,     6,     8,     9,    10,    11,    11,    10,     9,     8,     6,     5,
+    6,     8,    10,    11,    13,    13,    13,    13,    11,    10,     8,     6,
+    7,     9,    11,    13,    15,    15,    15,    15,    13,    11,     9,     7,
+    8,    10,    13,    15,    16,    17,    17,    16,    15,    13,    10,     8,
+    8,    11,    13,    15,    17,    18,    18,    17,    15,    13,    11,     8,
+    8,    11,    13,    15,    17,    18,    18,    17,    15,    13,    11,     8,
+    8,    10,    13,    15,    16,    17,    17,    16,    15,    13,    10,     8,
+    7,     9,    11,    13,    15,    15,    15,    15,    13,    11,     9,     7,
+    6,     8,    10,    11,    13,    13,    13,    13,    11,    10,     8,     6,
+    5,     6,     8,     9,    10,    11,    11,    10,     9,     8,     6,     5,
+    4,     5,     6,     7,     8,     8,     8,     8,     7,     6,     5,     4};
+  for (int i= 0; i < 144; i++)
+  {
+    g_bdofWeight[416+i] = weight8x8[i];
+  }
 #endif
-  
+#endif
+ 
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   memset(&g_resiBorderTemplate[0][0][0], 0, sizeof(g_resiBorderTemplate));
   memset(&g_resiBorderTemplateLFNST[0][0][0], 0, sizeof(g_resiBorderTemplateLFNST));
