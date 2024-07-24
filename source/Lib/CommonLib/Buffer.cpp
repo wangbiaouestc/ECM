@@ -615,6 +615,76 @@ void calcBIOParamSum5Core(Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signG
   }
 }
 
+#if JVET_AI0046_HIGH_PRECISION_BDOF_SAMPLE
+void calcBIOParamSum5NOSIMCore(int32_t* absGX, int32_t* absGY, int32_t* dIX, int32_t* dIY, int32_t* signGyGx, const int widthG, const int width, const int height, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGyGx ,Pel* dI, Pel* gX, Pel* gY)
+{
+  for (int y = 0; y < height; y++)
+  {
+    for (int x = 0; x < width; x++)
+    {
+      const int sampleIdx = y * width + x;
+      sumAbsGX[sampleIdx] = 0;
+      sumAbsGY[sampleIdx] = 0;
+      sumDIX[sampleIdx] = 0;
+      sumDIY[sampleIdx] = 0;
+      sumSignGyGx[sampleIdx] = 0;
+      int meanDiff = 0;
+      int absmeanDiff = 0;
+      int sX0 = 0, sX1 = 0;
+      int w = 1, a = 1, b = 2, c = 4, d = 4, e = 8, f = 16;
+      int weight[5][5] = {{a, b, c, b, a}, {b, d, e, d, b}, {c, e, f, e, c}, {b, d, e, d, b}, {a, b, c, b, a}};
+      int regVxVy = 2528; // = ((1 << 11) * 100)/81. 100 is summation of the new weights, 81 was the summation of the old weights
+      for (int yy = 0; yy < 5; yy++)
+      {
+        for (int xx = 0; xx < 5; xx++)
+        {
+          w = weight[yy][xx];
+          sumAbsGX[sampleIdx] += w * absGX[xx];
+          sumAbsGY[sampleIdx] += w * absGY[xx];
+          sumDIX[sampleIdx] += w * dIX[xx];
+          sumDIY[sampleIdx] += w * dIY[xx];
+          meanDiff    +=  dI[xx];
+          absmeanDiff += abs(dI[xx]);
+          sX0 -= w * gX[xx];
+          sX1 -= w * gY[xx];
+          sumSignGyGx[sampleIdx] += w * signGyGx[xx];
+        }
+        absGX += widthG;
+        absGY += widthG;
+        dIX += widthG;
+        dIY += widthG;
+        signGyGx += widthG;
+        dI += widthG;
+        gX += widthG;
+        gY += widthG;
+      }
+      meanDiff = (absmeanDiff > 2 * abs(meanDiff))  ? 0 : (meanDiff + 32) >> 6;
+      sumDIX[sampleIdx] += sX0*meanDiff;
+      sumDIY[sampleIdx] += sX1*meanDiff;
+      sumDIX[sampleIdx] += (sumDIX[sampleIdx] + 2) >> 2;
+      sumDIY[sampleIdx] += (sumDIY[sampleIdx] + 2) >> 2;
+      sumAbsGX[sampleIdx] += regVxVy;
+      sumAbsGY[sampleIdx] += regVxVy;
+      absGX += (1 - 5 * widthG);
+      absGY += (1 - 5 * widthG);
+      dIX += (1 - 5 * widthG);
+      dIY += (1 - 5 * widthG);
+      signGyGx += (1 - 5 * widthG);
+      dI += (1 - 5 * widthG);
+      gX += (1 - 5 * widthG);
+      gY += (1 - 5 * widthG);
+    }
+    absGX += (widthG - width);
+    absGY += (widthG - width);
+    dIX += (widthG - width);
+    dIY += (widthG - width);
+    signGyGx += (widthG - width);
+    gX += (widthG - width);
+    gY += (widthG - width);
+    dI += (widthG - width);
+  }
+}
+#endif
 void calcBIOParamSum4Core(Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGyGx, int width, int height, const int widthG, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGyGx)
 {
   for (int y = 0; y < height; y++)
@@ -663,6 +733,10 @@ void addBIOAvgNCore(const Pel* src0, int src0Stride, const Pel* src1, int src1St
   int shift2 = shift - 1;
   bool *pMcMask0 = mcMask[0];
   bool *pMcMask1 = mcMask[1];
+#if JVET_AI0046_HIGH_PRECISION_BDOF_SAMPLE
+  int pX = 0, pY = 0;
+  const int tt = 16;
+#endif
   if (isOOB[0] || isOOB[1])
   {
     for (int y = 0; y < height; y++)
@@ -704,11 +778,20 @@ void addBIOAvgNCore(const Pel* src0, int src0Stride, const Pel* src1, int src1St
     {
       for (int x = 0; x < width; x++)
       {
+#if JVET_AI0046_HIGH_PRECISION_BDOF_SAMPLE
+        pX = (tmpx[x] >  tt)  ?  1 : ((tmpx[x] < -tt) ? -1 : 0);
+        pY = (tmpy[x] >  tt)  ?  1 : ((tmpy[x] < -tt) ? -1 : 0);
+        int xX = tmpx[x] - 32 * pX;
+        int yY = tmpy[x] - 32 * pY;
+        b = (int)xX * (gradX0[x + pY * gradStride + pX] - gradX1[x - pY * gradStride - pX]) + (int)yY * (gradY0[x + pY * gradStride + pX] - gradY1[x - pY * gradStride - pX]);
+        dst[x] = ClipPel(rightShift((src0[x + pY * src0Stride + pX] + src1[x - pY * src1Stride - pX] + b + offset), shift), clpRng);
+#else
         b = (int)tmpx[x] * (gradX0[x] - gradX1[x]) + (int)tmpy[x] * (gradY0[x] - gradY1[x]);
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
         dst[x] = ClipPel(rightShift((src0[x] + src1[x] + b + offset), shift), clpRng);
 #else
         dst[x] = ClipPel((int16_t)rightShift((src0[x] + src1[x] + b + offset), shift), clpRng);
+#endif
 #endif
       }
       tmpx += width;
@@ -1189,6 +1272,10 @@ PelBufferOps::PelBufferOps()
 #if MULTI_PASS_DMVR || SAMPLE_BASED_BDOF
   calcBIOParameter   = calcBIOParameterCore;
   calcBIOParamSum5   = calcBIOParamSum5Core;
+#if JVET_AI0046_HIGH_PRECISION_BDOF_SAMPLE
+  calcBIOParamSum5NOSIM4     = calcBIOParamSum5NOSIMCore;
+  calcBIOParamSum5NOSIM8     = calcBIOParamSum5NOSIMCore;
+#endif
   calcBIOParamSum4   = calcBIOParamSum4Core;
   calcBIOClippedVxVy = calcBIOClippedVxVyCore;
   addBIOAvgN         = addBIOAvgNCore;

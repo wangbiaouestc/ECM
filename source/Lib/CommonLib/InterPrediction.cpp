@@ -6043,7 +6043,11 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
   const int   shiftNum = IF_INTERNAL_PREC + 1 - bitDepth;
 #endif
   const int   offset = (1 << (shiftNum - 1)) + 2 * IF_INTERNAL_OFFS;
+#if JVET_AI0046_HIGH_PRECISION_BDOF_SAMPLE
+  const int   limit = ( 1 << 5 ) - 1;
+#else
   const int   limit = ( 1 << 4 ) - 1;
+#endif
 
 #if MULTI_PASS_DMVR || SAMPLE_BASED_BDOF
   int srcBlockOffset = (stridePredMC + 1) * BIO_EXTEND_SIZE;
@@ -6124,11 +6128,16 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
   if (isBdofMvRefine)
   {
 #if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
+#if JVET_AI0046_HIGH_PRECISION_BDOF_SAMPLE
+    bool simBIOParameter = true;
+    if (true)
+#else
     bool simBIOParameter = false;
 #if JVET_AG0276_LIC_BDOF_BDMVR
     if (pu.bdmvrRefine == true && pu.cu->licFlag == false)
 #else
     if (pu.bdmvrRefine)
+#endif
 #endif
     {
       g_pelBufOP.calcBIOParameterHighPrecision(srcY0, srcY1, gradX0, gradX1, gradY0, gradY1, widthG, heightG, src0Stride, src1Stride, widthG,
@@ -6476,6 +6485,12 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
         {
           regVxVy >>= 1;
         }
+#if JVET_AI0046_HIGH_PRECISION_BDOF_SAMPLE
+        if ((bioDx == 16) || (bioDy == 16))
+        {
+          regVxVy <<= 1;
+        }
+#endif
         sumS1 += regVxVy;
         sumS5 += regVxVy;
 #endif
@@ -6559,6 +6574,9 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
 #if JVET_AG0067_DMVR_EXTENSIONS
           if (iter == 0)
           {
+#if JVET_AI0046_HIGH_PRECISION_BDOF_SAMPLE
+            if (!m_subPuMC || (ww*hh >= BDOF_SUBPU_AREA_THRESHOLD2))
+#endif
             bioMv >>= 1;
             for (int i = 0; i < std::max (1, bioDy >> BDOF_SUBPU_DIM_LOG2); i++)
             {
@@ -6572,7 +6590,11 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
           else
           {
 #if JVET_AG0067_DMVR_EXTENSIONS
+#if JVET_AI0046_HIGH_PRECISION_BDOF_SAMPLE
+            if (iter == 1 && !m_subPuMC && ((ww*hh >= BDOF_SUBPU_AREA_THRESHOLD1) || (ww*hh < BDOF_SUBPU_AREA_THRESHOLD0)))
+#else
             if (iter == 1 && !m_subPuMC)
+#endif
             {
               bioMv >>= 1;
             }
@@ -6744,8 +6766,12 @@ void InterPrediction::applyBiOptFlow(const PredictionUnit &pu, const CPelUnitBuf
   }
 #endif
 #if MULTI_PASS_DMVR || SAMPLE_BASED_BDOF
+#if JVET_AI0046_HIGH_PRECISION_BDOF_SAMPLE
+  g_pelBufOP.calcBIOParameterHighPrecision(srcY0, srcY1, gradX0, gradX1, gradY0, gradY1, widthG, heightG, src0Stride, src1Stride, widthG, bitDepth, m_piDotProduct1, m_piDotProduct2, m_piDotProduct3, m_piDotProduct5, m_piDotProduct6, m_dI ,m_Gx, m_Gy);
+#else
   g_pelBufOP.calcBIOParameter(srcY0, srcY1, gradX0, gradX1, gradY0, gradY1, widthG, heightG, src0Stride, src1Stride, widthG,
                               bitDepth, m_absGx, m_absGy, m_dIx, m_dIy, m_signGxGy, nullptr);
+#endif
   for (int yBlock = 0; yBlock < height; yBlock += bioDy)
   {
     for (int xBlock = 0; xBlock < width; xBlock += bioDx)
@@ -6856,6 +6882,57 @@ void InterPrediction::subBlockBiOptFlow(Pel* dstY, const int dstStride, const Pe
 void InterPrediction::subBlockBiOptFlow(Pel* dstY, const int dstStride, const Pel* src0, const int src0Stride, const Pel* src1, const int src1Stride, int bioParamOffset, const int bioParamStride, int width, int height, const ClpRng& clpRng, const int shiftNum, const int offset, const int limit)
 #endif
 {
+#if JVET_AI0046_HIGH_PRECISION_BDOF_SAMPLE
+  if (width == 4)
+  {
+    g_pelBufOP.calcBIOParamSum5NOSIM4(m_piDotProduct1 + bioParamOffset, m_piDotProduct5 + bioParamOffset, m_piDotProduct3 + bioParamOffset, m_piDotProduct6 + bioParamOffset, m_piDotProduct2 + bioParamOffset, bioParamStride, width, height, m_sumAbsGxSample32bit, m_sumAbsGySample32bit, m_sumDIXSample32bit, m_sumDIYSample32bit, m_sumSignGyGxSample32bit, m_dI + bioParamOffset ,m_Gx + bioParamOffset, m_Gy + bioParamOffset);
+  }
+  else
+  {
+    g_pelBufOP.calcBIOParamSum5NOSIM8(m_piDotProduct1 + bioParamOffset, m_piDotProduct5 + bioParamOffset, m_piDotProduct3 + bioParamOffset, m_piDotProduct6 + bioParamOffset, m_piDotProduct2 + bioParamOffset, bioParamStride, width, height, m_sumAbsGxSample32bit, m_sumAbsGySample32bit, m_sumDIXSample32bit, m_sumDIYSample32bit, m_sumSignGyGxSample32bit, m_dI + bioParamOffset ,m_Gx + bioParamOffset, m_Gy + bioParamOffset);
+  }
+  int* sumDIXSample32bit      = m_sumDIXSample32bit;
+  int* sumAbsGxSample32bit    = m_sumAbsGxSample32bit;
+  int* sumDIYSample32bit      = m_sumDIYSample32bit;
+  int* sumAbsGySample32bit    = m_sumAbsGySample32bit;
+  int* sumSignGyGxSample32bit = m_sumSignGyGxSample32bit;
+  int* tmpxSample32bit        = m_tmpxSample32bit;
+  int* tmpySample32bit        = m_tmpySample32bit;
+  const int bioSubblockSize = width * height;
+  int divTable[32] = { 32, 31, 30, 29, 28, 28, 27, 26, 26, 25, 24, 24, 23, 23, 22, 22, 21, 21, 20, 20, 20, 19, 19, 19, 18, 18, 18, 17, 17, 17, 17, 16 };
+  int log2D = 0, msbD = 0, invD = 0, shiftD = 0, offsetD = 0;
+  for (int idx = 0; idx < bioSubblockSize; idx++)
+  {
+    *tmpxSample32bit = 0;
+    *tmpySample32bit = 0;
+    if (*sumAbsGxSample32bit > 0)
+    {
+      log2D  = floorLog2(*sumAbsGxSample32bit);
+      msbD = int((*sumAbsGxSample32bit << 5) >> log2D) & 31;
+      invD = divTable[msbD];
+      shiftD  = log2D + 5;
+      offsetD = (1 << (shiftD - 1));
+      *tmpxSample32bit = Clip3(-limit, limit, int(((*sumDIXSample32bit << 3) * invD + offsetD) >> shiftD));
+    }
+    if (*sumAbsGySample32bit > 0)
+    {
+      log2D  = floorLog2(*sumAbsGySample32bit);
+      msbD = int((*sumAbsGySample32bit << 5) >> log2D) & 31;
+      invD = divTable[msbD];
+      shiftD  = log2D + 5;
+      offsetD = (1 << (shiftD - 1));
+      *tmpySample32bit = Clip3(-limit, limit, int((((*sumDIYSample32bit << 3) - ((*tmpxSample32bit)*(*sumSignGyGxSample32bit)>>1)) * invD + offsetD) >> shiftD));
+    }
+    sumDIXSample32bit++;
+    sumAbsGxSample32bit++;
+    sumDIYSample32bit++;
+    sumAbsGySample32bit++;
+    sumSignGyGxSample32bit++;
+    tmpxSample32bit++;
+    tmpySample32bit++;
+  }
+  bioParamOffset += ((bioParamStride + 1) << 1);
+#else
 #if SAMPLE_BASED_BDOF
   g_pelBufOP.calcBIOParamSum5(m_absGx + bioParamOffset, m_absGy + bioParamOffset, m_dIx + bioParamOffset,
                               m_dIy + bioParamOffset, m_signGxGy + bioParamOffset, bioParamStride, width, height,
@@ -6929,6 +7006,7 @@ void InterPrediction::subBlockBiOptFlow(Pel* dstY, const int dstStride, const Pe
       }
     }
   }
+#endif
 #endif
 #if JVET_Z0136_OOB
   g_pelBufOP.addBIOAvgN(src0, src0Stride, src1, src1Stride, dstY, dstStride, m_gradX0 + bioParamOffset, m_gradX1 + bioParamOffset, m_gradY0 + bioParamOffset, m_gradY1 + bioParamOffset, bioParamStride, width, height, m_tmpxSample32bit, m_tmpySample32bit, shiftNum, offset, clpRng, mcMask, mcStride, isOOB);

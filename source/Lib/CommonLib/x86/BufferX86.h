@@ -915,6 +915,606 @@ void calcBIOParameter_SSE(const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0,
   }
 #endif
 }
+#if JVET_AI0046_HIGH_PRECISION_BDOF_SAMPLE
+template< X86_VEXT vext , int ww>
+void calcBIOParamSum5NOSIMCore_SSE(int32_t* absGX, int32_t* absGY, int32_t* dIX, int32_t* dIY, int32_t* signGyGx, const int widthG, const int width, const int height, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGyGx, Pel* dI, Pel* gX, Pel* gY)
+{
+#ifdef USE_AVX2
+  int a = 1, b = 2, c = 4;
+  int shift1 = 1, shift2 = 2;
+  __m256i vmask[4] = {_mm256_setr_epi32(a, b, c, b, a, 0, 0, 0), _mm256_setr_epi32(0, a, b, c, b, a, 0, 0), _mm256_setr_epi32(0, 0, a, b, c, b, a, 0), _mm256_setr_epi32(0, 0, 0, a, b, c, b, a)};
+  __m256i vzero = _mm256_setzero_si256();
+  __m256i sumAbsGXTmp32 = vzero;
+  __m256i dummy = vzero;
+  __m256i sumDIXTmp32 = vzero;
+  __m256i sumAbsGYTmp32 = vzero;
+  __m256i sumDIYTmp32 = vzero;
+  __m256i sumSignGyGxTmp32 = vzero;
+  
+  __m128i vmask2[4] = {_mm_setr_epi16(a, b, c, b, a, 0, 0, 0), _mm_setr_epi16(0, a, b, c, b, a, 0, 0), _mm_setr_epi16(0, 0, a, b, c, b, a, 0), _mm_setr_epi16(0, 0, 0, a, b, c, b, a)};
+  __m128i vzero2 = _mm_setzero_si128();
+  __m128i sumX0 = vzero2;
+  __m128i sumX1 = vzero2;
+  __m128i sumMean = vzero2;
+  __m128i sumAbsMean = vzero2;
+  __m128i dummy2 = vzero2;
+  __m128i fOne[4] = {_mm_setr_epi16(1, 1, 1, 1, 1, 0, 0, 0), _mm_setr_epi16(0, 1, 1, 1, 1, 1, 0, 0), _mm_setr_epi16(0, 0, 1, 1, 1, 1, 1, 0), _mm_setr_epi16(0, 0, 0, 1, 1, 1, 1, 1)};
+  int mean4[4];
+  int absMean4[4];
+  
+  const int widthG_2 = (widthG << 1);
+  const int widthG_3 = widthG_2 + widthG;
+  const int widthG_4 = widthG_3 + widthG;
+  
+  int sX0[4] , sX1[4];
+  int regVxVy = 2528; // = ((1 << 11) * 100)/81. 100 is summation of the new weights, 81 was the summation of the old weights
+  if (ww == 4)
+  {
+    for (int y = 0; y < height; y++)
+    {
+      const int sampleIdx = y * width;
+      sumAbsGXTmp32 = _mm256_add_epi32 (_mm256_loadu_si256((const __m256i*)absGX), _mm256_slli_epi32(_mm256_loadu_si256((const __m256i*)(absGX + widthG)), shift1));
+      sumAbsGXTmp32 = _mm256_add_epi32 (sumAbsGXTmp32, _mm256_slli_epi32(_mm256_loadu_si256((const __m256i*)(absGX + widthG_2)), shift2));
+      sumAbsGXTmp32 = _mm256_add_epi32 (sumAbsGXTmp32, _mm256_slli_epi32(_mm256_loadu_si256((const __m256i*)(absGX + widthG_3)), shift1));
+      sumAbsGXTmp32 = _mm256_add_epi32 (sumAbsGXTmp32, _mm256_loadu_si256((const __m256i*)(absGX + widthG_4)));
+      
+      dummy = _mm256_mullo_epi32(sumAbsGXTmp32, vmask[0]);
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+      sumAbsGX[sampleIdx] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+      dummy = _mm256_mullo_epi32(sumAbsGXTmp32, vmask[1]);
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+      sumAbsGX[sampleIdx + 1] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+      dummy = _mm256_mullo_epi32(sumAbsGXTmp32, vmask[2]);
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+      sumAbsGX[sampleIdx + 2] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+      dummy = _mm256_mullo_epi32(sumAbsGXTmp32, vmask[3]);
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+      sumAbsGX[sampleIdx + 3] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+      
+      sumAbsGYTmp32 = _mm256_add_epi32 (_mm256_loadu_si256((const __m256i*)absGY), _mm256_slli_epi32(_mm256_loadu_si256((const __m256i*)(absGY + widthG)), shift1));
+      sumAbsGYTmp32 = _mm256_add_epi32 (sumAbsGYTmp32, _mm256_slli_epi32(_mm256_loadu_si256((const __m256i*)(absGY + widthG_2)), shift2));
+      sumAbsGYTmp32 = _mm256_add_epi32 (sumAbsGYTmp32, _mm256_slli_epi32(_mm256_loadu_si256((const __m256i*)(absGY + widthG_3)), shift1));
+      sumAbsGYTmp32 = _mm256_add_epi32 (sumAbsGYTmp32, _mm256_loadu_si256((const __m256i*)(absGY + widthG_4)));
+      
+      dummy = _mm256_mullo_epi32(sumAbsGYTmp32, vmask[0]);
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+      sumAbsGY[sampleIdx] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+      dummy = _mm256_mullo_epi32(sumAbsGYTmp32, vmask[1]);
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+      sumAbsGY[sampleIdx + 1] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+      dummy = _mm256_mullo_epi32(sumAbsGYTmp32, vmask[2]);
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+      sumAbsGY[sampleIdx + 2] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+      dummy = _mm256_mullo_epi32(sumAbsGYTmp32, vmask[3]);
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+      sumAbsGY[sampleIdx + 3] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+      
+      sumSignGyGxTmp32 = _mm256_add_epi32 (_mm256_loadu_si256((const __m256i*)signGyGx), _mm256_slli_epi32(_mm256_loadu_si256((const __m256i*)(signGyGx + widthG)), shift1));
+      sumSignGyGxTmp32 = _mm256_add_epi32 (sumSignGyGxTmp32, _mm256_slli_epi32(_mm256_loadu_si256((const __m256i*)(signGyGx + widthG_2)), shift2));
+      sumSignGyGxTmp32 = _mm256_add_epi32 (sumSignGyGxTmp32, _mm256_slli_epi32(_mm256_loadu_si256((const __m256i*)(signGyGx + widthG_3)), shift1));
+      sumSignGyGxTmp32 = _mm256_add_epi32 (sumSignGyGxTmp32, _mm256_loadu_si256((const __m256i*)(signGyGx + widthG_4)));
+      
+      dummy = _mm256_mullo_epi32(sumSignGyGxTmp32, vmask[0]);
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+      sumSignGyGx[sampleIdx] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+      dummy = _mm256_mullo_epi32(sumSignGyGxTmp32, vmask[1]);
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+      sumSignGyGx[sampleIdx + 1] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+      dummy = _mm256_mullo_epi32(sumSignGyGxTmp32, vmask[2]);
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+      sumSignGyGx[sampleIdx + 2] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+      dummy = _mm256_mullo_epi32(sumSignGyGxTmp32, vmask[3]);
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+      sumSignGyGx[sampleIdx + 3] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+      
+      sumDIXTmp32 = _mm256_add_epi32 (_mm256_loadu_si256((const __m256i*)dIX), _mm256_slli_epi32(_mm256_loadu_si256((const __m256i*)(dIX + widthG)), shift1));
+      sumDIXTmp32 = _mm256_add_epi32 (sumDIXTmp32, _mm256_slli_epi32(_mm256_loadu_si256((const __m256i*)(dIX + widthG_2)), shift2));
+      sumDIXTmp32 = _mm256_add_epi32 (sumDIXTmp32, _mm256_slli_epi32(_mm256_loadu_si256((const __m256i*)(dIX + widthG_3)), shift1));
+      sumDIXTmp32 = _mm256_add_epi32 (sumDIXTmp32, _mm256_loadu_si256((const __m256i*)(dIX + widthG_4)));
+      
+      dummy = _mm256_mullo_epi32(sumDIXTmp32, vmask[0]);
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+      sumDIX[sampleIdx] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+      dummy = _mm256_mullo_epi32(sumDIXTmp32, vmask[1]);
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+      sumDIX[sampleIdx + 1] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+      dummy = _mm256_mullo_epi32(sumDIXTmp32, vmask[2]);
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+      sumDIX[sampleIdx + 2] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+      dummy = _mm256_mullo_epi32(sumDIXTmp32, vmask[3]);
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+      sumDIX[sampleIdx + 3] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+      
+      sumDIYTmp32 = _mm256_add_epi32 (_mm256_loadu_si256((const __m256i*)dIY), _mm256_slli_epi32(_mm256_loadu_si256((const __m256i*)(dIY + widthG)), shift1));
+      sumDIYTmp32 = _mm256_add_epi32 (sumDIYTmp32, _mm256_slli_epi32(_mm256_loadu_si256((const __m256i*)(dIY + widthG_2)), shift2));
+      sumDIYTmp32 = _mm256_add_epi32 (sumDIYTmp32, _mm256_slli_epi32(_mm256_loadu_si256((const __m256i*)(dIY + widthG_3)), shift1));
+      sumDIYTmp32 = _mm256_add_epi32 (sumDIYTmp32, _mm256_loadu_si256((const __m256i*)(dIY + widthG_4)));
+      
+      dummy = _mm256_mullo_epi32(sumDIYTmp32, vmask[0]);
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+      sumDIY[sampleIdx] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+      dummy = _mm256_mullo_epi32(sumDIYTmp32, vmask[1]);
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+      sumDIY[sampleIdx + 1] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+      dummy = _mm256_mullo_epi32(sumDIYTmp32, vmask[2]);
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+      sumDIY[sampleIdx + 2] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+      dummy = _mm256_mullo_epi32(sumDIYTmp32, vmask[3]);
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+      dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+      sumDIY[sampleIdx + 3] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+      
+      sumX0 = _mm_add_epi16(_mm_loadu_si128((const __m128i*)(gX)), _mm_slli_epi16(_mm_loadu_si128((const __m128i*)(gX+ widthG)), shift1));
+      sumX0 = _mm_add_epi16(sumX0, _mm_slli_epi16(_mm_loadu_si128((const __m128i*)(gX+ widthG_2)), shift2));
+      sumX0 = _mm_add_epi16(sumX0, _mm_slli_epi16(_mm_loadu_si128((const __m128i*)(gX+ widthG_3)), shift1));
+      sumX0 = _mm_add_epi16(sumX0, _mm_loadu_si128((const __m128i*)(gX+ widthG_4)));
+      
+      dummy2 = _mm_madd_epi16(sumX0, vmask2[0]);
+      dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0x4e));   // 01001110
+      dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0xb1));   // 10110001
+      sX0[0] = _mm_cvtsi128_si32(dummy2);
+      dummy2 = _mm_madd_epi16(sumX0, vmask2[1]);
+      dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0x4e));   // 01001110
+      dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0xb1));   // 10110001
+      sX0[1] = _mm_cvtsi128_si32(dummy2);
+      dummy2 = _mm_madd_epi16(sumX0, vmask2[2]);
+      dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0x4e));   // 01001110
+      dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0xb1));   // 10110001
+      sX0[2] = _mm_cvtsi128_si32(dummy2);
+      dummy2 = _mm_madd_epi16(sumX0, vmask2[3]);
+      dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0x4e));   // 01001110
+      dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0xb1));   // 10110001
+      sX0[3] = _mm_cvtsi128_si32(dummy2);
+      
+      sumX1 = _mm_add_epi16(_mm_loadu_si128((const __m128i*)(gY)), _mm_slli_epi16(_mm_loadu_si128((const __m128i*)(gY+ widthG)), shift1));
+      sumX1 = _mm_add_epi16(sumX1, _mm_slli_epi16(_mm_loadu_si128((const __m128i*)(gY+ widthG_2)), shift2));
+      sumX1 = _mm_add_epi16(sumX1, _mm_slli_epi16(_mm_loadu_si128((const __m128i*)(gY+ widthG_3)), shift1));
+      sumX1 = _mm_add_epi16(sumX1, _mm_loadu_si128((const __m128i*)(gY+ widthG_4)));
+      
+      dummy2 = _mm_madd_epi16(sumX1, vmask2[0]);
+      dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0x4e));   // 01001110
+      dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0xb1));   // 10110001
+      sX1[0] = _mm_cvtsi128_si32(dummy2);
+      dummy2 = _mm_madd_epi16(sumX1, vmask2[1]);
+      dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0x4e));   // 01001110
+      dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0xb1));   // 10110001
+      sX1[1] = _mm_cvtsi128_si32(dummy2);
+      dummy2 = _mm_madd_epi16(sumX1, vmask2[2]);
+      dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0x4e));   // 01001110
+      dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0xb1));   // 10110001
+      sX1[2] = _mm_cvtsi128_si32(dummy2);
+      dummy2 = _mm_madd_epi16(sumX1, vmask2[3]);
+      dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0x4e));   // 01001110
+      dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0xb1));   // 10110001
+      sX1[3] = _mm_cvtsi128_si32(dummy2);
+      
+      sumMean = _mm_add_epi16(_mm_loadu_si128((const __m128i*)(dI)), (_mm_loadu_si128((const __m128i*)(dI+ widthG))));
+      sumMean = _mm_add_epi16(sumMean, (_mm_loadu_si128((const __m128i*)(dI+ widthG_2))));
+      sumMean = _mm_add_epi16(sumMean, (_mm_loadu_si128((const __m128i*)(dI+ widthG_3))));
+      sumMean = _mm_add_epi16(sumMean, (_mm_loadu_si128((const __m128i*)(dI+ widthG_4))));
+      
+      dummy2 = _mm_madd_epi16(sumMean, fOne[0]);
+      dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0x4e));   // 01001110
+      dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0xb1));   // 10110001
+      mean4[0] = _mm_cvtsi128_si32(dummy2);
+      dummy2 = _mm_madd_epi16(sumMean, fOne[1]);
+      dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0x4e));   // 01001110
+      dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0xb1));   // 10110001
+      mean4[1] = _mm_cvtsi128_si32(dummy2);
+      dummy2 = _mm_madd_epi16(sumMean, fOne[2]);
+      dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0x4e));   // 01001110
+      dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0xb1));   // 10110001
+      mean4[2] = _mm_cvtsi128_si32(dummy2);
+      dummy2 = _mm_madd_epi16(sumMean, fOne[3]);
+      dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0x4e));   // 01001110
+      dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0xb1));   // 10110001
+      mean4[3] = _mm_cvtsi128_si32(dummy2);
+      
+      sumAbsMean = _mm_add_epi16(_mm_abs_epi16(_mm_loadu_si128((const __m128i*)(dI))), _mm_abs_epi16(_mm_loadu_si128((const __m128i*)(dI+ widthG))));
+      sumAbsMean = _mm_add_epi16(sumAbsMean, _mm_abs_epi16(_mm_loadu_si128((const __m128i*)(dI+ widthG_2))));
+      sumAbsMean = _mm_add_epi16(sumAbsMean, _mm_abs_epi16(_mm_loadu_si128((const __m128i*)(dI+ widthG_3))));
+      sumAbsMean = _mm_add_epi16(sumAbsMean, _mm_abs_epi16(_mm_loadu_si128((const __m128i*)(dI+ widthG_4))));
+      
+      dummy2 = _mm_madd_epi16(sumAbsMean, fOne[0]);
+      dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0x4e));   // 01001110
+      dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0xb1));   // 10110001
+      absMean4[0] = _mm_cvtsi128_si32(dummy2);
+      dummy2 = _mm_madd_epi16(sumAbsMean, fOne[1]);
+      dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0x4e));   // 01001110
+      dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0xb1));   // 10110001
+      absMean4[1] = _mm_cvtsi128_si32(dummy2);
+      dummy2 = _mm_madd_epi16(sumAbsMean, fOne[2]);
+      dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0x4e));   // 01001110
+      dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0xb1));   // 10110001
+      absMean4[2] = _mm_cvtsi128_si32(dummy2);
+      dummy2 = _mm_madd_epi16(sumAbsMean, fOne[3]);
+      dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0x4e));   // 01001110
+      dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0xb1));   // 10110001
+      absMean4[3] = _mm_cvtsi128_si32(dummy2);
+      
+      mean4[0] = (absMean4[0] > 2 * abs(mean4[0])) ? 0 :  (mean4[0] + 32) >> 6;
+      sumDIX[sampleIdx] -= sX0[0]*mean4[0];
+      sumDIY[sampleIdx] -= sX1[0]*mean4[0];
+      mean4[1] = (absMean4[1] > 2 * abs(mean4[1])) ? 0 :  (mean4[1] + 32) >> 6;
+      sumDIX[sampleIdx + 1] -= sX0[1]*mean4[1];
+      sumDIY[sampleIdx + 1] -= sX1[1]*mean4[1];
+      mean4[2] = (absMean4[2] > 2 * abs(mean4[2])) ? 0 :  (mean4[2] + 32) >> 6;
+      sumDIX[sampleIdx + 2] -= sX0[2]*mean4[2];
+      sumDIY[sampleIdx + 2] -= sX1[2]*mean4[2];
+      mean4[3] = (absMean4[3] > 2 * abs(mean4[3])) ? 0 :  (mean4[3] + 32) >> 6;
+      sumDIX[sampleIdx + 3] -= sX0[3]*mean4[3];
+      sumDIY[sampleIdx + 3] -= sX1[3]*mean4[3];
+      
+      sumDIX[sampleIdx]     += (sumDIX[sampleIdx] + 2) >> 2;
+      sumDIY[sampleIdx]     += (sumDIY[sampleIdx] + 2) >> 2;
+      sumDIX[sampleIdx+1]   += (sumDIX[sampleIdx+1] + 2) >> 2;
+      sumDIY[sampleIdx+1]   += (sumDIY[sampleIdx+1] + 2) >> 2;
+      sumDIX[sampleIdx+2]   += (sumDIX[sampleIdx+2] + 2) >> 2;
+      sumDIY[sampleIdx+2]   += (sumDIY[sampleIdx+2] + 2) >> 2;
+      sumDIX[sampleIdx+3]   += (sumDIX[sampleIdx+3] + 2) >> 2;
+      sumDIY[sampleIdx+3]   += (sumDIY[sampleIdx+3] + 2) >> 2;
+      
+      sumAbsGX[sampleIdx]   += regVxVy;
+      sumAbsGY[sampleIdx]   += regVxVy;
+      sumAbsGX[sampleIdx+1] += regVxVy;
+      sumAbsGY[sampleIdx+1] += regVxVy;
+      sumAbsGX[sampleIdx+2] += regVxVy;
+      sumAbsGY[sampleIdx+2] += regVxVy;
+      sumAbsGX[sampleIdx+3] += regVxVy;
+      sumAbsGY[sampleIdx+3] += regVxVy;
+      
+      absGX += (widthG );
+      absGY += (widthG );
+      dIX += (widthG );
+      dIY += (widthG);
+      signGyGx += (widthG );
+      gX += (widthG );
+      gY += (widthG );
+      dI += (widthG );
+    }
+  }
+  else
+  {
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x = x + 4)
+      {
+        const int sampleIdx = y * width + x;
+        sumAbsGXTmp32 = _mm256_add_epi32 (_mm256_loadu_si256((const __m256i*)absGX), _mm256_slli_epi32(_mm256_loadu_si256((const __m256i*)(absGX + widthG)), shift1));
+        sumAbsGXTmp32 = _mm256_add_epi32 (sumAbsGXTmp32, _mm256_slli_epi32(_mm256_loadu_si256((const __m256i*)(absGX + widthG_2)), shift2));
+        sumAbsGXTmp32 = _mm256_add_epi32 (sumAbsGXTmp32, _mm256_slli_epi32(_mm256_loadu_si256((const __m256i*)(absGX + widthG_3)), shift1));
+        sumAbsGXTmp32 = _mm256_add_epi32 (sumAbsGXTmp32, _mm256_loadu_si256((const __m256i*)(absGX + widthG_4)));
+        
+        dummy = _mm256_mullo_epi32(sumAbsGXTmp32, vmask[0]);
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+        sumAbsGX[sampleIdx] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+        dummy = _mm256_mullo_epi32(sumAbsGXTmp32, vmask[1]);
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+        sumAbsGX[sampleIdx + 1] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+        dummy = _mm256_mullo_epi32(sumAbsGXTmp32, vmask[2]);
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+        sumAbsGX[sampleIdx + 2] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+        dummy = _mm256_mullo_epi32(sumAbsGXTmp32, vmask[3]);
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+        sumAbsGX[sampleIdx + 3] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+        
+        sumAbsGYTmp32 = _mm256_add_epi32 (_mm256_loadu_si256((const __m256i*)absGY), _mm256_slli_epi32(_mm256_loadu_si256((const __m256i*)(absGY + widthG)), shift1));
+        sumAbsGYTmp32 = _mm256_add_epi32 (sumAbsGYTmp32, _mm256_slli_epi32(_mm256_loadu_si256((const __m256i*)(absGY + widthG_2)), shift2));
+        sumAbsGYTmp32 = _mm256_add_epi32 (sumAbsGYTmp32, _mm256_slli_epi32(_mm256_loadu_si256((const __m256i*)(absGY + widthG_3)), shift1));
+        sumAbsGYTmp32 = _mm256_add_epi32 (sumAbsGYTmp32, _mm256_loadu_si256((const __m256i*)(absGY + widthG_4)));
+        
+        dummy = _mm256_mullo_epi32(sumAbsGYTmp32, vmask[0]);
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+        sumAbsGY[sampleIdx] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+        dummy = _mm256_mullo_epi32(sumAbsGYTmp32, vmask[1]);
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+        sumAbsGY[sampleIdx + 1] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+        dummy = _mm256_mullo_epi32(sumAbsGYTmp32, vmask[2]);
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+        sumAbsGY[sampleIdx + 2] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+        dummy = _mm256_mullo_epi32(sumAbsGYTmp32, vmask[3]);
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+        sumAbsGY[sampleIdx + 3] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+        
+        sumSignGyGxTmp32 = _mm256_add_epi32 (_mm256_loadu_si256((const __m256i*)signGyGx), _mm256_slli_epi32(_mm256_loadu_si256((const __m256i*)(signGyGx + widthG)), shift1));
+        sumSignGyGxTmp32 = _mm256_add_epi32 (sumSignGyGxTmp32, _mm256_slli_epi32(_mm256_loadu_si256((const __m256i*)(signGyGx + widthG_2)), shift2));
+        sumSignGyGxTmp32 = _mm256_add_epi32 (sumSignGyGxTmp32, _mm256_slli_epi32(_mm256_loadu_si256((const __m256i*)(signGyGx + widthG_3)), shift1));
+        sumSignGyGxTmp32 = _mm256_add_epi32 (sumSignGyGxTmp32, _mm256_loadu_si256((const __m256i*)(signGyGx + widthG_4)));
+        
+        dummy = _mm256_mullo_epi32(sumSignGyGxTmp32, vmask[0]);
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+        sumSignGyGx[sampleIdx] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+        dummy = _mm256_mullo_epi32(sumSignGyGxTmp32, vmask[1]);
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+        sumSignGyGx[sampleIdx + 1] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+        dummy = _mm256_mullo_epi32(sumSignGyGxTmp32, vmask[2]);
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+        sumSignGyGx[sampleIdx + 2] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+        dummy = _mm256_mullo_epi32(sumSignGyGxTmp32, vmask[3]);
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+        sumSignGyGx[sampleIdx + 3] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+        
+        sumDIXTmp32 = _mm256_add_epi32 (_mm256_loadu_si256((const __m256i*)dIX), _mm256_slli_epi32(_mm256_loadu_si256((const __m256i*)(dIX + widthG)), shift1));
+        sumDIXTmp32 = _mm256_add_epi32 (sumDIXTmp32, _mm256_slli_epi32(_mm256_loadu_si256((const __m256i*)(dIX + widthG_2)), shift2));
+        sumDIXTmp32 = _mm256_add_epi32 (sumDIXTmp32, _mm256_slli_epi32(_mm256_loadu_si256((const __m256i*)(dIX + widthG_3)), shift1));
+        sumDIXTmp32 = _mm256_add_epi32 (sumDIXTmp32, _mm256_loadu_si256((const __m256i*)(dIX + widthG_4)));
+        
+        dummy = _mm256_mullo_epi32(sumDIXTmp32, vmask[0]);
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+        sumDIX[sampleIdx] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+        dummy = _mm256_mullo_epi32(sumDIXTmp32, vmask[1]);
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+        sumDIX[sampleIdx + 1] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+        dummy = _mm256_mullo_epi32(sumDIXTmp32, vmask[2]);
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+        sumDIX[sampleIdx + 2] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+        dummy = _mm256_mullo_epi32(sumDIXTmp32, vmask[3]);
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+        sumDIX[sampleIdx + 3] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+        
+        sumDIYTmp32 = _mm256_add_epi32 (_mm256_loadu_si256((const __m256i*)dIY), _mm256_slli_epi32(_mm256_loadu_si256((const __m256i*)(dIY + widthG)), shift1));
+        sumDIYTmp32 = _mm256_add_epi32 (sumDIYTmp32, _mm256_slli_epi32(_mm256_loadu_si256((const __m256i*)(dIY + widthG_2)), shift2));
+        sumDIYTmp32 = _mm256_add_epi32 (sumDIYTmp32, _mm256_slli_epi32(_mm256_loadu_si256((const __m256i*)(dIY + widthG_3)), shift1));
+        sumDIYTmp32 = _mm256_add_epi32 (sumDIYTmp32, _mm256_loadu_si256((const __m256i*)(dIY + widthG_4)));
+        
+        dummy = _mm256_mullo_epi32(sumDIYTmp32, vmask[0]);
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+        sumDIY[sampleIdx] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+        dummy = _mm256_mullo_epi32(sumDIYTmp32, vmask[1]);
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+        sumDIY[sampleIdx + 1] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+        dummy = _mm256_mullo_epi32(sumDIYTmp32, vmask[2]);
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+        sumDIY[sampleIdx + 2] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+        dummy = _mm256_mullo_epi32(sumDIYTmp32, vmask[3]);
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b01001110));
+        dummy = _mm256_add_epi32 (dummy, _mm256_shuffle_epi32(dummy, 0b10110001));
+        sumDIY[sampleIdx + 3] = _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,1)) + _mm_cvtsi128_si32(_mm256_extracti128_si256(dummy,0));
+        
+        sumX0 = _mm_add_epi16(_mm_loadu_si128((const __m128i*)(gX)), _mm_slli_epi16(_mm_loadu_si128((const __m128i*)(gX+ widthG)), shift1));
+        sumX0 = _mm_add_epi16(sumX0, _mm_slli_epi16(_mm_loadu_si128((const __m128i*)(gX+ widthG_2)), shift2));
+        sumX0 = _mm_add_epi16(sumX0, _mm_slli_epi16(_mm_loadu_si128((const __m128i*)(gX+ widthG_3)), shift1));
+        sumX0 = _mm_add_epi16(sumX0, _mm_loadu_si128((const __m128i*)(gX+ widthG_4)));
+        
+        dummy2 = _mm_madd_epi16(sumX0, vmask2[0]);
+        dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0x4e));   // 01001110
+        dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0xb1));   // 10110001
+        sX0[0] = _mm_cvtsi128_si32(dummy2);
+        dummy2 = _mm_madd_epi16(sumX0, vmask2[1]);
+        dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0x4e));   // 01001110
+        dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0xb1));   // 10110001
+        sX0[1] = _mm_cvtsi128_si32(dummy2);
+        dummy2 = _mm_madd_epi16(sumX0, vmask2[2]);
+        dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0x4e));   // 01001110
+        dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0xb1));   // 10110001
+        sX0[2] = _mm_cvtsi128_si32(dummy2);
+        dummy2 = _mm_madd_epi16(sumX0, vmask2[3]);
+        dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0x4e));   // 01001110
+        dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0xb1));   // 10110001
+        sX0[3] = _mm_cvtsi128_si32(dummy2);
+        
+        sumX1 = _mm_add_epi16(_mm_loadu_si128((const __m128i*)(gY)), _mm_slli_epi16(_mm_loadu_si128((const __m128i*)(gY+ widthG)), shift1));
+        sumX1 = _mm_add_epi16(sumX1, _mm_slli_epi16(_mm_loadu_si128((const __m128i*)(gY+ widthG_2)), shift2));
+        sumX1 = _mm_add_epi16(sumX1, _mm_slli_epi16(_mm_loadu_si128((const __m128i*)(gY+ widthG_3)), shift1));
+        sumX1 = _mm_add_epi16(sumX1, _mm_loadu_si128((const __m128i*)(gY+ widthG_4)));
+        
+        dummy2 = _mm_madd_epi16(sumX1, vmask2[0]);
+        dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0x4e));   // 01001110
+        dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0xb1));   // 10110001
+        sX1[0] = _mm_cvtsi128_si32(dummy2);
+        dummy2 = _mm_madd_epi16(sumX1, vmask2[1]);
+        dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0x4e));   // 01001110
+        dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0xb1));   // 10110001
+        sX1[1] = _mm_cvtsi128_si32(dummy2);
+        dummy2 = _mm_madd_epi16(sumX1, vmask2[2]);
+        dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0x4e));   // 01001110
+        dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0xb1));   // 10110001
+        sX1[2] = _mm_cvtsi128_si32(dummy2);
+        dummy2 = _mm_madd_epi16(sumX1, vmask2[3]);
+        dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0x4e));   // 01001110
+        dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0xb1));   // 10110001
+        sX1[3] = _mm_cvtsi128_si32(dummy2);
+        
+        sumMean = _mm_add_epi16(_mm_loadu_si128((const __m128i*)(dI)), (_mm_loadu_si128((const __m128i*)(dI+ widthG))));
+        sumMean = _mm_add_epi16(sumMean, (_mm_loadu_si128((const __m128i*)(dI+ widthG_2))));
+        sumMean = _mm_add_epi16(sumMean, (_mm_loadu_si128((const __m128i*)(dI+ widthG_3))));
+        sumMean = _mm_add_epi16(sumMean, (_mm_loadu_si128((const __m128i*)(dI+ widthG_4))));
+        
+        dummy2 = _mm_madd_epi16(sumMean, fOne[0]);
+        dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0x4e));   // 01001110
+        dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0xb1));   // 10110001
+        mean4[0] = _mm_cvtsi128_si32(dummy2);
+        dummy2 = _mm_madd_epi16(sumMean, fOne[1]);
+        dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0x4e));   // 01001110
+        dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0xb1));   // 10110001
+        mean4[1] = _mm_cvtsi128_si32(dummy2);
+        dummy2 = _mm_madd_epi16(sumMean, fOne[2]);
+        dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0x4e));   // 01001110
+        dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0xb1));   // 10110001
+        mean4[2] = _mm_cvtsi128_si32(dummy2);
+        dummy2 = _mm_madd_epi16(sumMean, fOne[3]);
+        dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0x4e));   // 01001110
+        dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0xb1));   // 10110001
+        mean4[3] = _mm_cvtsi128_si32(dummy2);
+        
+        sumAbsMean = _mm_add_epi16(_mm_abs_epi16(_mm_loadu_si128((const __m128i*)(dI))), _mm_abs_epi16(_mm_loadu_si128((const __m128i*)(dI+ widthG))));
+        sumAbsMean = _mm_add_epi16(sumAbsMean, _mm_abs_epi16(_mm_loadu_si128((const __m128i*)(dI+ widthG_2))));
+        sumAbsMean = _mm_add_epi16(sumAbsMean, _mm_abs_epi16(_mm_loadu_si128((const __m128i*)(dI+ widthG_3))));
+        sumAbsMean = _mm_add_epi16(sumAbsMean, _mm_abs_epi16(_mm_loadu_si128((const __m128i*)(dI+ widthG_4))));
+        
+        dummy2 = _mm_madd_epi16(sumAbsMean, fOne[0]);
+        dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0x4e));   // 01001110
+        dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0xb1));   // 10110001
+        absMean4[0] = _mm_cvtsi128_si32(dummy2);
+        dummy2 = _mm_madd_epi16(sumAbsMean, fOne[1]);
+        dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0x4e));   // 01001110
+        dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0xb1));   // 10110001
+        absMean4[1] = _mm_cvtsi128_si32(dummy2);
+        dummy2 = _mm_madd_epi16(sumAbsMean, fOne[2]);
+        dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0x4e));   // 01001110
+        dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0xb1));   // 10110001
+        absMean4[2] = _mm_cvtsi128_si32(dummy2);
+        dummy2 = _mm_madd_epi16(sumAbsMean, fOne[3]);
+        dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0x4e));   // 01001110
+        dummy2 = _mm_add_epi32(dummy2, _mm_shuffle_epi32(dummy2, 0xb1));   // 10110001
+        absMean4[3] = _mm_cvtsi128_si32(dummy2);
+        
+        mean4[0] = (absMean4[0] > 2 * abs(mean4[0])) ? 0 :  (mean4[0] + 32) >> 6;
+        sumDIX[sampleIdx] -= sX0[0]*mean4[0];
+        sumDIY[sampleIdx] -= sX1[0]*mean4[0];
+        mean4[1] = (absMean4[1] > 2 * abs(mean4[1])) ? 0 :  (mean4[1] + 32) >> 6;
+        sumDIX[sampleIdx + 1] -= sX0[1]*mean4[1];
+        sumDIY[sampleIdx + 1] -= sX1[1]*mean4[1];
+        mean4[2] = (absMean4[2] > 2 * abs(mean4[2])) ? 0 :  (mean4[2] + 32) >> 6;
+        sumDIX[sampleIdx + 2] -= sX0[2]*mean4[2];
+        sumDIY[sampleIdx + 2] -= sX1[2]*mean4[2];
+        mean4[3] = (absMean4[3] > 2 * abs(mean4[3])) ? 0 :  (mean4[3] + 32) >> 6;
+        sumDIX[sampleIdx + 3] -= sX0[3]*mean4[3];
+        sumDIY[sampleIdx + 3] -= sX1[3]*mean4[3];
+        
+        sumDIX[sampleIdx]     += (sumDIX[sampleIdx] + 2) >> 2;
+        sumDIY[sampleIdx]     += (sumDIY[sampleIdx] + 2) >> 2;
+        sumDIX[sampleIdx+1]   += (sumDIX[sampleIdx+1] + 2) >> 2;
+        sumDIY[sampleIdx+1]   += (sumDIY[sampleIdx+1] + 2) >> 2;
+        sumDIX[sampleIdx+2]   += (sumDIX[sampleIdx+2] + 2) >> 2;
+        sumDIY[sampleIdx+2]   += (sumDIY[sampleIdx+2] + 2) >> 2;
+        sumDIX[sampleIdx+3]   += (sumDIX[sampleIdx+3] + 2) >> 2;
+        sumDIY[sampleIdx+3]   += (sumDIY[sampleIdx+3] + 2) >> 2;
+        
+        sumAbsGX[sampleIdx]   += regVxVy;
+        sumAbsGY[sampleIdx]   += regVxVy;
+        sumAbsGX[sampleIdx+1] += regVxVy;
+        sumAbsGY[sampleIdx+1] += regVxVy;
+        sumAbsGX[sampleIdx+2] += regVxVy;
+        sumAbsGY[sampleIdx+2] += regVxVy;
+        sumAbsGX[sampleIdx+3] += regVxVy;
+        sumAbsGY[sampleIdx+3] += regVxVy;
+        absGX += 4;
+        absGY += 4;
+        dIX += 4;
+        dIY += 4;
+        signGyGx += 4;
+        dI += 4;
+        gX += 4;
+        gY += 4;
+      }
+      absGX += (widthG - width);
+      absGY += (widthG - width);
+      dIX += (widthG - width);
+      dIY += (widthG - width);
+      signGyGx += (widthG - width);
+      gX += (widthG - width);
+      gY += (widthG - width);
+      dI += (widthG - width);
+    }
+  }
+  return;
+#endif
+  for (int y = 0; y < height; y++)
+  {
+    for (int x = 0; x < width; x++)
+    {
+      const int sampleIdx = y * width + x;
+      sumAbsGX[sampleIdx] = 0;
+      sumAbsGY[sampleIdx] = 0;
+      sumDIX[sampleIdx] = 0;
+      sumDIY[sampleIdx] = 0;
+      sumSignGyGx[sampleIdx] = 0;
+      int meanDiff = 0;
+      int absmeanDiff = 0;
+      int X0 = 0, X1 = 0;
+      int w = 1, a = 1, b = 2, c = 4, d = 4, e = 8, f = 16;
+      int weight[5][5] = {{a, b, c, b, a}, {b, d, e, d, b}, {c, e, f, e, c}, {b, d, e, d, b}, {a, b, c, b, a}};
+      int regVxVy = 2528; // = ((1 << 11) * 100)/81. 100 is summation of the new weights, 81 was the summation of the old weights
+      for (int yy = 0; yy < 5; yy++)
+      {
+        for (int xx = 0; xx < 5; xx++)
+        {
+          w = weight[yy][xx];
+          sumAbsGX[sampleIdx] += w * absGX[xx];
+          sumAbsGY[sampleIdx] += w * absGY[xx];
+          sumDIX[sampleIdx] += w * dIX[xx];
+          sumDIY[sampleIdx] += w * dIY[xx];
+          meanDiff    +=  dI[xx];
+          absmeanDiff += abs(dI[xx]);
+          X0 -= w * gX[xx];
+          X1 -= w * gY[xx];
+          sumSignGyGx[sampleIdx] += w * signGyGx[xx];
+        }
+        absGX += widthG;
+        absGY += widthG;
+        dIX += widthG;
+        dIY += widthG;
+        signGyGx += widthG;
+        dI += widthG;
+        gX += widthG;
+        gY += widthG;
+      }
+      meanDiff = (absmeanDiff > 2 * abs(meanDiff))  ? 0 : (meanDiff + 32) >> 6;
+      sumDIX[sampleIdx] += X0*meanDiff;
+      sumDIY[sampleIdx] += X1*meanDiff;
+      sumDIX[sampleIdx] += (sumDIX[sampleIdx] + 2) >> 2;
+      sumDIY[sampleIdx] += (sumDIY[sampleIdx] + 2) >> 2;
+      sumAbsGX[sampleIdx] += regVxVy;
+      sumAbsGY[sampleIdx] += regVxVy;
+      absGX += (1 - 5 * widthG);
+      absGY += (1 - 5 * widthG);
+      dIX += (1 - 5 * widthG);
+      dIY += (1 - 5 * widthG);
+      signGyGx += (1 - 5 * widthG);
+      dI += (1 - 5 * widthG);
+      gX += (1 - 5 * widthG);
+      gY += (1 - 5 * widthG);
+    }
+    absGX += (widthG - width);
+    absGY += (widthG - width);
+    dIX += (widthG - width);
+    dIY += (widthG - width);
+    signGyGx += (widthG - width);
+    gX += (widthG - width);
+    gY += (widthG - width);
+    dI += (widthG - width);
+  }
+}
+#endif
 #if JVET_AD0195_HIGH_PRECISION_BDOF_CORE
 template< X86_VEXT vext >
 void calcBIOParamSum5_SSE(Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGyGx, const int widthG, const int width, const int height, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGyGx)
@@ -2099,7 +2699,12 @@ void addBIOAvgN_SSE(const Pel* src0, int src0Stride, const Pel* src1, int src1St
   __m128i vibdimax = _mm_set1_epi16(clpRng.max);
   __m128i var1 = _mm_setzero_si128();
   __m128i var2 = _mm_setzero_si128();
-
+   
+#if JVET_AI0046_HIGH_PRECISION_BDOF_SAMPLE
+  int bb = 0;
+  int pX = 0, pY = 0;
+  const int tt = 16;
+#endif
 #if JVET_AG0067_DMVR_EXTENSIONS
   if (width != 4)
   {
@@ -2133,6 +2738,18 @@ void addBIOAvgN_SSE(const Pel* src0, int src0Stride, const Pel* src1, int src1St
         sum16 = _mm_min_epi16(sum16, vibdimax);
         _mm_storeu_si128((__m128i *)(dst+x), sum16);
       }
+#if JVET_AI0046_HIGH_PRECISION_BDOF_SAMPLE
+      for (int x = 0; x < width; x++)
+      {
+        pX = (tmpx[x] >  tt)  ?  1 : ((tmpx[x] < -tt) ? -1 : 0);
+        pY = (tmpy[x] >  tt)  ?  1 : ((tmpy[x] < -tt) ? -1 : 0);
+        if (pX == 0 && pY == 0) continue;
+        int xX = tmpx[x] - 32 * pX;
+        int yY = tmpy[x] - 32 * pY;
+        bb = (int)xX * (gradX0[x + pY * gradStride + pX] - gradX1[x - pY * gradStride - pX]) + (int)yY * (gradY0[x + pY * gradStride + pX] - gradY1[x - pY * gradStride - pX]);
+        dst[x] = ClipPel(rightShift((src0[x + pY * src0Stride + pX] + src1[x - pY * src1Stride - pX] + bb + offset), shift), clpRng);
+      }
+#endif
         dst += dstStride;       src0 += src0Stride;     src1 += src1Stride;
         gradX0 += gradStride; gradX1 += gradStride; gradY0 += gradStride; gradY1 += gradStride;
         tmpx += width; tmpy += width;
@@ -2200,6 +2817,18 @@ void addBIOAvgN_SSE(const Pel* src0, int src0Stride, const Pel* src1, int src1St
       sum = _mm_max_epi16(sum, vibdimin);
       sum = _mm_min_epi16(sum, vibdimax);
       _mm_storel_epi64((__m128i *)dst, sum);
+#if JVET_AI0046_HIGH_PRECISION_BDOF_SAMPLE
+      for (int x = 0; x < width; x++)
+      {
+        pX = (tmpx[x] >  tt)  ?  1 : ((tmpx[x] < -tt) ? -1 : 0);
+        pY = (tmpy[x] >  tt)  ?  1 : ((tmpy[x] < -tt) ? -1 : 0);
+        if (pX == 0 && pY == 0) continue;
+        int xX = tmpx[x] - 32 * pX;
+        int yY = tmpy[x] - 32 * pY;
+        bb = (int)xX * (gradX0[x + pY * gradStride + pX] - gradX1[x - pY * gradStride - pX]) + (int)yY * (gradY0[x + pY * gradStride + pX] - gradY1[x - pY * gradStride - pX]);
+        dst[x] = ClipPel(rightShift((src0[x + pY * src0Stride + pX] + src1[x - pY * src1Stride - pX] + bb + offset), shift), clpRng);
+      }
+#endif
       dst += dstStride;       src0 += src0Stride;     src1 += src1Stride;
       gradX0 += gradStride; gradX1 += gradStride; gradY0 += gradStride; gradY1 += gradStride;
       tmpx += width; tmpy += width;
@@ -4272,6 +4901,10 @@ void PelBufferOps::_initPelBufOpsX86()
 #else
   calcBIOParamSum4HighPrecision = calcBIOParamSumHighPrecision_SSE<vext>;
 #endif
+#endif
+#if JVET_AI0046_HIGH_PRECISION_BDOF_SAMPLE
+  calcBIOParamSum5NOSIM4   = calcBIOParamSum5NOSIMCore_SSE<vext,4>;
+  calcBIOParamSum5NOSIM8   = calcBIOParamSum5NOSIMCore_SSE<vext,8>;
 #endif
   calcBIOParamSum5   = calcBIOParamSum5_SSE<vext>;
   calcBIOParamSum4   = calcBIOParamSum4_SSE<vext>;
