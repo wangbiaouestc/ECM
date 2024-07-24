@@ -171,6 +171,9 @@ namespace CabacRetrain
       s = s.substr( 0, n ) + ".cabac_" + std::to_string( ctxi );
       files[ctxi].reset( new std::ofstream{ s,std::ios::binary } );
       auto &file = *files[ctxi];
+
+      CHECK( !file.is_open(), "Context bin file is not opened" );
+
       file << "ctx " << ctxi << "\n";
       if( ctxi < 0 || ctxi >= ( int ) ContextSetCfg::getInitTable( 0 ).size() )
       {
