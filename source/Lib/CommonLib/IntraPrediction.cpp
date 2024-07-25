@@ -26224,6 +26224,16 @@ void CccmCovariance::solveEip(const TCccmCoeff* A, const TCccmCoeff* Y, const in
     }
   }
 
+#if JVET_AI0066_REGULARIZED_EIP
+  // Regularization parameter: L2 multiplier * number of parameters
+  const int regularizationParam = (sampleNum <= REGULARIZED_EIP_L2_SAMPLE_THRESHOLD) ? REGULARIZED_EIP_L2_SMALL * numParams : REGULARIZED_EIP_L2_LARGE * numParams;
+  
+  for (int coli0 = 0; coli0 < numParams - 1; coli0++) // The last term (bias) is not regularized.
+  {
+    ATA[coli0][coli0] += regularizationParam;
+  }
+#endif
+
   for (int coli = 0; coli < numParams; coli++)
   {
     ATCb[coli] = Y[coli];

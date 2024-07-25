@@ -204,6 +204,9 @@
 #define JVET_AD0120_LBCCP                                 1 // JVET-AD0120: Local-Boosting Cross-Component Prediction, wherein the template part is controlled by CCCM SPS
 #define JVET_AE0043_CCP_MERGE_TEMPORAL                    1 // JVET-AE0043: Cross-component merge mode with temporal candidates
 #define JVET_AG0058_EIP                                   1 // JVET-AG0058: Extrapolation filter-based intra prediction mode
+#if JVET_AG0058_EIP
+#define JVET_AI0066_REGULARIZED_EIP                       1 // JVET-AI0066: L2 Regularization for EIP
+#endif
 #define JVET_AG0154_DECODER_DERIVED_CCP_FUSION            1 // JVET-AG0154: Decoder derived CCP mode with fusion candidates
 #define JVET_AG0059_CCP_MERGE_ENHANCEMENT                 1 // JVET-AG0059: Enhancements on CCP merge for chroma intra coding
 #define JVET_AH0065_RELAX_LINE_BUFFER                     1 // JVET-AH0065: Relaxing line buffer restriction
