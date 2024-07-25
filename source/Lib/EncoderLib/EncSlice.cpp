@@ -1896,7 +1896,12 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
 #if JVET_AG0145_ADAPTIVE_CLIPPING
   int pelMax = pcPic->getLumaClpRng().max;
   int pelMin = pcPic->getLumaClpRng().min;
+#if JVET_AI0096_ADAPTIVE_CLIPPING_BIT_DEPTH_FIX
+  int targetMin = 16 * (1 << (pcPic->cs->sps->getBitDepth(toChannelType(COMPONENT_Y)) - 8));
+  int targetMax = 235 * (1 << (pcPic->cs->sps->getBitDepth(toChannelType(COMPONENT_Y)) - 8));
+#else
   int targetMin = 64, targetMax = 940;
+#endif
   if (cs.slice->getSliceType() != I_SLICE)
   {
     const Picture* const pColPic = pcPic->cs->slice->getRefPic(RefPicList(1 - pcPic->cs->slice->getColFromL0Flag()), pcPic->cs->slice->getColRefIdx())->unscaledPic;

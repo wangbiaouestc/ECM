@@ -5627,8 +5627,14 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
     {
       deltaMin = -((-deltaMin) << clipDeltaShift);
     }
+#if JVET_AI0096_ADAPTIVE_CLIPPING_BIT_DEPTH_FIX
+    pcSlice->setLumaPelMax(std::min(deltaMax + (235 * (1 << (sps->getBitDepth(toChannelType(COMPONENT_Y)) - 8))), (1 << sps->getBitDepth(toChannelType(COMPONENT_Y))) - 1));
+    pcSlice->setLumaPelMin(std::max(0, deltaMin + (16 * (1 << (sps->getBitDepth(toChannelType(COMPONENT_Y)) - 8)))));
+#else
     pcSlice->setLumaPelMax(std::min(deltaMax + 940, (1 << sps->getBitDepth(toChannelType(COMPONENT_Y))) - 1));
     pcSlice->setLumaPelMin(std::max(0, deltaMin + 64));
+#endif
+
   }
   else
   {

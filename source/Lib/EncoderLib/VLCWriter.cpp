@@ -3564,7 +3564,11 @@ void HLSWriter::codeSliceHeader         ( Slice* pcSlice )
   }
   if (pcSlice->getSliceType() == I_SLICE)
   {
+#if JVET_AI0096_ADAPTIVE_CLIPPING_BIT_DEPTH_FIX
+    int deltaMin = pcSlice->getPic()->lumaClpRngforQuant.min - 16 * (1 << (pcSlice->getSPS()->getBitDepth(toChannelType(COMPONENT_Y)) - 8));
+#else
     int deltaMin = pcSlice->getPic()->lumaClpRngforQuant.min - 64;
+#endif
     if (deltaMin > 0)
     {
       deltaMin = (deltaMin >> clipDeltaShift);
@@ -3573,7 +3577,11 @@ void HLSWriter::codeSliceHeader         ( Slice* pcSlice )
     {
       deltaMin = -((-deltaMin) >> clipDeltaShift);
     }
+#if JVET_AI0096_ADAPTIVE_CLIPPING_BIT_DEPTH_FIX
+    int deltaMax = pcSlice->getPic()->lumaClpRngforQuant.max - (235 * (1 << (pcSlice->getSPS()->getBitDepth(toChannelType(COMPONENT_Y)) - 8)));
+#else
     int deltaMax = pcSlice->getPic()->lumaClpRngforQuant.max - 940;
+#endif
     if (deltaMax > 0)
     {
       deltaMax = (deltaMax >> clipDeltaShift);

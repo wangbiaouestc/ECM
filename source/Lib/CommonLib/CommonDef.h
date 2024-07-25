@@ -1619,8 +1619,12 @@ static const int SIGN_PRED_FREQ_RANGE   = 32;///< not configurable
 #else
 static const int SIGN_PRED_FREQ_RANGE   = 4; ///< not configurable
 #endif
+#if JVET_AI0096_SIGN_PRED_BIT_DEPTH_FIX
+static const int SIGN_PRED_RESIDUAL_BITS  = 8; ///< not configurable
+#else
 static const int SIGN_PRED_SHIFT        = 8; ///< not configurable
 static const int SIGN_PRED_OFFSET       = 1 << ( SIGN_PRED_SHIFT - 1 ); ///< not configurable
+#endif
 #endif
 #if MULTI_HYP_PRED
 static const auto MULTI_HYP_PRED_MAX_CANDS =                     4;
