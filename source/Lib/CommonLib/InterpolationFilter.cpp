@@ -120,6 +120,30 @@ const TFilterCoeff InterpolationFilter::m_lumaFilter12[LUMA_INTERPOLATION_FILTER
     {  0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0  }  // dummy line for SIMD reading of 2 chunks for 12-tap filter not to address wrong memory //kolya
 #endif
 };
+#if JVET_AI0094_SHARP_MC_FILTER_FOR_BIPRED
+const TFilterCoeff InterpolationFilter::m_lumaFilter12bi[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS + 1][12] =
+{
+    {   0,    0,    0,    0,    0,  256,    0,    0,    0,    0,    0,    0},
+    {  -1,    3,   -5,    8,  -16,  256,   15,   -6,    3,   -1,    0,    0},
+    {  -2,    5,   -9,   15,  -30,  253,   32,  -12,    5,   -2,    1,    0},
+    {  -3,    7,  -12,   21,  -40,  244,   50,  -18,    9,   -4,    2,    0},
+    {  -3,    8,  -15,   25,  -48,  235,   71,  -25,   12,   -6,    2,    0},
+    {  -3,    9,  -16,   28,  -53,  220,   93,  -32,   16,   -8,    3,   -1},
+    {  -3,    8,  -16,   28,  -54,  204,  116,  -39,   19,  -10,    4,   -1},
+    {  -2,    8,  -15,   27,  -53,  183,  139,  -45,   22,  -12,    5,   -1},
+    {  -2,    6,  -13,   25,  -50,  162,  162,  -50,   25,  -13,    6,   -2},
+    {  -1,    5,  -12,   22,  -45,  139,  183,  -53,   27,  -15,    8,   -2},
+    {  -1,    4,  -10,   19,  -39,  116,  204,  -54,   28,  -16,    8,   -3},
+    {  -1,    3,   -8,   16,  -32,   93,  220,  -53,   28,  -16,    9,   -3},
+    {   0,    2,   -6,   12,  -25,   71,  235,  -48,   25,  -15,    8,   -3},
+    {   0,    2,   -4,    9,  -18,   50,  244,  -40,   21,  -12,    7,   -3},
+    {   0,    1,   -2,    5,  -12,   32,  253,  -30,   15,   -9,    5,   -2},
+    {   0,    0,   -1,    3,   -6,   15,  256,  -16,    8,   -5,    3,   -1},
+#if SIMD_4x4_12
+    {  0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0  }  // dummy line for SIMD reading of 2 chunks for 12-tap filter not to address wrong memory //kolya
+#endif
+};
+#endif
 // This is used for affine
 const TFilterCoeff InterpolationFilter::m_lumaFilter[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][8] =
 {
@@ -2038,7 +2062,11 @@ void InterpolationFilter::filterVer(const ClpRng& clpRng, Pel const *src, int sr
  * \param  fmt        Chroma format
  * \param  bitDepth   Bit depth
  */
+#if JVET_AI0094_SHARP_MC_FILTER_FOR_BIPRED
+void InterpolationFilter::filterHor(const ComponentID compID, Pel const *src, int srcStride, Pel *dst, int dstStride, int width, int height, int frac, bool isLast, const ChromaFormat fmt, const ClpRng& clpRng, int nFilterIdx, bool biMCForDMVR, bool useAltHpelIf, bool useBiFilt
+#else
 void InterpolationFilter::filterHor(const ComponentID compID, Pel const *src, int srcStride, Pel *dst, int dstStride, int width, int height, int frac, bool isLast, const ChromaFormat fmt, const ClpRng& clpRng, int nFilterIdx, bool biMCForDMVR, bool useAltHpelIf
+#endif
 #if JVET_AC0104_IBC_BVD_PREDICTION
                                   , const bool useCopyWithNoClipping
 #endif
@@ -2130,7 +2158,18 @@ void InterpolationFilter::filterHor(const ComponentID compID, Pel const *src, in
 #endif
     else
     {
+#if JVET_AI0094_SHARP_MC_FILTER_FOR_BIPRED
+      if (useBiFilt && (width > 4 && height > 4))
+      {
+        filterHor<NTAPS_LUMA(0)>(clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_lumaFilter12bi[frac], biMCForDMVR);
+      }
+      else
+      {
+        filterHor<NTAPS_LUMA(0)>(clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_lumaFilter12[frac], biMCForDMVR);
+      }
+#else
       filterHor<NTAPS_LUMA(0)>( clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_lumaFilter12[frac], biMCForDMVR );
+#endif
     }
 #else
     CHECK( frac < 0 || frac >= LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS, "Invalid fraction" );
@@ -2235,7 +2274,11 @@ void InterpolationFilter::filterHor(const ComponentID compID, Pel const *src, in
  * \param  fmt        Chroma format
  * \param  bitDepth   Bit depth
  */
+#if JVET_AI0094_SHARP_MC_FILTER_FOR_BIPRED
+void InterpolationFilter::filterVer(const ComponentID compID, Pel const *src, int srcStride, Pel *dst, int dstStride, int width, int height, int frac, bool isFirst, bool isLast, const ChromaFormat fmt, const ClpRng& clpRng, int nFilterIdx, bool biMCForDMVR, bool useAltHpelIf, bool useBiFilt)
+#else
 void InterpolationFilter::filterVer(const ComponentID compID, Pel const *src, int srcStride, Pel *dst, int dstStride, int width, int height, int frac, bool isFirst, bool isLast, const ChromaFormat fmt, const ClpRng& clpRng, int nFilterIdx, bool biMCForDMVR, bool useAltHpelIf)
+#endif
 {
   if( frac == 0 && nFilterIdx < 2 )
   {
@@ -2332,7 +2375,18 @@ void InterpolationFilter::filterVer(const ComponentID compID, Pel const *src, in
 #endif
     else
     {
+#if JVET_AI0094_SHARP_MC_FILTER_FOR_BIPRED
+      if (useBiFilt && (width > 4 && height > 4))
+      {
+        filterVer<NTAPS_LUMA(0)>(clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_lumaFilter12bi[frac], biMCForDMVR);
+      }
+      else
+      {
+        filterVer<NTAPS_LUMA(0)>(clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_lumaFilter12[frac], biMCForDMVR);
+      }
+#else
       filterVer<NTAPS_LUMA(0)>( clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_lumaFilter12[frac], biMCForDMVR );
+#endif
     }
 #else
     CHECK( frac < 0 || frac >= LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS, "Invalid fraction" );

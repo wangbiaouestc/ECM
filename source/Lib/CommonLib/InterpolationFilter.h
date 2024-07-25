@@ -87,6 +87,9 @@ public:
 #endif
 #if IF_12TAP
   static const TFilterCoeff m_lumaFilter12[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS + 1][12];     ///< Luma filter taps //+1 added by //kolya
+#if JVET_AI0094_SHARP_MC_FILTER_FOR_BIPRED
+  static const TFilterCoeff m_lumaFilter12bi[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS + 1][12];     ///< Luma filter taps for bi-prediction
+#endif
   static const TFilterCoeff m_lumaFilter[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][8]; ///< Luma filter taps, for affine 
 #if JVET_AA0042_RPR_FILTERS
 #if JVET_AE0150_SMALL_SCALE_RPR_FILTERS
@@ -281,12 +284,20 @@ public:
   template <X86_VEXT vext>
   void _initInterpolationFilterX86();
 #endif
+#if JVET_AI0094_SHARP_MC_FILTER_FOR_BIPRED
+  void filterHor(const ComponentID compID, Pel const* src, int srcStride, Pel *dst, int dstStride, int width, int height, int frac, bool isLast, const ChromaFormat fmt, const ClpRng& clpRng, int nFilterIdx = 0, bool biMCForDMVR = false, bool useAltHpelIf = false, bool useBiFilt = 0
+#else
   void filterHor(const ComponentID compID, Pel const* src, int srcStride, Pel *dst, int dstStride, int width, int height, int frac, bool isLast, const ChromaFormat fmt, const ClpRng& clpRng, int nFilterIdx = 0, bool biMCForDMVR = false, bool useAltHpelIf = false
+#endif
 #if JVET_AC0104_IBC_BVD_PREDICTION
                , const bool useCopyWithNoClipping = false
 #endif
                 );
+#if JVET_AI0094_SHARP_MC_FILTER_FOR_BIPRED
+  void filterVer(const ComponentID compID, Pel const* src, int srcStride, Pel *dst, int dstStride, int width, int height, int frac, bool isFirst, bool isLast, const ChromaFormat fmt, const ClpRng& clpRng, int nFilterIdx = 0, bool biMCForDMVR = false, bool useAltHpelIf = false, bool useBiFilt = 0);
+#else
   void filterVer(const ComponentID compID, Pel const* src, int srcStride, Pel *dst, int dstStride, int width, int height, int frac, bool isFirst, bool isLast, const ChromaFormat fmt, const ClpRng& clpRng, int nFilterIdx = 0, bool biMCForDMVR = false, bool useAltHpelIf = false);
+#endif
 #if JVET_J0090_MEMORY_BANDWITH_MEASURE
   void cacheAssign( CacheModel *cache ) { m_cacheModel = cache; }
 #endif
