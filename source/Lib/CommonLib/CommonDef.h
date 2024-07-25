@@ -1326,6 +1326,13 @@ static const int CFLM_MAX_REF_SAMPLES = CCCM_MAX_REF_SAMPLES;
 static const int INTER_CCCM_NUM_PARAMS = 8;
 static const int INTER_CCCM_MAX_REF_SAMPLES = 256;
 #endif
+#if JVET_AG0058_EIP
+#if JVET_AI0066_REGULARIZED_EIP
+static const int REGULARIZED_EIP_L2_SAMPLE_THRESHOLD = 2024;
+static const int REGULARIZED_EIP_L2_SMALL = 192;
+static const int REGULARIZED_EIP_L2_LARGE = 128;
+#endif
+#endif
 #if JVET_AC0071_DBV
 static const int NUM_DBV_POSITION = 5;
 static const int DBV_TEMPLATE_SIZE = 1;
