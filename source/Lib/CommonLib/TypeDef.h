@@ -341,6 +341,8 @@
 #define JVET_AH0068_RM_TEMP_BUFF_CONSTRAINT               1 // JVET-AH0068 test a: Removing the one-CTU-row temporal buffer constraint for all relevant tools
 #define JVET_AI0046_HIGH_PRECISION_BDOF_SAMPLE            1 // JVET-AI0046: High Precision Sample Based BDOF
 #define JVET_AH0119_SUBBLOCK_TM                           1 // JVET-AH0119 extend affine TM and apply sbtmvp TM
+#define JVET_AI0094_SHARP_MC_FILTER_FOR_BIPRED            1 // JVET-AI0094: Sharp motion compensation filter for bi-prediction
+
 // Inter template matching tools
 #define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction
 #if ENABLE_INTER_TEMPLATE_MATCHING
