@@ -6367,6 +6367,33 @@ const CtxSet ContextSetCfg::CCPMergeFusionType = ContextSetCfg::addCtxSet({
   { 119 },
   { 119 },
 });
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+const CtxSet ContextSetCfg::SeparateTree = ContextSetCfg::addCtxSet
+({
+  { CNU, CNU, CNU },
+  { CNU, CNU, CNU },
+  { CNU, CNU, CNU },
+  { CNU, CNU, CNU },
+  { DWS, DWS, DWS },
+  { DWS, DWS, DWS },
+  { DWS, DWS, DWS },
+  { DWS, DWS, DWS },
+  { DWE, DWE, DWE },
+  { DWE, DWE, DWE },
+  { DWE, DWE, DWE },
+  { DWE, DWE, DWE },
+  { DWO, DWO, DWO },
+  { DWO, DWO, DWO },
+  { DWO, DWO, DWO },
+  { DWO, DWO, DWO },
+  { DWO, DWO, DWO },
+  { DWO, DWO, DWO },
+  { DWO, DWO, DWO },
+  { DWO, DWO, DWO },
+  });
+#endif
+
 #endif
 #if JVET_AH0076_OBIC
 const CtxSet ContextSetCfg::obicFlag = ContextSetCfg::addCtxSet

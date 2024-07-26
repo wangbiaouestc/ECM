@@ -1401,6 +1401,7 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
 
   CHECK(PU::isMIP(pu, toChannelType(compId)), "We should not get here for MIP.");
   const uint32_t       uiDirMode    = isLuma( compId ) && pu.cu->bdpcmMode ? BDPCM_IDX : !isLuma(compId) && pu.cu->bdpcmModeChroma ? BDPCM_IDX : PU::getFinalIntraMode(pu, channelType);
+
 #if JVET_AD0085_TMRL_EXTENSION
   bool bExtIntraDir = false;
 #if JVET_W0123_TIMD_FUSION
@@ -2596,7 +2597,11 @@ void IntraPrediction::predIntraDbv(const ComponentID compId, PelBuf &piPred, con
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   Mv mv = refineChromaBv(compId, pu, pcInterPred);
 #if JVET_AF0066_ENABLE_DBV_4_SINGLE_TREE
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  if (! ( CS::isDualITree(*pu.cs) || (pu.cu->isSST && pu.cu->separateTree) ) )
+#else
   if (!CS::isDualITree(*pu.cs))
+#endif
   {
     const int bvShiftHor = MV_FRACTIONAL_BITS_INTERNAL + ::getComponentScaleX(compId, pu.chromaFormat);
     const int bvShiftVer = MV_FRACTIONAL_BITS_INTERNAL + ::getComponentScaleY(compId, pu.chromaFormat);
@@ -2693,7 +2698,11 @@ Mv IntraPrediction::refineChromaBv(const ComponentID compId, const PredictionUni
   const int shiftSampleVer = ::getComponentScaleY(compId, pu.chromaFormat);
 #endif
 #if JVET_AF0066_ENABLE_DBV_4_SINGLE_TREE
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  if ( ! (CS::isDualITree(cs) || (pu.cu->isSST && pu.cu->separateTree) ) )
+#else
   if (!CS::isDualITree(cs))
+#endif
   {
 #if JVET_AF0079_STORING_INTRATMP
     if (PU::checkIsChromaBvCandidateValid(pu, pu.mv[0], 0))
@@ -4582,7 +4591,11 @@ void IntraPrediction::geneChromaFusionPred(const ComponentID compId, PelBuf &piP
   const CompArea &area = pu2.blocks[compId];
 
 #if JVET_AC0119_LM_CHROMA_FUSION
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  if (!pu.cs->pcv->isEncoder || !pu2.cs->slice->isIntra() || !( CS::isDualITree(*pu.cs) || (pu.cu->isSST && pu.cu->separateTree) ))
+#else
   if (!pu.cs->pcv->isEncoder || !pu2.cs->slice->isIntra() || !CS::isDualITree(*pu.cs))
+#endif
   {
 #endif
   xGetLumaRecPixels(pu2, area);
@@ -4594,7 +4607,11 @@ void IntraPrediction::geneChromaFusionPred(const ComponentID compId, PelBuf &piP
   if (pu.isChromaFusion > 1)
   {
     pu2.intraDir[1] = LM_CHROMA_IDX + pu.isChromaFusion - 2;
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    if (!pu.cs->pcv->isEncoder || !pu2.cs->slice->isIntra() || ! ( CS::isDualITree(*pu.cs) || (pu.cu->isSST && pu.cu->separateTree) ))
+#else
     if (!pu.cs->pcv->isEncoder || !pu2.cs->slice->isIntra() || !CS::isDualITree(*pu.cs))
+#endif
     {
 #if JVET_AH0136_CHROMA_REORDERING
       xCflmCreateChromaPred(pu, compId, piPred, pcInterPred);
@@ -5176,7 +5193,11 @@ void IntraPrediction::geneIntrainterPred(const CodingUnit &cu, PelStorage& pred)
   predIntraAng(COMPONENT_Y, ciipBuff, *pu);
 #if JVET_AC0112_IBC_CIIP
 #if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  const bool chroma = !cu.separateTree;
+#else
   const bool chroma = !(CS::isDualITree(*pu->cs));
+#endif
 #else
   const bool chroma = !pu.cu->isSepTree();
 #endif
@@ -6140,10 +6161,19 @@ void IntraPrediction::xFillReferenceSamplesForCoLuma(const CPelBuf &recoBuf, Pel
   int ctuWidth = sps.getCTUSize();
   int ctuWidthInNum = area.x / ctuWidth;
   int wUnit = std::min((picWidth - area.x - tuWidth) / unitWidth, ((ctuWidthInNum + 1) * ctuWidth - area.x - tuWidth) / unitWidth);
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE // to fix chroma ipm reorderding
+  if (cu.slice->isIntra())
+#endif
   numIntraNeighbor += area.y > 0 ? std::min(numAboveRightUnits, wUnit) : 0;
   for (int i = totalLeftUnits + 1 + numAboveUnits; i < totalLeftUnits + 1 + numAboveUnits + numAboveRightUnits; i++)
   {
     neighborFlags[i] = area.y > 0 ? ( i - (totalLeftUnits + 1 + numAboveUnits) < wUnit ? true : false) : false;
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE  // to fix chroma ipm reorderding
+    if (!cu.slice->isIntra())
+    {
+      neighborFlags[i] = false;
+    }
+#endif
   }
   numIntraNeighbor += area.x > 0 ? numLeftUnits : 0;
   for (int i = totalLeftUnits - 1; i > totalLeftUnits - 1 - numLeftUnits; i--)
@@ -6154,11 +6184,20 @@ void IntraPrediction::xFillReferenceSamplesForCoLuma(const CPelBuf &recoBuf, Pel
   int ctuHeight = sps.getCTUSize();
   int ctuHeightInNum = area.y / ctuHeight;
   int hUnit = std::min((picHeight - area.y - tuHeight) / unitHeight, ((ctuHeightInNum + 1) * ctuHeight - area.y - tuHeight) / unitHeight);
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  if (cu.slice->isIntra())
+#endif
   numIntraNeighbor += area.x > 0 ? std::min(numLeftBelowUnits, hUnit) : 0;
   int y = 0;
   for (int i = totalLeftUnits - 1 - numLeftUnits; i > totalLeftUnits - 1 - numLeftUnits - numLeftBelowUnits; i--)
   {
     neighborFlags[i] = area.x > 0 ? (y < hUnit ? true : false) : false;
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE  // to fix chroma ipm reorderding
+    if (!cu.slice->isIntra())
+    {
+      neighborFlags[i] = false;
+    }
+#endif
     y++;
   }
 
@@ -10594,7 +10633,11 @@ void IntraPrediction::deriveDimdChromaMode(const CPelBuf &recoBufY, const CPelBu
 #endif
 
 #if JVET_AH0136_CHROMA_REORDERING
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  if ( ( CS::isDualITree(*cu.cs) || (cu.isSST && cu.separateTree) ) && cu.cs->sps->getUseChromaReordering() && cu.slice->isIntra() )
+#else
   if (CS::isDualITree(*cu.cs) && cu.cs->sps->getUseChromaReordering())
+#endif
   {
     int amp[DIMD_FUSION_NUM - 1] = { 0 };
     curAmp = 0;
@@ -10632,7 +10675,11 @@ void IntraPrediction::deriveDimdChromaMode(const CPelBuf &recoBufY, const CPelBu
 #if JVET_AH0136_CHROMA_REORDERING
 void IntraPrediction::deriveNonCcpChromaModes(const CPelBuf &recoBufY, const CPelBuf &recoBufCb, const CPelBuf &recoBufCr, const CompArea &areaY, const CompArea &areaCb, const CompArea &areaCr, CodingUnit &cu, PredictionUnit &pu, InterPrediction *pcInterPred)
 {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  if (!( CS::isDualITree(*pu.cs) || (pu.cu->isSST && pu.cu->separateTree) ) || !pu.cs->sps->getUseChromaReordering() || !pu.cs->slice->isIntra())
+#else
   if (!CS::isDualITree(*pu.cs) || !pu.cs->sps->getUseChromaReordering())
+#endif
   {
     return;
   }
@@ -10649,7 +10696,10 @@ void IntraPrediction::deriveNonCcpChromaModes(const CPelBuf &recoBufY, const CPe
   lumaCU.cs = cu.cs;
   lumaPU.cs = pu.cs;
   lumaCU.slice = cu.slice;
-
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  lumaCU.isSST = cu.isSST;
+  lumaCU.separateTree = cu.separateTree;
+#endif
   // derive DBV info
 #if JVET_AC0071_DBV
   PU::deriveChromaBv(pu);
@@ -10661,6 +10711,7 @@ void IntraPrediction::deriveNonCcpChromaModes(const CPelBuf &recoBufY, const CPe
   uint8_t chromaList[NUM_CHROMA_LIST_MODE];
   int existNum = 0;
   bool hasDBV = false;
+
   buildChromaModeList(areaCb, cu, pu, chromaList, existNum, hasDBV);
 
   // prepare luma pred indfo
@@ -10751,17 +10802,21 @@ void IntraPrediction::deriveNonCcpChromaModes(const CPelBuf &recoBufY, const CPe
     predCoLuma(areaY, recoBufY, lumaPU, chromaList[x], predY, pcInterPred, cu);
 
     costL += cDistParamSatd.distFunc(cDistParamSatd);
+
     pu.intraDir[1] = chromaList[x];
+
     if (eTplType != NO_NEIGHBOR)
     {
       // pred chroma TM
       predChromaTM(areaCb, areaCr, pu, chromaList[x], predCb, predCr, eTplType, pcInterPred);
+
       if (eTplType == LEFT_ABOVE_NEIGHBOR)
       {
         costCbA += distParamSatd[0][0].distFunc(distParamSatd[0][0]);
         costCbL += distParamSatd[0][1].distFunc(distParamSatd[0][1]);
         costCrA += distParamSatd[1][0].distFunc(distParamSatd[1][0]);
         costCrL += distParamSatd[1][1].distFunc(distParamSatd[1][1]);
+
         cost = 8 * costL + ((costCbA + costCrA) << (logH + 2 - logN)) + ((costCbL + costCrL) << (logW + 2 - logN));
       }
       else if (eTplType == LEFT_NEIGHBOR)
@@ -10807,6 +10862,7 @@ void IntraPrediction::deriveNonCcpChromaModes(const CPelBuf &recoBufY, const CPe
     {
       cu.chromaList[i] = chromaList[i];
     }
+
     return;
   }
 
@@ -10960,7 +11016,13 @@ void IntraPrediction::buildChromaModeList(const CompArea &area, CodingUnit &cu, 
   Position posList[5] = { lumaArea.center(), lumaArea.topLeft(), lumaArea.topRight(), lumaArea.bottomLeft(), lumaArea.bottomRight() };
   for (int n = 0; n < NUM_DBV_POSITION; n++)
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    const PredictionUnit *lumaPU    = ( CS::isDualITree(*pu.cs)  || (pu.cu->isSST && pu.cu->separateTree) )
+      ? pu.cs->getLumaPU( posList[n], CHANNEL_TYPE_LUMA )
+      : pu.cs->getPU(posList[n], CHANNEL_TYPE_LUMA);
+#else
     const PredictionUnit *lumaPU = pu.cs->picture->cs->getPU(posList[n], CHANNEL_TYPE_LUMA);
+#endif
     int mode;
     if (lumaPU->cu->timd || lumaPU->cu->tmrlFlag)
     {
@@ -10991,8 +11053,17 @@ void IntraPrediction::buildChromaModeList(const CompArea &area, CodingUnit &cu, 
   for (const Position &posLT : posCand)
   {
     const PredictionUnit* puRef = PU::getPUFromPos(pu, CHANNEL_TYPE_CHROMA, posLT);
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    if (puRef != nullptr && CU::isIntra(*puRef->cu) && !PU::isLMCMode(puRef->intraDir[1]) && !PU::isDbvMode(puRef->intraDir[1])
+      && (puRef->intraDir[1]!=DM_CHROMA_IDX || puRef->cu->slice->isIntra())
+      && (puRef->intraDir[1]!=DIMD_CHROMA_IDX || puRef->cu->slice->isIntra()))
+#else
     if (puRef != nullptr && CU::isIntra(*puRef->cu) && !PU::isLMCMode(puRef->intraDir[1]) && !PU::isDbvMode(puRef->intraDir[1]))
+#endif
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      CHECK(puRef->intraDir[1] >= NUM_LUMA_MODE, "buildChromaList: puRef->intraDir[1] has to be strictly lower than NUM_LUMA_MODE=67");
+#endif
       int mode;
       mode = puRef->intraDir[1];
       if (hasMode[mode] == false)
@@ -12741,7 +12812,11 @@ void IntraPrediction::xGetLumaRecPixels(const PredictionUnit &pu, CompArea chrom
 
   int iRecStride2       = iRecStride << logSubHeightC;
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  const CodingUnit& lumaCU = isChroma( pu.chType ) ? *pu.cs->getLumaCU( lumaArea.pos(), CH_L ) : *pu.cu;
+#else
   const CodingUnit& lumaCU = isChroma( pu.chType ) ? *pu.cs->picture->cs->getCU( lumaArea.pos(), CH_L ) : *pu.cu;
+#endif
   const CodingUnit&     cu = *pu.cu;
 
   const CompArea& area = isChroma( pu.chType ) ? chromaArea : lumaArea;
@@ -21404,6 +21479,7 @@ void IntraPrediction::predIntraCCCM( const PredictionUnit &pu, PelBuf &predCb, P
       {
 #endif
       xCccmCalcModels(pu,cccmModelCb[0], cccmModelCr[0], 0, 0);
+
       int cccmSAD = xCalculateCCCMcost(pu, COMPONENT_Cb, intraDir, pu.blocks[COMPONENT_Cb], &cccmModelCb[0], 0);
       cccmSAD += xCalculateCCCMcost(pu, COMPONENT_Cr, intraDir, pu.blocks[COMPONENT_Cr], &cccmModelCr[0], 0);
 
@@ -22163,7 +22239,11 @@ void IntraPrediction::xCccmCreateLumaNoSubRef( const PredictionUnit& pu, CompAre
   }
 
   // In dualtree we can also use luma from the right and below (if not on CTU/picture boundary)
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  if( pu.cu->separateTree )
+#else
   if( CS::isDualITree( *pu.cs ) )
+#endif
   {
     int ctuWidth = pu.cs->sps->getMaxCUWidth() >> getComponentScaleX( COMPONENT_Cb, pu.chromaFormat );
     int ctuHeight = pu.cs->sps->getMaxCUHeight() >> getComponentScaleY( COMPONENT_Cb, pu.chromaFormat );
@@ -22660,6 +22740,12 @@ void IntraPrediction::xBvgCccmCreateLumaRef(const PredictionUnit& pu, CompArea c
                                            , downsFilterIdx
 #endif
                                            );
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      if (!pu.cu->slice->isIntra() && pu.cu->separateTree)
+      {
+        refLuma.at( x, y ) = refLuma.at( x, y - 1 );
+      }
+#endif
       if (chromaPosPicY >= maxPosPicY)
       {
         refLuma.at( x, y ) = refLuma.at( x, y - 1 );
@@ -22716,6 +22802,12 @@ void IntraPrediction::xBvgCccmCreateLumaRef(const PredictionUnit& pu, CompArea c
                                            , downsFilterIdx
 #endif
                                            );
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      if (!pu.cu->slice->isIntra() && pu.cu->separateTree)
+      {
+        refLuma.at( x, y ) = refLuma.at( x - 1, y );
+      }
+#endif
       if (chromaPosPicX >= maxPosPicX)
       {
         refLuma.at( x, y ) = refLuma.at( x - 1, y );
@@ -23104,7 +23196,11 @@ void IntraPrediction::xCccmCreateLumaRef(const PredictionUnit& pu, CompArea chro
   }
   
   // In dualtree we can also use luma from the right and below (if not on CTU/picture boundary)
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  if( CS::isDualITree( *pu.cs ) && ( pu.cs->slice->isIntra() || !pu.cs->slice->getSeparateTreeEnabled() ) )
+#else
   if ( CS::isDualITree( *pu.cs ) )
+#endif
   {
     int ctuWidth  = pu.cs->sps->getMaxCUWidth()  >> getComponentScaleX(COMPONENT_Cb, pu.chromaFormat);
     int ctuHeight = pu.cs->sps->getMaxCUHeight() >> getComponentScaleY(COMPONENT_Cb, pu.chromaFormat);
@@ -27008,6 +27104,12 @@ void IntraPrediction::getNeiEipCands(const PredictionUnit& pu, static_vector<Eip
   auto tryHistEip = [&](const LutEIP& eipLut)-> void
 #endif
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    if (!pu.cs->slice->isIntra() && pu.cs->slice->getSeparateTreeEnabled())
+    {
+      return;
+    }
+#endif
 #if JVET_Z0118_GDR  
     for (int idx = 0; idx < lut.size() && numCand < maxCands; idx++)
     {

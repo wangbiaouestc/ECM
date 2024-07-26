@@ -263,6 +263,15 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
         }
       }
 #endif
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      bool changeProcIntraReg = false;
+      if (currCU.isSST && currCU.separateTree && currCU.predMode == MODE_INTRA && currCU.slice->getProcessingSeparateTrees() && !currCU.slice->getProcessingIntraRegion())
+      {
+        currCU.slice->setProcessingIntraRegion(true);
+        changeProcIntraReg = true;
+      }
+#endif
+
       if (currCU.predMode != MODE_INTRA && currCU.predMode != MODE_PLT && currCU.Y().valid())
       {
         xDeriveCUMV(currCU);
@@ -480,7 +489,13 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
           }
         }
 #if JVET_AH0136_CHROMA_REORDERING
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        if (currCU.firstPU->parseChromaMode 
+          && (!( CS::isDualITree(cs) || (currCU.isSST && currCU.separateTree) ) || !currCU.cs->sps->getUseChromaReordering() || !currCU.cs->slice->isIntra())
+          )
+#else
         if (currCU.firstPU->parseChromaMode && (!CS::isDualITree(cs) || !currCU.cs->sps->getUseChromaReordering()))
+#endif
 #else
         if (currCU.firstPU->parseChromaMode)
 #endif
@@ -581,6 +596,15 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
         THROW( "Invalid prediction mode" );
         break;
       }
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      if (changeProcIntraReg )
+      {
+        currCU.slice->setProcessingIntraRegion(!currCU.slice->getProcessingIntraRegion());
+      }
+#endif
+
+
       m_pcInterPred->xFillIBCBuffer(currCU);
 #if JVET_Z0118_GDR // decompressCtu
       cs.updateReconMotIPM( currCU ); // decompressCtu : need
@@ -630,6 +654,7 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 #else
   const PredictionUnit &pu  = *tu.cs->getPU( area.pos(), chType );
 #endif
+
 #if ENABLE_DIMD
 #if JVET_AG0058_EIP
   if (pu.parseChromaMode && compID == COMPONENT_Cb && !CS::isDualITree(cs))
@@ -642,7 +667,15 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
 #if JVET_AG0059_CCP_MERGE_ENHANCEMENT
 #if JVET_AH0136_CHROMA_REORDERING
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  if ( ( (!PU::isLMCMode(pu.intraDir[1]) && compID == COMPONENT_Cb && !pu.cu->bdpcmModeChroma) 
+         && (CS::isDualITree(cs) || (pu.cu->isSST && pu.cu->separateTree) ) && pu.cs->sps->getUseChromaReordering() && pu.cs->slice->isIntra()
+       ) 
+    || ((pu.intraDir[1] == DIMD_CHROMA_IDX || pu.ccpMergeFusionType == 1) && compID == COMPONENT_Cb)
+    )
+#else
   if (((!PU::isLMCMode(pu.intraDir[1]) && compID == COMPONENT_Cb && !pu.cu->bdpcmModeChroma) && CS::isDualITree(cs) && pu.cs->sps->getUseChromaReordering()) || ((pu.intraDir[1] == DIMD_CHROMA_IDX || pu.ccpMergeFusionType == 1) && compID == COMPONENT_Cb))
+#endif
 #else
   if ((pu.intraDir[1] == DIMD_CHROMA_IDX || pu.ccpMergeFusionType == 1) && compID == COMPONENT_Cb)
 #endif
@@ -670,7 +703,14 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
   }
 #endif
 #if JVET_AH0136_CHROMA_REORDERING
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  if (
+       (!PU::isLMCMode(pu.intraDir[1]) && compID == COMPONENT_Cb && !pu.cu->bdpcmModeChroma) 
+       && (CS::isDualITree(cs) || (pu.cu->isSST && pu.cu->separateTree) ) && pu.cs->sps->getUseChromaReordering() && pu.cu->slice->isIntra()
+    )
+#else
   if ((!PU::isLMCMode(pu.intraDir[1]) && compID == COMPONENT_Cb && !pu.cu->bdpcmModeChroma) && CS::isDualITree(cs) && pu.cs->sps->getUseChromaReordering())
+#endif
   {
     CompArea areaCb = pu.Cb();
     CompArea areaCr = pu.Cr();
@@ -751,6 +791,8 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
   const uint32_t uiChFinalMode = PU::getFinalIntraMode(pu, chType);
 #endif
   PelBuf pReco              = cs.getRecoBuf(area);
+
+
 
   //===== init availability pattern =====
   bool predRegDiffFromTB = CU::isPredRegDiffFromTB(*tu.cu, compID);
@@ -1213,10 +1255,10 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 #if JVET_AH0136_CHROMA_REORDERING
         if (compID != COMPONENT_Y && PU::isDbvMode(uiChFinalMode))
 #else
-      if (compID != COMPONENT_Y && uiChFinalMode == DBV_CHROMA_IDX)
+        if (compID != COMPONENT_Y && uiChFinalMode == DBV_CHROMA_IDX)
 #endif
-      {
-        m_pcIntraPred->predIntraDbv(compID, piPred, pu
+        {
+          m_pcIntraPred->predIntraDbv(compID, piPred, pu
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
                                   , m_pcInterPred
 #endif
@@ -1225,6 +1267,7 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
       else
 #endif
         m_pcIntraPred->predIntraAng(compID, piPred, pu);
+
 #if JVET_Z0050_DIMD_CHROMA_FUSION
       if (compID != COMPONENT_Y && pu.isChromaFusion)
       {
@@ -1430,6 +1473,7 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 #endif
   pReco.copyFrom( piPred );
 #endif
+
 #if JVET_AC0071_DBV && JVET_AA0070_RRIBC
 #if JVET_AH0136_CHROMA_REORDERING
   if (compID != COMPONENT_Y && PU::isDbvMode(uiChFinalMode) && tu.cu->rribcFlipType)
@@ -3898,7 +3942,9 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
 #if JVET_Z0075_IBC_HMVP_ENLARGE
                 auto mrgCandIdx = pu.mergeIdx;
                 PU::getIBCMergeCandidates(pu, mrgCtx);
+
                 m_pcInterPred->adjustIBCMergeCandidates(pu, mrgCtx, 0, IBC_MRG_MAX_NUM_CANDS_MEM);
+
 #if JVET_AE0169_BIPREDICTIVE_IBC
                 if (pu.ibcMergeIdx1 != MAX_INT)
                 {

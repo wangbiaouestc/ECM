@@ -371,7 +371,11 @@ void Quant::dequant(const TransformUnit &tu,
 
   const bool            disableSMForLFNST = tu.cs->slice->getExplicitScalingListUsed() ? tu.cs->slice->getSPS()->getDisableScalingMatrixForLfnstBlks() : false;
 #if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  const bool            isLfnstApplied = tu.cu->lfnstIdx > 0 && (tu.cu->separateTree ? true : isLuma(compID));
+#else
   const bool            isLfnstApplied = tu.cu->lfnstIdx > 0 && (CS::isDualITree(*tu.cs) ? true : isLuma(compID));
+#endif
 #else
   const bool            isLfnstApplied = tu.cu->lfnstIdx > 0 && (tu.cu->isSepTree() ? true : isLuma(compID));
 #endif
@@ -1217,7 +1221,11 @@ void Quant::invTrSkipDeQuantOneSample(TransformUnit &tu, const ComponentID &comp
   
   const bool           disableSMForLFNST = tu.cs->slice->getExplicitScalingListUsed() ? tu.cs->slice->getSPS()->getDisableScalingMatrixForLfnstBlks() : false;
 #if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  const bool           isLfnstApplied = tu.cu->lfnstIdx > 0 && (tu.cu->separateTree ? true : isLuma(compID));
+#else
   const bool           isLfnstApplied = tu.cu->lfnstIdx > 0 && (CS::isDualITree(*tu.cs) ? true : isLuma(compID));
+#endif
 #else
   const bool           isLfnstApplied = tu.cu->lfnstIdx > 0 && (tu.cu->isSepTree() ? true : isLuma(compID));
 #endif

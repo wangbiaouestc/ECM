@@ -214,6 +214,8 @@
 #define JVET_AH0136_CHROMA_REORDERING                     1 // JVET-AH0136: Non-CCP intra chroma mode reordering
 #define JVET_AH0135_TEMPORAL_PARTITIONING                 1 // JVET_AH0135: Temporal partitioning prediction
 #define JVET_AH0209_PDP                                   1 // JVET_AH0209: Matrix based position dependent intra prediction replacing conventional intra modes
+#define JVET_AI0136_ADAPTIVE_DUAL_TREE                    1 // JVET-AI0136: Adaptive dual tree in inter slices
+
 //IBC
 #define JVET_Y0058_IBC_LIST_MODIFY                        1 // JVET-Y0058: Modifications of IBC merge/AMVP list construction, ARMC-TM-IBC part is included under JVET_W0090_ARMC_TM
 #define JVET_Z0075_IBC_HMVP_ENLARGE                       1 // JVET-Z0075: Enlarged HMVP table for IBC

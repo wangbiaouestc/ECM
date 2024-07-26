@@ -392,6 +392,9 @@ protected:
   double    m_ttFastSkipThr;
 #endif
   bool      m_dualTree;
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  bool      m_interSliceSeparateTreeEnabled;
+#endif
 #if JVET_AH0103_LOW_DELAY_LFNST_NSPT
   bool      m_intraLFNSTISlice;
   bool      m_intraLFNSTPBSlice;

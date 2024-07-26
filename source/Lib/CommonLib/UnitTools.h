@@ -84,6 +84,9 @@ namespace CU
   uint32_t getCtuAddr                     (const CodingUnit &cu);
 #if JVET_AG0117_CABAC_SPATIAL_TUNING
   bool isOnCtuBottom                  (const CodingUnit& cu);
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  bool isPartitionerOnCtuBottom(const CodingUnit& cu, const Partitioner& partitioner);
+#endif
 #endif
 #if JVET_V0130_INTRA_TMP
   Position getCtuXYAddr               (const CodingUnit& cu);
@@ -194,6 +197,10 @@ namespace CU
 #endif
 #if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
   bool interCcpMergeZeroRootCbfAllowed(const CodingUnit& cu);
+#endif
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  bool isIntraRegionRoot              (const CodingUnit &cu, const Partitioner& p);
 #endif
 }
 // PU tools

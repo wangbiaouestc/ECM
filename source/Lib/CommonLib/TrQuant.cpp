@@ -473,7 +473,11 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   if( lfnstIdx && tu.mtsIdx[compID] != MTS_SKIP && (tu.cu->isSepTree() ? true : isLuma(compID)) )
 #else
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  if (lfnstIdx && tu.mtsIdx[compID] != MTS_SKIP && (tu.cu->separateTree ? true : isLuma(compID)))
+#else
   if (lfnstIdx && tu.mtsIdx[compID] != MTS_SKIP && (CS::isDualITree(*tu.cs) ? true : isLuma(compID)))
+#endif
 #endif
   {
 #if JVET_AC0130_NSPT
@@ -772,7 +776,11 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   if( lfnstIdx && tu.mtsIdx[compID] != MTS_SKIP && (tu.cu->isSepTree() ? true : isLuma(compID)) )
 #else
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  if (lfnstIdx && tu.mtsIdx[compID] != MTS_SKIP && (tu.cu->separateTree ? true : isLuma(compID)))
+#else
   if (lfnstIdx && tu.mtsIdx[compID] != MTS_SKIP && (CS::isDualITree(*tu.cs) ? true : isLuma(compID)))
+#endif
 #endif
   {
 #if JVET_AC0130_NSPT

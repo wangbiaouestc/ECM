@@ -1752,6 +1752,19 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setMaxPicWidthInLumaSamples( m_iSourceWidth );
   sps.setMaxPicHeightInLumaSamples( m_iSourceHeight );
 #endif
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  sps.setUseInterSliceSeparateTree ( m_interSliceSeparateTreeEnabled );
+  if (getFrameRate() < 50 && (m_sourceWidth * m_sourceHeight) <= (832 * 480))
+  {
+    sps.setUseInterSliceSeparateTree ( false );
+  }
+  if(m_iQP < 27 || m_iQP>32)
+  {
+    sps.setUseInterSliceSeparateTree ( false );
+  }
+#endif
+
   if (m_resChangeInClvsEnabled)
   {
 #if JVET_AA0146_WRAP_AROUND_FIX
@@ -1774,6 +1787,7 @@ void EncLib::xInitSPS( SPS& sps )
       maxPicHeight = std::max(maxPicHeight, (int)((double)m_sourceHeight / m_scalingRatioVer3 + 0.5));
     }
 #endif
+
     const int minCuSize = std::max(8, 1 << m_log2MinCUSize);
     if (maxPicWidth % minCuSize)
     {

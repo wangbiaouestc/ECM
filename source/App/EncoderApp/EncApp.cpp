@@ -1116,6 +1116,10 @@ void EncApp::xInitLibCfg()
     }
   }
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  m_cEncLib.setInterSliceSeparateTreeEnabled                     ( m_interSliceSeparateTreeEnabled );
+#endif
+
   m_cEncLib.setMaxCUWidth                                        ( m_uiCTUSize );
   m_cEncLib.setMaxCUHeight                                       ( m_uiCTUSize );
   m_cEncLib.setLog2MinCodingBlockSize                            ( m_log2MinCuSize );

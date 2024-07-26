@@ -643,6 +643,11 @@ protected:
   ReshapeCW m_reshapeCW;
   int       m_CSoffset;
   bool      m_encDbOpt;
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  bool      m_interSliceSeparateTreeEnabled;
+#endif
+
   bool      m_useFastLCTU;
   bool      m_useFastMrg;
 #if MERGE_ENC_OPT
@@ -1986,6 +1991,12 @@ public:
   const ReshapeCW& getReshapeCW             ()                           { return m_reshapeCW; }
   void      setReshapeCSoffset              (int CSoffset)          { m_CSoffset = CSoffset; }
   int       getReshapeCSoffset              ()                      { return m_CSoffset; }
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  void      setInterSliceSeparateTreeEnabled( bool b )       { m_interSliceSeparateTreeEnabled = b; }
+  bool      getInterSliceSeparateTreeEnabled()         const { return m_interSliceSeparateTreeEnabled; }
+#endif
+
   void      setMaxCUWidth                   ( uint32_t  u )      { m_maxCUWidth  = u; }
   uint32_t      getMaxCUWidth                   () const         { return m_maxCUWidth; }
   void      setMaxCUHeight                  ( uint32_t  u )      { m_maxCUHeight = u; }

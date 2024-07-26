@@ -1245,6 +1245,9 @@ int CtxSmBvdBin(const int iPreviousBinIsCorrect2, const int iPreviousBinIsCorrec
 #if JVET_AE0159_FIBC
 unsigned ctxIbcFilterFlag(const CodingUnit& cu);
 #endif
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+unsigned CtxCUSeparateTree ( const CodingStructure& cs, Partitioner& partitioner );
+#endif
 }
 
 #endif // __CONTEXTMODELLING__

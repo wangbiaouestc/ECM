@@ -56,7 +56,11 @@ uint64_t CS::getEstBits(const CodingStructure &cs)
 
 bool CS::isDualITree( const CodingStructure &cs )
 {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  return cs.slice->getSeparateTreeEnabled() && (cs.slice->getProcessingIntraRegion() || cs.slice->isIntra())&& cs.slice->getProcessingSeparateTrees();
+#else
   return cs.slice->isIntra() && !cs.pcv->ISingleTree;
+#endif
 }
 
 UnitArea CS::getArea( const CodingStructure &cs, const UnitArea &area, const ChannelType chType )
@@ -192,6 +196,20 @@ bool CU::isOnCtuBottom( const CodingUnit& cu )
 
   return cuBottomY % ctuHeight == 0;
 }
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+bool CU::isPartitionerOnCtuBottom( const CodingUnit& cu, const Partitioner& partitioner )
+{
+  const CodingStructure &cs = *cu.cs;
+  const ComponentID compID  = partitioner.chType == CHANNEL_TYPE_CHROMA ? COMPONENT_Cb : COMPONENT_Y;
+  const Area& partArea        = partitioner.chType == CHANNEL_TYPE_CHROMA ? partitioner.currArea().Cb() : partitioner.currArea().Y();
+
+  const int ctuHeight = cs.pcv->maxCUHeight >> getComponentScaleY(compID, cs.pcv->chrFormat);
+  const int cuBottomY = partArea.y + partArea.height;
+
+  return cuBottomY % ctuHeight == 0;
+}
+#endif
 #endif
 
 bool CU::getRprScaling( const SPS* sps, const PPS* curPPS, Picture* refPic, int& xScale, int& yScale )
@@ -386,6 +404,12 @@ bool CU::isSecLicParaNeeded(const CodingUnit &cu)
     return false;
   }
 #endif
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  if (cu.slice->getProcessingIntraRegion())
+  {
+    return false;
+  }
+#endif
   return true;
 }
 
@@ -575,7 +599,11 @@ bool CU::isSameCtu(const CodingUnit& cu, const CodingUnit& cu2)
 bool CU::isLastSubCUOfCtu( const CodingUnit &cu )
 {
 #if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  const Area cuAreaY = cu.separateTree ? Area(recalcPosition(cu.chromaFormat, cu.chType, CHANNEL_TYPE_LUMA, cu.blocks[cu.chType].pos()), recalcSize(cu.chromaFormat, cu.chType, CHANNEL_TYPE_LUMA, cu.blocks[cu.chType].size())) : (const Area&)cu.Y();
+#else
   const Area cuAreaY = CS::isDualITree(*cu.cs) ? Area(recalcPosition(cu.chromaFormat, cu.chType, CHANNEL_TYPE_LUMA, cu.blocks[cu.chType].pos()), recalcSize(cu.chromaFormat, cu.chType, CHANNEL_TYPE_LUMA, cu.blocks[cu.chType].size())) : (const Area&)cu.Y();
+#endif
 #else
   const Area cuAreaY = cu.isSepTree() ? Area( recalcPosition( cu.chromaFormat, cu.chType, CHANNEL_TYPE_LUMA, cu.blocks[cu.chType].pos() ), recalcSize( cu.chromaFormat, cu.chType, CHANNEL_TYPE_LUMA, cu.blocks[cu.chType].size() ) ) : (const Area&)cu.Y();
 #endif
@@ -929,7 +957,11 @@ bool CU::canUseLfnstWithISP( const CodingUnit& cu, const ChannelType chType )
 Size CU::getLfnstSize( const CodingUnit& cu, const ChannelType chType )
 {
 #if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  int chIdx = cu.separateTree && cu.chType == CHANNEL_TYPE_CHROMA ? 1 : 0;
+#else
   int chIdx = CS::isDualITree( *cu.cs ) && cu.chType == CHANNEL_TYPE_CHROMA ? 1 : 0;
+#endif
 #else
   int chIdx = cu.isSepTree() && cu.chType == CHANNEL_TYPE_CHROMA ? 1 : 0;
 #endif
@@ -1048,6 +1080,19 @@ TUTraverser CU::traverseTUs( CodingUnit& cu )
 {
   return TUTraverser( cu.firstTU, cu.lastTU->next );
 }
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+bool CU::isIntraRegionRoot( const CodingUnit& cu, const Partitioner& p )
+{
+  return ( cu.isSST && 
+    cu.intraRegionRootDepth           == p.currDepth   &&
+    cu.intraRegionRootQtDepth         == p.currQtDepth &&
+    cu.intraRegionRootBtDepth         == p.currBtDepth &&
+    cu.intraRegionRootImplicitBtDepth == p.currImplicitBtDepth &&
+    cu.intraRegionRootMtDepth         == p.currMtDepth    
+    );
+}
+#endif
 
 cPUTraverser CU::traversePUs( const CodingUnit& cu )
 {
@@ -2989,7 +3034,11 @@ bool PU::isDMChromaMIP(const PredictionUnit &pu)
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   return !pu.cu->isSepTree() && (pu.chromaFormat == CHROMA_444) && getCoLocatedLumaPU(pu).cu->mipFlag;
 #else
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  return !(pu.cu->separateTree) && (pu.chromaFormat == CHROMA_444) && getCoLocatedLumaPU(pu).cu->mipFlag;
+#else
   return !(CS::isDualITree(*pu.cs)) && (pu.chromaFormat == CHROMA_444) && getCoLocatedLumaPU(pu).cu->mipFlag;
+#endif
 #endif
 }
 
@@ -3183,7 +3232,11 @@ bool PU::isMultiCccmWithMdf(const PredictionUnit& pu, int intraMode)
 bool PU::hasChromaFusionFlag(const PredictionUnit &pu, int intraMode)
 {
 #if ENABLE_DIMD
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  bool hasChromaFusionFlag = pu.cs->slice->getSliceType() == I_SLICE ||  (CS::isDualITree(*pu.cs) || (pu.cu->isSST && pu.cu->separateTree) ) || (pu.cs->sps->getUseDimd() && intraMode == DIMD_CHROMA_IDX);
+#else
   bool hasChromaFusionFlag = pu.cs->slice->getSliceType() == I_SLICE || (pu.cs->sps->getUseDimd() && intraMode == DIMD_CHROMA_IDX);
+#endif
 #else
   bool hasChromaFusionFlag = pu.cs->slice->getSliceType() == I_SLICE;
 #endif
@@ -3260,6 +3313,12 @@ void PU::getBvgCccmCands(PredictionUnit &pu, bool &validBv)
 }
 bool PU::bvgCccmModeAvail(const PredictionUnit &pu)
 {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  if (pu.cs->slice->getSeparateTreeEnabled() && !pu.cs->slice->isIntra())
+  {
+    return false;
+  }
+#endif
   CompArea lumaArea = CompArea(COMPONENT_Y, pu.chromaFormat, pu.Cb().lumaPos(), recalcSize(pu.chromaFormat, CHANNEL_TYPE_CHROMA, CHANNEL_TYPE_LUMA, pu.Cb().size()));
   lumaArea = clipArea(lumaArea, pu.cs->picture->block(COMPONENT_Y));
   Position posList[NUM_BVG_CCCM_CANDS] = { lumaArea.center(), lumaArea.topLeft(), lumaArea.topRight(), lumaArea.bottomLeft(), lumaArea.bottomRight() };
@@ -3267,7 +3326,12 @@ bool PU::bvgCccmModeAvail(const PredictionUnit &pu)
   
   for (int n = 0; n < NUM_BVG_CCCM_CANDS; n++)
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    const PredictionUnit *lumaPU = CS::isDualITree(*pu.cs) ? pu.cs->getLumaPU( posList[n], CHANNEL_TYPE_LUMA ) : 
+      pu.cs->picture->cs->getPU(posList[n], CHANNEL_TYPE_LUMA);
+#else
     const PredictionUnit *lumaPU = pu.cs->picture->cs->getPU(posList[n], CHANNEL_TYPE_LUMA);
+#endif
     if (lumaPU && (CU::isIBC(*lumaPU->cu) || isTmp(*lumaPU)))
     {
       return true;
@@ -3279,7 +3343,12 @@ bool PU::bvgCccmModeAvail(const PredictionUnit &pu)
         int offsetX = (a == 0) ? 1 : (a >> 1);
         int offsetY = (a == 0) ? 1 : (a % 2);
         Position temp(posList[n].getX() - offsetX * checkOffset, posList[n].getY() - offsetY * checkOffset);
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        const PredictionUnit *lumaPU = CS::isDualITree(*pu.cs) ? pu.cs->getLumaPU( temp, CHANNEL_TYPE_LUMA ) : 
+          pu.cs->picture->cs->getPU(temp, CHANNEL_TYPE_LUMA);
+#else
         const PredictionUnit* lumaPU = pu.cs->picture->cs->getPU(temp, CHANNEL_TYPE_LUMA);
+#endif
         if (lumaPU && (CU::isIBC(*lumaPU->cu) || isTmp(*lumaPU)))
         {
           return true;
@@ -3300,15 +3369,25 @@ bool PU::isBvgCccmCand(const PredictionUnit &pu, Mv &chromaBv, int& rrIbcType, i
   CompArea lumaArea = CompArea(COMPONENT_Y, pu.chromaFormat, pu.Cb().lumaPos(), recalcSize(pu.chromaFormat, CHANNEL_TYPE_CHROMA, CHANNEL_TYPE_LUMA, pu.Cb().size()));
   lumaArea = clipArea(lumaArea, pu.cs->picture->block(COMPONENT_Y));
   Position posList[NUM_BVG_CCCM_CANDS] = { lumaArea.center(), lumaArea.topLeft(), lumaArea.topRight(), lumaArea.bottomLeft(), lumaArea.bottomRight() };
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  const PredictionUnit *lumaPU     = ( CS::isDualITree(*pu.cs)  || (pu.cu->isSST && pu.cu->separateTree) ) ? pu.cs->getLumaPU( posList[candIdx], CHANNEL_TYPE_LUMA )
+    : pu.cs->getPU(posList[candIdx], CHANNEL_TYPE_LUMA);
+#else
   const PredictionUnit *lumaPU = pu.cs->picture->cs->getPU(posList[candIdx], CHANNEL_TYPE_LUMA);
-  
+#endif
+
   if (lumaPU && (CU::isIBC(*lumaPU->cu) || isTmp(*lumaPU)))
   {
     if (candIdx > 0)
     {
       for (int n = 0; n < candIdx; n++)
       {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        const PredictionUnit *prevLumaPU = ( CS::isDualITree(*pu.cs)  || (pu.cu->isSST && pu.cu->separateTree) ) ? pu.cs->getLumaPU( posList[n], CHANNEL_TYPE_LUMA ) :
+          pu.cs->picture->cs->getPU(posList[n], CHANNEL_TYPE_LUMA);
+#else
         const PredictionUnit *prevLumaPU = pu.cs->picture->cs->getPU(posList[n], CHANNEL_TYPE_LUMA);
+#endif
         if (prevLumaPU == lumaPU)
         {
           isBvgFound= false;
@@ -3341,14 +3420,24 @@ bool PU::isBvgCccmCand(const PredictionUnit &pu, Mv &chromaBv, int& rrIbcType, i
       int offsetX = (a == 0) ? 1 : (a >> 1);
       int offsetY = (a == 0) ? 1 : (a % 2);
       Position temp(posList[candIdx].getX() - offsetX * checkOffset, posList[candIdx].getY() - offsetY * checkOffset);
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      const PredictionUnit *lumaPU = ( CS::isDualITree(*pu.cs)  || (pu.cu->isSST && pu.cu->separateTree) ) ? pu.cs->getLumaPU( temp, CHANNEL_TYPE_LUMA ) :
+        pu.cs->picture->cs->getPU(temp, CHANNEL_TYPE_LUMA);
+#else
       const PredictionUnit* lumaPU = pu.cs->picture->cs->getPU(temp, CHANNEL_TYPE_LUMA);
+#endif
       if (lumaPU && (CU::isIBC(*lumaPU->cu) || isTmp(*lumaPU)))
       {
         if (candIdx > 0)
         {
           for (int n = 0; n < candIdx; n++)
           {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+            const PredictionUnit *prevLumaPU = ( CS::isDualITree(*pu.cs)  || (pu.cu->isSST && pu.cu->separateTree) ) ? pu.cs->getLumaPU( posList[n], CHANNEL_TYPE_LUMA ) :
+              pu.cs->picture->cs->getPU(posList[n], CHANNEL_TYPE_LUMA);
+#else
             const PredictionUnit* prevLumaPU = pu.cs->picture->cs->getPU(posList[n], CHANNEL_TYPE_LUMA);
+#endif
             if (prevLumaPU == lumaPU)
             {
               isBvgFound = false;
@@ -3589,7 +3678,11 @@ bool PU::hasNonLocalCCP(const PredictionUnit &pu)
   {
     return false;
   }
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  if (pu.cu->ispMode && !pu.cu->separateTree)
+#else
   if (pu.cu->ispMode && !CS::isDualITree(*pu.cs))
+#endif
   {
     return false;
   }
@@ -4242,6 +4335,12 @@ int PU::getCCPModelCandidateList(const PredictionUnit &pu, CCPModelCandidate can
   auto tryHistCCP = [&](const LutCCP& ccpLut)
 #endif
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    if (!pu.cs->slice->isIntra() && pu.cs->slice->getSeparateTreeEnabled())
+    {
+      return -1;
+    }
+#endif
 #if JVET_Z0118_GDR  
     for (int idx = 0; idx < lut.size(); idx++)
     {
@@ -4342,17 +4441,38 @@ int PU::getCCPModelCandidateList(const PredictionUnit &pu, CCPModelCandidate can
 
       for (int posIdx = 0; posIdx < 5 && foundNeighMV == false; posIdx++)
       {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        Position lumaPos = posCand[posIdx];
+        if (CU::isIntra(*pu.cu) && pu.cu->separateTree && pu.chType==CHANNEL_TYPE_CHROMA)
+        {
+          lumaPos.x <<= getComponentScaleX(COMPONENT_Cb, pu.chromaFormat);
+          lumaPos.y <<= getComponentScaleY(COMPONENT_Cb, pu.chromaFormat);
+        }
+#endif
         const PredictionUnit *puRef = cs.getPURestricted(posCand[posIdx], pu, pu.chType);
         bool isAvailableNeigh = puRef && 
-                                isDiffMER(pu.lumaPos(), posCand[posIdx], plevel) && 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+                                CU::isInter(*puRef->cu) && 
+                                isDiffMER(pu.lumaPos(), lumaPos, plevel) && 
+#else
+          isDiffMER(pu.lumaPos(), posCand[posIdx], plevel) && 
+#endif
 #if JVET_Y0065_GPM_INTRA
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+                                puRef->getMotionInfo( lumaPos ).isInter &&
+#else
                                 puRef->getMotionInfo( posCand[posIdx] ).isInter &&
+#endif
 #endif
                                 pu.cu != puRef->cu && CU::isInter(*puRef->cu);
 
         if (isAvailableNeigh)
         {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+          miNeigh = puRef->getMotionInfo(lumaPos);
+#else
           miNeigh = puRef->getMotionInfo(posCand[posIdx]);
+#endif
           for (int i = 0; i < 2 && foundNeighMV == false; i++)
           {
             int refIdx = miNeigh.refIdx[i];
@@ -4563,6 +4683,7 @@ int PU::getCCPModelCandidateList(const PredictionUnit &pu, CCPModelCandidate can
 void CU::saveModelsInHCCP(const CodingUnit &cu)
 {
   bool lumaUsesISP = !CS::isDualITree(*cu.cs) && cu.ispMode;
+
 #if JVET_AF0073_INTER_CCP_MERGE
   if (cu.chromaFormat == CHROMA_400 || (CS::isDualITree(*cu.cs) && cu.chType == CHANNEL_TYPE_LUMA))
 #else
@@ -5043,7 +5164,11 @@ uint32_t PU::getIntraDirLuma( const PredictionUnit &pu )
 void PU::getIntraChromaCandModes(const PredictionUnit &pu, unsigned modeList[NUM_CHROMA_MODE])
 {
 #if JVET_AH0136_CHROMA_REORDERING
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  if (( CS::isDualITree(*pu.cs) || (pu.cu->isSST && pu.cu->separateTree) ) && pu.cs->sps->getUseChromaReordering() && pu.cs->slice->isIntra())
+#else
   if (CS::isDualITree(*pu.cs) && pu.cs->sps->getUseChromaReordering())
+#endif
   {
     modeList[0] = LM_CHROMA_IDX;
     modeList[1] = MDLM_L_IDX;
@@ -5122,6 +5247,7 @@ void PU::getIntraChromaCandModes(const PredictionUnit &pu, unsigned modeList[NUM
     return;
   }
 #endif
+
 
   const uint32_t lumaMode = getCoLocatedIntraLumaMode(pu);
   for (int i = 0; i < 4; i++)
@@ -5259,7 +5385,18 @@ uint32_t PU::getFinalIntraMode( const PredictionUnit &pu, const ChannelType &chT
 #endif
 #if JVET_AC0071_DBV
 #if JVET_AH0136_CHROMA_REORDERING
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  if ((pu.cs->sps->getUseChromaReordering() && ( CS::isDualITree(*pu.cs) || (pu.cu->isSST && pu.cu->separateTree) ) && pu.cu->slice->isIntra()
+    && (PU::isDbvMode(pu.intraDir[1]) && !isLuma(chType) && pu.cu->mvs[pu.intraDir[1] - DBV_CHROMA_IDX] == Mv())) 
+    || 
+    (
+      (!( CS::isDualITree(*pu.cs) || (pu.cu->isSST && pu.cu->separateTree) ) || !pu.cs->sps->getUseChromaReordering() || !pu.cu->slice->isIntra()) 
+      && uiIntraMode == DBV_CHROMA_IDX && !isLuma(chType) && pu.bv == Mv()
+      )
+    )
+#else
   if ((pu.cs->sps->getUseChromaReordering() && CS::isDualITree(*pu.cs) && (PU::isDbvMode(pu.intraDir[1]) && !isLuma(chType) && pu.cu->mvs[pu.intraDir[1] - DBV_CHROMA_IDX] == Mv())) || ((!CS::isDualITree(*pu.cs) || !pu.cs->sps->getUseChromaReordering()) && uiIntraMode == DBV_CHROMA_IDX && !isLuma(chType) && pu.bv == Mv()))
+#endif
 #else
   if (uiIntraMode == DBV_CHROMA_IDX && !isLuma(chType) && pu.bv == Mv())
 #endif
@@ -5276,8 +5413,14 @@ const PredictionUnit &PU::getCoLocatedLumaPU(const PredictionUnit &pu)
   Position              refPos     = topLeftPos.offset(pu.blocks[pu.chType].lumaSize().width  >> 1,
                                                        pu.blocks[pu.chType].lumaSize().height >> 1);
 #if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  const PredictionUnit &lumaPU     = ( CS::isDualITree(*pu.cs)  || (pu.cu->isSST && pu.cu->separateTree) )
+    ? *pu.cs->getLumaPU( refPos, CHANNEL_TYPE_LUMA )
+    : *pu.cs->getPU(topLeftPos, CHANNEL_TYPE_LUMA);
+#else
   const PredictionUnit &lumaPU     = CS::isDualITree(*pu.cs) ? *pu.cs->picture->cs->getPU(refPos, CHANNEL_TYPE_LUMA)
                                                         : *pu.cs->getPU(topLeftPos, CHANNEL_TYPE_LUMA);
+#endif
 #else
   const PredictionUnit &lumaPU     = pu.cu->isSepTree() ? *pu.cs->picture->cs->getPU(refPos, CHANNEL_TYPE_LUMA)
                                                         : *pu.cs->getPU(topLeftPos, CHANNEL_TYPE_LUMA);
@@ -5341,7 +5484,12 @@ bool PU::isDbvMode(int mode)
 bool PU::dbvModeAvail(const PredictionUnit &pu)
 {
 #if JVET_AF0066_ENABLE_DBV_4_SINGLE_TREE
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  if (! ( CS::isDualITree(*pu.cs) || (pu.cu->isSST && pu.cu->separateTree) ) )
+#else
   if (!CS::isDualITree(*pu.cs))
+#endif
   {
     const PredictionUnit &lumaPU = PU::getCoLocatedLumaPU(pu);
     return lumaPU.cu->tmpFlag || CU::isIBC(*lumaPU.cu);
@@ -5352,7 +5500,13 @@ bool PU::dbvModeAvail(const PredictionUnit &pu)
   Position posList[5] = { lumaArea.center(), lumaArea.topLeft(), lumaArea.topRight(), lumaArea.bottomLeft(), lumaArea.bottomRight() };
   for (int n = 0; n < NUM_DBV_POSITION; n++)
   {
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    const PredictionUnit *lumaPU     = CS::isDualITree(*pu.cs) ? pu.cs->getLumaPU( posList[n], CHANNEL_TYPE_LUMA )
+      : pu.cs->getPU(posList[n], CHANNEL_TYPE_LUMA);
+#else
     const PredictionUnit *lumaPU = pu.cs->picture->cs->getPU(posList[n], CHANNEL_TYPE_LUMA);
+#endif
 #if JVET_AB0061_ITMP_BV_FOR_IBC
     if (CU::isIBC(*lumaPU->cu) || isTmp(*lumaPU))
 #else
@@ -5368,7 +5522,12 @@ bool PU::dbvModeAvail(const PredictionUnit &pu)
 void PU::deriveChromaBv(PredictionUnit &pu)
 {
 #if JVET_AF0066_ENABLE_DBV_4_SINGLE_TREE
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  if ( ! ( CS::isDualITree(*pu.cs)  || (pu.cu->isSST && pu.cu->separateTree) ) )
+#else
   if (!CS::isDualITree(*pu.cs))
+#endif
   {
     return;
   }
@@ -5402,7 +5561,12 @@ void PU::deriveChromaBv(PredictionUnit &pu)
 #endif
   for (int n = 0; n < NUM_DBV_POSITION; n++)
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    const PredictionUnit *lumaPU     = ( CS::isDualITree(*pu.cs)  || (pu.cu->isSST && pu.cu->separateTree) ) ? pu.cs->getLumaPU( posList[n], CHANNEL_TYPE_LUMA )
+      : pu.cs->getPU(posList[n], CHANNEL_TYPE_LUMA);
+#else
     const PredictionUnit *lumaPU = pu.cs->picture->cs->getPU(posList[n], CHANNEL_TYPE_LUMA);
+#endif
 #if JVET_AB0061_ITMP_BV_FOR_IBC
     if (CU::isIBC(*lumaPU->cu) || isTmp(*lumaPU))
 #else
@@ -6208,6 +6372,13 @@ bool PU::addIBCMergeHMVPCand(const CodingStructure &cs, MergeCtx &mrgCtx, const 
 #endif
 )
 {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    if (!pu.cs->slice->isIntra() && pu.cs->slice->getSeparateTreeEnabled() && pu.cs->slice->getSPS()->getIBCFlagInterSlice())
+    {
+      return false;
+    }
+#endif
+
 #if !JVET_Z0084_IBC_TM
   const Slice& slice = *cs.slice;
 #endif
@@ -8342,7 +8513,11 @@ bool PU::searchBv(const PredictionUnit& pu, int xPos, int yPos, int width, int h
 
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
 #if JVET_AC0071_DBV
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  const bool isDBV = (pu.cs->slice->getSliceType() == I_SLICE && ( CS::isDualITree(*pu.cs) || (pu.cu->isSST && pu.cu->separateTree) ) && pu.cu->slice->getSPS()->getUseIntraDBV())
+#else
   const bool isDBV = (pu.cs->slice->getSliceType() == I_SLICE && CS::isDualITree(*pu.cs) && pu.cu->slice->getSPS()->getUseIntraDBV())
+#endif
     && compID != COMPONENT_Y &&
 #if JVET_AH0136_CHROMA_REORDERING
     PU::isDbvMode(pu.intraDir[1]);
@@ -8352,7 +8527,14 @@ bool PU::searchBv(const PredictionUnit& pu, int xPos, int yPos, int width, int h
 #endif
 #if JVET_AH0136_CHROMA_REORDERING && JVET_AC0071_DBV
   bool isLumaDbv = false;
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  if (pu.cs->sps->getUseChromaReordering() && compID == COMPONENT_Y && PU::isDbvMode(pu.intraDir[1]) 
+    && ( CS::isDualITree(*pu.cs) || (pu.cu->isSST && pu.cu->separateTree) )
+    && pu.cs->slice->isIntra()
+    )
+#else
   if (pu.cs->sps->getUseChromaReordering() && compID == COMPONENT_Y && PU::isDbvMode(pu.intraDir[1]) && CS::isDualITree(*pu.cs))
+#endif
   {
     isLumaDbv = true;
   }
@@ -8429,6 +8611,19 @@ bool PU::searchBv(const PredictionUnit& pu, int xPos, int yPos, int width, int h
     {
       return false;
     }
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE // to fix chroma ipm reorderding
+    if (isLumaDbv && !pu.cs->slice->isIntra() && ( CS::isDualITree(*pu.cs) || (pu.cu->isSST && pu.cu->separateTree) ))
+    {
+      if (refRightX > (xPos + width - 1))
+      {
+        return false;
+      }
+      if (refBottomY > (yPos + height - 1))
+      {
+        return false;
+      }
+    }
+#endif
     return true;
   }
 #endif
@@ -30928,9 +31123,14 @@ bool CU::isNSPTAllowed( const TransformUnit &tu, const ComponentID compID, int w
 bool CU::nsptApplyCond( const TransformUnit& tu, ComponentID compID, bool allowNSPT )
 {
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+
   bool cond = allowNSPT && tu.cu->lfnstIdx > 0 && ( tu.cu->isSepTree() ? true : isLuma( compID ) );
 #else
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  bool cond = allowNSPT && tu.cu->lfnstIdx > 0 && (tu.cu->separateTree ? true : isLuma( compID ) );
+#else
   bool cond = allowNSPT && tu.cu->lfnstIdx > 0 && ( CS::isDualITree( *tu.cs ) ? true : isLuma( compID ) );
+#endif
 #endif
 
   return cond;

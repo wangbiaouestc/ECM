@@ -60,6 +60,11 @@ void EncModeCtrl::init( EncCfg *pCfg, RateCtrl *pRateCtrl, RdCost* pRdCost )
 
   initLumaDeltaQpLUT();
 #endif
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  m_avoidComplexIntraInInterSlice = false;
+  m_savedInterHad                 = MAX_UINT;
+  m_treeIdx                       = 0;
+#endif
 }
 
 bool EncModeCtrl::tryModeMaster( const EncTestMode& encTestmode, const CodingStructure &cs, Partitioner& partitioner )
@@ -78,7 +83,11 @@ bool EncModeCtrl::tryModeMaster( const EncTestMode& encTestmode, const CodingStr
 
 void EncModeCtrl::setEarlySkipDetected()
 {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().earlySkip = true;
+#else
   m_ComprCUCtxList.back().earlySkip = true;
+#endif
 }
 
 void EncModeCtrl::xExtractFeatures( const EncTestMode encTestmode, CodingStructure& cs )
@@ -92,6 +101,21 @@ void EncModeCtrl::xExtractFeatures( const EncTestMode encTestmode, CodingStructu
   cs.features[ENC_FT_ENC_MODE_OPTS  ] = double( encTestmode.opts     );
 }
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+bool EncModeCtrl::nextMode( const CodingStructure &cs, Partitioner &partitioner )
+{
+  m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().lastTestMode = m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.back();
+
+  m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.pop_back();
+
+  while( !m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.empty() && !tryModeMaster( currTestMode(), cs, partitioner ) )
+  {
+    m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.pop_back();
+  }
+
+  return !m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.empty();
+}
+#else
 bool EncModeCtrl::nextMode( const CodingStructure &cs, Partitioner &partitioner )
 {
   m_ComprCUCtxList.back().lastTestMode = m_ComprCUCtxList.back().testModes.back();
@@ -105,30 +129,51 @@ bool EncModeCtrl::nextMode( const CodingStructure &cs, Partitioner &partitioner 
 
   return !m_ComprCUCtxList.back().testModes.empty();
 }
+#endif
+
 
 EncTestMode EncModeCtrl::currTestMode() const
 {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  return m_ComprCUCtxList[m_treeIdx].back().testModes.back();
+#else
   return m_ComprCUCtxList.back().testModes.back();
+#endif
 }
 
 EncTestMode EncModeCtrl::lastTestMode() const
 {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  return m_ComprCUCtxList[m_treeIdx].back().lastTestMode;
+#else
   return m_ComprCUCtxList.back().lastTestMode;
+#endif
 }
 
 bool EncModeCtrl::anyMode() const
 {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  return !m_ComprCUCtxList[m_treeIdx].back().testModes.empty();
+#else
   return !m_ComprCUCtxList.back().testModes.empty();
+#endif
 }
 
 void EncModeCtrl::setBest( CodingStructure& cs )
 {
   if( cs.cost != MAX_DOUBLE && !cs.cus.empty() )
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    m_ComprCUCtxList[m_treeIdx].back().bestCS = &cs;
+    m_ComprCUCtxList[m_treeIdx].back().bestCU = cs.cus[0];
+    m_ComprCUCtxList[m_treeIdx].back().bestTU = cs.cus[0]->firstTU;
+    m_ComprCUCtxList[m_treeIdx].back().lastTestMode = getCSEncMode( cs );
+#else
     m_ComprCUCtxList.back().bestCS = &cs;
     m_ComprCUCtxList.back().bestCU = cs.cus[0];
     m_ComprCUCtxList.back().bestTU = cs.cus[0]->firstTU;
     m_ComprCUCtxList.back().lastTestMode = getCSEncMode( cs );
+#endif
   }
 }
 
@@ -276,6 +321,57 @@ void CacheBlkInfoCtrl::create(const int maxCuSize)
   m_numWidths  = gp_sizeIdxInfo->numWidths();
   m_numHeights = gp_sizeIdxInfo->numHeights();
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  for (unsigned treeIdx = 0; treeIdx < MAX_TREE_TYPE; treeIdx++ )
+  {
+    for( unsigned x = 0; x < numPos; x++ )
+    {
+      for( unsigned y = 0; y < numPos; y++ )
+      {
+        m_codedCUInfo[treeIdx][x][y] = new CodedCUInfo**[m_numWidths];
+
+        for( int wIdx = 0; wIdx < gp_sizeIdxInfo->numWidths(); wIdx++ )
+        {
+          if( gp_sizeIdxInfo->isCuSize( gp_sizeIdxInfo->sizeFrom( wIdx ) ) && x + ( gp_sizeIdxInfo->sizeFrom( wIdx ) >> MIN_CU_LOG2 ) <= ( MAX_CU_SIZE >> MIN_CU_LOG2 ) )
+          {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+            if (treeIdx > 0 && gp_sizeIdxInfo->sizeFrom(wIdx) > 64)
+            {
+              m_codedCUInfo[treeIdx][x][y][wIdx] = nullptr;
+              continue;
+            }
+#endif
+            m_codedCUInfo[treeIdx][x][y][wIdx] = new CodedCUInfo*[gp_sizeIdxInfo->numHeights()];
+
+            for( int hIdx = 0; hIdx < gp_sizeIdxInfo->numHeights(); hIdx++ )
+            {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+              if (treeIdx > 0 && gp_sizeIdxInfo->sizeFrom(hIdx) > 64)
+              {
+                m_codedCUInfo[treeIdx][x][y][wIdx][hIdx] = nullptr;
+                continue;
+              }
+#endif
+
+              if( gp_sizeIdxInfo->isCuSize( gp_sizeIdxInfo->sizeFrom( hIdx ) ) && y + ( gp_sizeIdxInfo->sizeFrom( hIdx ) >> MIN_CU_LOG2 ) <= ( MAX_CU_SIZE >> MIN_CU_LOG2 ) )
+              {
+                m_codedCUInfo[treeIdx][x][y][wIdx][hIdx] = new CodedCUInfo;
+              }
+              else
+              {
+                m_codedCUInfo[treeIdx][x][y][wIdx][hIdx] = nullptr;
+              }
+            }
+          }
+          else
+          {
+            m_codedCUInfo[treeIdx][x][y][wIdx] = nullptr;
+          }
+        }
+      }
+    }
+  }
+#else
   for( unsigned x = 0; x < numPos; x++ )
   {
     for( unsigned y = 0; y < numPos; y++ )
@@ -307,12 +403,41 @@ void CacheBlkInfoCtrl::create(const int maxCuSize)
       }
     }
   }
+#endif
 }
 
 void CacheBlkInfoCtrl::destroy()
 {
   const unsigned numPos = m_maxCuSize >> MIN_CU_LOG2;
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  for( unsigned treeIdx = 0; treeIdx < MAX_TREE_TYPE; treeIdx++ )
+  {
+    for( unsigned x = 0; x < numPos; x++ )
+    {
+      for( unsigned y = 0; y < numPos; y++ )
+      {
+        for( int wIdx = 0; wIdx < gp_sizeIdxInfo->numWidths(); wIdx++ )
+        {
+          if( m_codedCUInfo[treeIdx][x][y][wIdx] )
+          {
+            for( int hIdx = 0; hIdx < gp_sizeIdxInfo->numHeights(); hIdx++ )
+            {
+              if( m_codedCUInfo[treeIdx][x][y][wIdx][hIdx] )
+              {
+                delete m_codedCUInfo[treeIdx][x][y][wIdx][hIdx];
+              }
+            }
+
+            delete[] m_codedCUInfo[treeIdx][x][y][wIdx];
+          }
+        }
+
+        delete[] m_codedCUInfo[treeIdx][x][y];
+      }
+    }
+  }
+#else
   for( unsigned x = 0; x < numPos; x++ )
   {
     for( unsigned y = 0; y < numPos; y++ )
@@ -336,12 +461,41 @@ void CacheBlkInfoCtrl::destroy()
       delete[] m_codedCUInfo[x][y];
     }
   }
+#endif
 }
 
 void CacheBlkInfoCtrl::init( const Slice &slice )
 {
   const unsigned numPos = m_maxCuSize >> MIN_CU_LOG2;
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  for( unsigned treeIdx = 0; treeIdx < MAX_TREE_TYPE; treeIdx++ )
+  {
+    for( unsigned x = 0; x < numPos; x++ )
+    {
+      for( unsigned y = 0; y < numPos; y++ )
+      {
+        if (!m_codedCUInfo[treeIdx][x][y])
+        {
+          continue;
+        }
+        for( int wIdx = 0; wIdx < gp_sizeIdxInfo->numWidths(); wIdx++ )
+        {
+          if( m_codedCUInfo[treeIdx][x][y][wIdx] )
+          {
+            for( int hIdx = 0; hIdx < gp_sizeIdxInfo->numHeights(); hIdx++ )
+            {
+              if( m_codedCUInfo[treeIdx][x][y][wIdx][hIdx] )
+              {
+                std::fill_n( reinterpret_cast< char * >(m_codedCUInfo[treeIdx][x][y][wIdx][hIdx]), sizeof( CodedCUInfo ), 0 );
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+#else
   for( unsigned x = 0; x < numPos; x++ )
   {
     for( unsigned y = 0; y < numPos; y++ )
@@ -361,6 +515,7 @@ void CacheBlkInfoCtrl::init( const Slice &slice )
       }
     }
   }
+#endif
 
   m_slice_chblk = &slice;
 #if ENABLE_SPLIT_PARALLELISM
@@ -434,15 +589,40 @@ CodedCUInfo& CacheBlkInfoCtrl::getBlkInfo( const UnitArea& area )
   unsigned idx1, idx2, idx3, idx4;
   getAreaIdx( area.Y(), *m_slice_chblk->getPPS()->pcv, idx1, idx2, idx3, idx4 );
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  return *m_codedCUInfo[m_treeIdx][idx1][idx2][idx3][idx4];
+#else
   return *m_codedCUInfo[idx1][idx2][idx3][idx4];
+#endif
 }
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+CodedCUInfo* CacheBlkInfoCtrl::getBlkInfoPtr( const UnitArea& area )
+{
+  unsigned idx1, idx2, idx3, idx4;
+
+  if (m_treeIdx > 0 && (area.lwidth() > 64 || area.lheight() > 64))
+  {
+    return nullptr;
+  }
+
+  getAreaIdx( area.Y(), *m_slice_chblk->getPPS()->pcv, idx1, idx2, idx3, idx4 );
+
+  return m_codedCUInfo[m_treeIdx][idx1][idx2][idx3][idx4];
+}
+#endif
 
 bool CacheBlkInfoCtrl::isSkip( const UnitArea& area )
 {
   unsigned idx1, idx2, idx3, idx4;
+
   getAreaIdx( area.Y(), *m_slice_chblk->getPPS()->pcv, idx1, idx2, idx3, idx4 );
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  return m_codedCUInfo[m_treeIdx][idx1][idx2][idx3][idx4]->isSkip;
+#else
   return m_codedCUInfo[idx1][idx2][idx3][idx4]->isSkip;
+#endif
 }
 
 char CacheBlkInfoCtrl::getSelectColorSpaceOption(const UnitArea& area)
@@ -450,7 +630,11 @@ char CacheBlkInfoCtrl::getSelectColorSpaceOption(const UnitArea& area)
   unsigned idx1, idx2, idx3, idx4;
   getAreaIdx(area.Y(), *m_slice_chblk->getPPS()->pcv, idx1, idx2, idx3, idx4);
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  return m_codedCUInfo[m_treeIdx][idx1][idx2][idx3][idx4]->selectColorSpaceOption;
+#else
   return m_codedCUInfo[idx1][idx2][idx3][idx4]->selectColorSpaceOption;
+#endif
 }
 
 bool CacheBlkInfoCtrl::isMMVDSkip(const UnitArea& area)
@@ -458,7 +642,11 @@ bool CacheBlkInfoCtrl::isMMVDSkip(const UnitArea& area)
   unsigned idx1, idx2, idx3, idx4;
   getAreaIdx(area.Y(), *m_slice_chblk->getPPS()->pcv, idx1, idx2, idx3, idx4);
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  return m_codedCUInfo[m_treeIdx][idx1][idx2][idx3][idx4]->isMMVDSkip;
+#else
   return m_codedCUInfo[idx1][idx2][idx3][idx4]->isMMVDSkip;
+#endif
 }
 
 void CacheBlkInfoCtrl::setMv( const UnitArea& area, const RefPicList refPicList, const int iRefIdx, const Mv& rMv )
@@ -468,8 +656,13 @@ void CacheBlkInfoCtrl::setMv( const UnitArea& area, const RefPicList refPicList,
   unsigned idx1, idx2, idx3, idx4;
   getAreaIdx( area.Y(), *m_slice_chblk->getPPS()->pcv, idx1, idx2, idx3, idx4 );
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  m_codedCUInfo[m_treeIdx][idx1][idx2][idx3][idx4]->saveMv [refPicList][iRefIdx] = rMv;
+  m_codedCUInfo[m_treeIdx][idx1][idx2][idx3][idx4]->validMv[refPicList][iRefIdx] = true;
+#else
   m_codedCUInfo[idx1][idx2][idx3][idx4]->saveMv [refPicList][iRefIdx] = rMv;
   m_codedCUInfo[idx1][idx2][idx3][idx4]->validMv[refPicList][iRefIdx] = true;
+#endif
 #if ENABLE_SPLIT_PARALLELISM
 
   touch( area );
@@ -483,12 +676,21 @@ bool CacheBlkInfoCtrl::getMv( const UnitArea& area, const RefPicList refPicList,
 
   if( iRefIdx >= MAX_STORED_CU_INFO_REFS )
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    rMv = m_codedCUInfo[m_treeIdx][idx1][idx2][idx3][idx4]->saveMv[refPicList][0];
+#else
     rMv = m_codedCUInfo[idx1][idx2][idx3][idx4]->saveMv[refPicList][0];
+#endif
     return false;
   }
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  rMv = m_codedCUInfo[m_treeIdx][idx1][idx2][idx3][idx4]->saveMv[refPicList][iRefIdx];
+  return m_codedCUInfo[m_treeIdx][idx1][idx2][idx3][idx4]->validMv[refPicList][iRefIdx];
+#else
   rMv = m_codedCUInfo[idx1][idx2][idx3][idx4]->saveMv[refPicList][iRefIdx];
   return m_codedCUInfo[idx1][idx2][idx3][idx4]->validMv[refPicList][iRefIdx];
+#endif
 }
 
 void SaveLoadEncInfoSbt::init( const Slice &slice )
@@ -602,21 +804,32 @@ bool CacheBlkInfoCtrl::getInter(const UnitArea& area)
   unsigned idx1, idx2, idx3, idx4;
   getAreaIdx(area.Y(), *m_slice_chblk->getPPS()->pcv, idx1, idx2, idx3, idx4);
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  return m_codedCUInfo[m_treeIdx][idx1][idx2][idx3][idx4]->isInter;
+#else
   return m_codedCUInfo[idx1][idx2][idx3][idx4]->isInter;
+#endif
 }
 void CacheBlkInfoCtrl::setBcwIdx(const UnitArea& area, uint8_t gBiIdx)
 {
   unsigned idx1, idx2, idx3, idx4;
   getAreaIdx(area.Y(), *m_slice_chblk->getPPS()->pcv, idx1, idx2, idx3, idx4);
-
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  m_codedCUInfo[m_treeIdx][idx1][idx2][idx3][idx4]->bcwIdx = gBiIdx;
+#else
   m_codedCUInfo[idx1][idx2][idx3][idx4]->bcwIdx = gBiIdx;
+#endif
 }
 uint8_t CacheBlkInfoCtrl::getBcwIdx(const UnitArea& area)
 {
   unsigned idx1, idx2, idx3, idx4;
   getAreaIdx(area.Y(), *m_slice_chblk->getPPS()->pcv, idx1, idx2, idx3, idx4);
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  return m_codedCUInfo[m_treeIdx][idx1][idx2][idx3][idx4]->bcwIdx;
+#else
   return m_codedCUInfo[idx1][idx2][idx3][idx4]->bcwIdx;
+#endif
 }
 
 #if REUSE_CU_RESULTS
@@ -628,6 +841,13 @@ static bool isTheSameNbHood( const CodingUnit &cu, const CodingStructure& cs, co
   {
     return false;
   }
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  if ( cu.isSST && ( !cu.slice->getProcessingIntraRegion() || cu.separateTree != cu.slice->getProcessingSeparateTrees() ) )
+  {
+    return false;
+  }
+#endif
 
   const PartitioningStack &ps = partitioner.getPartStack();
 
@@ -671,37 +891,71 @@ void BestEncInfoCache::create( const ChromaFormat chFmt )
   m_numWidths  = gp_sizeIdxInfo->numWidths();
   m_numHeights = gp_sizeIdxInfo->numHeights();
 
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  for (unsigned treeIdx = 0; treeIdx < MAX_TREE_TYPE; treeIdx++ )
+  {
+#endif
   for( unsigned x = 0; x < numPos; x++ )
   {
     for( unsigned y = 0; y < numPos; y++ )
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_bestEncInfo[treeIdx][x][y] = new BestEncodingInfo**[m_numWidths];
+#else
       m_bestEncInfo[x][y] = new BestEncodingInfo**[m_numWidths];
-
+#endif
       for( int wIdx = 0; wIdx < gp_sizeIdxInfo->numWidths(); wIdx++ )
       {
         if( gp_sizeIdxInfo->isCuSize( gp_sizeIdxInfo->sizeFrom( wIdx ) ) && x + ( gp_sizeIdxInfo->sizeFrom( wIdx ) >> MIN_CU_LOG2 ) <= (maxCuSize >> MIN_CU_LOG2 ) )
         {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+          m_bestEncInfo[treeIdx][x][y][wIdx] = new BestEncodingInfo*[gp_sizeIdxInfo->numHeights()];
+#else
           m_bestEncInfo[x][y][wIdx] = new BestEncodingInfo*[gp_sizeIdxInfo->numHeights()];
-
+#endif
           for( int hIdx = 0; hIdx < gp_sizeIdxInfo->numHeights(); hIdx++ )
           {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+            if (treeIdx > 0 )// && (gp_sizeIdxInfo->sizeFrom(wIdx) > 64 || gp_sizeIdxInfo->sizeFrom(wIdx)>64))
+            {
+              m_bestEncInfo[treeIdx][x][y][wIdx][hIdx] = nullptr;
+              continue;
+            }
+            else
+#endif
             if( gp_sizeIdxInfo->isCuSize( gp_sizeIdxInfo->sizeFrom( hIdx ) ) && y + ( gp_sizeIdxInfo->sizeFrom( hIdx ) >> MIN_CU_LOG2 ) <= (maxCuSize >> MIN_CU_LOG2 ) )
             {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+              m_bestEncInfo[treeIdx][x][y][wIdx][hIdx] = new BestEncodingInfo;
+#else
               m_bestEncInfo[x][y][wIdx][hIdx] = new BestEncodingInfo;
-
+#endif
               int w = gp_sizeIdxInfo->sizeFrom( wIdx );
               int h = gp_sizeIdxInfo->sizeFrom( hIdx );
 
               const UnitArea area( chFmt, Area( 0, 0, w, h ) );
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+              new ( &m_bestEncInfo[treeIdx][x][y][wIdx][hIdx]->cu ) CodingUnit    ( area );
+              new ( &m_bestEncInfo[treeIdx][x][y][wIdx][hIdx]->pu ) PredictionUnit( area );
+#else
               new ( &m_bestEncInfo[x][y][wIdx][hIdx]->cu ) CodingUnit    ( area );
               new ( &m_bestEncInfo[x][y][wIdx][hIdx]->pu ) PredictionUnit( area );
+#endif
 #if CONVERT_NUM_TU_SPLITS_TO_CFG
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+              m_bestEncInfo[treeIdx][x][y][wIdx][hIdx]->tus.clear();
+#else
               m_bestEncInfo[x][y][wIdx][hIdx]->tus.clear();
-
+#endif
               for( int i = 0; i < maxNumTUs; i++ )
               {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+                m_bestEncInfo[treeIdx][x][y][wIdx][hIdx]->tus.push_back( TransformUnit( area ) );
+#else
                 m_bestEncInfo[x][y][wIdx][hIdx]->tus.push_back( TransformUnit( area ) );
+#endif
               }
 #elif REUSE_CU_RESULTS_WITH_MULTIPLE_TUS
               m_bestEncInfo[x][y][wIdx][hIdx]->numTus = 0;
@@ -713,27 +967,89 @@ void BestEncInfoCache::create( const ChromaFormat chFmt )
               new ( &m_bestEncInfo[x][y][wIdx][hIdx]->tu ) TransformUnit( area );
 #endif
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+              m_bestEncInfo[treeIdx][x][y][wIdx][hIdx]->poc      = -1;
+#else
               m_bestEncInfo[x][y][wIdx][hIdx]->poc      = -1;
+#endif
             }
             else
             {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+              m_bestEncInfo[treeIdx][x][y][wIdx][hIdx] = nullptr;
+#else
               m_bestEncInfo[x][y][wIdx][hIdx] = nullptr;
+#endif
             }
           }
         }
         else
         {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+          m_bestEncInfo[treeIdx][x][y][wIdx] = nullptr;
+#else
           m_bestEncInfo[x][y][wIdx] = nullptr;
+#endif
         }
       }
     }
   }
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  }
+#endif
+
 }
 
 void BestEncInfoCache::destroy()
 {
   const unsigned numPos = m_maxCuSize >> MIN_CU_LOG2;
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  for (unsigned treeIdx = 0; treeIdx < MAX_TREE_TYPE; treeIdx++ )
+  {
+    for( unsigned x = 0; x < numPos; x++ )
+    {
+      for( unsigned y = 0; y < numPos; y++ )
+      {
+        for( int wIdx = 0; wIdx < gp_sizeIdxInfo->numWidths(); wIdx++ )
+        {
+          if( m_bestEncInfo[treeIdx][x][y][wIdx] )
+          {
+            for( int hIdx = 0; hIdx < gp_sizeIdxInfo->numHeights(); hIdx++ )
+            {
+              if( m_bestEncInfo[treeIdx][x][y][wIdx][hIdx] )
+              {
+                delete m_bestEncInfo[treeIdx][x][y][wIdx][hIdx];
+              }
+            }
+
+            delete[] m_bestEncInfo[treeIdx][x][y][wIdx];
+          }
+        }
+
+        delete[] m_bestEncInfo[treeIdx][x][y];
+      }
+    }
+    delete[] m_pCoeff[treeIdx];
+#if SIGN_PREDICTION
+    delete[] m_pCoeffSign[treeIdx];
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+    delete[] m_pCoeffSignScanIdx[treeIdx];
+#endif
+#endif
+
+    delete[] m_pPcmBuf[treeIdx];
+
+    if (m_runType[treeIdx] != nullptr)
+    {
+      delete[] m_runType[treeIdx];
+      m_runType[treeIdx] = nullptr;
+    }
+
+  }
+
+
+#else
   for( unsigned x = 0; x < numPos; x++ )
   {
     for( unsigned y = 0; y < numPos; y++ )
@@ -772,6 +1088,9 @@ void BestEncInfoCache::destroy()
     delete[] m_runType;
     m_runType = nullptr;
   }
+
+#endif
+
 }
 
 void BestEncInfoCache::init( const Slice &slice )
@@ -789,17 +1108,34 @@ void BestEncInfoCache::init( const Slice &slice )
 
   size_t numCoeff = 0;
 
+
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  m_treeIdx = 0;
+  for (unsigned treeIdx = 0; treeIdx < MAX_TREE_TYPE; treeIdx++ )
+  {
+    numCoeff = 0;
+#endif
+
   for( unsigned x = 0; x < numPos; x++ )
   {
     for( unsigned y = 0; y < numPos; y++ )
     {
       for( int wIdx = 0; wIdx < gp_sizeIdxInfo->numWidths(); wIdx++ )
       {
-        if( m_bestEncInfo[x][y][wIdx] ) for( int hIdx = 0; hIdx < gp_sizeIdxInfo->numHeights(); hIdx++ )
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        if( m_bestEncInfo[treeIdx][x][y][wIdx] ) for( int hIdx = 0; hIdx < gp_sizeIdxInfo->numHeights(); hIdx++ )
         {
-          if( m_bestEncInfo[x][y][wIdx][hIdx] )
+          if( m_bestEncInfo[treeIdx][x][y][wIdx][hIdx] )
           {
-            for( const CompArea& blk : m_bestEncInfo[x][y][wIdx][hIdx]->cu.blocks )
+            for( const CompArea& blk : m_bestEncInfo[treeIdx][x][y][wIdx][hIdx]->cu.blocks )
+#else
+        if (m_bestEncInfo[x][y][wIdx]) for (int hIdx = 0; hIdx < gp_sizeIdxInfo->numHeights(); hIdx++)
+        {
+          if (m_bestEncInfo[x][y][wIdx][hIdx])
+          {
+            for (const CompArea& blk : m_bestEncInfo[x][y][wIdx][hIdx]->cu.blocks)
+#endif
             {
               numCoeff += blk.area();
             }
@@ -809,19 +1145,44 @@ void BestEncInfoCache::init( const Slice &slice )
     }
   }
 
+
 #if CONVERT_NUM_TU_SPLITS_TO_CFG
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  m_pCoeff[treeIdx] = new TCoeff[numCoeff*m_maxNumTUs];
+#if SIGN_PREDICTION
+  m_pCoeffSign[treeIdx] = new SIGN_PRED_TYPE[numCoeff*m_maxNumTUs];
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  m_pCoeffSignScanIdx[treeIdx] = new unsigned[numCoeff*m_maxNumTUs];
+#endif
+#endif
+  m_pPcmBuf[treeIdx] = new Pel[numCoeff*m_maxNumTUs];
+
+  if( slice.getSPS()->getPLTMode() )
+  {
+    m_runType[treeIdx] = new bool[numCoeff*m_maxNumTUs];
+  }
+#else
   m_pCoeff = new TCoeff[numCoeff*m_maxNumTUs];
 #if SIGN_PREDICTION
-  m_pCoeffSign = new SIGN_PRED_TYPE[numCoeff * m_maxNumTUs];
+  m_pCoeffSign = new SIGN_PRED_TYPE[numCoeff*m_maxNumTUs];
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   m_pCoeffSignScanIdx = new unsigned[numCoeff*m_maxNumTUs];
 #endif
 #endif
   m_pPcmBuf = new Pel[numCoeff*m_maxNumTUs];
+
   if( slice.getSPS()->getPLTMode() )
   {
     m_runType = new bool[numCoeff*m_maxNumTUs];
   }
+#endif
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  }
+#endif
+
+
 #elif REUSE_CU_RESULTS_WITH_MULTIPLE_TUS
   m_pCoeff  = new TCoeff[numCoeff*MAX_NUM_TUS];
 #if SIGN_PREDICTION
@@ -847,15 +1208,36 @@ void BestEncInfoCache::init( const Slice &slice )
   }
 #endif
 
-  TCoeff *coeffPtr = m_pCoeff;
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  for (unsigned treeIdx = 0; treeIdx < MAX_TREE_TYPE; treeIdx++ )
+  {
+#endif
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  TCoeff *coeffPtr = m_pCoeff[treeIdx];
 #if SIGN_PREDICTION
-  SIGN_PRED_TYPE *coeffSignPtr = m_pCoeffSign;
+  SIGN_PRED_TYPE *coeffSignPtr = m_pCoeffSign[treeIdx];
+  
 #if JVET_Y0141_SIGN_PRED_IMPROVE
-  unsigned *coeffSignScanIdx = m_pCoeffSignScanIdx;
+  unsigned *coeffSignScanIdx = m_pCoeffSignScanIdx[treeIdx];
 #endif
 #endif
-  Pel    *pcmPtr   = m_pPcmBuf;
-  bool   *runTypePtr   = m_runType;
+  Pel    *pcmPtr   = m_pPcmBuf[treeIdx];
+  bool   *runTypePtr   = m_runType[treeIdx];
+#else
+    TCoeff *coeffPtr = m_pCoeff;
+#if SIGN_PREDICTION
+    SIGN_PRED_TYPE *coeffSignPtr = m_pCoeffSign;
+
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+    unsigned *coeffSignScanIdx = m_pCoeffSignScanIdx;
+#endif
+#endif
+    Pel    *pcmPtr   = m_pPcmBuf;
+    bool   *runTypePtr   = m_runType;
+#endif
+
+
   m_dummyCS.pcv = m_slice_bencinf->getPPS()->pcv;
 
   for( unsigned x = 0; x < numPos; x++ )
@@ -864,9 +1246,15 @@ void BestEncInfoCache::init( const Slice &slice )
     {
       for( int wIdx = 0; wIdx < gp_sizeIdxInfo->numWidths(); wIdx++ )
       {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        if( m_bestEncInfo[treeIdx][x][y][wIdx] ) for( int hIdx = 0; hIdx < gp_sizeIdxInfo->numHeights(); hIdx++ )
+        {
+          if( m_bestEncInfo[treeIdx][x][y][wIdx][hIdx] )
+#else
         if( m_bestEncInfo[x][y][wIdx] ) for( int hIdx = 0; hIdx < gp_sizeIdxInfo->numHeights(); hIdx++ )
         {
           if( m_bestEncInfo[x][y][wIdx][hIdx] )
+#endif
           {
             TCoeff *coeff[MAX_NUM_TBLOCKS] = { 0, };
 #if SIGN_PREDICTION
@@ -887,7 +1275,11 @@ void BestEncInfoCache::init( const Slice &slice )
             for( int j = 0; j < MAX_NUM_TUS; j++ )
 #endif
             {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+              TransformUnit &tu = m_bestEncInfo[treeIdx][x][y][wIdx][hIdx]->tus[j];
+#else
               TransformUnit &tu = m_bestEncInfo[x][y][wIdx][hIdx]->tus[j];
+#endif
               const UnitArea &area = tu;
 
               for( int i = 0; i < area.blocks.size(); i++ )
@@ -946,6 +1338,11 @@ void BestEncInfoCache::init( const Slice &slice )
       }
     }
   }
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  }
+#endif
+
 #if ENABLE_SPLIT_PARALLELISM
 
   m_currTemporalId = 0;
@@ -966,10 +1363,20 @@ bool BestEncInfoCache::setFromCs( const CodingStructure& cs, const Partitioner& 
   }
 
   unsigned idx1, idx2, idx3, idx4;
+
   getAreaIdx( cs.area.Y(), *m_slice_bencinf->getPPS()->pcv, idx1, idx2, idx3, idx4 );
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  BestEncodingInfo& encInfo = *m_bestEncInfo[m_treeIdx][idx1][idx2][idx3][idx4];
+#else
   BestEncodingInfo& encInfo = *m_bestEncInfo[idx1][idx2][idx3][idx4];
-
+#endif
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  if (!(m_bestEncInfo[m_treeIdx][idx1][idx2][idx3][idx4]))
+  {
+    return false;
+  }
+#endif
   encInfo.poc            =  cs.picture->poc;
   encInfo.cu.repositionTo( *cs.cus.front() );
   encInfo.pu.repositionTo( *cs.pus.front() );
@@ -1025,19 +1432,34 @@ bool BestEncInfoCache::isValid( const CodingStructure& cs, const Partitioner& pa
   unsigned idx1, idx2, idx3, idx4;
   getAreaIdx( cs.area.Y(), *m_slice_bencinf->getPPS()->pcv, idx1, idx2, idx3, idx4 );
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  BestEncodingInfo& encInfo = *m_bestEncInfo[m_treeIdx][idx1][idx2][idx3][idx4];
+#else
   BestEncodingInfo& encInfo = *m_bestEncInfo[idx1][idx2][idx3][idx4];
+#endif
+
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   if( encInfo.cu.treeType != partitioner.treeType || encInfo.cu.modeType != partitioner.modeType )
   {
     return false;
   }
 #endif
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  if (!(m_bestEncInfo[m_treeIdx][idx1][idx2][idx3][idx4]))
+  {
+    return false;
+  }
+#endif
+
   if( encInfo.cu.qp != qp )
     return false;
   if( cs.picture->poc != encInfo.poc || CS::getArea( cs, cs.area, partitioner.chType ) != CS::getArea( cs, encInfo.cu, partitioner.chType ) || !isTheSameNbHood( encInfo.cu, cs, partitioner
     , encInfo.pu, (cs.picture->Y().width), (cs.picture->Y().height)
 )
     || CU::isIBC(encInfo.cu)
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    || (CU::isIntra(encInfo.cu) && (!cs.slice->isIntra() && cs.slice->getSeparateTreeEnabled()))
+#endif
     || partitioner.currQgEnable() || cs.currQP[partitioner.chType] != encInfo.cu.qp
     )
   {
@@ -1054,7 +1476,11 @@ bool BestEncInfoCache::setCsFrom( CodingStructure& cs, EncTestMode& testMode, co
   unsigned idx1, idx2, idx3, idx4;
   getAreaIdx( cs.area.Y(), *m_slice_bencinf->getPPS()->pcv, idx1, idx2, idx3, idx4 );
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  BestEncodingInfo& encInfo = *m_bestEncInfo[m_treeIdx][idx1][idx2][idx3][idx4];
+#else
   BestEncodingInfo& encInfo = *m_bestEncInfo[idx1][idx2][idx3][idx4];
+#endif
 
   if( cs.picture->poc != encInfo.poc || CS::getArea( cs, cs.area, partitioner.chType ) != CS::getArea( cs, encInfo.cu, partitioner.chType ) || !isTheSameNbHood( encInfo.cu, cs, partitioner
     , encInfo.pu, (cs.picture->Y().width), (cs.picture->Y().height)
@@ -1181,6 +1607,19 @@ static bool interHadActive( const ComprCUCtx& ctx )
 // EncModeCtrlQTBT
 //////////////////////////////////////////////////////////////////////////
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+void EncModeCtrlMTnoRQT::setTreeIdx()
+{
+  EncModeCtrl::m_treeIdx = 0;
+  if ( m_slice->getSeparateTreeEnabled() && m_slice->getProcessingIntraRegion() && m_slice->getProcessingSeparateTrees() && !m_slice->isIntra())
+  {
+    EncModeCtrl::m_treeIdx = ( m_slice->getProcessingChannelType() == CH_L ) ? 1 : 2;
+  } 
+  CacheBlkInfoCtrl::m_treeIdx = EncModeCtrl::m_treeIdx;
+  BestEncInfoCache::m_treeIdx = EncModeCtrl::m_treeIdx;
+}
+#endif
+
 void EncModeCtrlMTnoRQT::create( const EncCfg& cfg )
 {
 #if JVET_Z0118_GDR
@@ -1214,9 +1653,16 @@ void EncModeCtrlMTnoRQT::initCTUEncoding( const Slice &slice )
 #endif
   SaveLoadEncInfoSbt::init( slice );
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  CHECK( !m_ComprCUCtxList[0].empty(), "Mode list is not empty at the beginning of a CTU" );
+#else
   CHECK( !m_ComprCUCtxList.empty(), "Mode list is not empty at the beginning of a CTU" );
+#endif
 
   m_slice             = &slice;
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  setTreeIdx();
+#endif
 #if ENABLE_SPLIT_PARALLELISM
   m_runNextInParallel      = false;
 #endif
@@ -1254,7 +1700,12 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
     }
   }
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  setTreeIdx();
+  m_ComprCUCtxList[EncModeCtrl::m_treeIdx].push_back( ComprCUCtx( cs, minDepth, maxDepth, NUM_EXTRA_FEATURES ) );
+#else
   m_ComprCUCtxList.push_back( ComprCUCtx( cs, minDepth, maxDepth, NUM_EXTRA_FEATURES ) );
+#endif
 
 #if ENABLE_SPLIT_PARALLELISM
   if( m_runNextInParallel )
@@ -1265,7 +1716,7 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
     }
     CHECK( cs.picture->scheduler.getSplitJobId() == 0, "Trying to run a parallel level although jobId is 0!" );
     m_runNextInParallel                          = false;
-    m_ComprCUCtxList.back().isLevelSplitParallel = true;
+    m_ComprCUCtxList[m_treeIdx].back().isLevelSplitParallel = true;
   }
 
 #endif
@@ -1301,8 +1752,23 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
                          && ( cs.area.lwidth() > ( cs.pcv->getMinQtSize( *cs.slice, partitioner.chType ) << 1 ) );
 
 #endif
+
   // set features
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  ComprCUCtx &cuECtx  = m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back();
+  bool isReusingCu    = false;
+  if ( !cs.slice->isIntra() && cs.slice->getSeparateTreeEnabled() && cs.slice->getProcessingIntraRegion() && 
+    cs.slice->isIntraRegionRoot( &partitioner ) && !cs.slice->getProcessingSeparateTrees() && 
+    m_nonIntraCUECtx->bestCU && !m_nonIntraCUECtx->bestCU->isSST )
+  {
+    cuECtx = *m_nonIntraCUECtx;
+    isReusingCu = cuECtx.get<bool>( IS_REUSING_CU );
+  }
+  else
+  {
+#else
   ComprCUCtx &cuECtx  = m_ComprCUCtxList.back();
+#endif
   cuECtx.set( BEST_NON_SPLIT_COST,  MAX_DOUBLE );
   cuECtx.set( BEST_VERT_SPLIT_COST, MAX_DOUBLE );
   cuECtx.set( BEST_HORZ_SPLIT_COST, MAX_DOUBLE );
@@ -1322,6 +1788,9 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
   cuECtx.set( DID_QUAD_SPLIT,       false );
   cuECtx.set( IS_BEST_NOSPLIT_SKIP, false );
   cuECtx.set( MAX_QT_SUB_DEPTH,     0 );
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  }
+#endif
 
   // QP
   int baseQP = cs.baseQP;
@@ -1380,12 +1849,13 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
 
   if( !cuECtx.get<bool>( QT_BEFORE_BT ) )
   {
-#if JVET_AH0135_TEMPORAL_PARTITIONING
-    if ( canQt )
-#endif
     for( int qp = maxQP; qp >= minQP; qp-- )
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.push_back( { ETM_SPLIT_QT, ETO_STANDARD, qp } );
+#else
       m_ComprCUCtxList.back().testModes.push_back( { ETM_SPLIT_QT, ETO_STANDARD, qp } );
+#endif
     }
   }
 
@@ -1398,7 +1868,11 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
     // add split modes
     for( int qp = maxQP; qp >= minQP; qp-- )
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.push_back( { ETM_SPLIT_TT_V, ETO_STANDARD, qp } );
+#else
       m_ComprCUCtxList.back().testModes.push_back( { ETM_SPLIT_TT_V, ETO_STANDARD, qp } );
+#endif
     }
   }
 
@@ -1411,7 +1885,11 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
     // add split modes
     for( int qp = maxQP; qp >= minQP; qp-- )
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.push_back( { ETM_SPLIT_TT_H, ETO_STANDARD, qp } );
+#else
       m_ComprCUCtxList.back().testModes.push_back( { ETM_SPLIT_TT_H, ETO_STANDARD, qp } );
+#endif
     }
   }
 
@@ -1427,13 +1905,25 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
     // add split modes
     for( int qp = maxQP; qp >= minQP; qp-- )
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.push_back( { ETM_SPLIT_BT_V, ETO_STANDARD, qp } );
+#else
       m_ComprCUCtxList.back().testModes.push_back( { ETM_SPLIT_BT_V, ETO_STANDARD, qp } );
+#endif
     }
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().set( DID_VERT_SPLIT, true );
+#else
     m_ComprCUCtxList.back().set( DID_VERT_SPLIT, true );
+#endif
   }
   else
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().set( DID_VERT_SPLIT, false );
+#else
     m_ComprCUCtxList.back().set( DID_VERT_SPLIT, false );
+#endif
   }
 
 #if JVET_AH0135_TEMPORAL_PARTITIONING
@@ -1445,13 +1935,25 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
     // add split modes
     for( int qp = maxQP; qp >= minQP; qp-- )
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.push_back( { ETM_SPLIT_BT_H, ETO_STANDARD, qp } );
+#else
       m_ComprCUCtxList.back().testModes.push_back( { ETM_SPLIT_BT_H, ETO_STANDARD, qp } );
+#endif
     }
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().set( DID_HORZ_SPLIT, true );
+#else
     m_ComprCUCtxList.back().set( DID_HORZ_SPLIT, true );
+#endif
   }
   else
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().set( DID_HORZ_SPLIT, false );
+#else
     m_ComprCUCtxList.back().set( DID_HORZ_SPLIT, false );
+#endif
   }
 
   if( cuECtx.get<bool>( QT_BEFORE_BT ) )
@@ -1461,7 +1963,11 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
 #endif
     for( int qp = maxQPq; qp >= minQPq; qp-- )
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.push_back( { ETM_SPLIT_QT, ETO_STANDARD, qp } );
+#else
       m_ComprCUCtxList.back().testModes.push_back( { ETM_SPLIT_QT, ETO_STANDARD, qp } );
+#endif
     }
   }
 
@@ -1469,8 +1975,12 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
   if ( canNo )
   {
 #endif
-  m_ComprCUCtxList.back().testModes.push_back( { ETM_POST_DONT_SPLIT } );
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.push_back( { ETM_POST_DONT_SPLIT } );
+#else
+    m_ComprCUCtxList.back().testModes.push_back( { ETM_POST_DONT_SPLIT } );
+#endif
 #if JVET_AH0135_TEMPORAL_PARTITIONING
   }
   else
@@ -1502,11 +2012,19 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
   {
     const int  qp       = std::max( qpLoop, lowestQP );
 #if REUSE_CU_RESULTS
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    isReusingCu = isValid( cs, partitioner, qp );
+#else
     const bool isReusingCu = isValid( cs, partitioner, qp );
+#endif
     cuECtx.set( IS_REUSING_CU, isReusingCu );
     if( isReusingCu )
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.push_back( {ETM_RECO_CACHED, ETO_STANDARD, qp} );
+#else
       m_ComprCUCtxList.back().testModes.push_back( {ETM_RECO_CACHED, ETO_STANDARD, qp} );
+#endif
     }
 #endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
@@ -1515,14 +2033,26 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
 #if JVET_AE0169_BIPREDICTIVE_IBC
       if (m_pcEncCfg->getIbcMerge() && partitioner.chType == CHANNEL_TYPE_LUMA)
       {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.push_back({ ETM_IBC_MERGE,   ETO_STANDARD,  qp });
+#else
         m_ComprCUCtxList.back().testModes.push_back({ ETM_IBC_MERGE,   ETO_STANDARD,  qp });
+#endif
       }
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.push_back({ ETM_IBC,         ETO_STANDARD,  qp });
+#else
       m_ComprCUCtxList.back().testModes.push_back({ ETM_IBC,         ETO_STANDARD,  qp });
+#endif
 #else
       m_ComprCUCtxList.back().testModes.push_back({ ETM_IBC,         ETO_STANDARD,  qp });
       if (m_pcEncCfg->getIbcMerge() && partitioner.chType == CHANNEL_TYPE_LUMA)
       {
-        m_ComprCUCtxList.back().testModes.push_back({ ETM_IBC_MERGE,   ETO_STANDARD,  qp });
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.push_back({ ETM_IBC_MERGE,   ETO_STANDARD,  qp });
+#else
+        m_ComprCUCtxList[m_treeIdx].back().testModes.push_back({ ETM_IBC_MERGE,   ETO_STANDARD,  qp });
+#endif
       }
 #endif
     }
@@ -1536,16 +2066,30 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
     if (cs.slice->getSPS()->getPLTMode() && (partitioner.treeType != TREE_D || cs.slice->isIntra() || (cs.area.lwidth() == 4 && cs.area.lheight() == 4)) && getPltEnc())
 #endif
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.push_back({ ETM_PALETTE, ETO_STANDARD, qp });
+#else
       m_ComprCUCtxList.back().testModes.push_back({ ETM_PALETTE, ETO_STANDARD, qp });
+#endif
     }
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.push_back( { ETM_SEPARATE_TREE_INTRA, ETO_STANDARD, qp });
+
+    m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.push_back( { ETM_INTRA, ETO_STANDARD, qp } );
+#else
     m_ComprCUCtxList.back().testModes.push_back( { ETM_INTRA, ETO_STANDARD, qp } );
+#endif
 #if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
     if (cs.slice->getSPS()->getPLTMode() && !cs.slice->isIntra() && !(cs.area.lwidth() == 4 && cs.area.lheight() == 4) && getPltEnc())
 #else
     if (cs.slice->getSPS()->getPLTMode() && partitioner.treeType == TREE_D && !cs.slice->isIntra() && !(cs.area.lwidth() == 4 && cs.area.lheight() == 4) && getPltEnc())
 #endif
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.push_back({ ETM_PALETTE,  ETO_STANDARD, qp });
+#else
       m_ComprCUCtxList.back().testModes.push_back({ ETM_PALETTE,  ETO_STANDARD, qp });
+#endif
     }
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
     }
@@ -1557,13 +2101,21 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
     if (cs.sps->getIBCFlag() && checkIbc)
 #endif
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.push_back({ ETM_IBC,         ETO_STANDARD,  qp });
+#else
       m_ComprCUCtxList.back().testModes.push_back({ ETM_IBC,         ETO_STANDARD,  qp });
+#endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
       if( m_pcEncCfg->getIbcMerge() )
 #endif
       if (partitioner.chType == CHANNEL_TYPE_LUMA)
       {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.push_back({ ETM_IBC_MERGE,   ETO_STANDARD,  qp });
+#else
         m_ComprCUCtxList.back().testModes.push_back({ ETM_IBC_MERGE,   ETO_STANDARD,  qp });
+#endif
       }
     }
   }
@@ -1592,7 +2144,11 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
 #if MULTI_HYP_PRED
       if (cs.sps->getUseInterMultiHyp() && m_slice->isInterB())
       {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.push_back({ ETM_INTER_MULTIHYP, ETO_STANDARD, qp });
+#else
         m_ComprCUCtxList.back().testModes.push_back({ ETM_INTER_MULTIHYP, ETO_STANDARD, qp });
+#endif
       }
 #endif
       if (m_pcEncCfg->getIMV())
@@ -1601,10 +2157,18 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
         // inter with imv and illumination compensation
         if (useLIC)
         {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+          m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.push_back({ ETM_INTER_ME, EncTestModeOpts((4 << ETO_IMV_SHIFT) | ETO_LIC), qp });
+#else
           m_ComprCUCtxList.back().testModes.push_back({ ETM_INTER_ME, EncTestModeOpts((4 << ETO_IMV_SHIFT) | ETO_LIC), qp });
+#endif
         }
 #endif
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.push_back({ ETM_INTER_ME,  EncTestModeOpts( 4 << ETO_IMV_SHIFT ), qp });
+#else
         m_ComprCUCtxList.back().testModes.push_back({ ETM_INTER_ME,  EncTestModeOpts( 4 << ETO_IMV_SHIFT ), qp });
+#endif
       }
       if( m_pcEncCfg->getIMV() || m_pcEncCfg->getUseAffineAmvr() )
       {
@@ -1613,25 +2177,45 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
         // inter with imv and illumination compensation
         if (useLIC)
         {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+          m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.push_back({ ETM_INTER_ME, EncTestModeOpts((imv << ETO_IMV_SHIFT) | ETO_LIC), qp });
+#else
           m_ComprCUCtxList.back().testModes.push_back({ ETM_INTER_ME, EncTestModeOpts((imv << ETO_IMV_SHIFT) | ETO_LIC), qp });
+#endif
         }
 #endif
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.push_back( { ETM_INTER_ME, EncTestModeOpts( imv << ETO_IMV_SHIFT ), qp } );
+#else
         m_ComprCUCtxList.back().testModes.push_back( { ETM_INTER_ME, EncTestModeOpts( imv << ETO_IMV_SHIFT ), qp } );
+#endif
 #if INTER_LIC
         // inter with imv and illumination compensation
         if (useLIC)
         {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+          m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.push_back({ ETM_INTER_ME, EncTestModeOpts((1 << ETO_IMV_SHIFT) | ETO_LIC), qp });
+#else
           m_ComprCUCtxList.back().testModes.push_back({ ETM_INTER_ME, EncTestModeOpts((1 << ETO_IMV_SHIFT) | ETO_LIC), qp });
+#endif
         }
 #endif
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.push_back( { ETM_INTER_ME, EncTestModeOpts( 1 << ETO_IMV_SHIFT ), qp } );
+#else
         m_ComprCUCtxList.back().testModes.push_back( { ETM_INTER_ME, EncTestModeOpts( 1 << ETO_IMV_SHIFT ), qp } );
+#endif
       }
 
 #if INTER_LIC
       // inter with illumination compensation
       if (useLIC)
       {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.push_back({ ETM_INTER_ME,    ETO_LIC,      qp });
+#else
         m_ComprCUCtxList.back().testModes.push_back({ ETM_INTER_ME,    ETO_LIC,      qp });
+#endif
       }
 #endif
 
@@ -1644,7 +2228,11 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
         if( cs.sps->getUseGeo() && cs.slice->isInterB() )
 #endif
         {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+          m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.push_back( { ETM_MERGE_GEO, ETO_STANDARD, qp } );
+#else
           m_ComprCUCtxList.back().testModes.push_back( { ETM_MERGE_GEO, ETO_STANDARD, qp } );
+#endif
         }
 #if TM_MRG && !MERGE_ENC_OPT
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
@@ -1653,34 +2241,50 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
         if (cs.sps->getUseDMVDMode())
 #endif
         {
-          m_ComprCUCtxList.back().testModes.push_back({ ETM_MERGE_TM,     ETO_STANDARD, qp });
+          m_ComprCUCtxList[m_treeIdx].back().testModes.push_back({ ETM_MERGE_TM,     ETO_STANDARD, qp });
         }
 #endif
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.push_back( { ETM_MERGE_SKIP,  ETO_STANDARD, qp } );
+#else
         m_ComprCUCtxList.back().testModes.push_back( { ETM_MERGE_SKIP,  ETO_STANDARD, qp } );
+#endif
 #if AFFINE_MMVD && !MERGE_ENC_OPT
         if (cs.sps->getUseAffineMmvdMode())
         {
-          m_ComprCUCtxList.back().testModes.push_back({ ETM_AF_MMVD,    ETO_STANDARD, qp });
+          m_ComprCUCtxList[m_treeIdx].back().testModes.push_back({ ETM_AF_MMVD,    ETO_STANDARD, qp });
         }
 #endif
 #if !MERGE_ENC_OPT
         if ( cs.sps->getUseAffine() || cs.sps->getSbTMVPEnabledFlag() )
         {
-          m_ComprCUCtxList.back().testModes.push_back( { ETM_AFFINE,    ETO_STANDARD, qp } );
+          m_ComprCUCtxList[m_treeIdx].back().testModes.push_back( { ETM_AFFINE,    ETO_STANDARD, qp } );
         }
 #endif
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.push_back( { ETM_INTER_ME,    ETO_STANDARD, qp } );
+#else
         m_ComprCUCtxList.back().testModes.push_back( { ETM_INTER_ME,    ETO_STANDARD, qp } );
+#endif
       }
       else
       {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.push_back( { ETM_INTER_ME,    ETO_STANDARD, qp } );
+#else
         m_ComprCUCtxList.back().testModes.push_back( { ETM_INTER_ME,    ETO_STANDARD, qp } );
+#endif
 #if JVET_Y0065_GPM_INTRA
         if( cs.sps->getUseGeo() && !cs.slice->isIntra() )
 #else
         if( cs.sps->getUseGeo() && cs.slice->isInterB() )
 #endif
         {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+          m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.push_back( { ETM_MERGE_GEO, ETO_STANDARD, qp } );
+#else
           m_ComprCUCtxList.back().testModes.push_back( { ETM_MERGE_GEO, ETO_STANDARD, qp } );
+#endif
         }
 #if TM_MRG && !MERGE_ENC_OPT
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
@@ -1689,20 +2293,24 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
         if (cs.sps->getUseDMVDMode())
 #endif
         {
-          m_ComprCUCtxList.back().testModes.push_back( { ETM_MERGE_TM,     ETO_STANDARD, qp } );
+          m_ComprCUCtxList[m_treeIdx].back().testModes.push_back( { ETM_MERGE_TM,     ETO_STANDARD, qp } );
         }
 #endif
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.push_back( { ETM_MERGE_SKIP,  ETO_STANDARD, qp } );
+#else
         m_ComprCUCtxList.back().testModes.push_back( { ETM_MERGE_SKIP,  ETO_STANDARD, qp } );
+#endif
 #if AFFINE_MMVD && !MERGE_ENC_OPT
         if (cs.sps->getUseAffineMmvdMode())
         {
-          m_ComprCUCtxList.back().testModes.push_back({ ETM_AF_MMVD,    ETO_STANDARD, qp });
+          m_ComprCUCtxList[m_treeIdx].back().testModes.push_back({ ETM_AF_MMVD,    ETO_STANDARD, qp });
         }
 #endif
 #if !MERGE_ENC_OPT
         if ( cs.sps->getUseAffine() || cs.sps->getSbTMVPEnabledFlag() )
         {
-          m_ComprCUCtxList.back().testModes.push_back( { ETM_AFFINE,    ETO_STANDARD, qp } );
+          m_ComprCUCtxList[m_treeIdx].back().testModes.push_back( { ETM_AFFINE,    ETO_STANDARD, qp } );
         }
 #endif
       }
@@ -1711,36 +2319,137 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
         int minSize = min(cs.area.lwidth(), cs.area.lheight());
         if (minSize < 128 && minSize >= 4)
         {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+          m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.push_back({ ETM_HASH_INTER, ETO_STANDARD, qp });
+#else
           m_ComprCUCtxList.back().testModes.push_back({ ETM_HASH_INTER, ETO_STANDARD, qp });
+#endif
         }
       }
     }
   }
 
   // ensure to skip unprobable modes
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  if( !tryModeMaster( m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().testModes.back(), cs, partitioner ) )
+#else
   if( !tryModeMaster( m_ComprCUCtxList.back().testModes.back(), cs, partitioner ) )
+#endif
   {
     nextMode( cs, partitioner );
   }
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back().lastTestMode = EncTestMode();
+#else
   m_ComprCUCtxList.back().lastTestMode = EncTestMode();
+#endif
+
 }
 
 void EncModeCtrlMTnoRQT::finishCULevel( Partitioner &partitioner )
 {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  m_ComprCUCtxList[EncModeCtrl::m_treeIdx].pop_back();
+#else
   m_ComprCUCtxList.pop_back();
+#endif
 }
+
+
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+static bool doNotTest(  const EncTestMode& encTestmode, const CodingStructure &cs, Partitioner& partitioner  )
+{
+  if ( cs.slice->getSeparateTreeEnabled() && encTestmode.type != ETM_POST_DONT_SPLIT && encTestmode.type != ETM_RECO_CACHED )
+  {
+    // When processing SST only test ETM_INTRA/split
+    if ( cs.slice->getProcessingIntraRegion() && encTestmode.type != ETM_INTRA && encTestmode.type != ETM_IBC  && encTestmode.type != ETM_IBC_MERGE && 
+      (!cs.slice->getSPS()->getPLTMode() || encTestmode.type != ETM_PALETTE) && 
+      !isModeSplit( encTestmode.type ) )
+    {
+      return true;
+    }
+    // When not processing SST, do not test ETM_INTRA (since intra is tested under SST)
+    if ( !cs.slice->isIntra() && !cs.slice->getProcessingIntraRegion() && encTestmode.type == ETM_INTRA )
+    {
+      return true;
+    }
+    // When processing SST, do not split shared tree
+    if ( cs.slice->getProcessingIntraRegion() && !cs.slice->getProcessingSeparateTrees() && isModeSplit( encTestmode.type ) )
+    {
+      return true;
+    }
+
+    const bool isBlInPic = cs.picture->Y().contains( partitioner.currArea().Y().bottomLeft() );
+    const bool isTrInPic = cs.picture->Y().contains( partitioner.currArea().Y().topRight() );
+    if( isBlInPic && isTrInPic ) // not boundary
+    {
+      // inter + processing SST
+      if ( !cs.slice->isIntra() && cs.slice->getProcessingIntraRegion() )
+      {
+        if ( encTestmode.type != ETM_INTRA && !isModeSplit( encTestmode ) )
+        {
+          return true;
+        }
+        if ( cs.slice->getIntraRegionNoSplitTest() && isModeSplit( encTestmode ) )
+        {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+#endif
+
 
 
 bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingStructure &cs, Partitioner& partitioner )
 {
-  ComprCUCtx& cuECtx = m_ComprCUCtxList.back();
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  if ( cs.slice->isIntra() && cs.slice->getSeparateTreeEnabled() && !cs.slice->getProcessingIntraRegion() && ( partitioner.currArea().lwidth() <= 256 && partitioner.currArea().lheight() <= 256 ) )
+  {
+    if ( encTestmode.type == ETM_SEPARATE_TREE_INTRA )
+    {
+      return true;
+    }
+    else
+    {
+      return false;
+    }
+}
+#else
+  if ( cs.slice->isIntra() && cs.slice->getSeparateTreeEnabled() )
+  {
+    if ( encTestmode.type == ETM_SEPARATE_TREE_INTRA )
+    {
+      return false;
+    }
+  }
+#endif
+
+  if ( doNotTest( encTestmode, cs, partitioner ) )
+  {
+    return false;
+  }
+
+  ComprCUCtx& cuECtx = m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back();
+#else
+  ComprCUCtx& cuECtx = m_ComprCUCtxList.back();
+#endif
   // MTT modes early termination for 64x64 luma CU based on nosplit intra cost
 #if JVET_AE0057_MTT_ET
   if (m_pcEncCfg->getUseMttSkip() && partitioner.currQtDepth == (cs.sps->getCTUSize() == 256 ? 2 : 1)
       && partitioner.currBtDepth == 0
-      && partitioner.currArea().lwidth() == 64 && partitioner.currArea().lheight() == 64)
+      && partitioner.currArea().lwidth() == 64 && partitioner.currArea().lheight() == 64
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      && !(cs.slice->getSeparateTreeEnabled() && cs.sps->getInterSliceSeparateTreeEnabled())
+#endif
+    )
   {
     if (((partitioner.currArea().Y().x + 63 < cs.picture->lwidth())
          && (partitioner.currArea().Y().y + 63 < cs.picture->lheight()))
@@ -1842,7 +2551,12 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
 #endif
   const EncTestMode      bestMode    = bestCS ? getCSEncMode( *bestCS ) : EncTestMode();
 
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  CodedCUInfo    *relatedCU          = getBlkInfoPtr( partitioner.currArea() );
+#else
   CodedCUInfo    &relatedCU          = getBlkInfo( partitioner.currArea() );
+#endif
 
   if( cuECtx.minDepth > partitioner.currQtDepth && partitioner.canSplit( CU_QUAD_SPLIT, cs ) )
   {
@@ -1932,8 +2646,24 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
     {
       return true;
     }
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    if ( slice.getSeparateTreeEnabled() )
+    {
+      if ( !slice.isIntra() && m_avoidComplexIntraInInterSlice )
+      {
+        return false;
+      }
+    }
+    else
+    {
+#endif
     if( !( slice.isIntra() || bestMode.type == ETM_INTRA || !cuECtx.bestTU ||
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    ((!m_pcEncCfg->getDisableIntraPUsInInterSlices()) && (relatedCU && (!relatedCU->isInter || !relatedCU->isIBC)) && (
+#else
       ((!m_pcEncCfg->getDisableIntraPUsInInterSlices()) && (!relatedCU.isInter || !relatedCU.isIBC) && (
+#endif
                                          ( cuECtx.bestTU->cbf[0] != 0 ) ||
            ( ( numComp > COMPONENT_Cb ) && cuECtx.bestTU->cbf[1] != 0 ) ||
            ( ( numComp > COMPONENT_Cr ) && cuECtx.bestTU->cbf[2] != 0 )  // avoid very complex intra if it is unlikely
@@ -1949,6 +2679,19 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
     {
       return false;
     }
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    }
+
+    if ( slice.getSeparateTreeEnabled() )
+    {
+      if ( slice.getProcessingIntraRegion() && slice.isIntraRegionRoot( &partitioner ) )
+      {
+        cuECtx.interHad = m_savedInterHad;
+      }
+    }
+    else
+    {
+#endif
     if( lastTestMode().type != ETM_INTRA && cuECtx.bestCS && cuECtx.bestCU && interHadActive( cuECtx ) )
     {
       // Get SATD threshold from best Inter-CU
@@ -1970,16 +2713,93 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
       return false;
     }
 #endif
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    }
+#endif
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    if ( m_pcEncCfg->getUseFastISP() && (relatedCU && relatedCU->relatedCuIsValid) )
+#else
     if ( m_pcEncCfg->getUseFastISP() && relatedCU.relatedCuIsValid )
+#endif
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      cuECtx.ispPredModeVal     = relatedCU->ispPredModeVal;
+      cuECtx.bestDCT2NonISPCost = relatedCU->bestDCT2NonISPCost;
+      cuECtx.relatedCuIsValid   = relatedCU->relatedCuIsValid;
+      cuECtx.bestNonDCT2Cost    = relatedCU->bestNonDCT2Cost;
+      cuECtx.bestISPIntraMode   = relatedCU->bestISPIntraMode;
+#else
       cuECtx.ispPredModeVal     = relatedCU.ispPredModeVal;
       cuECtx.bestDCT2NonISPCost = relatedCU.bestDCT2NonISPCost;
       cuECtx.relatedCuIsValid   = relatedCU.relatedCuIsValid;
       cuECtx.bestNonDCT2Cost    = relatedCU.bestNonDCT2Cost;
       cuECtx.bestISPIntraMode   = relatedCU.bestISPIntraMode;
+#endif
     }
+
     return true;
   }
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  else if ( encTestmode.type == ETM_SEPARATE_TREE_INTRA )
+  {
+    if( getFastDeltaQp() )
+    {
+      if( cs.area.lumaSize().width > cs.pcv->fastDeltaQPCuMaxSize )
+      {
+        return false; // only check necessary 2Nx2N Intra in fast delta-QP mode
+      }
+    }
+
+    if( m_pcEncCfg->getUsePbIntraFast() && !cs.slice->isIntra() && !interHadActive( cuECtx ) && cuECtx.bestCU && CU::isInter( *cuECtx.bestCU ) )
+    {
+      return false;
+    }
+
+    if ( !cs.slice->isIntra() && m_pcEncCfg->getUseFastLCTU() && partitioner.currArea().lumaSize().area() > 4096 )
+    {
+      return false;
+    }
+
+    // INTRA MODES
+    m_avoidComplexIntraInInterSlice = false;
+    if( !( slice.isIntra() || bestMode.type == ETM_INTRA ||
+        ( ( !m_pcEncCfg->getDisableIntraPUsInInterSlices() ) && (relatedCU && !relatedCU->isInter) && cuECtx.bestTU != nullptr && (
+        ( cuECtx.bestTU->cbf[0] != 0 ) ||
+        ( ( numComp > COMPONENT_Cb ) && cuECtx.bestTU->cbf[1] != 0 ) ||
+        ( ( numComp > COMPONENT_Cr ) && cuECtx.bestTU->cbf[2] != 0 )  // avoid very complex intra if it is unlikely
+        ) ) ) )
+    {
+      m_avoidComplexIntraInInterSlice = true;
+    }
+
+    if( lastTestMode().type != ETM_INTRA && lastTestMode().type != ETM_SEPARATE_TREE_INTRA && cuECtx.bestCS && cuECtx.bestCU && interHadActive( cuECtx ) )
+    {
+      // Get SATD threshold from best Inter-CU
+      if( !cs.slice->isIntra() && m_pcEncCfg->getUsePbIntraFast() )
+      {
+        CodingUnit* bestCU = cuECtx.bestCU;
+        if( bestCU && CU::isInter( *bestCU ) )
+        {
+          DistParam distParam;
+          const bool useHad = true;
+          m_pcRdCost->setDistParam( distParam, cs.getOrgBuf( COMPONENT_Y ), cuECtx.bestCS->getPredBuf( COMPONENT_Y ), cs.sps->getBitDepth( CHANNEL_TYPE_LUMA ), COMPONENT_Y, useHad );
+          cuECtx.interHad = distParam.distFunc( distParam );
+        }
+      }
+    }
+    m_savedInterHad = cuECtx.interHad;
+
+    if ( cs.slice->getSeparateTreeEnabled() && !cs.slice->getProcessingIntraRegion() && !m_avoidComplexIntraInInterSlice )
+    {
+      return true;
+    }
+    else
+    {
+      return false;
+    }
+  }
+#endif
   else if (encTestmode.type == ETM_PALETTE)
   {
     if (partitioner.currArea().lumaSize().width > 64 || partitioner.currArea().lumaSize().height > 64
@@ -2058,7 +2878,11 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
         // NOTE: ETO_STANDARD is always done when early SKIP mode detection is enabled
         if( !m_pcEncCfg->getUseEarlySkipDetection() )
         {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+          if( relatedCU && (relatedCU->isSkip || relatedCU->isIntra) )
+#else
           if( relatedCU.isSkip || relatedCU.isIntra )
+#endif
           {
             return false;
           }
@@ -2076,7 +2900,11 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
       }
     }
 #if MULTI_HYP_PRED
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    if (encTestmode.type == ETM_INTER_MULTIHYP && (relatedCU && relatedCU->isInter && relatedCU->numAddHyp == 0) )
+#else
     if (encTestmode.type == ETM_INTER_MULTIHYP && relatedCU.isInter && relatedCU.numAddHyp == 0)
+#endif
     {
       return false;
     }
@@ -2101,13 +2929,21 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
       return false;
     }
 #if JVET_W0097_GPM_MMVD_TM
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    if (encTestmode.type == ETM_MERGE_GEO && relatedCU && relatedCU->skipGPM)
+#else
     if (encTestmode.type == ETM_MERGE_GEO && relatedCU.skipGPM)
+#endif
     {
       return false;
     }
 #endif
 #if JVET_AD0213_LIC_IMP
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    if (encTestmode.type == ETM_INTER_ME && (encTestmode.opts & ETO_LIC) && relatedCU && relatedCU->skipLIC)
+#else
     if (encTestmode.type == ETM_INTER_ME && (encTestmode.opts & ETO_LIC) && relatedCU.skipLIC)
+#endif
     {
       return false;
     }
@@ -2128,9 +2964,15 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
     if ((!slice.isIntra() || slice.getSPS()->getIBCFlag()) && cuECtx.get<bool>(IS_BEST_NOSPLIT_SKIP))
 #endif
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      for( int i = 2; i < m_ComprCUCtxList[EncModeCtrl::m_treeIdx].size(); i++ )
+      {
+        if( ( m_ComprCUCtxList[EncModeCtrl::m_treeIdx].end() - i )->get<bool>( IS_BEST_NOSPLIT_SKIP ) )
+#else
       for( int i = 2; i < m_ComprCUCtxList.size(); i++ )
       {
         if( ( m_ComprCUCtxList.end() - i )->get<bool>( IS_BEST_NOSPLIT_SKIP ) )
+#endif
         {
           skipScore += 1;
         }
@@ -2150,7 +2992,13 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
 
       return false;
     }
-
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    // speedups
+    if ( !cs.slice->isIntra() && cs.slice->getSeparateTreeEnabled() && !cs.slice->getProcessingIntraRegion() && cuECtx.skipSplits )
+    {
+      return false;
+    }
+#endif
     if( m_pcEncCfg->getUseContentBasedFastQtbt() )
     {
       const CompArea& currArea = partitioner.currArea().Y();
@@ -2387,6 +3235,27 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
       if( bestCS && bestCU )
       {
 #if JVET_W0097_GPM_MMVD_TM
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        if (!slice.isIntra() && relatedCU)
+        {
+          double gpmCost = cuECtx.get<double>(BEST_GPM_COST);
+          if (gpmCost != (MAX_DOUBLE * .5))
+          {
+            if (gpmCost > (bestCS->cost * 1.2))
+            {
+              relatedCU->skipGPM = true;
+            }
+            else if (gpmCost > bestCS->cost && bestCU->skip)
+            {
+              relatedCU->skipGPM = true;
+            }
+            else if (gpmCost > bestCS->cost && (!cuECtx.bestTU->cbf[0] && !cuECtx.bestTU->cbf[1] && !cuECtx.bestTU->cbf[2]))
+            {
+              relatedCU->skipGPM = true;
+            }
+          }
+        }
+#else
         if (!slice.isIntra())
         {
           double gpmCost = cuECtx.get<double>(BEST_GPM_COST);
@@ -2407,8 +3276,12 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
           }
         }
 #endif
+#endif
 #if JVET_AD0213_LIC_IMP
         int fastLic = m_pcEncCfg->getFastLic();
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        if(relatedCU)
+#endif
         if (fastLic)
         {
           double licCost = cuECtx.get<double>(BEST_LIC_COST);
@@ -2419,17 +3292,63 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
           {
             if (licCost > (bestCS->cost * r) && bestCU->skip)
             {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+              relatedCU->skipLIC = true;
+#else
               relatedCU.skipLIC = true;
+#endif
             }
             else if (c2 && licCost > (bestCS->cost * 1.1))
             {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+              relatedCU->skipLIC = true;
+#else
               relatedCU.skipLIC = true;
+#endif
             }
           }
         }
 #endif
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        if (relatedCU && CU::isInter(*bestCU))
+#else
         if( CU::isInter( *bestCU ) )
+#endif
         {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+          relatedCU->isInter   = true;
+          relatedCU->isSkip   |= bestCU->skip;
+          relatedCU->isMMVDSkip |= bestCU->mmvdSkip;
+          relatedCU->bcwIdx    = bestCU->bcwIdx;
+#if MULTI_HYP_PRED
+          relatedCU->numAddHyp = (uint8_t)bestCU->firstPU->addHypData.size();
+#endif
+          if (bestCU->slice->getSPS()->getUseColorTrans())
+          {
+            if (m_pcEncCfg->getRGBFormatFlag())
+            {
+              if (bestCU->colorTransform && bestCU->rootCbf)
+              {
+                relatedCU->selectColorSpaceOption = 1;
+              }
+              else
+              {
+                relatedCU->selectColorSpaceOption = 2;
+              }
+            }
+            else
+            {
+              if (!bestCU->colorTransform || !bestCU->rootCbf)
+              {
+                relatedCU->selectColorSpaceOption = 1;
+              }
+              else
+              {
+                relatedCU->selectColorSpaceOption = 2;
+              }
+            }
+          }
+#else
           relatedCU.isInter   = true;
           relatedCU.isSkip   |= bestCU->skip;
           relatedCU.isMMVDSkip |= bestCU->mmvdSkip;
@@ -2462,9 +3381,46 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
               }
             }
           }
+#endif
         }
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        else if (relatedCU && CU::isIBC(*bestCU))
+#else
         else if (CU::isIBC(*bestCU))
+#endif
         {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+#if JVET_AA0070_RRIBC
+          relatedCU->isRribcCoded = bestCU->rribcFlipType > 0;
+#endif
+          relatedCU->isIBC = true;
+          relatedCU->isSkip |= bestCU->skip;
+          if (bestCU->slice->getSPS()->getUseColorTrans())
+          {
+            if (m_pcEncCfg->getRGBFormatFlag())
+            {
+              if (bestCU->colorTransform && bestCU->rootCbf)
+              {
+                relatedCU->selectColorSpaceOption = 1;
+              }
+              else
+              {
+                relatedCU->selectColorSpaceOption = 2;
+              }
+            }
+            else
+            {
+              if (!bestCU->colorTransform || !bestCU->rootCbf)
+              {
+                relatedCU->selectColorSpaceOption = 1;
+              }
+              else
+              {
+                relatedCU->selectColorSpaceOption = 2;
+              }
+            }
+          }
+#else
 #if JVET_AA0070_RRIBC
           relatedCU.isRribcCoded = bestCU->rribcFlipType > 0;
 #endif
@@ -2495,11 +3451,21 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
               }
             }
           }
+#endif
         }
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        else if( relatedCU && CU::isIntra( *bestCU ) )
+#else
         else if( CU::isIntra( *bestCU ) )
+#endif
         {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+          relatedCU->isIntra   = true;
+          if ( m_pcEncCfg->getUseFastISP() && cuECtx.ispWasTested && ( !relatedCU->relatedCuIsValid || bestCS->cost < relatedCU->bestCost ) )
+#else
           relatedCU.isIntra   = true;
           if ( m_pcEncCfg->getUseFastISP() && cuECtx.ispWasTested && ( !relatedCU.relatedCuIsValid || bestCS->cost < relatedCU.bestCost ) )
+#endif
           {
             // Compact data
             int bit0 = true;
@@ -2530,14 +3496,39 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
               (bit8 << 8) |
 #endif
               ( cuECtx.bestPredModeDCT2 << 9 );
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+            relatedCU->ispPredModeVal     = val;
+            relatedCU->bestDCT2NonISPCost = cuECtx.bestDCT2NonISPCost;
+            relatedCU->bestCost           = bestCS->cost;
+            relatedCU->bestNonDCT2Cost    = cuECtx.bestNonDCT2Cost;
+            relatedCU->bestISPIntraMode   = cuECtx.bestISPIntraMode;
+            relatedCU->relatedCuIsValid   = true;
+#else
             relatedCU.ispPredModeVal     = val;
             relatedCU.bestDCT2NonISPCost = cuECtx.bestDCT2NonISPCost;
             relatedCU.bestCost           = bestCS->cost;
             relatedCU.bestNonDCT2Cost    = cuECtx.bestNonDCT2Cost;
             relatedCU.bestISPIntraMode   = cuECtx.bestISPIntraMode;
             relatedCU.relatedCuIsValid   = true;
+#endif
           }
 #if INTRA_TRANS_ENC_OPT
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+          if ((m_pcEncCfg->getIntraPeriod() == 1) && isLuma(partitioner.chType) && cuECtx.isLfnstTested() && (!relatedCU->relatedCuLfnstIsValid || bestCS->cost < relatedCU->bestCostForLfnst))
+          {
+            relatedCU->bestCostForLfnst = bestCS->cost;
+            relatedCU->relatedCuLfnstIsValid = true;
+
+            if (cuECtx.bestLfnstCost[1] > (cuECtx.bestLfnstCost[0] * 1.4))
+            {
+              relatedCU->skipLfnstTest = true;
+            }
+            else
+            {
+              relatedCU->skipLfnstTest = false;
+            }
+          }
+#else
           if ((m_pcEncCfg->getIntraPeriod() == 1) && isLuma(partitioner.chType) && cuECtx.isLfnstTested() && (!relatedCU.relatedCuLfnstIsValid || bestCS->cost < relatedCU.bestCostForLfnst))
           {
             relatedCU.bestCostForLfnst = bestCS->cost;
@@ -2553,10 +3544,15 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
             }
           }
 #endif
+#endif
 #if JVET_AB0092_GLM_WITH_LUMA
           if (!isLuma(partitioner.chType) && !(bestCU->firstPU->glmIdc.isActive()))
           {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+            relatedCU->skipGLM = true;
+#else
             relatedCU.skipGLM = true;
+#endif
           }
 #endif
         }
@@ -2568,108 +3564,117 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
 #endif
         cuECtx.set( IS_BEST_NOSPLIT_SKIP, bestCU->skip );
 #if JVET_AG0276_NLIC
-        if (cuECtx.bestCU->altLMFlag)
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        if (!cs.slice->getProcessingIntraRegion())
         {
-          cuECtx.bestCU->secAltLMParaUnit = cuECtx.bestCU->altLMParaUnit;
-        }
-        else
-        {
-#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
-          cuECtx.bestCU->secAltLMParaUnit.resetAltLinearModel();
-#else
-          cuECtx.bestCU->secAltLMParaUnit = cuECtx.bestCU->altLMParaUnit;
 #endif
-        }
-        cuECtx.bestCU->altLMParaUnit.resetAltLinearModel();
-#if JVET_AG0276_LIC_FLAG_SIGNALING
-        cuECtx.bestCU->altLMBRParaUnit.resetAltLinearModel();
-#endif
-        if (CU::isSecLicParaNeeded(*bestCU))
-        {
-          UnitArea   localUnitArea(bestCU->chromaFormat, Area(0, 0, bestCU->lumaSize().width, bestCU->lumaSize().height));
-          PelUnitBuf predBeforeMCAdjBuffer = m_pcInterSearch->m_acPredBeforeLICBuffer[REF_PIC_LIST_0].getBuf(localUnitArea);
-
-          bool isPredSampleRefined = CU::isPredRefined(*bestCU);
-          if (!isPredSampleRefined)
+          if (cuECtx.bestCU->altLMFlag)
           {
-            bool obmcApplied = true;
-            if (bestCU->cs->sps->getUseOBMC() == false || bestCU->obmcFlag == false || bestCU->lwidth() * bestCU->lheight() < 32)
-            {
-              obmcApplied = false;
-            }
-            if (obmcApplied && bestCU->firstPU->mergeFlag)
-            {
-              if (m_pcInterSearch->isSCC(*bestCU->firstPU))
-              {
-                obmcApplied = false;
-              }
-            }
-            if (obmcApplied)
-            {
-              isPredSampleRefined = true;
-            }
-          }
-          if (CU::isAllowSecLicPara(*bestCU))
-          {
-            if (isPredSampleRefined)
-            {
-#if INTER_LIC
-              bool orgLicFlag = bestCU->licFlag;
-              bestCU->licFlag = false;
-#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
-              bool orgLicInheritedFlag = bestCU->licInheritPara;
-              bestCU->licInheritPara = false;
-#endif
-#endif
-              bool orgCiipFlag = bestCU->firstPU->ciipFlag;
-              bestCU->firstPU->ciipFlag = false;
-              m_pcInterSearch->xPredWoRefinement(*bestCU->firstPU, predBeforeMCAdjBuffer);
-#if INTER_LIC
-              bestCU->licFlag = orgLicFlag;
-#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
-              bestCU->licInheritPara = orgLicInheritedFlag;
-#endif
-#endif
-              bestCU->firstPU->ciipFlag = orgCiipFlag;
-            }
-            else
-            {
-              m_pcInterSearch->motionCompensation(*cuECtx.bestCU);
-              predBeforeMCAdjBuffer.copyFrom(cuECtx.bestCU->cs->getPredBuf(*cuECtx.bestCU->firstPU));
-            }
+            cuECtx.bestCU->secAltLMParaUnit = cuECtx.bestCU->altLMParaUnit;
           }
           else
           {
-            if (cuECtx.bestCU->affine && cuECtx.bestCU->firstPU->mergeFlag && cuECtx.bestCU->cs->sps->getUseOBMC() && cuECtx.bestCU->obmcFlag && (cuECtx.bestCU->cs->sps->getUseAltLM() || cuECtx.bestCU->cs->sps->getUseAffAltLM()))
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+            cuECtx.bestCU->secAltLMParaUnit.resetAltLinearModel();
+#else
+            cuECtx.bestCU->secAltLMParaUnit = cuECtx.bestCU->altLMParaUnit;
+#endif
+          }
+          cuECtx.bestCU->altLMParaUnit.resetAltLinearModel();
+#if JVET_AG0276_LIC_FLAG_SIGNALING
+          cuECtx.bestCU->altLMBRParaUnit.resetAltLinearModel();
+#endif
+          if (CU::isSecLicParaNeeded(*bestCU))
+          {
+            UnitArea   localUnitArea(bestCU->chromaFormat, Area(0, 0, bestCU->lumaSize().width, bestCU->lumaSize().height));
+            PelUnitBuf predBeforeMCAdjBuffer = m_pcInterSearch->m_acPredBeforeLICBuffer[REF_PIC_LIST_0].getBuf(localUnitArea);
+
+            bool isPredSampleRefined = CU::isPredRefined(*bestCU);
+            if (!isPredSampleRefined)
             {
-              if (cuECtx.bestCU->obmcFlag && m_pcInterSearch->isSCC(*cuECtx.bestCU->firstPU) && !CU::isTLCond(*cuECtx.bestCU))
+              bool obmcApplied = true;
+              if (bestCU->cs->sps->getUseOBMC() == false || bestCU->obmcFlag == false || bestCU->lwidth() * bestCU->lheight() < 32)
               {
-                cuECtx.bestCU->obmcFlag = false;
+                obmcApplied = false;
+              }
+              if (obmcApplied && bestCU->firstPU->mergeFlag)
+              {
+                if (m_pcInterSearch->isSCC(*bestCU->firstPU))
+                {
+                  obmcApplied = false;
+                }
+              }
+              if (obmcApplied)
+              {
+                isPredSampleRefined = true;
               }
             }
-          }
-          if (CU::isAllowSecLicPara(*bestCU))
-          {
-            PelUnitBuf recBuf = m_pcInterSearch->m_acPredBeforeLICBuffer[REF_PIC_LIST_1].getBuf(localUnitArea);
-            recBuf.copyFrom(cuECtx.bestCU->cs->getRecoBuf(*cuECtx.bestCU->firstPU));
-            if (bestCS->slice->getLmcsEnabledFlag() && m_pcInterSearch->m_pcReshape->getCTUFlag())
+            if (CU::isAllowSecLicPara(*bestCU))
             {
-              recBuf.Y().rspSignal(m_pcInterSearch->m_pcReshape->getInvLUT());
+              if (isPredSampleRefined)
+              {
+#if INTER_LIC
+                bool orgLicFlag = bestCU->licFlag;
+                bestCU->licFlag = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                bool orgLicInheritedFlag = bestCU->licInheritPara;
+                bestCU->licInheritPara = false;
+#endif
+#endif
+                bool orgCiipFlag = bestCU->firstPU->ciipFlag;
+                bestCU->firstPU->ciipFlag = false;
+                m_pcInterSearch->xPredWoRefinement(*bestCU->firstPU, predBeforeMCAdjBuffer);
+#if INTER_LIC
+                bestCU->licFlag = orgLicFlag;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                bestCU->licInheritPara = orgLicInheritedFlag;
+#endif
+#endif
+                bestCU->firstPU->ciipFlag = orgCiipFlag;
+              }
+              else
+              {
+                m_pcInterSearch->motionCompensation(*cuECtx.bestCU);
+                predBeforeMCAdjBuffer.copyFrom(cuECtx.bestCU->cs->getPredBuf(*cuECtx.bestCU->firstPU));
+              }
             }
+            else
+            {
+              if (cuECtx.bestCU->affine && cuECtx.bestCU->firstPU->mergeFlag && cuECtx.bestCU->cs->sps->getUseOBMC() && cuECtx.bestCU->obmcFlag && (cuECtx.bestCU->cs->sps->getUseAltLM() || cuECtx.bestCU->cs->sps->getUseAffAltLM()))
+              {
+                if (cuECtx.bestCU->obmcFlag && m_pcInterSearch->isSCC(*cuECtx.bestCU->firstPU) && !CU::isTLCond(*cuECtx.bestCU))
+                {
+                  cuECtx.bestCU->obmcFlag = false;
+                }
+              }
+            }
+            if (CU::isAllowSecLicPara(*bestCU))
+            {
+              PelUnitBuf recBuf = m_pcInterSearch->m_acPredBeforeLICBuffer[REF_PIC_LIST_1].getBuf(localUnitArea);
+              recBuf.copyFrom(cuECtx.bestCU->cs->getRecoBuf(*cuECtx.bestCU->firstPU));
+              if (bestCS->slice->getLmcsEnabledFlag() && m_pcInterSearch->m_pcReshape->getCTUFlag())
+              {
+                recBuf.Y().rspSignal(m_pcInterSearch->m_pcReshape->getInvLUT());
+              }
 #if JVET_AG0276_LIC_FLAG_SIGNALING
-            m_pcInterSearch->xDevSecLicPara<false>(*cuECtx.bestCU, predBeforeMCAdjBuffer, recBuf);
+              m_pcInterSearch->xDevSecLicPara<false>(*cuECtx.bestCU, predBeforeMCAdjBuffer, recBuf);
 #else
-            m_pcInterSearch->xDevSecLicPara(*cuECtx.bestCU, predBeforeMCAdjBuffer, recBuf);
+              m_pcInterSearch->xDevSecLicPara(*cuECtx.bestCU, predBeforeMCAdjBuffer, recBuf);
 #endif
 #if JVET_AG0276_LIC_FLAG_SIGNALING
-            m_pcInterSearch->xDevSecLicPara<true>(*cuECtx.bestCU, predBeforeMCAdjBuffer, recBuf);
-            if ((cuECtx.bestCU->altLMBRParaUnit.scale[COMPONENT_Y] == cuECtx.bestCU->altLMParaUnit.scale[COMPONENT_Y]) && (cuECtx.bestCU->altLMBRParaUnit.offset[COMPONENT_Y] == cuECtx.bestCU->altLMParaUnit.offset[COMPONENT_Y]))
-            {
-              cuECtx.bestCU->altLMBRParaUnit.resetAltLinearModel();
-            }
+              m_pcInterSearch->xDevSecLicPara<true>(*cuECtx.bestCU, predBeforeMCAdjBuffer, recBuf);
+              if ((cuECtx.bestCU->altLMBRParaUnit.scale[COMPONENT_Y] == cuECtx.bestCU->altLMParaUnit.scale[COMPONENT_Y]) && (cuECtx.bestCU->altLMBRParaUnit.offset[COMPONENT_Y] == cuECtx.bestCU->altLMParaUnit.offset[COMPONENT_Y]))
+              {
+                cuECtx.bestCU->altLMBRParaUnit.resetAltLinearModel();
+              }
 #endif
+            }
           }
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE 
         }
+#endif
+
 #endif
       }
     }
@@ -2761,7 +3766,11 @@ bool EncModeCtrlMTnoRQT::checkSkipOtherLfnst( const EncTestMode& encTestmode, Co
 {
   xExtractFeatures( encTestmode, *tempCS );
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  ComprCUCtx& cuECtx  = m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back();
+#else
   ComprCUCtx& cuECtx  = m_ComprCUCtxList.back();
+#endif
   bool skipOtherLfnst = false;
 
   if( encTestmode.type == ETM_INTRA )
@@ -2780,8 +3789,11 @@ bool EncModeCtrlMTnoRQT::useModeResult( const EncTestMode& encTestmode, CodingSt
 {
   xExtractFeatures( encTestmode, *tempCS );
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  ComprCUCtx& cuECtx = m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back();
+#else
   ComprCUCtx& cuECtx = m_ComprCUCtxList.back();
-
+#endif
 
   if(      encTestmode.type == ETM_SPLIT_BT_H )
   {
@@ -2799,7 +3811,11 @@ bool EncModeCtrlMTnoRQT::useModeResult( const EncTestMode& encTestmode, CodingSt
   {
     cuECtx.set( BEST_TRIV_SPLIT_COST, tempCS->cost );
   }
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  else if( ( encTestmode.type == ETM_INTRA || ( encTestmode.type == ETM_SEPARATE_TREE_INTRA && EncModeCtrl::m_treeIdx==0 ) )  )
+#else
   else if( encTestmode.type == ETM_INTRA )
+#endif
   {
     const CodingUnit& cu = *tempCS->getCU( partitioner.chType );
 

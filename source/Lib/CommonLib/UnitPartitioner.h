@@ -103,7 +103,11 @@ struct PartLevel
 };
 
 // set depending on max QT / BT possibilities
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+typedef static_vector<PartLevel, ( 2 * MAX_CU_DEPTH + 1 ) << 1> PartitioningStack;
+#else
 typedef static_vector<PartLevel, 2 * MAX_CU_DEPTH + 1> PartitioningStack;
+#endif
 
 class Partitioner
 {

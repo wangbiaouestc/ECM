@@ -187,10 +187,21 @@ void LoopFilter::loopFilterPic( CodingStructure& cs
       // CU-based deblocking
       for( auto &currCU : cs.traverseCUs( CS::getArea( cs, ctuArea, CH_L ), CH_L ) )
       {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        if ( currCU.separateTree && currCU.chType != CH_L )
+        {
+          continue;
+        }
+#endif
         xDeblockCU( currCU, EDGE_VER );
       }
 
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      if ( cs.slice->getSeparateTreeEnabled() )
+#else
       if( CS::isDualITree( cs ) )
+#endif
       {
         memset( m_aapucBS       [EDGE_VER].data(), 0,     m_aapucBS       [EDGE_VER].byte_size() );
         memset( m_aapbEdgeFilter[EDGE_VER].data(), false, m_aapbEdgeFilter[EDGE_VER].byte_size() );
@@ -198,6 +209,12 @@ void LoopFilter::loopFilterPic( CodingStructure& cs
 
         for( auto &currCU : cs.traverseCUs( CS::getArea( cs, ctuArea, CH_C ), CH_C ) )
         {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+          if ( !currCU.separateTree || ( currCU.separateTree && currCU.chType != CH_C ) )
+          {
+            continue;
+          }
+#endif
           xDeblockCU( currCU, EDGE_VER );
         }
       }
@@ -222,10 +239,20 @@ void LoopFilter::loopFilterPic( CodingStructure& cs
       // CU-based deblocking
       for( auto &currCU : cs.traverseCUs( CS::getArea( cs, ctuArea, CH_L ), CH_L ) )
       {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        if ( currCU.separateTree && currCU.chType != CH_L )
+        {
+          continue;
+        }
+#endif
         xDeblockCU( currCU, EDGE_HOR );
       }
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      if ( cs.slice->getSeparateTreeEnabled() )
+#else
       if( CS::isDualITree( cs ) )
+#endif
       {
         memset( m_aapucBS       [EDGE_HOR].data(), 0,     m_aapucBS       [EDGE_HOR].byte_size() );
         memset( m_aapbEdgeFilter[EDGE_HOR].data(), false, m_aapbEdgeFilter[EDGE_HOR].byte_size() );
@@ -233,6 +260,12 @@ void LoopFilter::loopFilterPic( CodingStructure& cs
 
         for( auto &currCU : cs.traverseCUs( CS::getArea( cs, ctuArea, CH_C ), CH_C ) )
         {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+          if ( !currCU.separateTree || ( currCU.separateTree && currCU.chType != CH_C ) )
+          {
+            continue;
+          }
+#endif
           xDeblockCU( currCU, EDGE_HOR );
         }
       }

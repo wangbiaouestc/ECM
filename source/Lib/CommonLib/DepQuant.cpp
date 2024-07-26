@@ -3166,7 +3166,11 @@ void DepQuant::dequant(const TransformUnit &tu, CoeffBuf &dstCoeff, const Compon
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
     const bool isLfnstApplied = tu.cu->lfnstIdx > 0 && (tu.cu->isSepTree() ? true : isLuma(compID));
 #else
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    const bool isLfnstApplied = tu.cu->lfnstIdx > 0 && (tu.cu->separateTree ? true : isLuma(compID));
+#else
     const bool isLfnstApplied = tu.cu->lfnstIdx > 0 && (CS::isDualITree(*tu.cs) ? true : isLuma(compID));
+#endif
 #endif
     const bool disableSMForACT =
       tu.cs->slice->getSPS()->getScalingMatrixForAlternativeColourSpaceDisabledFlag()

@@ -158,6 +158,7 @@ struct UnitScale
   Size     scale( const Size     &size ) const { return { size.width >> posx, size.height >> posy }; }
   Area     scale( const Area    &_area ) const { return Area( scale( _area.pos() ), scale( _area.size() ) ); }
 };
+
 #if JVET_AH0135_TEMPORAL_PARTITIONING
 
 struct SplitPred

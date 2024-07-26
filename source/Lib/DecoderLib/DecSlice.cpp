@@ -38,7 +38,6 @@
 #include "DecSlice.h"
 #include "CommonLib/UnitTools.h"
 #include "CommonLib/dtrace_next.h"
-
 #include <vector>
 
 //! \ingroup DecoderLib
@@ -101,6 +100,32 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
   clearAmvpSbTmvpStatArea(slice);
 #endif
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  if ( slice->isIntra() )
+  {
+    slice->setSeparateTreeEnabled( slice->getSPS()->getUseDualITree() );
+  }
+  else
+  {
+    slice->setSeparateTreeEnabled( slice->getSPS()->getInterSliceSeparateTreeEnabled() );
+
+    if ( !slice->isIntra())
+    {
+      int picWidth = sps->getMaxPicWidthInLumaSamples();
+      int picHeight = sps->getMaxPicHeightInLumaSamples();
+      if ( (picWidth * picHeight) <= (1280*720) && ( slice->getTLayer()>0 ) )
+      {
+        slice->setSeparateTreeEnabled(false);
+      }
+      else if (slice->getTLayer()>=ID_SEP_TREE_TID_OFF)
+      {
+        slice->setSeparateTreeEnabled(false);
+      }
+    }
+  }
+#endif
+
+
   // setup coding structure
   CodingStructure& cs = *pic->cs;
   cs.slice            = slice;
@@ -115,7 +140,6 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
   cs.chromaQpAdj      = 0;
 
   cs.picture->resizeSAO(cs.pcv->sizeInCtus, 0);
-
   cs.resetPrevPLT(cs.prevPLT);
 
   if (slice->getFirstCtuRsAddrInSlice() == 0)

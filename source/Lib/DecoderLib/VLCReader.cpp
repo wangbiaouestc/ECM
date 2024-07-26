@@ -1986,6 +1986,17 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   {
     pcSPS->setUseDualITree(0);
   }
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  READ_FLAG( uiCode, "inter_slice_separate_tree_enabled_flag" );    pcSPS->setUseInterSliceSeparateTree( uiCode == 1 );
+  if ( pcSPS->getInterSliceSeparateTreeEnabled() )
+  {
+    READ_UVLC( uiCode,  "log2_shared_tree_upper_bound_inter_slice_minus4" );
+    READ_UVLC( uiCode,  "log2_separate_tree_lower_bound_inter_slice_minus4" );
+  }
+#endif
+
+
   if (pcSPS->getUseDualITree())
   {
     READ_UVLC(uiCode, "sps_log2_diff_min_qt_min_cb_intra_slice_chroma"); minQT[2] = 1 << (uiCode + pcSPS->getLog2MinCodingBlockSize());

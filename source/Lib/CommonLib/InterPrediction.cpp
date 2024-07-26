@@ -1644,6 +1644,7 @@ void InterPrediction::xPredInterUni(const PredictionUnit &pu, const RefPicList &
       CHECK( bioApplied, "BIO is not allowed with affine" );
       m_iRefListIdx = eRefPicList;
       bool genChromaMv = (!luma && chroma && compID == COMPONENT_Cb);
+
 #if JVET_AH0314_LIC_INHERITANCE_FOR_MRG && JVET_AG0164_AFFINE_GPM
       if (pu.cu->licInheritPara)
       {
@@ -4005,6 +4006,7 @@ void InterPrediction::xPredInterBlk ( const ComponentID& compID, const Predictio
         refBuf = refPic->getRecoBuf(CompArea(compID, chFmt, offset, pu.blocks[compID].size()), wrapRef);
       }
 #endif
+
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
       if (isIBC && pu.cs->sps->getIBCFracFlag() && bvValidType == IBC_INT_BV_VALID)
       {
@@ -4794,7 +4796,6 @@ void InterPrediction::xPredIBCBlkPadding(const PredictionUnit& pu, ComponentID c
   deltaY = yFilterTap == 0 ? 0 : deltaY;
   refBuf.buf    = localRefBuf.bufAt(-addedOffsetTL.getX() - deltaX, -addedOffsetTL.getY() - deltaY);
 #endif
-
 }
 #endif
 
