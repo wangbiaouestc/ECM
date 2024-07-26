@@ -818,10 +818,16 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setLFNST                                             ( m_LFNST );
 #endif
   m_cEncLib.setUseFastLFNST                                      ( m_useFastLFNST );
+#if JVET_AI0050_INTER_MTSS
+  m_cEncLib.setUseInterMTSS                                      ( m_useInterMTSS );
+#endif
+#if JVET_AI0050_SBT_LFNST
+  m_cEncLib.setUseSBTLFNST                                       ( m_useSbtLFNST );
+#endif
 #if JVET_AH0103_LOW_DELAY_LFNST_NSPT
   m_cEncLib.setUseFastInterLFNST                                 ( m_useFastInterLFNST );
 #endif
-  m_cEncLib.setSbTmvpEnabledFlag(m_sbTmvpEnableFlag);
+  m_cEncLib.setSbTmvpEnabledFlag                                 ( m_sbTmvpEnableFlag );
   m_cEncLib.setAffine                                            ( m_Affine );
   m_cEncLib.setAffineType                                        ( m_AffineType );
 #if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE

@@ -1041,6 +1041,12 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_AH0103_LOW_DELAY_LFNST_NSPT
   ( "FastInterLFNST",                                 m_useFastInterLFNST,                              false, "Fast methods for inter-LFNST/NSPT" )
 #endif
+#if JVET_AI0050_INTER_MTSS
+  ("InterMTSS",                                       m_useInterMTSS,                                    true, "Inter MTSS (0:off, 1:on)  [default: on]")
+#endif
+#if JVET_AI0050_SBT_LFNST
+  ("SbtLFNST",                                        m_useSbtLFNST,                                     true, "SBT-LFNST (0:off, 1:on)  [default: on]")
+#endif
   ("SbTMVP",                                          m_sbTmvpEnableFlag,                               false, "Enable Subblock Temporal Motion Vector Prediction (0: off, 1: on) [default: off]")
   ("MMVD",                                            m_MMVD,                                            true, "Enable Merge mode with Motion Vector Difference (0:off, 1:on)  [default: 1]")
   ("Affine",                                          m_Affine,                                         false, "Enable affine prediction (0:off, 1:on)  [default: off]")
@@ -5611,6 +5617,12 @@ void EncAppCfg::xPrintParameter()
     msg( VERBOSE, "InterLFNST:%d ", m_interLFNST );
 #else
     msg( VERBOSE, "LFNST:%d ", m_LFNST );
+#endif
+#if JVET_AI0050_INTER_MTSS
+    msg( VERBOSE, "InterMTSS:%d ", m_useInterMTSS );
+#endif
+#if JVET_AI0050_SBT_LFNST
+    msg( VERBOSE, "SbtLFNST:%d ", m_useSbtLFNST );
 #endif
     msg( VERBOSE, "MMVD:%d ", m_MMVD);
     msg( VERBOSE, "Affine:%d ", m_Affine );

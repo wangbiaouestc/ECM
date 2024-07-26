@@ -419,6 +419,8 @@
 #define JVET_AG0100_TRANSFORM_COEFFICIENT_CODING          1 // JVET_AG0100: 3.2b Transform coefficient coding
 #define JVET_AG0143_INTER_INTRA                           1 // JVET_AG0143: 3.1c CABAC inter/intra model switch
 #define JVET_AH0103_LOW_DELAY_LFNST_NSPT                  1 // JVET_AH0103: Low-delay configurations for LFNST/NSPT
+#define JVET_AI0050_INTER_MTSS                            1 // JVET_AI0050: Multiple LFNST/NSPT kernel set selection for GPM coded block
+#define JVET_AI0050_SBT_LFNST                             1 // JVET_AI0050: Enable LFNST/NSPT for SBT coded block
 
 // Entropy Coding
 #define EC_HIGH_PRECISION                                 1 // CABAC high precision

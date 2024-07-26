@@ -713,6 +713,9 @@ public:
 #if JVET_AG0061_INTER_LFNST_NSPT
   static const CtxSet   InterLFNSTIdx;
 #endif
+#if JVET_AI0050_INTER_MTSS
+  static const CtxSet   InterLFNSTIntraIdx;
+#endif
   static const CtxSet   PLTFlag;
   static const CtxSet   RotationFlag;
   static const CtxSet   RunTypeFlag;

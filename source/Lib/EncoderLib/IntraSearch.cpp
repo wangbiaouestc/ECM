@@ -2774,13 +2774,33 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
                 if(modeInfo.mipTrFlg)
                 {
                   PelBuf eipSaveBuf(m_eipMergePredBuf[modeIdx], pu.Y());
-                  m_eipMergeModel[modeIdx].eipDimdMode = deriveIpmForTransform(eipSaveBuf, cu);
+#if JVET_AI0050_INTER_MTSS
+                  int secondDimdIntraDir = 0;
+#endif
+                  m_eipMergeModel[modeIdx].eipDimdMode = deriveIpmForTransform(eipSaveBuf, cu
+#if JVET_AI0050_INTER_MTSS
+                    , secondDimdIntraDir
+#endif
+                  );
+#if JVET_AI0050_INTER_MTSS
+                  cu.dimdDerivedIntraDir2nd = secondDimdIntraDir;
+#endif
                   CHECK(modeIdx >= NUM_EIP_MERGE_SIGNAL, "modeIdx >= NUM_EIP_MERGE_SIGNAL");
                 }
                 else
                 {
                   PelBuf eipSaveBuf(m_eipPredBuf[modeIdx], pu.Y());
-                  m_eipModel[modeIdx].eipDimdMode = deriveIpmForTransform(eipSaveBuf, cu);
+#if JVET_AI0050_INTER_MTSS
+                  int secondDimdIntraDir = 0;
+#endif
+                  m_eipModel[modeIdx].eipDimdMode = deriveIpmForTransform(eipSaveBuf, cu
+#if JVET_AI0050_INTER_MTSS
+                    , secondDimdIntraDir
+#endif
+                  );
+#if JVET_AI0050_INTER_MTSS
+                  cu.dimdDerivedIntraDir2nd = secondDimdIntraDir;
+#endif
                   CHECK(modeIdx >= NUM_DERIVED_EIP, "modeIdx >= NUM_DERIVED_EIP");
                 }
               }

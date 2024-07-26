@@ -406,6 +406,12 @@ protected:
 #if JVET_AH0103_LOW_DELAY_LFNST_NSPT
   bool      m_useFastInterLFNST;
 #endif
+#if JVET_AI0050_INTER_MTSS
+  bool      m_useInterMTSS;
+#endif
+#if JVET_AI0050_SBT_LFNST
+  bool      m_useSbtLFNST;
+#endif
   bool      m_sbTmvpEnableFlag;
   bool      m_Affine;
   bool      m_AffineType;

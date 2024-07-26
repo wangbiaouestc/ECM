@@ -434,9 +434,15 @@ struct CodingUnit : public UnitArea
   uint8_t        mtsFlag;
 #if JVET_AG0061_INTER_LFNST_NSPT
   uint8_t        lfnstFlag;
+#if JVET_AI0050_INTER_MTSS
+  uint8_t        lfnstIntra;
+#endif
 #endif
 #if JVET_AG0061_INTER_LFNST_NSPT
   int            dimdDerivedIntraDir;
+#if JVET_AI0050_INTER_MTSS
+  int            dimdDerivedIntraDir2nd;
+#endif
 #endif
   uint8_t        lfnstIdx;
   uint8_t        bcwIdx;
@@ -923,6 +929,9 @@ struct TransformUnit : public UnitArea
   uint8_t        mtsIdx     [ MAX_NUM_TBLOCKS ];
 #if JVET_AG0061_INTER_LFNST_NSPT
   uint8_t        lfnstIdx   [ MAX_NUM_TBLOCKS ];
+#if JVET_AI0050_INTER_MTSS
+  uint8_t        lfnstIntra [ MAX_NUM_TBLOCKS ];
+#endif
 #endif
   bool           noResidual;
   uint8_t        jointCbCr;

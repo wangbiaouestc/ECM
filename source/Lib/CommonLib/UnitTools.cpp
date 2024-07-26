@@ -29775,7 +29775,23 @@ bool CU::isSbtMode( const uint8_t sbtInfo )
   uint8_t sbtIdx = getSbtIdx( sbtInfo );
   return sbtIdx >= SBT_VER_HALF && sbtIdx <= SBT_HOR_QUAD;
 }
-
+#if JVET_AI0050_SBT_LFNST
+void CU::getSBTPosAndSize(const CodingUnit &cu, Position& pos, Size& size, uint8_t sbtMode)
+{
+  switch (sbtMode)
+  {
+  case SBT_VER_H0: pos = Position(0, 0);  size = Size(cu.lwidth() >> 1, cu.lheight());  break;
+  case SBT_VER_H1: pos = Position(cu.lwidth() >> 1, 0);  size = Size(cu.lwidth() >> 1, cu.lheight());  break;
+  case SBT_HOR_H0: pos = Position(0, 0);  size = Size(cu.lwidth(), cu.lheight() >> 1);  break;
+  case SBT_HOR_H1: pos = Position(0, cu.lheight() >> 1);  size = Size(cu.lwidth(), cu.lheight() >> 1);  break;
+  case SBT_VER_Q0: pos = Position(0, 0);  size = Size(cu.lwidth() >> 2, cu.lheight());  break;
+  case SBT_VER_Q1: pos = Position((3 * cu.lwidth()) >> 2, 0);  size = Size(cu.lwidth() >> 2, cu.lheight());  break;
+  case SBT_HOR_Q0: pos = Position(0, 0);  size = Size(cu.lwidth(), cu.lheight() >> 2);  break;
+  case SBT_HOR_Q1: pos = Position(0, (3 * cu.lheight()) >> 2);  size = Size(cu.lwidth(), cu.lheight() >> 2);  break;
+  default:           assert(0);
+  }
+}
+#endif
 bool CU::isSameSbtSize( const uint8_t sbtInfo1, const uint8_t sbtInfo2 )
 {
   uint8_t sbtIdx1 = getSbtIdxFromSbtMode( sbtInfo1 );
@@ -31290,7 +31306,17 @@ uint32_t PU::getFinalIntraModeForTransform( const TransformUnit &tu, const Compo
   }
   if (tu.cu->geoFlag)
   {
+#if JVET_AI0050_INTER_MTSS
+    intraMode = tu.cu->dimdDerivedIntraDir;
+#else
     intraMode = g_geoAngle2IntraAng[g_geoParams[tu.cu->firstPU->geoSplitDir][0]];
+#endif
+  }
+#endif
+#if JVET_AI0050_INTER_MTSS
+  if (tu.cu->lfnstIntra)
+  {
+    intraMode = tu.cu->dimdDerivedIntraDir2nd;
   }
 #endif
 #if JVET_AB0155_SGPM

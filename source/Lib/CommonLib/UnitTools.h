@@ -172,6 +172,9 @@ namespace CU
   uint8_t numSbtModeRdo               (uint8_t sbtAllowed);
   bool    isSbtMode                   (const uint8_t sbtInfo);
   bool    isSameSbtSize               (const uint8_t sbtInfo1, const uint8_t sbtInfo2);
+#if JVET_AI0050_SBT_LFNST
+  void    getSBTPosAndSize            (const CodingUnit &cu, Position& pos, Size& size, uint8_t sbtMode);
+#endif
   bool    getRprScaling               ( const SPS* sps, const PPS* curPPS, Picture* refPic, int& xScale, int& yScale );
   void    checkConformanceILRP        (Slice *slice);
 #if JVET_AB0157_TMRL
