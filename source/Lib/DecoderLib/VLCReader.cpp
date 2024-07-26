@@ -2586,6 +2586,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
     READ_FLAG(uiCode, "sps_tm_mmvd_enabled_flag");                  pcSPS->setUseTMMMVD(uiCode != 0);
   }
 #endif
+#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+  READ_FLAG( uiCode, "sps_alt_cost_enabled_flag");                  pcSPS->setUseAltCost(uiCode != 0);
+#endif
 
   READ_FLAG( uiCode,    "sps_bcw_enabled_flag" );                   pcSPS->setUseBcw( uiCode != 0 );
   READ_FLAG( uiCode,     "sps_ciip_enabled_flag" );                           pcSPS->setUseCiip             ( uiCode != 0 );

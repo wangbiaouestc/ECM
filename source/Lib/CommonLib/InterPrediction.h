@@ -1450,12 +1450,20 @@ public:
 #endif
 #if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+  void       deriveTMMv         (PredictionUnit& pu, Distortion* tmCost = NULL, int mergeIdx = -1);
+#else
   void       deriveTMMv         (PredictionUnit& pu, Distortion* tmCost = NULL);
+#endif
 #else
   void       deriveTMMv         (PredictionUnit& pu);
 #endif
 #endif
+#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+  Distortion deriveTMMv         (const PredictionUnit& pu, bool fillCurTpl, Distortion curBestCost, RefPicList eRefList, int refIdx, int maxSearchRounds, Mv& mv, const MvField* otherMvf = nullptr, int mergeIdx = -1);
+#else
   Distortion deriveTMMv         (const PredictionUnit& pu, bool fillCurTpl, Distortion curBestCost, RefPicList eRefList, int refIdx, int maxSearchRounds, Mv& mv, const MvField* otherMvf = nullptr);
+#endif
 #if JVET_AD0213_LIC_IMP
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   template <int tplSize>
@@ -1551,14 +1559,26 @@ public:
 #endif
 #endif
 #if JVET_AC0144_AFFINE_DMVR_REGRESSION
+#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+  void bmAffineInit(const PredictionUnit& pu, int mergeIdx = -1);
+#else
   void bmAffineInit(const PredictionUnit &pu);
+#endif
   void bmInitAffineSubBlocks(const Position puPos, const int width, const int height, const int dx, const int dy,
     int mvScaleHor[2], int mvScaleVer[2], int deltaMvHorX[2], int deltaMvHorY[2], int deltaMvVerX[2], int deltaMvVerY[2]);
 #if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
+#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+  bool processBDMVR4AdaptiveAffine(PredictionUnit& pu, Mv(&mvAffiL0)[2][3], Mv(&mvAffiL1)[2][3], EAffineModel& affTypeL0, EAffineModel& affTypeL1, int mergeIdx = -1);
+#else
   bool processBDMVR4AdaptiveAffine(PredictionUnit& pu, Mv(&mvAffiL0)[2][3], Mv(&mvAffiL1)[2][3], EAffineModel& affTypeL0, EAffineModel& affTypeL1);
+#endif
   void xDeriveCPMV(PredictionUnit &pu, const Mv(&curShiftMv)[2][3], int deltaMvHorX, int deltaMvHorY, int deltaMvVerX, int deltaMvVerY, int baseCP, Mv(&cpMV)[2][3]);
   Distortion xBDMVRMv6ParameterSearchAffine(Distortion curBestCost, PredictionUnit& pu);
+#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+  void bmAdaptiveAffineIntSearch(const PredictionUnit& pu, Mv(&mvOffsetL0)[2], Distortion& minCostL0, Mv(&mvOffsetL1)[2], Distortion& minCostL1, int mergeIdx = -1);
+#else
   void bmAdaptiveAffineIntSearch(const PredictionUnit &pu, Mv(&mvOffsetL0)[2], Distortion &minCostL0, Mv(&mvOffsetL1)[2], Distortion &minCostL1);
+#endif
   void bmAdaptiveAffineHPelSearch(const PredictionUnit &pu, Mv(&mvOffset)[2], Distortion &minCost, Distortion localCostArray[9], RefPicList refList);
   Distortion xGetBilateralMatchingErrorAdaptiveAffine(const PredictionUnit& pu, Mv(&mvOffset)[2], RefPicList refList, bool skipOtherRef);
   bool bmAdaptiveAffineRegression(PredictionUnit &pu, Distortion &minCost, RefPicList refList);
@@ -1568,7 +1588,11 @@ public:
 #else
   Distortion xGetBilateralMatchingErrorAffine(const PredictionUnit& pu, Mv(&mvAffi)[2][3]);
 #endif
+#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+  void bmAffineIntSearch(const PredictionUnit &pu, Mv(&mvOffset)[2], Distortion &minCost, Distortion totalCost[(AFFINE_DMVR_INT_SRCH_RANGE << 1) + 1][(AFFINE_DMVR_INT_SRCH_RANGE << 1) + 1], int mergeIdx = -1);
+#else
   void bmAffineIntSearch(const PredictionUnit &pu, Mv(&mvOffset)[2], Distortion &minCost, Distortion totalCost[(AFFINE_DMVR_INT_SRCH_RANGE << 1) + 1][(AFFINE_DMVR_INT_SRCH_RANGE << 1) + 1]);
+#endif
   void bmAffineHPelSearch(const PredictionUnit &pu, Mv(&mvOffset)[2], Distortion &minCost, Distortion localCostArray[9]);
 
   void xInitBilateralMatching(const int width, const int height, const int bitDepth, const bool useMR, const bool useHadmard);
@@ -1579,7 +1603,11 @@ public:
   Mv*       getBdofSubPuMvOffset() {return m_bdofSubPuMvOffset;}
   void      setBdmvrSubPuMvBuf(Mv* mvBuf0, Mv* mvBuf1) { m_bdmvrSubPuMvBuf[0] = mvBuf0; m_bdmvrSubPuMvBuf[1] = mvBuf1; }
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
+#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+  bool      processBDMVR              (PredictionUnit& pu, int step = 0, Distortion* tmCost = NULL, int mergeIdx = -1);
+#else
   bool      processBDMVR              (PredictionUnit& pu, int step = 0, Distortion* tmCost = NULL);
+#endif
 #else
   bool      processBDMVR              (PredictionUnit& pu);
 #endif
@@ -1588,28 +1616,56 @@ public:
 #if JVET_AH0119_SUBBLOCK_TM
     , AffineMergeCtx &affineMergeCtx, bool doTM
 #endif
+#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+      , int mergeIdx = -1
+#endif
   );
 #endif
 #if JVET_AH0119_SUBBLOCK_TM
+#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+  bool processTM4SbTmvpBaseMV(PredictionUnit& pu, AffineMergeCtx& affineMergeCtx, int uiAffMergeCand, Distortion& uiCostOri, Distortion& uiCostBest, uint32_t targetList, int mergeIdx = -1);
+  bool processTM4SbTmvp(PredictionUnit& pu, AffineMergeCtx& affineMergeCtx, int uiAffMergeCand, bool isEncoder, int mergeIdx = -1);
+#else
   bool processTM4SbTmvpBaseMV(PredictionUnit& pu, AffineMergeCtx &affineMergeCtx, int uiAffMergeCand, Distortion& uiCostOri, Distortion& uiCostBest, uint32_t targetList);
   bool processTM4SbTmvp(PredictionUnit& pu, AffineMergeCtx &affineMergeCtx, int uiAffMergeCand, bool isEncoder);
+#endif
 #endif
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
   bool      processTM4Affine(PredictionUnit& pu, AffineMergeCtx &affineMergeCtx, int uiAffMergeCand, bool isEncoder
 #if JVET_AH0119_SUBBLOCK_TM
     , bool isTmPara = true
 #endif
+#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+    , int mergeIdx = -1
+#endif
   );
 #if JVET_AH0119_SUBBLOCK_TM
-  Distortion xGetTemplateMatchingError(PredictionUnit& pu, AffineMergeCtx &affineMergeCtx, int interpolationIdx=2 , bool isStore=false);
-  bool processTM4AffineBaseMV(PredictionUnit& pu, AffineMergeCtx &affineMergeCtx, int uiAffMergeCand, Mv(&bestCPMV)[2][3], Distortion& uiCostOri, Distortion& uiCostBest, uint32_t targetList);
+  Distortion xGetTemplateMatchingError(PredictionUnit& pu, AffineMergeCtx &affineMergeCtx, int interpolationIdx=2 , bool isStore=false
+#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+    , int mergeIdx = -1
+#endif
+  );
+  bool processTM4AffineBaseMV(PredictionUnit& pu, AffineMergeCtx &affineMergeCtx, int uiAffMergeCand, Mv(&bestCPMV)[2][3], Distortion& uiCostOri, Distortion& uiCostBest, uint32_t targetList
+#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+    , int mergeIdx = -1
+#endif
+  );
   void xUpdateCPMV(PredictionUnit &pu, int32_t targetRefList, const Mv(&curCPMV)[2][3], const int deltaMvHorX, const int deltaMvHorY, const int deltaMvVerX, const int deltaMvVerY, const int baseCP);
-  bool processTM4AffinePara(PredictionUnit& pu, AffineMergeCtx &affineMergeCtx, int uiAffMergeCand, int32_t targetRefList, Mv(&cpBestMVF)[2][3], Distortion& uiCostOri, Distortion& uiCostBest);
+  bool processTM4AffinePara(PredictionUnit& pu, AffineMergeCtx &affineMergeCtx, int uiAffMergeCand, int32_t targetRefList, Mv(&cpBestMVF)[2][3], Distortion& uiCostOri, Distortion& uiCostBest
+#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+    , int mergeIdx = -1
+#endif
+  );
 #endif
 #endif
 #if JVET_X0049_ADAPT_DMVR
+#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+  bool      processBDMVRPU2Dir        (PredictionUnit& pu, bool subPURefine[2], Mv(&finalMvDir)[2], int mergeIdx = -1);
+  void      processBDMVRSubPU         (PredictionUnit& pu, bool subPURefine, int mergeIdx = -1);
+#else
   bool      processBDMVRPU2Dir        (PredictionUnit& pu, bool subPURefine[2], Mv(&finalMvDir)[2]);
   void      processBDMVRSubPU         (PredictionUnit& pu, bool subPURefine);
+#endif
 #endif
 #endif
 #if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
@@ -1855,6 +1911,9 @@ public:
   const Mv*         m_otherRefListMv;
         Distortion  m_minCost;
         bool        m_useWeight;
+#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+        int         m_mergeIdx;
+#endif
         int         m_maxSearchRounds;
         ComponentID m_compID;
 
@@ -1888,6 +1947,9 @@ public:
                   const bool                fillCurTpl,
                   const ComponentID         compID,
                   const bool                useWeight,
+#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+                  const int                 mergeIdx,
+#endif
                   const int                 maxSearchRounds,
                         Pel*                curTplAbove,
                         Pel*                curTplLeft,

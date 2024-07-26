@@ -2277,6 +2277,75 @@ Distortion RdCost::xGetSSE64( const DistParam &rcDtParam )
 // HADAMARD with step (used in fractional search)
 // --------------------------------------------------------------------------------------------------------------------
 
+#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+Distortion RdCost::xCalcHADs1xN(const Pel* piOrg, const Pel* piCur, int iStrideOrg, int iStrideCur, int iRows, int iCols)
+{
+  Distortion satd = 0;
+  int diffLen = iCols * iRows;
+
+  while (!isPowerOf2(diffLen))
+  {
+    diffLen++;
+  }
+  std::vector<int> diff(diffLen);
+  if (iRows == 1)
+  {
+    for (int x = 0; x < iCols; x++)
+    {
+      diff[x] = piOrg[x] - piCur[x];
+    }
+  }
+  else if (iCols == 1)
+  {
+    for (int y = 0; y < iRows; y++)
+    {
+      diff[y] = piOrg[0] - piCur[0];
+      piOrg += iStrideOrg;
+      piCur += iStrideCur;
+    }
+  }
+  else
+  {
+    CHECK(1, "shall not be here");
+  }
+  if (diffLen > iCols * iRows)
+  {
+    for (int i = iCols * iRows; i < diffLen; i++)
+    {
+      diff[i] = 0;
+    }
+  }
+
+  int h = 1, x1 = 0, y1 = 0;
+
+  // fwht
+  while (h < diffLen)
+  {
+    for (int i = 0; i < diffLen; i += h * 2)
+    {
+      for (int j = i; j < i + h; j++)
+      {
+        x1 = diff[j];
+        y1 = diff[j + h];
+        diff[j] = x1 + y1;
+        diff[j + h] = x1 - y1;
+      }
+    }
+    h *= 2;
+  }
+
+  for (int i = 0; i < diffLen; i++)
+  {
+    satd += abs(diff[i]);
+  }
+
+  satd -= abs(diff[0]);
+  satd += abs(diff[0]) >> 2; // DC shift from JVET_R0164_MEAN_SCALED_SATD
+  satd = (int)(satd / sqrt(diffLen) * 2);
+
+  return satd;
+}
+#endif
 Distortion RdCost::xCalcHADs2x2( const Pel *piOrg, const Pel *piCur, int iStrideOrg, int iStrideCur, int iStep )
 {
   Distortion satd = 0;
@@ -3065,6 +3134,12 @@ Distortion RdCost::xGetHADs( const DistParam &rcDtParam )
       piCur += iOffsetCur;
     }
   }
+#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+  else if (iRows == 1 || iCols == 1)
+  {
+    uiSum = xCalcHADs1xN(piOrg, piCur, iStrideOrg, iStrideCur, iRows, iCols);
+  }
+#endif
   else
   {
     THROW( "Invalid size" );

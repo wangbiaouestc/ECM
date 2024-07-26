@@ -1045,6 +1045,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("MMVD",                                            m_MMVD,                                            true, "Enable Merge mode with Motion Vector Difference (0:off, 1:on)  [default: 1]")
   ("Affine",                                          m_Affine,                                         false, "Enable affine prediction (0:off, 1:on)  [default: off]")
   ("AffineType",                                      m_AffineType,                                      true,  "Enable affine type prediction (0:off, 1:on)  [default: on]" )
+#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+  ("AltCost",                                         m_useAltCost,                                      true, "Enable alternating cost function based on parity of merge index (0:off, 1:on)  [default: on]")
+#endif
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
   ("AffineTM",                                        m_useAffineTM,                                     true, "Enable TM-based subblock motion refinement (0:off, 1:on)  [default: on]")
 #if JVET_AG0276_NLIC
