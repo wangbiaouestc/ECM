@@ -190,7 +190,12 @@ static const int AMVP_DECIMATION_FACTOR =                           2;
 #endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+#if JVET_AI0103_ADDITIONAL_CMVP
+static const int NUM_CMVP_CANDS =                                  4; ///< CMVP
+static const int NUM_MERGE_CANDS =                                 28 + NUM_CMVP_CANDS; ///< for new maximum buffer of merging candidates
+#else
 static const int NUM_MERGE_CANDS =                                 28; ///< for maximum buffer of merging candidates
+#endif
 static const int NUM_TMVP_CANDS =                                  8; ///< TMVP
 static const int MAX_PAIR_CANDS =                                  4; ///< MAX Pairiwse candidates for Regular TM and BM merge modes
 #else
