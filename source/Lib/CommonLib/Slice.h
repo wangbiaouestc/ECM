@@ -1791,6 +1791,9 @@ private:
   bool              m_SMVD;
   bool              m_Affine;
   bool              m_AffineType;
+#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+  bool              m_useAltCost;
+#endif
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
   bool              m_useAffineTM;
 #if JVET_AG0276_NLIC
@@ -2658,6 +2661,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
   void      setUseFastSubTmvp     ( bool b )                                        { m_fastSubTmvp = b; }
   bool      getUseFastSubTmvp     ()                                      const     { return m_fastSubTmvp; }
+#endif
+#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+  void      setUseAltCost         ( bool b )                                        { m_useAltCost = b; }
+  bool      getUseAltCost         ()                                      const     { return m_useAltCost; }
 #endif
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
   void      setUseAffineTM        ( bool b )                                        { m_useAffineTM = b; }

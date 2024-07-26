@@ -1095,6 +1095,9 @@ private:
   static Distortion xGetMRHADs        ( const DistParam& pcDtParam );
 
   static Distortion xGetHADs          ( const DistParam& pcDtParam );
+#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+  static Distortion xCalcHADs1xN      ( const Pel* piOrg, const Pel* piCurr, int iStrideOrg, int iStrideCur, int iRows, int iCols);
+#endif
   static Distortion xCalcHADs2x2      ( const Pel *piOrg, const Pel *piCurr, int iStrideOrg, int iStrideCur, int iStep );
   static Distortion xCalcHADs4x4      ( const Pel *piOrg, const Pel *piCurr, int iStrideOrg, int iStrideCur, int iStep );
   static Distortion xCalcHADs8x8      ( const Pel *piOrg, const Pel *piCurr, int iStrideOrg, int iStrideCur, int iStep );
