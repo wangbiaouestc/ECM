@@ -961,6 +961,82 @@ class InterPrediction;
 #endif
 
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+#if JVET_AI0197_AFFINE_TMVP
+class AffineMergeCtx
+{
+public:
+  AffineMergeCtx()
+    : numValidMergeCand(0)
+#if JVET_AG0164_AFFINE_GPM
+    , m_indexOffset(0)
+    , m_isGPMAff(0)
+#endif
+  {
+    for (unsigned i = 0; i < AFFINE_MRG_MAX_NUM_CANDS_ALL; i++)
+    {
+      affineType[i] = AFFINEMODEL_4PARAM;
+    }
+  }
+  ~AffineMergeCtx() {}
+
+public:
+  MvField       mvFieldNeighbours[AFFINE_MRG_MAX_NUM_CANDS_ALL << 1][3];   // double length for mv of both lists
+  unsigned char interDirNeighbours[AFFINE_MRG_MAX_NUM_CANDS_ALL];
+  Distortion    candCost[AFFINE_MRG_MAX_NUM_CANDS_ALL];
+  EAffineModel  affineType[AFFINE_MRG_MAX_NUM_CANDS_ALL];
+#if JVET_AG0276_NLIC
+  bool           altLMFlag[AFFINE_MRG_MAX_NUM_CANDS_ALL];
+  AltLMInterUnit altLMParaNeighbours[AFFINE_MRG_MAX_NUM_CANDS_ALL];
+#endif
+#if INTER_LIC
+  bool licFlags[AFFINE_MRG_MAX_NUM_CANDS_ALL];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  bool    licInheritPara[AFFINE_MRG_MAX_NUM_CANDS_ALL];
+  int16_t licScale[AFFINE_MRG_MAX_NUM_CANDS_ALL][2][3];
+  int16_t licOffset[AFFINE_MRG_MAX_NUM_CANDS_ALL][2][3];
+#endif
+#endif
+#if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
+  bool obmcFlags[AFFINE_MRG_MAX_NUM_CANDS_ALL];
+#endif
+  uint8_t bcwIdx[AFFINE_MRG_MAX_NUM_CANDS_ALL];
+  int     numValidMergeCand;
+  int     numAffCandToTestEnc;
+  int     maxNumMergeCand;
+
+  MergeCtx *mrgCtx;
+  MergeType mergeType[AFFINE_MRG_MAX_NUM_CANDS_ALL];
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+  int colIdx[AFFINE_MRG_MAX_NUM_CANDS_ALL];
+#endif
+#if JVET_AB0112_AFFINE_DMVR
+  bool xCheckSimilarMotion(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1) const;
+#endif
+#if JVET_AG0164_AFFINE_GPM
+  int  m_indexOffset;
+  int  m_isGPMAff;
+  void setAffMergeInfo(PredictionUnit &pu, int candIdx, int8_t mmvdIdx = -1) const;
+#endif
+#if JVET_AG0276_NLIC
+  bool xCheckSimilarMotion1(int mergeCandIndex, uint32_t mvdSimilarityThresh = 1, bool isAltLM = false) const;
+#endif
+#if JVET_AH0119_SUBBLOCK_TM
+  bool xCheckSimilarSbTMVP(PredictionUnit pu, int mergeCandIndex, uint32_t mvdSimilarityThresh = 1) const;
+#endif
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  void setLICParamToPu(PredictionUnit &pu, int candIdx, bool hasLIC);
+  void setLICParamToPu(PredictionUnit &pu, int candIdx, bool hasLIC) const;
+  void loadLICParamFromPu(const PredictionUnit *pu, int candIdx, bool allowAltModel, bool hasLIC);
+  void loadLICParamFromMotInfo(const MotionInfo *mi, int candIdx, bool allowAltModel, bool hasLIC);
+  void copyLICParamFromCtx(int candIdx, const AffineMergeCtx &src, int candIdxSrc);
+  void setDefaultLICParamToCtx(int candIdx);
+  void setInheritAndLICFlags(int candIdx);
+#if JVET_AG0276_NLIC
+  void setLICParamUsingAltLM(int candIdx);
+#endif
+#endif
+};
+#else
 class AffineMergeCtx
 {
 public:
@@ -1028,6 +1104,7 @@ public:
 #endif
 #endif
 };
+#endif
 #else
 class AffineMergeCtx
 {

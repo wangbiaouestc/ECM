@@ -239,7 +239,12 @@ static const int RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE = 31;
 #else
 static const int RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE = 30;
 #endif
+#if JVET_AI0197_AFFINE_TMVP
+static const int ADDITIONAL_AFFINE_CAND_NUM   = 24;
+static const int AFFINE_MRG_MAX_NUM_CANDS_ALL = AFFINE_MRG_MAX_NUM_CANDS + ADDITIONAL_AFFINE_CAND_NUM;
+#else
 static const int ADDITIONAL_AFFINE_CAND_NUM = 15;
+#endif
 #if JVET_AB0189_RMVF_BITLENGTH_CONTROL
 static const int RMVF_MV_RANGE = (1 << 12);
 static const int RMVF_CUSIZE_THRED = 128;
@@ -1185,7 +1190,11 @@ static const double AMAXBT_TH128 =                                 60.0;
 static const int ADAPTIVE_SUB_GROUP_SIZE =                         5;
 #if JVET_Z0139_HIST_AFF || JVET_Z0139_NA_AFF
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+#if JVET_AI0197_AFFINE_TMVP
+static const int ADAPTIVE_AFFINE_SUB_GROUP_SIZE = AFFINE_MRG_MAX_NUM_CANDS_ALL;
+#else
 static const int ADAPTIVE_AFFINE_SUB_GROUP_SIZE = RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE;
+#endif
 #else
 static const int ADAPTIVE_AFFINE_SUB_GROUP_SIZE = AFFINE_MRG_MAX_NUM_CANDS;
 #endif

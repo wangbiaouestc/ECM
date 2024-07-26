@@ -16675,16 +16675,27 @@ void  InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMer
   const uint32_t maxNumAffineMergeCand = (sortedCandNum > 0) ? sortedCandNum: pu.cs->slice->getPicHeader()->getMaxNumAffineMergeCand();
 #endif
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+#if JVET_AI0197_AFFINE_TMVP
+  uint32_t   rdCandList[AFFINE_MRG_MAX_NUM_CANDS_ALL][AFFINE_MRG_MAX_NUM_CANDS_ALL];
+  Distortion candCostList[AFFINE_MRG_MAX_NUM_CANDS_ALL][AFFINE_MRG_MAX_NUM_CANDS_ALL];
+#else
   uint32_t rdCandList[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE][RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
   Distortion candCostList[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE][RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE];
+#endif
 #else
   uint32_t rdCandList[AFFINE_MRG_MAX_NUM_CANDS][AFFINE_MRG_MAX_NUM_CANDS];
   Distortion candCostList[AFFINE_MRG_MAX_NUM_CANDS][AFFINE_MRG_MAX_NUM_CANDS];
 #endif
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+#if JVET_AI0197_AFFINE_TMVP
+  for (uint32_t i = 0; i < AFFINE_MRG_MAX_NUM_CANDS_ALL; i++)
+  {
+    for (uint32_t j = 0; j < AFFINE_MRG_MAX_NUM_CANDS_ALL; j++)
+#else
   for (uint32_t i = 0; i < RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE; i++)
   {
     for (uint32_t j = 0; j < RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE; j++)
+#endif
 #else
   for (uint32_t i = 0; i < AFFINE_MRG_MAX_NUM_CANDS; i++)
   {
@@ -16926,7 +16937,11 @@ void  InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMer
 
 void  InterPrediction::updateAffineCandInfo(PredictionUnit &pu, AffineMergeCtx& affMrgCtx, 
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+#if JVET_AI0197_AFFINE_TMVP
+  uint32_t (*RdCandList)[AFFINE_MRG_MAX_NUM_CANDS_ALL],
+#else
   uint32_t(*RdCandList)[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE],
+#endif
 #else
   uint32_t(*RdCandList)[AFFINE_MRG_MAX_NUM_CANDS], 
 #endif
@@ -17150,11 +17165,19 @@ void InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMerg
     altLMRMVFCand.numAffCandToTestEnc++;
   }
 
+#if JVET_AI0197_AFFINE_TMVP
+  uint32_t   rdCandList[AFFINE_MRG_MAX_NUM_CANDS_ALL + (ALT_AFF_MRG_MAX_NUM_CANDS << 1)];
+  uint32_t   candCategory[AFFINE_MRG_MAX_NUM_CANDS_ALL + (ALT_AFF_MRG_MAX_NUM_CANDS << 1)];
+  Distortion candCostList[AFFINE_MRG_MAX_NUM_CANDS_ALL + (ALT_AFF_MRG_MAX_NUM_CANDS << 1)];
+
+  for (uint32_t i = 0; i < AFFINE_MRG_MAX_NUM_CANDS_ALL + (ALT_AFF_MRG_MAX_NUM_CANDS << 1); i++)
+#else
   uint32_t rdCandList[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE + (ALT_AFF_MRG_MAX_NUM_CANDS << 1)];
   uint32_t candCategory[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE + (ALT_AFF_MRG_MAX_NUM_CANDS << 1)];
   Distortion candCostList[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE + (ALT_AFF_MRG_MAX_NUM_CANDS << 1)];
 
   for (uint32_t i = 0; i < RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE + (ALT_AFF_MRG_MAX_NUM_CANDS << 1); i++)
+#endif
   {
     rdCandList[i] = i;
     candCategory[i] = MAX_UINT;
