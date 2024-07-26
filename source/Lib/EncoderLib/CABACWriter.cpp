@@ -9040,7 +9040,9 @@ void CABACWriter::residual_lfnst_mode( const CodingUnit& cu, CUCtx& cuCtx )
     ( cu.isSepTree() && cu.chType == CHANNEL_TYPE_CHROMA && std::min( cu.blocks[ 1 ].width, cu.blocks[ 1 ].height ) < 4 )
 #endif
     || ( cu.blocks[ chIdx ].lumaSize().width > cu.cs->sps->getMaxTbSize() || cu.blocks[ chIdx ].lumaSize().height > cu.cs->sps->getMaxTbSize() )
-#if JVET_AG0061_INTER_LFNST_NSPT
+#if JVET_AG0061_INTER_LFNST_NSPT && JVET_AI0050_SBT_LFNST
+    || ( !cu.cs->sps->getUseSbtLFNST() && cu.sbtInfo && CU::isInter( cu ))
+#elif JVET_AG0061_INTER_LFNST_NSPT
     || ( cu.sbtInfo && CU::isInter( cu ) ) //JVET-AG0208 (EE2-related: On LFNST/NSPT index signalling)
 #endif
     )
@@ -9112,6 +9114,12 @@ void CABACWriter::residual_lfnst_mode( const CodingUnit& cu, CUCtx& cuCtx )
         m_BinEncoder.encodeBin(idxLFNST > 2, Ctx::InterLFNSTIdx(2));
       }
     }
+#if JVET_AI0050_INTER_MTSS
+    if (cu.cs->sps->getUseInterMTSS() && idxLFNST > 0 && cu.geoFlag)
+    {
+      m_BinEncoder.encodeBin(cu.lfnstIntra, Ctx::InterLFNSTIntraIdx());
+    }
+#endif
   }
   else
   {

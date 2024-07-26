@@ -1961,6 +1961,12 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setUseIntraMTS           ( m_IntraMTS );
   sps.setUseInterMTS           ( m_InterMTS );
   sps.setUseSBT                             ( m_SBT );
+#if JVET_AI0050_INTER_MTSS
+  sps.setUseInterMTSS          ( m_useInterMTSS );
+#endif
+#if JVET_AI0050_SBT_LFNST
+  sps.setUseSbtLFNST           ( m_useSbtLFNST );
+#endif
   sps.setUseSMVD                ( m_SMVD );
   sps.setUseBcw                ( m_bcw );
 #if INTER_LIC

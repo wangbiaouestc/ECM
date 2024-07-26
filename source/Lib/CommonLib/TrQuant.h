@@ -174,7 +174,11 @@ protected:
 private:
   DepQuant *m_quant;          //!< Quantizer
 #if JVET_AG0061_INTER_LFNST_NSPT
+#if JVET_AI0050_INTER_MTSS
+  TCoeff   m_mtsCoeffs[NUM_TRAFO_MODES_MTS + 6][MAX_TB_SIZEY * MAX_TB_SIZEY];
+#else
   TCoeff   m_mtsCoeffs[NUM_TRAFO_MODES_MTS + 3][MAX_TB_SIZEY * MAX_TB_SIZEY];
+#endif
 #else
   TCoeff   m_mtsCoeffs[NUM_TRAFO_MODES_MTS][MAX_TB_SIZEY * MAX_TB_SIZEY];
 #endif

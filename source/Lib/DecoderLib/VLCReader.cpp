@@ -2100,6 +2100,12 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   READ_FLAG( uiCode, "sps_intra_lfnst_intra_slice_enabled_flag" );               pcSPS->setUseIntraLFNSTISlice( uiCode != 0 );
   READ_FLAG( uiCode, "sps_intra_lfnst_inter_slice_enabled_flag" );               pcSPS->setUseIntraLFNSTPBSlice( uiCode != 0 );
   READ_FLAG( uiCode, "sps_inter_lfnst_enabled_flag" );            pcSPS->setUseInterLFNST( uiCode != 0 );
+#if JVET_AI0050_INTER_MTSS
+  if (pcSPS->getUseInterLFNST())
+  {
+    READ_FLAG( uiCode, "sps_inter_mtss_enabled_flag" );            pcSPS->setUseInterMTSS( uiCode != 0 );
+  }
+#endif
 #else
   READ_FLAG(uiCode, "sps_lfnst_enabled_flag");                    pcSPS->setUseLFNST(uiCode != 0);
 #endif
@@ -2447,6 +2453,12 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   }
 #endif
   READ_FLAG(uiCode, "sps_sbt_enabled_flag");                        pcSPS->setUseSBT                 ( uiCode != 0 );
+#if JVET_AI0050_SBT_LFNST
+  if (pcSPS->getUseSBT())
+  {
+    READ_FLAG(uiCode, "sps_sbt_lfnst_enabled_flag");            pcSPS->setUseSbtLFNST(uiCode != 0);
+  }
+#endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   READ_FLAG( uiCode,    "sps_dmvd_enabled_flag" );                      pcSPS->setUseDMVDMode( uiCode != 0 );
 #endif

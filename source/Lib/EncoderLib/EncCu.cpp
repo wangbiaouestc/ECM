@@ -9538,6 +9538,9 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
 #if JVET_AG0061_INTER_LFNST_NSPT
   cu.lfnstFlag = false;
   cu.lfnstIdx = 0;
+#if JVET_AI0050_INTER_MTSS
+  cu.lfnstIntra = 0;
+#endif
 #endif
 #if INTER_LIC
   cu.licFlag = false;
@@ -11408,6 +11411,9 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
 #if JVET_AG0061_INTER_LFNST_NSPT
       cu.lfnstFlag = false;
       cu.lfnstIdx = 0;
+#if JVET_AI0050_INTER_MTSS
+      cu.lfnstIntra = 0;
+#endif
 #endif
       cu.imv = 0;
       cu.mmvdSkip = false;
@@ -11749,6 +11755,9 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
 #if JVET_AG0061_INTER_LFNST_NSPT
     cu.lfnstFlag = false;
     cu.lfnstIdx  = 0;
+#if JVET_AI0050_INTER_MTSS
+    cu.lfnstIntra = 0;
+#endif
 #endif
     cu.imv = 0;
     cu.mmvdSkip = false;
@@ -13778,6 +13787,9 @@ void EncCu::xCheckRDCostMergeGeoComb2Nx2N(CodingStructure *&tempCS, CodingStruct
 #if JVET_AG0061_INTER_LFNST_NSPT
         cu.lfnstFlag = false;
         cu.lfnstIdx  = 0;
+#if JVET_AI0050_INTER_MTSS
+        cu.lfnstIntra = 0;
+#endif
 #endif
         cu.imv = 0;
         cu.mmvdSkip = false;
@@ -22760,6 +22772,9 @@ void EncCu::xEncodeInterResidual(   CodingStructure *&tempCS
 #if JVET_AG0061_INTER_LFNST_NSPT
   cu->lfnstFlag           = false;
   cu->lfnstIdx            = 0;
+#if JVET_AI0050_INTER_MTSS
+  cu->lfnstIntra          = 0;
+#endif
 #if JVET_AH0103_LOW_DELAY_LFNST_NSPT
   const bool lfnstAllowed = tempCS->sps->getUseInterLFNST() && CU::isInter( *cu )
 #else
@@ -22858,6 +22873,9 @@ void EncCu::xEncodeInterResidual(   CodingStructure *&tempCS
 #if JVET_AG0061_INTER_LFNST_NSPT
     cu->lfnstFlag = false;
     cu->lfnstIdx  = 0;
+#if JVET_AI0050_INTER_MTSS
+    cu->lfnstIntra = 0;
+#endif
 #endif
     const bool skipResidual = residualPass == 1;
     if( skipResidual || histBestSbt == MAX_UCHAR || !CU::isSbtMode( histBestSbt ) )
@@ -22950,107 +22968,194 @@ void EncCu::xEncodeInterResidual(   CodingStructure *&tempCS
       numSbtRdo = 1;
       m_pcInterSearch->initSbtRdoOrder( CU::getSbtMode( CU::getSbtIdx( histBestSbt ), CU::getSbtPos( histBestSbt ) ) );
     }
+#if JVET_AI0050_SBT_LFNST
+    std::vector<TrCost> trCosts;
+    double costSBT[NUMBER_SBT_MODE];
+    bool   skipCurSBT[NUMBER_SBT_MODE];
+    std::fill_n(costSBT, NUMBER_SBT_MODE, MAX_DOUBLE);
+    std::fill_n(skipCurSBT, NUMBER_SBT_MODE, true);
 
-    for( int sbtModeIdx = 0; sbtModeIdx < numSbtRdo; sbtModeIdx++ )
-    {
-      uint8_t sbtMode = m_pcInterSearch->getSbtRdoOrder( sbtModeIdx );
-      uint8_t sbtIdx = CU::getSbtIdxFromSbtMode( sbtMode );
-      uint8_t sbtPos = CU::getSbtPosFromSbtMode( sbtMode );
-
-      //fast algorithm (early skip, save & load)
-      if( histBestSbt == MAX_UCHAR )
+    const int32_t iPicSize = pu.cu->slice->getPic()->lumaSize().area();
+    bool iPicSizeCondition = iPicSize < 4096000;
+    for (int lfnstIdx = 0; lfnstIdx < (tempCS->sps->getUseSbtLFNST() ? 2 : 1); lfnstIdx++)
+    { 
+      if (lfnstIdx && prevBestSbt == 0 && trCosts[0].second != MAX_DOUBLE && trCosts[0].second != std::numeric_limits<int>::max() && iPicSizeCondition) // 4096000 = 2560 * 1600
       {
-        uint8_t skipCode = m_pcInterSearch->skipSbtByRDCost( cu->lwidth(), cu->lheight(), cu->mtDepth, sbtIdx, sbtPos, bestCS->cost, sbtOffDist, sbtOffCost, sbtOffRootCbf );
-        if( skipCode != MAX_UCHAR )
+        double th = pu.cu->slice->getCheckLDB() ? (iPicSize < 2073600 ? 1.04 : 1.07) : 1.04; // 2073600 = 1920 * 1080
+        if (trCosts[0].second > bestCS->cost * th)
         {
           continue;
         }
-
-        if( sbtModeIdx > 0 )
+      }
+#endif
+      for (int sbtModeIdx = 0; sbtModeIdx < numSbtRdo; sbtModeIdx++)
+      {
+#if JVET_AI0050_SBT_LFNST
+        if (lfnstIdx && skipCurSBT[sbtModeIdx] && iPicSizeCondition)
         {
-          uint8_t prevSbtMode = m_pcInterSearch->getSbtRdoOrder( sbtModeIdx - 1 );
-          //make sure the prevSbtMode is the same size as the current SBT mode (otherwise the estimated dist may not be comparable)
-          if( CU::isSameSbtSize( prevSbtMode, sbtMode ) )
+          continue;
+        }
+#endif
+        uint8_t sbtMode = m_pcInterSearch->getSbtRdoOrder(sbtModeIdx);
+        uint8_t sbtIdx = CU::getSbtIdxFromSbtMode(sbtMode);
+        uint8_t sbtPos = CU::getSbtPosFromSbtMode(sbtMode);
+
+        //fast algorithm (early skip, save & load)
+        if (histBestSbt == MAX_UCHAR)
+        {
+          uint8_t skipCode = m_pcInterSearch->skipSbtByRDCost(cu->lwidth(), cu->lheight(), cu->mtDepth, sbtIdx, sbtPos, bestCS->cost, sbtOffDist, sbtOffCost, sbtOffRootCbf);
+          if (skipCode != MAX_UCHAR)
           {
-            Distortion currEstDist = m_pcInterSearch->getEstDistSbt( sbtMode );
-            Distortion prevEstDist = m_pcInterSearch->getEstDistSbt( prevSbtMode );
-            if( currEstDist > prevEstDist * 1.15 )
+            continue;
+          }
+
+          if (sbtModeIdx > 0)
+          {
+            uint8_t prevSbtMode = m_pcInterSearch->getSbtRdoOrder(sbtModeIdx - 1);
+            //make sure the prevSbtMode is the same size as the current SBT mode (otherwise the estimated dist may not be comparable)
+            if (CU::isSameSbtSize(prevSbtMode, sbtMode))
             {
-              continue;
+              Distortion currEstDist = m_pcInterSearch->getEstDistSbt(sbtMode);
+              Distortion prevEstDist = m_pcInterSearch->getEstDistSbt(prevSbtMode);
+              if (currEstDist > prevEstDist * 1.15)
+              {
+                continue;
+              }
+            }
+          }
+        }
+
+        //init tempCS and TU
+        if (bestCost == bestCS->cost) //The first EMT pass didn't become the bestCS, so we clear the TUs generated
+        {
+          tempCS->clearTUs();
+        }
+        else if (false == swapped)
+        {
+          tempCS->initStructData(encTestMode.qp);
+          tempCS->copyStructure(*bestCS, partitioner.chType);
+          tempCS->getPredBuf().copyFrom(bestCS->getPredBuf());
+          bestCost = bestCS->cost;
+          cu = tempCS->getCU(partitioner.chType);
+          swapped = true;
+        }
+        else
+        {
+          tempCS->clearTUs();
+          bestCost = bestCS->cost;
+          cu = tempCS->getCU(partitioner.chType);
+        }
+
+        //we need to restart the distortion for the new tempCS, the bit count and the cost
+        tempCS->dist = 0;
+        tempCS->fracBits = 0;
+        tempCS->cost = MAX_DOUBLE;
+        cu->skip = false;
+#if JVET_AG0061_INTER_LFNST_NSPT
+#if JVET_AI0050_SBT_LFNST
+        cu->lfnstFlag = lfnstIdx;
+        if (cu->lfnstFlag)
+        {
+#if JVET_AI0050_INTER_MTSS
+          int secondDimdIntraDir = 0;
+#endif
+          Position pos(0, 0);
+          Size size(0, 0);
+          CU::getSBTPosAndSize(*cu, pos, size, sbtMode);
+          cu->dimdDerivedIntraDir = m_pcIntraSearch->deriveIpmForTransform(cu->cs->getPredBuf(*cu->firstPU).Y().subBuf(pos, size), *cu
+#if JVET_AI0050_INTER_MTSS
+            , secondDimdIntraDir
+#endif
+          );
+#if JVET_AI0050_INTER_MTSS
+          cu->dimdDerivedIntraDir2nd = secondDimdIntraDir;
+#endif
+        }
+#else
+        cu->lfnstFlag = false;
+#endif
+        cu->lfnstIdx = 0;
+#if JVET_AI0050_INTER_MTSS
+        cu->lfnstIntra = 0;
+#endif
+#endif
+        //set SBT info
+        cu->setSbtIdx(sbtIdx);
+        cu->setSbtPos(sbtPos);
+
+        //try residual coding
+#if JVET_AI0050_SBT_LFNST
+        bool isValid = m_pcInterSearch->encodeResAndCalcRdInterCU(*tempCS, partitioner, skipResidual);
+#else
+        m_pcInterSearch->encodeResAndCalcRdInterCU(*tempCS, partitioner, skipResidual);
+#endif
+#if JVET_AI0050_SBT_LFNST
+        if (isValid || !cu->lfnstFlag)
+        {
+#endif
+          if (tempCS->slice->getSPS()->getUseColorTrans())
+          {
+            bestCS->tmpColorSpaceCost = tempCS->tmpColorSpaceCost;
+            bestCS->firstColorSpaceSelected = tempCS->firstColorSpaceSelected;
+          }
+          numRDOTried++;
+
+          xEncodeDontSplit(*tempCS, partitioner);
+
+          xCheckDQP(*tempCS, partitioner);
+          xCheckChromaQPOffset(*tempCS, partitioner);
+
+          if (NULL != bestHasNonResi && (bestCostInternal > tempCS->cost))
+          {
+            bestCostInternal = tempCS->cost;
+            if (!(tempCS->getPU(partitioner.chType)->ciipFlag))
+            {
+              *bestHasNonResi = !cu->rootCbf;
+            }
+          }
+
+          if (tempCS->cost < currBestCost)
+          {
+            currBestSbt = cu->sbtInfo;
+            currBestTrs = tempCS->tus[cu->sbtInfo ? cu->getSbtPos() : 0]->mtsIdx[COMPONENT_Y];
+            assert(currBestTrs == 0 || currBestTrs == 1);
+            currBestCost = tempCS->cost;
+          }
+#if JVET_AI0050_SBT_LFNST
+          if (lfnstIdx == 0)
+          {
+            costSBT[sbtModeIdx] = tempCS->cost;
+          }
+#endif
+#if WCG_EXT
+          DTRACE_MODE_COST(*tempCS, m_pcRdCost->getLambda(true));
+#else
+          DTRACE_MODE_COST(*tempCS, m_pcRdCost->getLambda());
+#endif
+          xCheckBestMode(tempCS, bestCS, partitioner, encTestMode);
+#if JVET_AI0050_SBT_LFNST
+        }
+      }
+      if (lfnstIdx == 0)
+      {
+        for (int i = 0; i < NUMBER_SBT_MODE; i++)
+        {
+          trCosts.push_back(TrCost(i, int(std::min<double>(costSBT[i], std::numeric_limits<int>::max()))));
+        }
+        std::stable_sort(trCosts.begin(), trCosts.end(), [](const TrCost  l, const TrCost r) {return l.second < r.second; });
+        for (int i = 0; i < NUM_SBT_LFNST_RDO; i++)
+        {
+          if (trCosts[i].second != MAX_DOUBLE && trCosts[i].second != std::numeric_limits<int>::max())
+          {
+            double th = 1.1;
+            if (i == 0 || (i > 0 && (trCosts[i].second < th * trCosts[0].second)))
+            {
+              skipCurSBT[trCosts[i].first] = false;
             }
           }
         }
       }
-
-      //init tempCS and TU
-      if( bestCost == bestCS->cost ) //The first EMT pass didn't become the bestCS, so we clear the TUs generated
-      {
-        tempCS->clearTUs();
-      }
-      else if( false == swapped )
-      {
-        tempCS->initStructData( encTestMode.qp );
-        tempCS->copyStructure( *bestCS, partitioner.chType );
-        tempCS->getPredBuf().copyFrom( bestCS->getPredBuf() );
-        bestCost = bestCS->cost;
-        cu = tempCS->getCU( partitioner.chType );
-        swapped = true;
-      }
-      else
-      {
-        tempCS->clearTUs();
-        bestCost = bestCS->cost;
-        cu = tempCS->getCU( partitioner.chType );
-      }
-
-      //we need to restart the distortion for the new tempCS, the bit count and the cost
-      tempCS->dist = 0;
-      tempCS->fracBits = 0;
-      tempCS->cost = MAX_DOUBLE;
-      cu->skip = false;
-#if JVET_AG0061_INTER_LFNST_NSPT
-      cu->lfnstFlag = false;
-      cu->lfnstIdx  = 0;
 #endif
-      //set SBT info
-      cu->setSbtIdx( sbtIdx );
-      cu->setSbtPos( sbtPos );
-
-      //try residual coding
-      m_pcInterSearch->encodeResAndCalcRdInterCU( *tempCS, partitioner, skipResidual );
-      if (tempCS->slice->getSPS()->getUseColorTrans())
-      {
-        bestCS->tmpColorSpaceCost = tempCS->tmpColorSpaceCost;
-        bestCS->firstColorSpaceSelected = tempCS->firstColorSpaceSelected;
-      }
-      numRDOTried++;
-
-      xEncodeDontSplit( *tempCS, partitioner );
-
-      xCheckDQP( *tempCS, partitioner );
-      xCheckChromaQPOffset( *tempCS, partitioner );
-
-      if( NULL != bestHasNonResi && ( bestCostInternal > tempCS->cost ) )
-      {
-        bestCostInternal = tempCS->cost;
-        if( !( tempCS->getPU( partitioner.chType )->ciipFlag ) )
-          *bestHasNonResi = !cu->rootCbf;
-      }
-
-      if( tempCS->cost < currBestCost )
-      {
-        currBestSbt = cu->sbtInfo;
-        currBestTrs = tempCS->tus[cu->sbtInfo ? cu->getSbtPos() : 0]->mtsIdx[COMPONENT_Y];
-        assert( currBestTrs == 0 || currBestTrs == 1 );
-        currBestCost = tempCS->cost;
-      }
-
-#if WCG_EXT
-      DTRACE_MODE_COST( *tempCS, m_pcRdCost->getLambda( true ) );
-#else
-      DTRACE_MODE_COST( *tempCS, m_pcRdCost->getLambda() );
-#endif
-      xCheckBestMode( tempCS, bestCS, partitioner, encTestMode );
     }
 #if JVET_AA0133_INTER_MTS_OPT
     if (!skipResidual && mtsAllowed)
@@ -23087,6 +23192,9 @@ void EncCu::xEncodeInterResidual(   CodingStructure *&tempCS
 #if JVET_AG0061_INTER_LFNST_NSPT
       cu->lfnstFlag = false;
       cu->lfnstIdx  = 0;
+#if JVET_AI0050_INTER_MTSS
+      cu->lfnstIntra = 0;
+#endif
 #endif
 #endif
       m_pcInterSearch->setBestCost(bestCS->cost);
@@ -23138,6 +23246,9 @@ void EncCu::xEncodeInterResidual(   CodingStructure *&tempCS
         cu->mtsFlag          = true;
         cu->lfnstFlag        = false;
         cu->lfnstIdx         = 0;
+#if JVET_AI0050_INTER_MTSS
+        cu->lfnstIntra       = 0;
+#endif
 #endif
       //try residual coding
         bool isValid = m_pcInterSearch->encodeResAndCalcRdInterCU(*tempCS, partitioner, skipResidual);
@@ -23245,7 +23356,17 @@ void EncCu::xEncodeInterResidual(   CodingStructure *&tempCS
           bestCost = bestCS->cost;
           cu       = tempCS->getCU(partitioner.chType);
         }
-        cu->dimdDerivedIntraDir = m_pcIntraSearch->deriveIpmForTransform(cu->cs->getPredBuf(*cu->firstPU).Y(), *cu);
+#if JVET_AI0050_INTER_MTSS
+        int secondDimdIntraDir = 0;
+#endif
+        cu->dimdDerivedIntraDir = m_pcIntraSearch->deriveIpmForTransform(cu->cs->getPredBuf(*cu->firstPU).Y(), *cu
+#if JVET_AI0050_INTER_MTSS
+          , secondDimdIntraDir
+#endif
+        );
+#if JVET_AI0050_INTER_MTSS
+        cu->dimdDerivedIntraDir2nd = secondDimdIntraDir;
+#endif
         // we need to restart the distortion for the new tempCS, the bit count and the cost
         tempCS->dist         = 0;
         tempCS->fracBits     = 0;
@@ -23256,6 +23377,9 @@ void EncCu::xEncodeInterResidual(   CodingStructure *&tempCS
         cu->mtsFlag          = false;
         cu->lfnstFlag        = true;
         cu->lfnstIdx         = 0;
+#if JVET_AI0050_INTER_MTSS
+        cu->lfnstIntra       = 0;
+#endif
         m_pcInterSearch->setBestCost(bestCS->cost);
         {
           // try residual coding

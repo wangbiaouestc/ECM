@@ -414,6 +414,12 @@ protected:
 #else
   bool      m_LFNST;
 #endif
+#if JVET_AI0050_INTER_MTSS
+  bool      m_useInterMTSS;
+#endif
+#if JVET_AI0050_SBT_LFNST
+  bool      m_useSbtLFNST;
+#endif
   bool      m_useFastLFNST;
 #if JVET_AH0103_LOW_DELAY_LFNST_NSPT
   bool      m_useFastInterLFNST;
@@ -1576,7 +1582,14 @@ public:
   void      setUseFastInterLFNST            ( bool b )       { m_useFastInterLFNST = b; }
   bool      getUseFastInterLFNST()                     const { return m_useFastInterLFNST; }
 #endif
-
+#if JVET_AI0050_INTER_MTSS
+  void      setUseInterMTSS                 ( bool b )       { m_useInterMTSS = b; }
+  bool      getUseInterMTSS()                          const { return m_useInterMTSS; }
+#endif
+#if JVET_AI0050_SBT_LFNST
+  void      setUseSBTLFNST                  ( bool b )       { m_useSbtLFNST = b; }
+  bool      getUseSBTLFNST()                           const { return m_useSbtLFNST; }
+#endif
   void      setUseLMChroma                  ( int n )        { m_LMChroma = n; }
   int       getUseLMChroma()                           const { return m_LMChroma; }
   void      setHorCollocatedChromaFlag( bool b )             { m_horCollocatedChromaFlag = b; }

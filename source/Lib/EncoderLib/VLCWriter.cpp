@@ -1287,6 +1287,12 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
   WRITE_FLAG( pcSPS->getUseIntraLFNSTISlice() ? 1 : 0, "sps_intra_lfnst_intra_slice_enabled_flag" );
   WRITE_FLAG( pcSPS->getUseIntraLFNSTPBSlice() ? 1 : 0, "sps_intra_lfnst_inter_slice_enabled_flag" );
   WRITE_FLAG( pcSPS->getUseInterLFNST() ? 1 : 0, "sps_inter_lfnst_enabled_flag" );
+#if JVET_AI0050_INTER_MTSS
+  if (pcSPS->getUseInterLFNST())
+  {
+    WRITE_FLAG(pcSPS->getUseInterMTSS() ? 1 : 0, "sps_inter_mtss_enabled_flag");
+  }
+#endif
 #else
   WRITE_FLAG(pcSPS->getUseLFNST() ? 1 : 0, "sps_lfnst_enabled_flag");
 #endif
@@ -1534,6 +1540,12 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
   }
 #endif
   WRITE_FLAG( pcSPS->getUseSBT() ? 1 : 0,                                                      "sps_sbt_enabled_flag");
+#if JVET_AI0050_SBT_LFNST
+  if (pcSPS->getUseSBT())
+  {
+    WRITE_FLAG( pcSPS->getUseSbtLFNST() ? 1 : 0,                                               "sps_sbt_lfnst_enabled_flag");
+  }
+#endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   WRITE_FLAG( pcSPS->getUseDMVDMode() ? 1 : 0,                                                 "sps_dmvd_enabled_flag" );
 #endif

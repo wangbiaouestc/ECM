@@ -6445,6 +6445,31 @@ const CtxSet ContextSetCfg::obicFlag = ContextSetCfg::addCtxSet
   { 133 },
   });
 #endif
+#if JVET_AI0050_INTER_MTSS
+const CtxSet ContextSetCfg::InterLFNSTIntraIdx = ContextSetCfg::addCtxSet({
+// ctx 1599 1599
+  { CNU },
+  { CNU },
+  { CNU },
+  { CNU },
+  { DWS },
+  { DWS },
+  { DWS },
+  { DWS },
+  { DWE },
+  { DWE },
+  { DWE },
+  { DWE },
+  { DWO },
+  { DWO },
+  { DWO },
+  { DWO },
+  { DWO },
+  { DWO },
+  { DWO },
+  { DWO },
+  });
+#endif
 #if JVET_AI0136_ADAPTIVE_DUAL_TREE
 const CtxSet ContextSetCfg::SeparateTree = ContextSetCfg::addCtxSet
 ({

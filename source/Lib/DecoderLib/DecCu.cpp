@@ -1236,7 +1236,17 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
       m_pcIntraPred->eipPred(pu, piPred);
       if (!isEncoder)
       {
-        pu.cu->eipModel.eipDimdMode = IntraPrediction::deriveIpmForTransform(piPred, *pu.cu);
+#if JVET_AI0050_INTER_MTSS
+        int secondDimdIntraDir = 0;
+#endif
+        pu.cu->eipModel.eipDimdMode = IntraPrediction::deriveIpmForTransform(piPred, *pu.cu
+#if JVET_AI0050_INTER_MTSS
+          , secondDimdIntraDir
+#endif
+        );
+#if JVET_AI0050_INTER_MTSS
+        pu.cu->dimdDerivedIntraDir2nd = secondDimdIntraDir;
+#endif
       }
     }
 #endif
@@ -2699,7 +2709,37 @@ void DecCu::xDecodeInterTexture(CodingUnit &cu)
 #if JVET_AG0061_INTER_LFNST_NSPT
   if (cu.lfnstIdx)
   {
-    cu.dimdDerivedIntraDir = m_pcIntraPred->deriveIpmForTransform(cu.cs->getPredBuf(*cu.firstPU).Y(), cu);
+#if JVET_AI0050_INTER_MTSS
+    int secondDimdIntraDir = 0;
+#endif
+#if JVET_AI0050_SBT_LFNST
+    if (cu.cs->sps->getUseSbtLFNST() && cu.sbtInfo)
+    {
+      Position pos(0, 0);
+      Size size(0, 0);
+      int sbtIdx = cu.getSbtIdx();
+      int sbtPos = cu.getSbtPos();
+      CU::getSBTPosAndSize(cu, pos, size, CU::getSbtMode(sbtIdx, sbtPos));
+      cu.dimdDerivedIntraDir = m_pcIntraPred->deriveIpmForTransform(cu.cs->getPredBuf(*cu.firstPU).Y().subBuf(pos, size), cu
+#if JVET_AI0050_INTER_MTSS
+        , secondDimdIntraDir
+#endif
+      );
+    }
+    else
+    {
+#endif
+      cu.dimdDerivedIntraDir = m_pcIntraPred->deriveIpmForTransform(cu.cs->getPredBuf(*cu.firstPU).Y(), cu
+#if JVET_AI0050_INTER_MTSS
+        , secondDimdIntraDir
+#endif
+      );
+#if JVET_AI0050_SBT_LFNST
+    }
+#endif
+#if JVET_AI0050_INTER_MTSS
+    cu.dimdDerivedIntraDir2nd = secondDimdIntraDir;
+#endif
   }
 #endif
 

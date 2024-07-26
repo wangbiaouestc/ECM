@@ -801,7 +801,11 @@ public:
 #endif
 #endif
 #if ENABLE_DIMD && (JVET_AB0067_MIP_DIMD_LFNST || JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST || JVET_AG0058_EIP || JVET_AG0061_INTER_LFNST_NSPT)
-  static int deriveIpmForTransform(CPelBuf predBuf, CodingUnit& cu);
+  static int deriveIpmForTransform(CPelBuf predBuf, CodingUnit& cu
+#if JVET_AI0050_INTER_MTSS
+    , int &secondMode
+#endif
+  );
 #endif
 #if !JVET_AG0061_INTER_LFNST_NSPT
   static int  buildHistogram      ( const Pel *pReco, int iStride, uint32_t uiHeight, uint32_t uiWidth, int* piHistogram, int direction, int bw, int bh );
