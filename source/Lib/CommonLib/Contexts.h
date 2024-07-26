@@ -495,6 +495,10 @@ public:
 #if JVET_Y0065_GPM_INTRA
   static const CtxSet   GPMIntraFlag;
 #endif
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+  static const CtxSet   GpmInterIbcFlag;
+  static const CtxSet   GpmInterIbcIdx;
+#endif
   static const CtxSet   PredMode;
   static const CtxSet   MultiRefLineIdx;
   static const CtxSet   IntraLumaMpmFlag;

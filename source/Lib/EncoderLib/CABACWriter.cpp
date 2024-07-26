@@ -5201,6 +5201,16 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
 #endif
       bool bUseOnlyOneVector = pu.cs->slice->isInterP() || pu.cs->sps->getMaxNumGeoCand() == 1;
 #endif
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+#if JVET_AG0164_AFFINE_GPM
+      bool isIbc0 = (pu.geoMergeIdx0 >= GEO_MAX_ALL_INTER_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS);
+      bool isIbc1 = (pu.geoMergeIdx1 >= GEO_MAX_ALL_INTER_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS);
+#else
+      bool isIbc0 = (pu.geoMergeIdx0 >= GEO_MAX_NUM_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS);
+      bool isIbc1 = (pu.geoMergeIdx1 >= GEO_MAX_NUM_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS);
+#endif
+      bool isGpmInterIbcEnabled = pu.cs->sps->getUseGeoInterIbc();
+#endif
       m_BinEncoder.encodeBin(pu.geoMMVDFlag0, Ctx::GeoMmvdFlag());
       if (pu.geoMMVDFlag0)
       {
@@ -5222,6 +5232,12 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
       else
       {
         m_BinEncoder.encodeBin( isIntra0 ? 1 : 0, Ctx::GPMIntraFlag() );
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+        if (isIntra0 && isGpmInterIbcEnabled)
+        {
+          m_BinEncoder.encodeBin( isIbc0 ? 1 : 0, Ctx::GpmInterIbcFlag() );
+        }
+#endif
       }
 
       if (!bUseOnlyOneVector || isIntra0)
@@ -5248,6 +5264,12 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
       else if (!isIntra0)
       {
         m_BinEncoder.encodeBin( isIntra1 ? 1 : 0, Ctx::GPMIntraFlag() );
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+        if (isIntra1 && isGpmInterIbcEnabled)
+        {
+          m_BinEncoder.encodeBin( isIbc1 ? 1 : 0, Ctx::GpmInterIbcFlag() );
+        }
+#endif
       }
       }
       else
@@ -5256,6 +5278,9 @@ void CABACWriter::merge_idx( const PredictionUnit& pu )
       }
 
       CHECK( pu.gpmIntraFlag != (isIntra0 || isIntra1), "gpmIntraFlag shall be equal to (isIntra0 || isIntra1)" );
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+      CHECK( pu.gpmInterIbcFlag != (isIbc0 || isIbc1), "gpmInterIbcFlag shall be equal to (isIbc0 || isIbc1)" );
+#endif
 #endif
 
 #if TM_MRG
@@ -5846,6 +5871,15 @@ void CABACWriter::geo_merge_idx1(const PredictionUnit& pu)
   bool isIntra1 = (candIdx1 >= GEO_MAX_NUM_UNI_CANDS);
 #endif
 #endif
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+#if JVET_AG0164_AFFINE_GPM
+  bool isIbc0 = (candIdx0 >= GEO_MAX_ALL_INTER_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS);
+  bool isIbc1 = (candIdx1 >= GEO_MAX_ALL_INTER_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS);
+#else
+  bool isIbc0 = (candIdx0 >= GEO_MAX_NUM_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS);
+  bool isIbc1 = (candIdx1 >= GEO_MAX_NUM_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS);
+#endif
+#endif
 
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   geoModeIdx(pu);
@@ -5862,10 +5896,40 @@ void CABACWriter::geo_merge_idx1(const PredictionUnit& pu)
 #if JVET_Y0065_GPM_INTRA
   if (isIntra0)
   {
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+    if (isIbc0)
+    {
+#if JVET_AG0164_AFFINE_GPM
+      int mergeIdx = candIdx0 - GEO_MAX_ALL_INTER_UNI_CANDS - GEO_MAX_NUM_INTRA_CANDS;
+#else
+      int mergeIdx = candIdx0 - GEO_MAX_NUM_UNI_CANDS - GEO_MAX_NUM_INTRA_CANDS;
+#endif
+      int numCandminus1 = GEO_MAX_NUM_IBC_CANDS - 1;
+      unsigned int uiUnaryIdx = 0;
+      for (; uiUnaryIdx < numCandminus1; ++uiUnaryIdx)
+      {
+        unsigned int uiSymbol = mergeIdx == uiUnaryIdx ? 0 : 1;
+        m_BinEncoder.encodeBin(uiSymbol, Ctx::GpmInterIbcIdx((uiUnaryIdx > LAST_MERGE_IDX_CABAC - 1 ? LAST_MERGE_IDX_CABAC - 1 : uiUnaryIdx)));
+        if (uiSymbol == 0)
+        {
+          break;
+        }
+      }
+    }
+    else
+    {
+#if JVET_AG0164_AFFINE_GPM
+      unary_max_eqprob(candIdx0 - GEO_MAX_ALL_INTER_UNI_CANDS, GEO_MAX_NUM_INTRA_CANDS-1);
+#else
+      unary_max_eqprob(candIdx0 - GEO_MAX_NUM_UNI_CANDS, GEO_MAX_NUM_INTRA_CANDS - 1);
+#endif
+    }
+#else
 #if JVET_AG0164_AFFINE_GPM
     unary_max_eqprob(candIdx0 - GEO_MAX_ALL_INTER_UNI_CANDS, GEO_MAX_NUM_INTRA_CANDS-1);
 #else
     unary_max_eqprob(candIdx0 - GEO_MAX_NUM_UNI_CANDS, GEO_MAX_NUM_INTRA_CANDS-1);
+#endif
 #endif
   }
   else if (numCandminus2 >= 0)
@@ -5903,10 +5967,40 @@ void CABACWriter::geo_merge_idx1(const PredictionUnit& pu)
 
   if (isIntra1)
   {
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+    if (isIbc1)
+    {
+#if JVET_AG0164_AFFINE_GPM
+      int mergeIdx = candIdx1 - GEO_MAX_ALL_INTER_UNI_CANDS - GEO_MAX_NUM_INTRA_CANDS;
+#else
+      int mergeIdx = candIdx1 - GEO_MAX_NUM_UNI_CANDS - GEO_MAX_NUM_INTRA_CANDS;
+#endif
+      int numCandminus1 = GEO_MAX_NUM_IBC_CANDS - 1;
+      unsigned int uiUnaryIdx = 0;
+      for (; uiUnaryIdx < numCandminus1; ++uiUnaryIdx)
+      {
+        unsigned int uiSymbol = mergeIdx == uiUnaryIdx ? 0 : 1;
+        m_BinEncoder.encodeBin(uiSymbol, Ctx::GpmInterIbcIdx((uiUnaryIdx > LAST_MERGE_IDX_CABAC - 1 ? LAST_MERGE_IDX_CABAC - 1 : uiUnaryIdx)));
+        if (uiSymbol == 0)
+        {
+          break;
+        }
+      }
+    }
+    else
+    {
+#if JVET_AG0164_AFFINE_GPM
+      unary_max_eqprob(candIdx1 - GEO_MAX_ALL_INTER_UNI_CANDS, GEO_MAX_NUM_INTRA_CANDS - 1);
+#else
+      unary_max_eqprob(candIdx1 - GEO_MAX_NUM_UNI_CANDS, GEO_MAX_NUM_INTRA_CANDS - 1);
+#endif
+    }
+#else
 #if JVET_AG0164_AFFINE_GPM
     unary_max_eqprob(candIdx1 - GEO_MAX_ALL_INTER_UNI_CANDS, GEO_MAX_NUM_INTRA_CANDS - 1);
 #else
     unary_max_eqprob(candIdx1 - GEO_MAX_NUM_UNI_CANDS, GEO_MAX_NUM_INTRA_CANDS-1);
+#endif
 #endif
   }
   else if (numCandminus2 >= 0)
@@ -6022,11 +6116,19 @@ uint64_t CABACWriter::geo_intraFlag_est( const TempCtx& ctxStart, const int flag
   return getEstFracBits();
 }
 
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+uint64_t CABACWriter::geo_intraIdx_est( const int intraIdx, const bool isGeoIbc)
+#else
 uint64_t CABACWriter::geo_intraIdx_est( const int intraIdx)
+#endif
 {
   resetBits();
 
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+  unary_max_eqprob(intraIdx, GEO_MAX_NUM_INTRA_CANDS + (isGeoIbc ? GEO_MAX_NUM_IBC_CANDS : 0) - 1);
+#else
   unary_max_eqprob(intraIdx, GEO_MAX_NUM_INTRA_CANDS-1);
+#endif
 
   return getEstFracBits();
 }

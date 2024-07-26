@@ -26897,7 +26897,11 @@ void IntraPrediction::getNeiEipCands(const PredictionUnit& pu, static_vector<Eip
           for (int i = 0; i < 2 && foundNeighMV == false; i++)
           {
             int refIdx = miNeigh.refIdx[i];
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+            if (miNeigh.isInter && refIdx != -1)
+#else
             if (refIdx != -1)
+#endif
             {
               const int currRefPOC = slice.getRefPic(RefPicList(i), refIdx)->getPOC();
               if (currRefPOC == colPOC)

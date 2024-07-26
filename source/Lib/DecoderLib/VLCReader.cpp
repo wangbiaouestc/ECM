@@ -2639,6 +2639,10 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
         READ_FLAG( uiCode,    "sps_gpm_tm_enabled_flag" );                      pcSPS->setUseGPMTMMode( uiCode != 0 );
       }
 #endif
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+      READ_FLAG(uiCode, "sps_gpm_inter_ibc_enabled_flag");
+      pcSPS->setUseGeoInterIbc(uiCode != 0);
+#endif
     }
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_W0097_GPM_MMVD_TM && TM_MRG
     else

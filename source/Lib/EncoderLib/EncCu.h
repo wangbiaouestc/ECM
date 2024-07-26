@@ -190,15 +190,25 @@ public:
       for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++)
       {
 #if JVET_AG0164_AFFINE_GPM
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+        singleDistList[partIdx][splitDir] = new SingleGeoMMVDMergeEntry*[GEO_MAX_ALL_INTER_UNI_CANDS +GEO_MAX_NUM_INTRA_CANDS+GEO_MAX_NUM_IBC_CANDS];
+        for (int candIdx = 0; candIdx < GEO_MAX_ALL_INTER_UNI_CANDS +GEO_MAX_NUM_INTRA_CANDS+GEO_MAX_NUM_IBC_CANDS; candIdx++)
+#else
         singleDistList[partIdx][splitDir] = new SingleGeoMMVDMergeEntry*[GEO_MAX_ALL_INTER_UNI_CANDS +GEO_MAX_NUM_INTRA_CANDS];
         for (int candIdx = 0; candIdx < GEO_MAX_ALL_INTER_UNI_CANDS +GEO_MAX_NUM_INTRA_CANDS; candIdx++)
+#endif
         {
           singleDistList[partIdx][splitDir][candIdx] = new SingleGeoMMVDMergeEntry[GPM_EXT_MMVD_MAX_REFINE_NUM + 2];
         }
 #else
 #if JVET_Y0065_GPM_INTRA
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+        singleDistList[partIdx][splitDir] = new SingleGeoMMVDMergeEntry*[GEO_MAX_NUM_UNI_CANDS+GEO_MAX_NUM_INTRA_CANDS+GEO_MAX_NUM_IBC_CANDS];
+        for (int candIdx = 0; candIdx < GEO_MAX_NUM_UNI_CANDS+GEO_MAX_NUM_INTRA_CANDS+GEO_MAX_NUM_IBC_CANDS; candIdx++)
+#else
         singleDistList[partIdx][splitDir] = new SingleGeoMMVDMergeEntry*[GEO_MAX_NUM_UNI_CANDS+GEO_MAX_NUM_INTRA_CANDS];
         for (int candIdx = 0; candIdx < GEO_MAX_NUM_UNI_CANDS+GEO_MAX_NUM_INTRA_CANDS; candIdx++)
+#endif
 #else
         singleDistList[partIdx][splitDir] = new SingleGeoMMVDMergeEntry*[MRG_MAX_NUM_CANDS];
         for (int candIdx = 0; candIdx < MRG_MAX_NUM_CANDS; candIdx++)
@@ -221,13 +231,21 @@ public:
       for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++)
       {
 #if JVET_AG0164_AFFINE_GPM
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+        for (int candIdx = 0; candIdx < GEO_MAX_ALL_INTER_UNI_CANDS +GEO_MAX_NUM_INTRA_CANDS+GEO_MAX_NUM_IBC_CANDS; candIdx++)
+#else
         for (int candIdx = 0; candIdx < GEO_MAX_ALL_INTER_UNI_CANDS +GEO_MAX_NUM_INTRA_CANDS; candIdx++)
+#endif
         {
           delete[] singleDistList[partIdx][splitDir][candIdx];
         }
 #else
 #if JVET_Y0065_GPM_INTRA
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+        for (int candIdx = 0; candIdx < GEO_MAX_NUM_UNI_CANDS+GEO_MAX_NUM_INTRA_CANDS+GEO_MAX_NUM_IBC_CANDS; candIdx++)
+#else
         for (int candIdx = 0; candIdx < GEO_MAX_NUM_UNI_CANDS+GEO_MAX_NUM_INTRA_CANDS; candIdx++)
+#endif
 #else
         for (int candIdx = 0; candIdx < MRG_MAX_NUM_CANDS; candIdx++)
 #endif

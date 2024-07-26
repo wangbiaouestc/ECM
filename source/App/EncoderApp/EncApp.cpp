@@ -970,6 +970,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setUseCiipTimd                                       (m_ciipTimd);
 #endif
   m_cEncLib.setUseGeo                                            ( m_Geo );
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+  m_cEncLib.setUseGeoInterIbc                                    ( m_Geo ? m_geoInterIbc : false );
+#endif
   m_cEncLib.setUseHashME                                         ( m_HashME );
 
   m_cEncLib.setAllowDisFracMMVD                                  ( m_allowDisFracMMVD );

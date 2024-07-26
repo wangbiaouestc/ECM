@@ -2039,6 +2039,9 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
   sps.setUseGeoBlend           ( true );
 #endif
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+  sps.setUseGeoInterIbc        ( m_Geo ? m_geoInterIbc : false );
+#endif
   sps.setUseMMVD               ( m_MMVD );
   sps.setFpelMmvdEnabledFlag   (( m_MMVD ) ? m_allowDisFracMMVD : false);
 #if JVET_Y0067_ENHANCED_MMVD_MVD_SIGN_PRED || JVET_AD0140_MVD_PREDICTION

@@ -212,7 +212,11 @@ public:
   void        geo_mmvd_idx(PredictionUnit&          pu, RefPicList eRefPicList);
   void        geo_merge_idx(PredictionUnit&          pu);
 #if JVET_Y0065_GPM_INTRA
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+  void        geo_merge_idx1          ( PredictionUnit&          pu, bool isIntra0, bool isIntra1, bool isIbc0, bool isIbc1);
+#else
   void        geo_merge_idx1          ( PredictionUnit&          pu, bool isIntra0, bool isIntra1);
+#endif
 #else
   void        geo_merge_idx1          ( PredictionUnit&          pu);
 #endif

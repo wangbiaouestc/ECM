@@ -5561,6 +5561,9 @@ void CABACReader::merge_idx( PredictionUnit& pu )
         pu.geoMergeIdx0 = (uint8_t)pu.mergeIdx;
         pu.geoMergeIdx1 = (uint8_t)pu.mergeIdx;
         pu.gpmIntraFlag = false;
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+        pu.gpmInterIbcFlag = false;
+#endif
         return;
       }
 #endif
@@ -5578,6 +5581,11 @@ void CABACReader::merge_idx( PredictionUnit& pu )
       bool isIntra0 = false;
       bool isIntra1 = false;
       bool bUseOnlyOneVector = pu.cs->slice->isInterP() || pu.cs->sps->getMaxNumGeoCand() == 1;
+#endif
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+      bool isIbc0 = false;
+      bool isIbc1 = false;
+      bool isGpmInterIbcEnabled = pu.cs->sps->getUseGeoInterIbc();
 #endif
       pu.geoMMVDFlag0 = m_BinDecoder.decodeBin(Ctx::GeoMmvdFlag());
       if (pu.geoMMVDFlag0)
@@ -5599,6 +5607,12 @@ void CABACReader::merge_idx( PredictionUnit& pu )
       else
       {
         isIntra0 = m_BinDecoder.decodeBin( Ctx::GPMIntraFlag() ) ? true : false;
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+        if (isIntra0 && isGpmInterIbcEnabled)
+        {
+          isIbc0 = m_BinDecoder.decodeBin( Ctx::GpmInterIbcFlag() ) ? true : false;
+        }
+#endif
       }
 
       if (!bUseOnlyOneVector || isIntra0)
@@ -5624,6 +5638,12 @@ void CABACReader::merge_idx( PredictionUnit& pu )
       else if (!isIntra0)
       {
         isIntra1 = m_BinDecoder.decodeBin( Ctx::GPMIntraFlag() ) ? true : false;
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+        if (isIntra1 && isGpmInterIbcEnabled)
+        {
+          isIbc1 = m_BinDecoder.decodeBin( Ctx::GpmInterIbcFlag() ) ? true : false;
+        }
+#endif
       }
       }
       else
@@ -5631,6 +5651,9 @@ void CABACReader::merge_idx( PredictionUnit& pu )
         isIntra1 = true;
       }
       pu.gpmIntraFlag = (isIntra0 || isIntra1);
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+      pu.gpmInterIbcFlag = (isIbc0 || isIbc1);
+#endif
 #endif
 
 #if TM_MRG
@@ -5664,7 +5687,11 @@ void CABACReader::merge_idx( PredictionUnit& pu )
 #if JVET_Y0065_GPM_INTRA
           if (isIntra0 || isIntra1)
           {
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+            geo_merge_idx1(pu, isIntra0, isIntra1, isIbc0, isIbc1);
+#else
             geo_merge_idx1(pu, isIntra0, isIntra1);
+#endif
           }
           else
 #endif
@@ -5693,7 +5720,11 @@ void CABACReader::merge_idx( PredictionUnit& pu )
         else
         {
 #if JVET_Y0065_GPM_INTRA
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+          geo_merge_idx1(pu, isIntra0, isIntra1, isIbc0, isIbc1);
+#else
           geo_merge_idx1(pu, isIntra0, isIntra1);
+#endif
 #else
           geo_merge_idx1(pu);
 #endif
@@ -5702,7 +5733,11 @@ void CABACReader::merge_idx( PredictionUnit& pu )
       else
       {
 #if JVET_Y0065_GPM_INTRA
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+        geo_merge_idx1(pu, isIntra0, isIntra1, isIbc0, isIbc1);
+#else
         geo_merge_idx1(pu, isIntra0, isIntra1);
+#endif
 #else
         geo_merge_idx1(pu);
 #endif
@@ -6041,7 +6076,11 @@ void CABACReader::geo_merge_idx(PredictionUnit& pu)
 }
 
 #if JVET_Y0065_GPM_INTRA
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+void CABACReader::geo_merge_idx1(PredictionUnit& pu, bool isIntra0, bool isIntra1, bool isIbc0, bool isIbc1)
+#else
 void CABACReader::geo_merge_idx1(PredictionUnit& pu, bool isIntra0, bool isIntra1)
+#endif
 #else
 void CABACReader::geo_merge_idx1(PredictionUnit& pu)
 #endif
@@ -6072,10 +6111,38 @@ void CABACReader::geo_merge_idx1(PredictionUnit& pu)
 #if JVET_Y0065_GPM_INTRA
   if (isIntra0)
   {
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+    if (isIbc0)
+    {
+      unsigned int uiUnaryIdx = 0;
+      int numCandminus1 = GEO_MAX_NUM_IBC_CANDS - 1;
+      for (; uiUnaryIdx < numCandminus1; ++uiUnaryIdx)
+      {
+        if (!m_BinDecoder.decodeBin(Ctx::GpmInterIbcIdx((uiUnaryIdx > LAST_MERGE_IDX_CABAC - 1 ? LAST_MERGE_IDX_CABAC - 1 : uiUnaryIdx))))
+        {
+          break;
+        }
+      }
+#if JVET_AG0164_AFFINE_GPM
+      mergeCand0 = GEO_MAX_ALL_INTER_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS + uiUnaryIdx;
+#else
+      mergeCand0 = GEO_MAX_NUM_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS + uiUnaryIdx;
+#endif
+    }
+    else
+    {
+#if JVET_AG0164_AFFINE_GPM
+      mergeCand0 = GEO_MAX_ALL_INTER_UNI_CANDS + unary_max_eqprob(GEO_MAX_NUM_INTRA_CANDS-1);
+#else
+      mergeCand0 = GEO_MAX_NUM_UNI_CANDS + unary_max_eqprob(GEO_MAX_NUM_INTRA_CANDS - 1);
+#endif
+    }
+#else
 #if JVET_AG0164_AFFINE_GPM
     mergeCand0 = GEO_MAX_ALL_INTER_UNI_CANDS + unary_max_eqprob(GEO_MAX_NUM_INTRA_CANDS-1);
 #else
     mergeCand0 = GEO_MAX_NUM_UNI_CANDS + unary_max_eqprob(GEO_MAX_NUM_INTRA_CANDS-1);
+#endif
 #endif
   }
   else if (numCandminus2 >= 0)
@@ -6107,10 +6174,38 @@ void CABACReader::geo_merge_idx1(PredictionUnit& pu)
 
   if (isIntra1)
   {
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+    if (isIbc1)
+    {
+      unsigned int uiUnaryIdx = 0;
+      int numCandminus1 = GEO_MAX_NUM_IBC_CANDS - 1;
+      for (; uiUnaryIdx < numCandminus1; ++uiUnaryIdx)
+      {
+        if (!m_BinDecoder.decodeBin(Ctx::GpmInterIbcIdx((uiUnaryIdx > LAST_MERGE_IDX_CABAC - 1 ? LAST_MERGE_IDX_CABAC - 1 : uiUnaryIdx))))
+        {
+          break;
+        }
+      }
+#if JVET_AG0164_AFFINE_GPM
+      mergeCand1 = GEO_MAX_ALL_INTER_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS + uiUnaryIdx;
+#else
+      mergeCand1 = GEO_MAX_NUM_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS + uiUnaryIdx;
+#endif
+    }
+    else
+    {
+#if JVET_AG0164_AFFINE_GPM
+      mergeCand1 = GEO_MAX_ALL_INTER_UNI_CANDS + unary_max_eqprob(GEO_MAX_NUM_INTRA_CANDS - 1);
+#else
+      mergeCand1 = GEO_MAX_NUM_UNI_CANDS + unary_max_eqprob(GEO_MAX_NUM_INTRA_CANDS - 1);
+#endif
+    }
+#else
 #if JVET_AG0164_AFFINE_GPM
     mergeCand1 = GEO_MAX_ALL_INTER_UNI_CANDS + unary_max_eqprob(GEO_MAX_NUM_INTRA_CANDS - 1);
 #else
     mergeCand1 = GEO_MAX_NUM_UNI_CANDS + unary_max_eqprob(GEO_MAX_NUM_INTRA_CANDS-1);
+#endif
 #endif
   }
   else if (numCandminus2 >= 0)

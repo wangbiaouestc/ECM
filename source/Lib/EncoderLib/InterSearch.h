@@ -1360,6 +1360,9 @@ public:
 #if JVET_Y0065_GPM_INTRA
                                   , IntraPrediction* pcIntraPred
 #endif
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+                                  , Mv* geoBvList
+#endif
                                   , int mmvdCand0 = -1, int mmvdCand1 = -1); // mmvdCandX = -1: regular, 0~GPM_EXT_MMVD_MAX_REFINE_NUM-1: MMVD, >=GPM_EXT_MMVD_MAX_REFINE_NUM: TM
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG
   void setGeoTMSplitModeToSyntaxTable(PredictionUnit& pu, MergeCtx (&mergeCtx)[GEO_NUM_TM_MV_CAND], int mergeCand0, int mergeCand1, int mmvdCand0 = -1, int mmvdCand1 = -1); // mmvdCandX = -1: regular, 0~GPM_EXT_MMVD_MAX_REFINE_NUM-1: MMVD, >=GPM_EXT_MMVD_MAX_REFINE_NUM: TM
@@ -1375,21 +1378,51 @@ public:
 
 protected:
 #if JVET_Y0065_GPM_INTRA
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+  inline void xRemapMrgIndexAndMmvdIdx(int& mergeCand0, int& mergeCand1, int& mmvdCand0, int& mmvdCand1, bool &isIntra0, bool &isIntra1, bool &isIbc0, bool &isIbc1)
+#else
   inline void xRemapMrgIndexAndMmvdIdx(int& mergeCand0, int& mergeCand1, int& mmvdCand0, int& mmvdCand1, bool &isIntra0, bool &isIntra1)
+#endif
   {
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+#if JVET_AG0164_AFFINE_GPM
+    bool isIbc = (mergeCand0 >= GEO_MAX_ALL_INTER_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS) || (mergeCand1 >= GEO_MAX_ALL_INTER_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS);
+#else
+    bool isIbc = (mergeCand0 >= GEO_MAX_NUM_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS) || (mergeCand1 >= GEO_MAX_NUM_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS);
+#endif
+#endif
 #if JVET_W0097_GPM_MMVD_TM
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+    const int intraMmvdBufIdx = (GPM_EXT_MMVD_MAX_REFINE_NUM + 1) + 1 + (isIbc ? 1 : 0);
+#else
     static const int intraMmvdBufIdx = (GPM_EXT_MMVD_MAX_REFINE_NUM + 1) + 1;
+#endif
+#else
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+    const int intraMmvdBufIdx = 1 + (isIbc ? 1 : 0);
 #else
     static const int intraMmvdBufIdx = 1;
+#endif
 #endif
 
     isIntra0 = false;
     isIntra1 = false;
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+    isIbc0 = false;
+    isIbc1 = false;
+#endif
 #if JVET_AG0164_AFFINE_GPM
     if (mergeCand0 >= GEO_MAX_ALL_INTER_UNI_CANDS)
     {
       isIntra0    = true;
       mergeCand0 -= GEO_MAX_ALL_INTER_UNI_CANDS;
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+      if (isIntra0 && mergeCand0 >= GEO_MAX_NUM_INTRA_CANDS)
+      {
+        isIbc0 = true;
+        mergeCand0 -= GEO_MAX_NUM_INTRA_CANDS;
+      }
+#endif
       mmvdCand0   = intraMmvdBufIdx - 1;
     }
 
@@ -1397,6 +1430,13 @@ protected:
     {
       isIntra1    = true;
       mergeCand1 -= GEO_MAX_ALL_INTER_UNI_CANDS;
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+      if (isIntra1 && mergeCand1 >= GEO_MAX_NUM_INTRA_CANDS)
+      {
+        isIbc1 = true;
+        mergeCand1 -= GEO_MAX_NUM_INTRA_CANDS;
+      }
+#endif
       mmvdCand1   = intraMmvdBufIdx - 1;
     }
 #else
@@ -1404,6 +1444,13 @@ protected:
     {
       isIntra0    = true;
       mergeCand0 -= GEO_MAX_NUM_UNI_CANDS;
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+      if (isIntra0 && mergeCand0 >= GEO_MAX_NUM_INTRA_CANDS)
+      {
+        isIbc0 = true;
+        mergeCand0 -= GEO_MAX_NUM_INTRA_CANDS;
+      }
+#endif
       mmvdCand0   = intraMmvdBufIdx - 1;
     }
 
@@ -1411,6 +1458,13 @@ protected:
     {
       isIntra1    = true;
       mergeCand1 -= GEO_MAX_NUM_UNI_CANDS;
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+      if (isIntra1 && mergeCand1 >= GEO_MAX_NUM_INTRA_CANDS)
+      {
+        isIbc1 = true;
+        mergeCand1 -= GEO_MAX_NUM_INTRA_CANDS;
+      }
+#endif
       mmvdCand1   = intraMmvdBufIdx - 1;
     }
 #endif
@@ -1437,6 +1491,9 @@ protected:
 #endif
 #if JVET_Y0065_GPM_INTRA
                             IntraPrediction* pcIntraPred,
+#endif
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+                            Mv* geoBvList,
 #endif
                             uint32_t (&gpmTplCostPart0)[2][GEO_NUM_PARTITION_MODE],
                             uint32_t (&gpmTplCostPart1)[2][GEO_NUM_PARTITION_MODE],
