@@ -424,6 +424,20 @@ namespace PU
     , int* targetRefIdx = nullptr
 #endif
   );
+#if JVET_AI0197_AFFINE_TMVP
+  bool getColocatedAffineCMVP(const PredictionUnit &pu, const RefPicList &eRefPicList, const Position &pos, Mv rcMv[3],
+                              const int &refIdx, bool sbFlag
+#if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+                              ,
+                              int col = 0
+#endif
+                              ,
+                              int *targetRefIdx = nullptr
+#endif
+                              ,
+                              EAffineModel *targetAffineType = nullptr);
+#endif
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
   inline void       getTemplateTop(const bool availableTop, const PredictionUnit &pu, CPelBuf pRecY, PelBuf pTemplateDest,
                                    Position offset, int Width, int templateSize);

@@ -1073,8 +1073,12 @@ public:
   void    updateAffineCandInThreeGrp(PredictionUnit &pu, AffineMergeCtx& affMrgCtx, AffineMergeCtx& altLMAffMrgCtx, AffineMergeCtx& altLMAffMrgCtx1, uint32_t* rdCandList, uint32_t* rdCandGrpList, int listsize);
 #endif
   void    updateAffineCandInfo(PredictionUnit &pu, AffineMergeCtx& affMrgCtx, 
-#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION  
-    uint32_t(*RdCandList)[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE], 
+#if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+#if JVET_AI0197_AFFINE_TMVP
+    uint32_t (*RdCandList)[AFFINE_MRG_MAX_NUM_CANDS_ALL],
+#else
+    uint32_t(*RdCandList)[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE],
+#endif
 #else
     uint32_t(*RdCandList)[AFFINE_MRG_MAX_NUM_CANDS],
 #endif
