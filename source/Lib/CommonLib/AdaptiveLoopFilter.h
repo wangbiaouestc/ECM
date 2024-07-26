@@ -238,15 +238,31 @@ public:
   template<AlfFilterType filtTypeCcAlf>
 #if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
 #if JVET_AH0057_CCALF_COEFF_PRECISION
-  static void filterBlkCcAlf(const PelBuf& dstBuf, const CPelUnitBuf& recSrc, const Area& blkDst, const Area& blkSrc, const ComponentID compId, const int16_t* filterCoeff, const ClpRngs& clpRngs, CodingStructure& cs, const CPelUnitBuf& resiSrc, const Pel clippingValues[4], const int coeffPrec );
+  static void filterBlkCcAlf(const PelBuf& dstBuf, const CPelUnitBuf& recSrc, const Area& blkDst, const Area& blkSrc, const ComponentID compId, const int16_t* filterCoeff, const ClpRngs& clpRngs, CodingStructure& cs, const CPelUnitBuf& resiSrc, const Pel clippingValues[4], const int coeffPrec 
+#if JVET_AI0166_CCALF_CHROMA_SAO_INPUT
+    , const CPelUnitBuf& recSAOSrc
+#endif
+  );
 #else
-  static void filterBlkCcAlf(const PelBuf& dstBuf, const CPelUnitBuf& recSrc, const Area& blkDst, const Area& blkSrc, const ComponentID compId, const int16_t* filterCoeff, const ClpRngs& clpRngs, CodingStructure& cs, const CPelUnitBuf& resiSrc, const Pel clippingValues[4] );
+  static void filterBlkCcAlf(const PelBuf& dstBuf, const CPelUnitBuf& recSrc, const Area& blkDst, const Area& blkSrc, const ComponentID compId, const int16_t* filterCoeff, const ClpRngs& clpRngs, CodingStructure& cs, const CPelUnitBuf& resiSrc, const Pel clippingValues[4] 
+#if JVET_AI0166_CCALF_CHROMA_SAO_INPUT
+    , const CPelUnitBuf& recSAOSrc
+#endif
+  );
 #endif
 #else
 #if JVET_AH0057_CCALF_COEFF_PRECISION
-  static void filterBlkCcAlf(const PelBuf& dstBuf, const CPelUnitBuf& recSrc, const Area& blkDst, const Area& blkSrc, const ComponentID compId, const int16_t* filterCoeff, const ClpRngs& clpRngs, CodingStructure& cs, const int coeffPrec);
+  static void filterBlkCcAlf(const PelBuf& dstBuf, const CPelUnitBuf& recSrc, const Area& blkDst, const Area& blkSrc, const ComponentID compId, const int16_t* filterCoeff, const ClpRngs& clpRngs, CodingStructure& cs, const int coeffPrec
+#if JVET_AI0166_CCALF_CHROMA_SAO_INPUT
+    , const CPelUnitBuf& recSAOSrc
+#endif
+  );
 #else
-  static void filterBlkCcAlf(const PelBuf& dstBuf, const CPelUnitBuf& recSrc, const Area& blkDst, const Area& blkSrc, const ComponentID compId, const int16_t* filterCoeff, const ClpRngs& clpRngs, CodingStructure& cs);
+  static void filterBlkCcAlf(const PelBuf& dstBuf, const CPelUnitBuf& recSrc, const Area& blkDst, const Area& blkSrc, const ComponentID compId, const int16_t* filterCoeff, const ClpRngs& clpRngs, CodingStructure& cs
+#if JVET_AI0166_CCALF_CHROMA_SAO_INPUT
+    , const CPelUnitBuf& recSAOSrc
+#endif
+  );
 #endif
 #endif
 #else
@@ -313,15 +329,31 @@ public:
 #endif
 #if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
 #if JVET_AH0057_CCALF_COEFF_PRECISION
-  void(*m_filterCcAlf)(const PelBuf &dstBuf, const CPelUnitBuf &recSrc, const Area &blkDst, const Area &blkSrc, const ComponentID compId, const int16_t *filterCoeff, const ClpRngs &clpRngs, CodingStructure &cs, const CPelUnitBuf &resiSrc, const Pel clippingValues[4], const int coeffPrec );
+  void(*m_filterCcAlf)(const PelBuf &dstBuf, const CPelUnitBuf &recSrc, const Area &blkDst, const Area &blkSrc, const ComponentID compId, const int16_t *filterCoeff, const ClpRngs &clpRngs, CodingStructure &cs, const CPelUnitBuf &resiSrc, const Pel clippingValues[4], const int coeffPrec 
+#if JVET_AI0166_CCALF_CHROMA_SAO_INPUT
+    , const CPelUnitBuf& recSrcSAO
+#endif
+    );
 #else
-  void(*m_filterCcAlf)(const PelBuf &dstBuf, const CPelUnitBuf &recSrc, const Area &blkDst, const Area &blkSrc, const ComponentID compId, const int16_t *filterCoeff, const ClpRngs &clpRngs, CodingStructure &cs, const CPelUnitBuf &resiSrc, const Pel clippingValues[4] );
+  void(*m_filterCcAlf)(const PelBuf &dstBuf, const CPelUnitBuf &recSrc, const Area &blkDst, const Area &blkSrc, const ComponentID compId, const int16_t *filterCoeff, const ClpRngs &clpRngs, CodingStructure &cs, const CPelUnitBuf &resiSrc, const Pel clippingValues[4] 
+#if JVET_AI0166_CCALF_CHROMA_SAO_INPUT
+    , const CPelUnitBuf& recSrcSAO
+#endif
+    );
 #endif
 #else
 #if JVET_AH0057_CCALF_COEFF_PRECISION
-  void(*m_filterCcAlf)(const PelBuf &dstBuf, const CPelUnitBuf &recSrc, const Area &blkDst, const Area &blkSrc, const ComponentID compId, const int16_t *filterCoeff, const ClpRngs &clpRngs, CodingStructure &cs, const int coeffPrec);
+  void(*m_filterCcAlf)(const PelBuf &dstBuf, const CPelUnitBuf &recSrc, const Area &blkDst, const Area &blkSrc, const ComponentID compId, const int16_t *filterCoeff, const ClpRngs &clpRngs, CodingStructure &cs, const int coeffPrec
+#if JVET_AI0166_CCALF_CHROMA_SAO_INPUT
+    , const CPelUnitBuf& recSrcSAO
+#endif
+    );
 #else
-  void(*m_filterCcAlf)(const PelBuf &dstBuf, const CPelUnitBuf &recSrc, const Area &blkDst, const Area &blkSrc, const ComponentID compId, const int16_t *filterCoeff, const ClpRngs &clpRngs, CodingStructure &cs);
+  void(*m_filterCcAlf)(const PelBuf &dstBuf, const CPelUnitBuf &recSrc, const Area &blkDst, const Area &blkSrc, const ComponentID compId, const int16_t *filterCoeff, const ClpRngs &clpRngs, CodingStructure &cs
+#if JVET_AI0166_CCALF_CHROMA_SAO_INPUT
+    , const CPelUnitBuf& recSrcSAO
+#endif
+    );
 #endif
 #endif
   template<AlfFilterType filtType>
@@ -809,6 +841,10 @@ protected:
 #if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
   PelStorage                   m_tempBufResi;
   PelStorage                   m_tempBufResi2;
+#endif
+#if JVET_AI0166_CCALF_CHROMA_SAO_INPUT
+  PelStorage                   m_tempBufSAO;
+  PelStorage                   m_tempBufSAO2;
 #endif
   int                          m_inputBitDepth[MAX_NUM_CHANNEL_TYPE];
   int                          m_picWidth;
