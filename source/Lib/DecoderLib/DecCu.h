@@ -131,6 +131,9 @@ private:
 #if JVET_AG0164_AFFINE_GPM
   AffineMergeCtx    m_geoAffMrgCtx;
 #endif
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+  Mv                m_geoBvList[GEO_MAX_NUM_IBC_CANDS];
+#endif
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   MergeCtx          m_geoTmMrgCtx[GEO_NUM_TM_MV_CAND];

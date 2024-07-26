@@ -795,6 +795,9 @@ public:
 #if JVET_Y0065_GPM_INTRA
                            , IntraPrediction* pcIntraPred
 #endif
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+                           , Mv* geoBvList
+#endif
   );
 #endif
 #if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
@@ -824,6 +827,9 @@ public:
 #endif
 #if JVET_Y0065_GPM_INTRA
                               , IntraPrediction* pcIntraPred, std::vector<Pel>* reshapeLUT
+#endif
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+                              , Mv* geoBvList
 #endif
   );
 #else
@@ -901,7 +907,11 @@ public:
   bool xAMLIBCGetCurBlkTemplate(PredictionUnit& pu, int nCurBlkWidth, int nCurBlkHeight);
 #if JVET_AC0112_IBC_LIC
 #if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+  void getIBCAMLRefTemplate(PredictionUnit &pu, int nCurBlkWidth, int nCurBlkHeight, bool doIbcLic = false, bool checkTmlBvValidaion = true, Pel* pcBufPredRefTop = nullptr, Pel* pcBufPredRefLeft = nullptr);
+#else
   void getIBCAMLRefTemplate(PredictionUnit &pu, int nCurBlkWidth, int nCurBlkHeight, bool doIbcLic = false, bool checkTmlBvValidaion = true);
+#endif
 #else
   void getIBCAMLRefTemplate(PredictionUnit &pu, int nCurBlkWidth, int nCurBlkHeight, bool doIbcLic = false);
 #endif
@@ -1298,6 +1308,63 @@ public:
     pu.cu->affine = false;
 #endif
   }
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+  template <uint8_t partIdx, bool useDefaultPelBuffer = true>
+  void    fillPartGpmInterIbcRefTemplate(PredictionUnit &pu, std::vector<Pel>* lut, Pel* bufTop = nullptr, Pel* bufLeft = nullptr)
+  {
+    if (useDefaultPelBuffer)
+    {
+      bufTop  = partIdx == 0 ? m_acYuvRefAMLTemplatePart0[0] : m_acYuvRefAMLTemplatePart1[0];
+      bufLeft = partIdx == 0 ? m_acYuvRefAMLTemplatePart0[1] : m_acYuvRefAMLTemplatePart1[1];
+    }
+    getIBCAMLRefTemplate(pu, pu.lumaSize().width, pu.lumaSize().height, false, true, bufTop, bufLeft);
+    if (lut != nullptr)
+    {
+      if (m_bAMLTemplateAvailabe[0])
+      {
+        for (int w = 0; w < pu.lwidth(); ++w)
+        {
+          bufTop[w] = (*lut)[bufTop[w]];
+        }
+      }
+
+      if (m_bAMLTemplateAvailabe[1])
+      {
+        for (int h = 0; h < pu.lheight(); ++h)
+        {
+          bufLeft[h] = (*lut)[bufLeft[h]];
+        }
+      }
+    }
+  }
+
+  template <uint8_t partIdx, bool useDefaultPelBuffer = true>
+  void    fillPartGpmInterIbcRefTemplate(PredictionUnit &pu, std::vector<Pel>* lut, Mv* geoBvList, int candIdx, int geoMmvdIdx = -1, Pel* bufTop = nullptr, Pel* bufLeft = nullptr)
+  {
+#if JVET_Y0065_GPM_INTRA
+#if JVET_AG0164_AFFINE_GPM
+    if (candIdx < GEO_MAX_ALL_INTER_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS)
+#else
+    if (candIdx < GEO_MAX_NUM_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS)
+#endif
+#else
+    if (candIdx < GEO_MAX_NUM_UNI_CANDS)
+#endif
+    {
+      return;
+    }
+    pu.cu->predMode = MODE_IBC;
+#if JVET_AG0164_AFFINE_GPM
+    pu.mv[REF_PIC_LIST_0] = geoBvList[candIdx - (GEO_MAX_ALL_INTER_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS)];
+#else
+    pu.mv[REF_PIC_LIST_0] = geoBvList[candIdx - (GEO_MAX_NUM_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS)];
+#endif
+    pu.bv = pu.mv[REF_PIC_LIST_0];
+    pu.bv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
+    fillPartGpmInterIbcRefTemplate<partIdx, useDefaultPelBuffer>(pu, lut, bufTop, bufLeft);
+    pu.cu->predMode = MODE_INTER;
+  }
+#endif
 #endif
 #if INTER_LIC || JVET_AC0112_IBC_LIC
 #if JVET_AE0078_IBC_LIC_EXTENSION

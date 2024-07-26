@@ -1433,7 +1433,12 @@ static const int GEO_MAX_NUM_UNI_AFF_CANDS_ARMC                     = 22;
 
 #if JVET_Y0065_GPM_INTRA
 static const int GEO_MAX_NUM_INTRA_CANDS =                          3;
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+static const int GEO_MAX_NUM_IBC_CANDS =                            4;
+static const int GEO_NUM_INTRA_RDO_BUFFER =                         23 + GEO_MAX_NUM_IBC_CANDS;
+#else
 static const int GEO_NUM_INTRA_RDO_BUFFER =                         23;
+#endif
 #if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
 static const int GEO_BLEND_MAX_NUM_CANDS =                        ((GEO_MAX_NUM_UNI_CANDS + 1) >> 1) * ((GEO_MAX_NUM_UNI_CANDS + 1) >> 1) / 2;
 static const int GEO_NUM_RDO_BUFFER =                               GEO_MAX_NUM_UNI_CANDS + 67 + 1 + 1;
@@ -1444,7 +1449,11 @@ static const int GEO_NUM_RDO_BUFFER =                               GEO_MAX_NUM_
 static const int GEO_NUM_RDO_BUFFER =                               GEO_MAX_NUM_UNI_CANDS + GEO_NUM_INTRA_RDO_BUFFER;
 #endif
 #endif
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+static const int GEO_MAX_NUM_CANDS = (GEO_MAX_NUM_UNI_CANDS+GEO_MAX_NUM_INTRA_CANDS+GEO_MAX_NUM_IBC_CANDS) * ((GEO_MAX_NUM_UNI_CANDS+GEO_MAX_NUM_INTRA_CANDS+GEO_MAX_NUM_IBC_CANDS) - 1);
+#else
 static const int GEO_MAX_NUM_CANDS = (GEO_MAX_NUM_UNI_CANDS+GEO_MAX_NUM_INTRA_CANDS) * ((GEO_MAX_NUM_UNI_CANDS+GEO_MAX_NUM_INTRA_CANDS) - 1);
+#endif
 #else
 static const int GEO_MAX_NUM_CANDS = GEO_MAX_NUM_UNI_CANDS * (GEO_MAX_NUM_UNI_CANDS - 1);
 #endif
@@ -1486,6 +1495,9 @@ static const int GEO_ENC_MMVD_MAX_REFINE_NUM_ADJ = 1 // regular merge(1)
 #endif
 #if JVET_Y0065_GPM_INTRA
                                                  + 1 // intra(1)
+#endif
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+                                                 + 1 // IBC(1)
 #endif
 ;
 #else

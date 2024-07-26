@@ -251,6 +251,7 @@
 #define JVET_AE0174_NONINTER_TM_TOOLS_CONTROL             1 // JVET-AE0174: Add non-inter TM sps flag to control whether template matching is used for non-inter (Intra and IBC) tools
 #define JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES    1 // JVET-AE0094: IBC with non-adjacent spatial candidates
 #define JVET_AG0091_ARBVP                                 1 // JVET-AG0091: Auto-relocated block vector prediction
+#define JVET_AI0082_TEMPORAL_BV                           1 // JVET-AI0081: Temporal BV for IBC merge list construction
 
 #if JVET_AC0071_DBV && JVET_V0130_INTRA_TMP
 #define JVET_AF0066_ENABLE_DBV_4_SINGLE_TREE              1 // JVET-AF0066: Enable DBV mode in single tree configuration
@@ -307,6 +308,7 @@
 #define JVET_Z0139_HIST_AFF                               1 // JVET-Z0139: Affine HMVP 
 #define JVET_Z0139_NA_AFF                                 1 // JVET-Z0139: Constructed non-adjacent spatial neighbors for affine mode
 #define JVET_AA0058_GPM_ADAPTIVE_BLENDING                 1 // JVET-AA0058: GPM adaptive blending
+#define JVET_AI0082_GPM_WITH_INTER_IBC                    1 // JVET-AI0082: GPM with inter prediction and IBC
 #define JVET_AA0146_WRAP_AROUND_FIX                       1 // JVET-AA0146: bugfix&cleanup for wrap around motion compensation
 #define JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION          1 // JVET-AA0107 Regression based affine merge candidate derivation
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION

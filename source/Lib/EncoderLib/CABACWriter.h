@@ -260,7 +260,11 @@ public:
   );
 #if JVET_Y0065_GPM_INTRA
   uint64_t    geo_intraFlag_est         ( const TempCtx& ctxStart, const int flag);
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+  uint64_t    geo_intraIdx_est          ( const int intraIdx, const bool isGeoIbc);
+#else
   uint64_t    geo_intraIdx_est          ( const int intraIdx);
+#endif
 #endif
   uint64_t    geo_mmvdFlag_est(const TempCtx& ctxStart, const int flag);
   uint64_t    geo_mmvdIdx_est(const TempCtx& ctxStart, const int mmvdIdx, const bool extMMVD);

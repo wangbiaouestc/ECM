@@ -1934,6 +1934,9 @@ void DecCu::xReconInter(CodingUnit &cu)
 #if JVET_Y0065_GPM_INTRA
                                         , m_pcIntraPred, (cu.cs->slice->getLmcsEnabledFlag() && m_pcReshape->getCTUFlag()) ? &m_pcReshape->getFwdLUT() : nullptr
 #endif
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+                                        , m_geoBvList
+#endif
     );
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG
     MergeCtx& m_geoTmMrgCtx0 = m_geoTmMrgCtx[g_geoTmShape[0][g_geoParams[cu.firstPU->geoSplitDir][0]]];
@@ -1966,6 +1969,9 @@ void DecCu::xReconInter(CodingUnit &cu)
                               , cu.firstPU->geoBldIdx
 #endif
                               , m_pcIntraPred->m_intraMPM
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+                              , m_geoBvList
+#endif
 #if JVET_AE0046_BI_GPM
                                , cu.firstPU->gpmDmvrRefinePart0
                                , cu.firstPU->gpmDmvrRefinePart1

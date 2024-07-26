@@ -537,6 +537,9 @@ protected:
   bool      m_ciipTimd;
 #endif
   bool      m_Geo;
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+  bool      m_geoInterIbc;
+#endif
   bool      m_HashME;
   bool      m_allowDisFracMMVD;
   bool      m_AffineAmvr;

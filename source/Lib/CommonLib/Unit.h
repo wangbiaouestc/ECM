@@ -655,6 +655,9 @@ struct InterPredictionData
 #if JVET_Y0065_GPM_INTRA
   bool        gpmIntraFlag;
 #endif
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+  bool        gpmInterIbcFlag;
+#endif
 #if JVET_W0097_GPM_MMVD_TM
   bool        geoMMVDFlag0;
   uint8_t     geoMMVDIdx0;

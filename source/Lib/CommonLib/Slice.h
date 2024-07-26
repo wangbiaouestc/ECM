@@ -1859,6 +1859,9 @@ private:
   bool              m_ciipAffine;
 #endif
   bool              m_Geo;
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+  bool              m_geoInterIbc;
+#endif
 #if INTER_LIC
   bool              m_licEnabledFlag;
 #if JVET_AG0276_LIC_SLOPE_ADJUST
@@ -2602,6 +2605,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #endif
   void      setUseGeo             ( bool b )                                        { m_Geo = b; }
   bool      getUseGeo             ()                                      const     { return m_Geo; }
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+  void      setUseGeoInterIbc     ( bool b )                                        { m_geoInterIbc = b; }
+  bool      getUseGeoInterIbc     ()                                      const     { return m_geoInterIbc; }
+#endif
 #if INTER_LIC
   void      setLicEnabledFlag     ( bool b )                                        { m_licEnabledFlag = b; }
   bool      getLicEnabledFlag     ()                                     const      { return m_licEnabledFlag; }

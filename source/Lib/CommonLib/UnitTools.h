@@ -467,7 +467,7 @@ namespace PU
   inline void       getRribcBvpCand(PredictionUnit &pu, AMVPInfo *amvpInfo);
   inline void       clusterBvpCand(const int cbWidth, const int cbHeight, AMVPInfo *pInfo);
 #endif
-  void fillMvpCand                    (      PredictionUnit &pu, const RefPicList &eRefPicList, const int &refIdx, AMVPInfo &amvpInfo 
+  void fillMvpCand                    (      PredictionUnit &pu, const RefPicList &eRefPicList, const int &refIdx, AMVPInfo &amvpInfo
 #if TM_AMVP || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
                                      , InterPrediction* interPred = nullptr
 #endif
@@ -830,6 +830,9 @@ namespace PU
      , AffineMergeCtx& geoAffMrgCtx
 #endif
     , MergeCtx& geoTmMrgCtx0, MergeCtx& geoTmMrgCtx1, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool tmFlag0, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool tmFlag1, const bool mmvdFlag1, const uint8_t mmvdIdx1, const uint8_t bldIdx,const uint8_t *intraMPM,
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+      const Mv* geoBvList,
+#endif
     const bool dmvrPart0 = false, const bool dmvrPart1 = false, Mv* bdofSubPuMvOffsetPart0 = nullptr, Mv* bdofSubPuMvOffsetPart1 = nullptr);
 #else
   void spanGeoMMVDMotionInfo(PredictionUnit &pu, MergeCtx &geoMrgCtx, MergeCtx &geoTmMrgCtx0, MergeCtx &geoTmMrgCtx1, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool tmFlag0, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool tmFlag1, const bool mmvdFlag1, const uint8_t mmvdIdx1, const uint8_t bldIdx, const uint8_t *intraMPM);
@@ -1388,7 +1391,11 @@ void sortIntraCandList(double uiCost, int mergeCand, static_vector<double, N>& c
 {
   size_t shift = 0;
   size_t currSize = candCostList.size();
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+  CHECK(currSize >= GEO_MAX_NUM_INTRA_CANDS + GEO_MAX_NUM_IBC_CANDS, "list overflow!");
+#else
   CHECK(currSize >= GEO_MAX_NUM_INTRA_CANDS, "list overflow!");
+#endif
 
   while (shift < currSize && uiCost < candCostList[currSize - 1 - shift])
   {
@@ -1427,6 +1434,11 @@ Position getRecoLinesEIP(const CodingUnit& cu, const ComponentID compId);
 bool     getAllowedEipMerge(const CodingUnit &cu, const ComponentID compId);
 bool     getAllowedEip(const CodingUnit &cu, const ComponentID compId);
 int getAllowedCurEip(const CodingUnit& cu, const ComponentID compId, static_vector<EIPInfo, NUM_DERIVED_EIP>& eipInfoList);
+#endif
+
+#if JVET_AI0082_TEMPORAL_BV
+bool getColocatedBVP(const PredictionUnit &pu, const Position &posIn, MotionInfo &rcMv, const int col);
+void getTemporalBv(const PredictionUnit &pu, std::vector<MotionInfo>& temporalMiCandList);
 #endif
 #endif
 #if JVET_AG0061_INTER_LFNST_NSPT
