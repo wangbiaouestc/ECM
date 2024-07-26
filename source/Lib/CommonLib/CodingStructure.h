@@ -202,7 +202,11 @@ public:
   const PredictionUnit *getPURestricted(const Position &pos, const PredictionUnit& curPu,                           const ChannelType _chType) const;
   const TransformUnit  *getTURestricted(const Position &pos, const TransformUnit& curTu,                            const ChannelType _chType) const;
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  CodingUnit&     addCU(const UnitArea &unit, const ChannelType _chType, const PartSplit& implicitSplit = CU_DONT_SPLIT);
+#else
   CodingUnit&     addCU(const UnitArea &unit, const ChannelType _chType);
+#endif
   PredictionUnit& addPU(const UnitArea &unit, const ChannelType _chType);
   TransformUnit&  addTU(const UnitArea &unit, const ChannelType _chType);
   void            addEmptyTUs(Partitioner &partitioner);
@@ -266,6 +270,8 @@ public:
   std::vector<    CodingUnit*> cus;
   std::vector<PredictionUnit*> pus;
   std::vector< TransformUnit*> tus;
+
+
 
   LutMotionCand motionLut;
 
@@ -482,6 +488,33 @@ public:
   const uint8_t& getIpmInfo(const Position& pos, PictureType pt) const;
 #endif
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  std::vector<    CodingUnit*> *m_lumaCUs;
+  std::vector<PredictionUnit*> *m_lumaPUs;
+  std::vector< TransformUnit*> *m_lumaTUs;
+  UnitScale                    *m_lumaUnitScale;
+  UnitArea                     *m_lumaArea;
+  unsigned                     *m_lumaCuIdx;
+  unsigned                     *m_lumaPuIdx;
+  unsigned                     *m_lumaTuIdx;
+  CodingStructure              *m_lumaParent;
+  CodingUnit                   *m_bestCU;
+  CodingUnit                   *m_lastCodedCU;
+  double                        m_savedCost;
+  uint64_t                      m_lumaFracBits;
+  Distortion                    m_lumaDist;
+  double                        m_lumaCost;
+
+  void copyLumaPointers( CodingStructure& cs );
+  void setLumaPointers ( CodingStructure& cs );
+  void popLastCU( const PartSplit& implicitSplit );
+  void deriveSeparateTreeFlagInference( int& separateTreeFlag, bool& inferredSeparateTreeFlag, int width, int height, bool canSplit );
+  void determineIfSeparateTreeFlagInferred( bool& inferredSeparateTreeFlag, int width, int height, bool canSplit );
+
+  /*const*/ CodingUnit     *getLumaCU(const Position &pos, const ChannelType _chType) const;
+  const PredictionUnit *getLumaPU(const Position &pos, const ChannelType _chType) const;
+  const TransformUnit  *getLumaTU(const Position &pos, const ChannelType _chType) const;
+#endif
 
 public:
   // ---------------------------------------------------------------------------

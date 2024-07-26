@@ -1044,6 +1044,9 @@ struct UnitBuf
 
         UnitBuf<      T> subBuf (const UnitArea& subArea);
   const UnitBuf<const T> subBuf (const UnitArea& subArea) const;
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  void copyFromComponent    ( const UnitBuf<const T> &other, ComponentID startCompId, ComponentID lastCompId );
+#endif
   void colorSpaceConvert(const UnitBuf<T> &other, const bool forward, const ClpRng& clpRng);
 };
 
@@ -1089,6 +1092,18 @@ void UnitBuf<T>::addHypothesisAndClip(const UnitBuf<const T> &other, const int w
 }
 #endif
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+template<typename T>
+void UnitBuf<T>::copyFromComponent( const UnitBuf<const T> &other, ComponentID startCompId, ComponentID lastCompId )
+{
+  CHECK( chromaFormat != other.chromaFormat, "Incompatible formats" );
+
+  for( unsigned i = startCompId; i <= lastCompId; i++ )
+  {
+    bufs[i].copyFrom( other.bufs[i] );
+  }
+}
+#endif
 
 template<typename T>
 void UnitBuf<T>::subtract( const UnitBuf<const T> &other )

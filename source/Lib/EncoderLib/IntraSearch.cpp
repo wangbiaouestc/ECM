@@ -928,7 +928,11 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 
 #if JVET_AH0200_INTRA_TMP_BV_REORDER
     double tmpBestSatdCost = MAX_DOUBLE;
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    CodedCUInfo *relatedCU = ((EncModeCtrlMTnoRQT *) m_modeCtrl)->getBlkInfoPtr(partitioner.currArea());
+#else
     CodedCUInfo &relatedCU = ((EncModeCtrlMTnoRQT *) m_modeCtrl)->getBlkInfo(partitioner.currArea());
+#endif
     bool isTmpModeTestd = false;
 #endif	
     CHECK(pu.cu != &cu, "PU is not contained in the CU");
@@ -1624,7 +1628,11 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 #if JVET_AH0200_INTRA_TMP_BV_REORDER
                 cu.tmpFracIdx   = 0;
                 int numModesForFracIntraTmp = numModesForFullRD + adjustedTMPNonLicBvNum;
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+                if(relatedCU && relatedCU->skipFracTmp)
+#else
                 if(relatedCU.skipFracTmp)
+#endif
                 {
                   numModesForFracIntraTmp = numModesForFullRD;
                 }
@@ -1641,7 +1649,11 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
                 }
 
                 int numModesForLicFracIntraTmp = numModesForFullRD + adjustedTmpLicBvNum;
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+                if(relatedCU && relatedCU->skipFracTmp)
+#else
                 if(relatedCU.skipFracTmp)
+#endif
                 {
                   numModesForLicFracIntraTmp = numModesForFullRD;
                 }
@@ -1852,7 +1864,11 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
                         {
                           break;
                         }
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+                        if(idxInList >= (numModesForFullRD-1) && relatedCU && relatedCU->skipFracTmp)
+#else
                         if(idxInList >= (numModesForFullRD-1) && relatedCU.skipFracTmp)
+#endif
                         {
                           break;
                         }
@@ -1881,7 +1897,11 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
                         {
                           break;
                         }
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+                        if(idxInList >= (numModesForFullRD-1) && relatedCU && relatedCU->skipFracTmp)
+#else
                         if(idxInList >= (numModesForFullRD-1) && relatedCU.skipFracTmp)
+#endif
                         {
                           break;
                         }
@@ -2795,10 +2815,17 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
 #if JVET_AH0200_INTRA_TMP_BV_REORDER
           if(isTmpModeTestd)
           {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+            if(relatedCU && !relatedCU->skipFracTmp && (tmpBestSatdCost > m_bestIntraSADHADCost * TMP_ENC_REFINE_THRESHOLD))
+            {
+              relatedCU->skipFracTmp = true;
+            }
+#else
             if(!relatedCU.skipFracTmp && (tmpBestSatdCost > m_bestIntraSADHADCost * TMP_ENC_REFINE_THRESHOLD))
             {
               relatedCU.skipFracTmp = true;
             }
+#endif
           }
 #endif
 #endif
@@ -4058,6 +4085,7 @@ void IntraSearch::xCalcCcpMrgPred(const PredictionUnit& pu, const ComponentID co
 }
 #endif
 
+
 void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner, const double maxCostAllowed 
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
                                       , InterPrediction* pcInterPred
@@ -4324,8 +4352,13 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
           satdGlmIdcBest[mode - LM_CHROMA_IDX].setAllZero();
           
 #if JVET_AB0092_GLM_WITH_LUMA
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+          CodedCUInfo* relatedCU = ((EncModeCtrlMTnoRQT *)m_modeCtrl)->getBlkInfoPtr(partitioner.currArea());
+          if (relatedCU && PU::hasGlmFlag(pu, mode) && !relatedCU->skipGLM)
+#else
           CodedCUInfo& relatedCU = ((EncModeCtrlMTnoRQT *)m_modeCtrl)->getBlkInfo(partitioner.currArea());
           if (PU::hasGlmFlag(pu, mode) && !relatedCU.skipGLM)
+#endif
 #else
           if ( PU::hasGlmFlag( pu, mode ) )
 #endif
@@ -4447,7 +4480,11 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
           continue;
         }
 #if JVET_AH0136_CHROMA_REORDERING
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        if (CS::isDualITree(*pu.cs) && cu.cs->slice->isIntra() && cu.cs->sps->getUseChromaReordering())
+#else
         if (CS::isDualITree(*pu.cs) && cu.cs->sps->getUseChromaReordering())
+#endif
         {
           if ((mode == LM_CHROMA_IDX) || mode == pu.cu->chromaList[0] || mode == pu.cu->chromaList[1]) 
           {
@@ -4517,7 +4554,11 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
         else
         {
 #if JVET_AH0136_CHROMA_REORDERING && JVET_AC0071_DBV
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+          if (cu.cs->sps->getUseChromaReordering() && CS::isDualITree(cs) && cs.slice->isIntra() && PU::isDbvMode(mode))
+#else
           if (cu.cs->sps->getUseChromaReordering() && CS::isDualITree(cs) && PU::isDbvMode(mode))
+#endif
           {
             if (cu.mvs[mode - DBV_CHROMA_IDX] == Mv())
             {
@@ -4562,7 +4603,11 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
         else
         {
 #if JVET_AH0136_CHROMA_REORDERING && JVET_AC0071_DBV
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+          if (cu.cs->sps->getUseChromaReordering() && CS::isDualITree(cs) && cs.slice->isIntra() && PU::isDbvMode(mode))
+#else
           if (cu.cs->sps->getUseChromaReordering() && CS::isDualITree(cs) && PU::isDbvMode(mode))
+#endif
           {
             pu.bv = cu.bvs[mode - DBV_CHROMA_IDX];
             pu.mv[0] = cu.mvs[mode - DBV_CHROMA_IDX];
@@ -4894,8 +4939,9 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
 #if JVET_AD0188_CCP_MERGE
             pu.curCand = {};
 #endif
+
 #if JVET_AD0202_CCCM_MDF
-            predIntraCCCM(pu, cccmStorage[sub][cccmBufferIdx].Cb(), cccmStorage[sub][cccmBufferIdx].Cr(), mode);
+            predIntraCCCM(pu, cccmStorage[sub][cccmBufferIdx].Cb(), cccmStorage[sub][cccmBufferIdx].Cr(), mode );
 #else
             predIntraCCCM(pu, cccmStorage[sub][idx].Cb(), cccmStorage[sub][idx].Cr(), mode);
 #endif
@@ -5760,7 +5806,11 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
         {
           pu.intraDir[1] = chromaIntraMode;
 #if JVET_AH0136_CHROMA_REORDERING && JVET_AC0071_DBV
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+          if (cu.cs->sps->getUseChromaReordering() && PU::isDbvMode(pu.intraDir[1]) && CS::isDualITree(cs) && cs.slice->isIntra())
+#else
           if (cu.cs->sps->getUseChromaReordering() && PU::isDbvMode(pu.intraDir[1]) && CS::isDualITree(cs))
+#endif
           {
             pu.bv = cu.bvs[pu.intraDir[1] - DBV_CHROMA_IDX];
             pu.mv[0] = cu.mvs[pu.intraDir[1] - DBV_CHROMA_IDX];
@@ -8815,8 +8865,13 @@ void IntraSearch::xEncIntraHeader( CodingStructure &cs, Partitioner &partitioner
 #endif
           && cu.Y().valid())
       {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        m_CABACEstimator->cu_skip_flag( cu , partitioner );
+        m_CABACEstimator->pred_mode   ( cu , partitioner );
+#else
         m_CABACEstimator->cu_skip_flag( cu );
         m_CABACEstimator->pred_mode   ( cu );
+#endif
       }
 #if ENABLE_DIMD
       m_CABACEstimator->cu_dimd_flag(cu);
@@ -8834,7 +8889,11 @@ void IntraSearch::xEncIntraHeader( CodingStructure &cs, Partitioner &partitioner
     {
       if ( !cu.Y().valid())
       {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        m_CABACEstimator->pred_mode( cu , partitioner );
+#else
         m_CABACEstimator->pred_mode( cu );
+#endif
       }
       m_CABACEstimator->bdpcm_mode( cu, COMPONENT_Y );
       setLumaIntraPredIdx(pu);
@@ -10019,6 +10078,7 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
       crReco.reconstruct(crPred, crResi, cs.slice->clpRng( COMPONENT_Cr ));
     }
   }
+
 #if JVET_AC0071_DBV && JVET_AA0070_RRIBC
 #if JVET_AH0136_CHROMA_REORDERING
   if (compID != COMPONENT_Y && PU::isDbvMode(uiChFinalMode) && pu.cu->rribcFlipType)
@@ -12351,7 +12411,11 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
     int  predMode   = pu.cu->bdpcmModeChroma ? BDPCM_IDX : PU::getFinalIntraMode(pu, CHANNEL_TYPE_CHROMA);
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AC0071_DBV
 #if JVET_AH0136_CHROMA_REORDERING
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    if (!PU::isDbvMode(predMode) || (pu.isChromaFusion > 0 && !(pu.cu->slice->getSeparateTreeEnabled() && pu.cu->isSST && pu.cu->separateTree)))
+#else
     if (!PU::isDbvMode(predMode) || pu.isChromaFusion > 0)
+#endif
 #else
     if (predMode != DBV_CHROMA_IDX)
 #endif
@@ -12360,7 +12424,11 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
     }
 #endif
 #if JVET_AH0136_CHROMA_REORDERING && JVET_AC0071_DBV
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    if (pu.cs->sps->getUseChromaReordering() && PU::isDbvMode(predMode) && CS::isDualITree(cs) && cs.slice->isIntra())
+#else
     if (pu.cs->sps->getUseChromaReordering() && PU::isDbvMode(predMode) && CS::isDualITree(cs))
+#endif
     {
       pu.bv = pu.cu->bvs[predMode - DBV_CHROMA_IDX];
       pu.mv[0] = pu.cu->mvs[predMode - DBV_CHROMA_IDX];
@@ -12513,6 +12581,7 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
                                   , pcInterPred
 #endif
         );
+
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AC0071_DBV
 #if JVET_AH0136_CHROMA_REORDERING
         if (pu.isChromaFusion == 0)

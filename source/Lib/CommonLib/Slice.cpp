@@ -135,6 +135,16 @@ Slice::Slice()
 , m_encCABACTableIdx              (I_SLICE)
 , m_iProcessingStartTime          ( 0 )
 , m_dProcessingTime               ( 0 )
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+, m_separateTreeEnabled           ( false )
+, m_processingIntraRegion         ( false )
+, m_processingSeparateTrees       ( false )
+, m_processingChannelType         ( MAX_NUM_CHANNEL_TYPE )
+, m_intraRegionRootBtDepth        ( -1 )
+, m_intraRegionRootMtDepth        ( -1 )
+, m_intraRegionRootImplicitBtDepth( -1 )
+, m_intraRegionNoSplitTest        ( false )
+#endif
 {
   for(uint32_t i=0; i<NUM_REF_PIC_LIST_01; i++)
   {
@@ -255,6 +265,10 @@ void Slice::initSlice()
   m_tileGroupCcAlfCrApsId = -1;
 #if JVET_AG0196_CABAC_RETRAIN
   m_cabacInitSliceType = I_SLICE;
+#endif
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  m_separateTreeEnabled           = false;
+  exitIntraRegionTesting();
 #endif
 }
 
@@ -3180,6 +3194,51 @@ unsigned Slice::getMinPictureDistance(
   return (unsigned) minPicDist;
 }
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+void Slice::setIntraRegionRoot( Partitioner* p )
+{ 
+  m_intraRegionRootDepth           = p->currDepth;
+  m_intraRegionRootQtDepth         = p->currQtDepth;
+  m_intraRegionRootBtDepth         = p->currBtDepth;
+  m_intraRegionRootMtDepth         = p->currMtDepth;
+  m_intraRegionRootImplicitBtDepth = p->currImplicitBtDepth;
+}
+
+void Slice::setCUIntraRegionRoot ( CodingUnit*cu )
+{
+  cu->intraRegionRootDepth           = m_intraRegionRootDepth;
+  cu->intraRegionRootQtDepth         = m_intraRegionRootQtDepth;
+  cu->intraRegionRootBtDepth         = m_intraRegionRootBtDepth;
+  cu->intraRegionRootMtDepth         = m_intraRegionRootMtDepth;
+  cu->intraRegionRootImplicitBtDepth = m_intraRegionRootImplicitBtDepth;
+}
+
+bool Slice::isIntraRegionRoot(Partitioner* p) const 
+{
+  return ( m_separateTreeEnabled && 
+    m_intraRegionRootDepth           != -1                     &&
+    m_intraRegionRootDepth           == p->currDepth           &&
+    m_intraRegionRootQtDepth         == p->currQtDepth         &&
+    m_intraRegionRootBtDepth         == p->currBtDepth         &&
+    m_intraRegionRootMtDepth         == p->currMtDepth         &&
+    m_intraRegionRootImplicitBtDepth == p->currImplicitBtDepth &&
+    true
+    );
+}
+
+void Slice::exitIntraRegionTesting() 
+{ 
+  m_processingIntraRegion   = false; 
+  m_processingSeparateTrees = false;
+  m_processingChannelType   = MAX_NUM_CHANNEL_TYPE;
+  m_intraRegionNoSplitTest  = false;
+  m_intraRegionRootDepth = m_intraRegionRootQtDepth = 
+  m_intraRegionRootImplicitBtDepth =
+  m_intraRegionRootBtDepth = m_intraRegionRootMtDepth = -1;
+}
+#endif
+
+
 // ------------------------------------------------------------------------------------------------
 // Video parameter set (VPS)
 // ------------------------------------------------------------------------------------------------
@@ -4055,6 +4114,9 @@ SPS::SPS()
 , m_disableScalingMatrixForLfnstBlks( true)
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
 , m_tempCabacInitMode( 0 )
+#endif
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+, m_interSliceSeparateTree    ( false )
 #endif
 {
   for(int ch=0; ch<MAX_NUM_CHANNEL_TYPE; ch++)

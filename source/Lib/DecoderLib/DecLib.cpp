@@ -840,6 +840,7 @@ void DecLib::executeLoopFilters()
 
 
   m_cLoopFilter.loopFilterPic( cs );
+
 #if !MULTI_PASS_DMVR
   CS::setRefinedMotionField(cs);
 #endif

@@ -44,7 +44,6 @@
 #include "CommonLib/dtrace_blockstatistics.h"
 #endif
 
-
 #include <math.h>
 
 //! \ingroup EncoderLib
@@ -2031,7 +2030,11 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
 #endif
   {
 #if JVET_AA0070_RRIBC
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    m_pcCuEncoder->getIbcHashMap().rebuildPicHashMap(cs.picture->getTrueOrigBuf(), CS::isDualITree(cs) || cs.slice->isIntra());
+#else
     m_pcCuEncoder->getIbcHashMap().rebuildPicHashMap(cs.picture->getTrueOrigBuf(), CS::isDualITree(cs));
+#endif
 #else
     m_pcCuEncoder->getIbcHashMap().rebuildPicHashMap(cs.picture->getTrueOrigBuf());
 #endif
@@ -2429,11 +2432,23 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
       int numberOfSkipPixel = 0;
       for (auto &cu : cs.traverseCUs(ctuArea, CH_L))
       {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        if ( cu.separateTree && cu.chType != CH_L )
+        {
+          continue;
+        }
+#endif
         numberOfSkipPixel += cu.skip*cu.lumaSize().area();
       }
 
       for( auto &cu : cs.traverseCUs( ctuArea, CH_L ) )
       {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        if ( cu.separateTree && cu.chType != CH_L )
+        {
+          continue;
+        }
+#endif
         if( !cu.skip || cu.rootCbf )
         {
           numberOfEffectivePixels += cu.lumaSize().area();

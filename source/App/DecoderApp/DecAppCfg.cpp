@@ -51,6 +51,7 @@ namespace CabacRetrain
 extern void init(const std::string &fn,bool activate);
 }
 #endif
+
 //! \ingroup DecoderApp
 //! \{
 

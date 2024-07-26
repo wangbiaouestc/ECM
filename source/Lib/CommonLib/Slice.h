@@ -66,6 +66,10 @@ class TrQuant;
 // Constants
 // ====================================================================================================================
 class PreCalcValues;
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+class Partitioner;
+#endif
+
 static const uint32_t REF_PIC_LIST_NUM_IDX=32;
 
 typedef std::list<Picture*> PicList;
@@ -1960,6 +1964,9 @@ private:
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   unsigned int      m_tempCabacInitMode;
 #endif
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  bool        m_interSliceSeparateTree;
+#endif
 
 #if JVET_AH0209_PDP
   bool              m_pdp;
@@ -2711,6 +2718,11 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if JVET_AH0209_PDP
   void      setUsePDP( bool b )                                                 { m_pdp = b; }
   bool      getUsePDP()                                                   const { return m_pdp; }
+#endif
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  void     setUseInterSliceSeparateTree     ( bool b )                              { m_interSliceSeparateTree = b;    }
+  bool     getInterSliceSeparateTreeEnabled ()                            const     { return m_interSliceSeparateTree; }
 #endif
 };
 
@@ -3778,6 +3790,19 @@ private:
 #endif
   std::vector<RefListAndRefIdx> m_multiHypRefPics;
 #endif
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  bool                       m_separateTreeEnabled;
+  bool                       m_processingIntraRegion;
+  bool                       m_processingSeparateTrees;
+  ChannelType                m_processingChannelType;
+  int                        m_intraRegionRootDepth;
+  int                        m_intraRegionRootQtDepth;
+  int                        m_intraRegionRootBtDepth;
+  int                        m_intraRegionRootMtDepth;
+  int                        m_intraRegionRootImplicitBtDepth;
+  bool                       m_intraRegionNoSplitTest;
+#endif
+
 public:
                               Slice();
   virtual                     ~Slice();
@@ -4282,12 +4307,32 @@ public:
   bool                        getAdaptiveClipQuant()                        const { return m_adaptiveClipQuant; };
 #endif
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  void                        setSeparateTreeEnabled( const bool& b )                 { m_separateTreeEnabled = b;        }
+  bool                        getSeparateTreeEnabled()                          const { return m_separateTreeEnabled;     }
+  void                        setProcessingIntraRegion( const bool& b )               { m_processingIntraRegion = b;      }
+  bool                        getProcessingIntraRegion()                        const { return m_processingIntraRegion;   }
+  void                        setProcessingSeparateTrees( const bool& b )             { m_processingSeparateTrees = b;    }
+  bool                        getProcessingSeparateTrees()                      const { return m_processingSeparateTrees; }
+  void                        setProcessingChannelType( const ChannelType& ch )       { m_processingChannelType = ch;     }
+  ChannelType                 getProcessingChannelType()                        const { return m_processingChannelType;   }
+  void                        setIntraRegionRoot( Partitioner* p );
+  void                        setCUIntraRegionRoot ( CodingUnit*cu );
+  bool                        isIntraRegionRoot( Partitioner* p )               const ;
+  void                        exitIntraRegionTesting();
+  bool                        shouldCopyLumaCUs()                               const { return ( m_separateTreeEnabled && m_processingIntraRegion && m_processingSeparateTrees && m_processingChannelType == CH_C ); }
+  bool                        processingIntraRegionChroma()                     const { return ( m_separateTreeEnabled && m_processingIntraRegion && m_processingSeparateTrees && m_processingChannelType == CH_C ); }
+  void                        setIntraRegionNoSplitTest( const bool& b )              { m_intraRegionNoSplitTest = b;     }
+  bool                        getIntraRegionNoSplitTest()                       const { return m_intraRegionNoSplitTest;  }
+#endif
+
 protected:
   Picture*              xGetRefPic( PicList& rcListPic, int poc, const int layerId );
   Picture*              xGetLongTermRefPic( PicList& rcListPic, int poc, bool pocHasMsb, const int layerId );
 public:
   std::unordered_map< Position, std::unordered_map< Size, double> > m_mapPltCost[2];
 private:
+
 };// END CLASS DEFINITION Slice
 
 

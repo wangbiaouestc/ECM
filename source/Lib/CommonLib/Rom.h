@@ -60,6 +60,7 @@ void         destroyROM();
 // ====================================================================================================================
 // Data structure related table & variable
 // ====================================================================================================================
+
 #if JVET_AH0209_PDP
 extern const int g_sizeData[PDP_NUM_SIZES][11];
 extern std::unordered_map<int, int> g_size;

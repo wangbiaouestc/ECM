@@ -3373,3 +3373,28 @@ void AffineMergeCtx::setAffMergeInfo(PredictionUnit &pu, int candIdx, int8_t mmv
   }
 }
 #endif
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+unsigned DeriveCtx::CtxCUSeparateTree( const CodingStructure& cs, Partitioner& partitioner )
+{
+  const Position pos         = partitioner.currArea().blocks[partitioner.chType];
+  const unsigned curSliceIdx = cs.slice->getIndependentSliceIdx();
+  const unsigned curTileIdx  = cs.pps->getTileIdx( partitioner.currArea().lumaPos() );
+#if HEVC_TILES_WPP
+  const unsigned curTileIdx  = cs.picture->tileMap->getTileIdxMap( pos );
+#endif
+
+#if HEVC_TILES_WPP
+  const CodingUnit *cuLeft = cs.getCURestricted( pos.offset(-1, 0), curSliceIdx, curTileIdx, partitioner.chType );
+  const CodingUnit *cuAbove = cs.getCURestricted( pos.offset(0, -1), curSliceIdx, curTileIdx, partitioner.chType );
+#else
+  const CodingUnit *cuLeft = cs.getCURestricted( pos.offset(-1, 0), pos, curSliceIdx, curTileIdx, partitioner.chType );
+  const CodingUnit *cuAbove = cs.getCURestricted( pos.offset(0, -1), pos, curSliceIdx, curTileIdx, partitioner.chType );
+#endif
+
+  unsigned ctxId = ( cuLeft && cuLeft->separateTree ) ? 1 : 0;
+  ctxId += ( cuAbove && cuAbove->separateTree ) ? 1 : 0;
+
+  return ctxId;
+}
+#endif

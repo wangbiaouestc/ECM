@@ -2258,6 +2258,20 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
     }
 #endif
 
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    if ( pcSlice->isIntra() )
+    {
+      pcSlice->setSeparateTreeEnabled( pcSlice->getSPS()->getUseDualITree()  );
+    }
+    else
+    {
+      //CHECK( !rpcSlice->getSPS()->getSpsNext().getInterSliceSeparateTreeEnabled(), "Error separate trees not enabled\n" )
+      pcSlice->setSeparateTreeEnabled( pcSlice->getSPS()->getInterSliceSeparateTreeEnabled()  );
+    }
+    pcSlice->setProcessingIntraRegion( false );
+#endif
+
     // Set the nal unit type
     pcSlice->setNalUnitType(getNalUnitType(pocCurr, m_iLastIDR, isField));
     // set two flags according to slice type presented in the picture
@@ -2488,6 +2502,20 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
     }
 
     xPicInitHashME( pcPic, pcSlice->getPPS(), rcListPic );
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    if ( !pcSlice->isIntra() )
+    { 
+      if ( (picWidth * picHeight) <= (1280*720) && ( pcSlice->getTLayer()>0 ) )
+      {
+        pcSlice->setSeparateTreeEnabled(false);
+      }
+      else if ( pcSlice->getTLayer()>=ID_SEP_TREE_TID_OFF ) 
+      {
+        pcSlice->setSeparateTreeEnabled(false);
+      }
+    }
+#endif
 
     if( m_pcCfg->getUseAMaxBT() )
     {
@@ -3258,7 +3286,11 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
 
     pcPic->cs->slice = pcSlice; // please keep this
 #if ENABLE_QPA
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    if ( pcSlice->getPPS()->getSliceChromaQpFlag() && pcSlice->getPic()->cs->slice->isIntra() && !pcSlice->getPic()->cs->pcv->ISingleTree && !m_pcCfg->getUsePerceptQPA() && (m_pcCfg->getSliceChromaOffsetQpPeriodicity() == 0))
+#else
     if (pcSlice->getPPS()->getSliceChromaQpFlag() && CS::isDualITree (*pcSlice->getPic()->cs) && !m_pcCfg->getUsePerceptQPA() && (m_pcCfg->getSliceChromaOffsetQpPeriodicity() == 0))
+#endif
 #else
     if (pcSlice->getPPS()->getSliceChromaQpFlag() && CS::isDualITree (*pcSlice->getPic()->cs))
 #endif

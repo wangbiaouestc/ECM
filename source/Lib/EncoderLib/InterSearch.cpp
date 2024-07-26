@@ -14666,6 +14666,12 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
     {
       for( auto &currTU : csSplit->traverseTUs( currArea, partitioner.chType ) )
       {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        if ( currTU.chType != partitioner.chType )
+        {
+          continue;
+        }
+#endif
         for( unsigned ch = 0; ch < numTBlocks; ch++ )
         {
           compCbf[ ch ] |= ( TU::getCbfAtDepth( currTU, ComponentID(ch), currDepth + 1 ) ? 1 : 0 );
@@ -14929,7 +14935,11 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
 
     PredictionUnit &pu = *cs.getPU( partitioner.chType );
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    m_CABACEstimator->cu_skip_flag  ( cu, partitioner );
+#else
     m_CABACEstimator->cu_skip_flag  ( cu );
+#endif
     m_CABACEstimator->merge_data(pu);
 #if INTER_LIC
     m_CABACEstimator->cu_lic_flag(cu);
@@ -15823,7 +15833,11 @@ uint64_t InterSearch::xGetSymbolFracBitsInter(CodingStructure &cs, Partitioner &
   {
     cu.skip = true;
     CHECK(cu.colorTransform, "ACT should not be enabled for skip mode");
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    m_CABACEstimator->cu_skip_flag  ( cu, partitioner );
+#else
     m_CABACEstimator->cu_skip_flag  ( cu );
+#endif
     if (cu.firstPU->ciipFlag)
     {
       // CIIP shouldn't be skip, the upper level function will deal with it, i.e. setting the overall cost to MAX_DOUBLE
@@ -15839,8 +15853,13 @@ uint64_t InterSearch::xGetSymbolFracBitsInter(CodingStructure &cs, Partitioner &
     CHECK( cu.skip, "Skip flag has to be off at this point!" );
 
     if (cu.Y().valid())
-    m_CABACEstimator->cu_skip_flag( cu );
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    m_CABACEstimator->cu_skip_flag( cu, partitioner );
+    m_CABACEstimator->pred_mode   ( cu, partitioner );
+#else
+      m_CABACEstimator->cu_skip_flag( cu );
     m_CABACEstimator->pred_mode   ( cu );
+#endif
     m_CABACEstimator->cu_pred_data( cu );
     CUCtx cuCtx;
     cuCtx.isDQPCoded = true;

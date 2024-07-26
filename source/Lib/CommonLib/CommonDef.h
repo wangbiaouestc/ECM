@@ -326,6 +326,15 @@ static const int MIP_MAX_HEIGHT =                                  MAX_INTRA_SIZ
 static const int MIP_MAX_WIDTH =                                   MAX_TB_SIZEY;
 static const int MIP_MAX_HEIGHT =                                  MAX_TB_SIZEY;
 #endif
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+static const int ID_SEP_TREE_BLK_SIZE_LIMIT1 =                     10; // W*H>=2^BLK_SIZE_LIMIT1 implies separate tree
+static const int ID_SEP_TREE_BLK_SIZE_LIMIT2 =                     7;  // W*H<=2^BLK_SIZE_LIMIT2 implies shared tree
+static const int ID_SEP_TREE_TID_OFF         =                     3;  
+
+static const int MAX_TREE_TYPE              =                      3; ///< LumaChromaSharedTree(0), LumaSeparateTree(1), ChromaSeparateTree(2)
+#endif
+
 #if JVET_AH0209_PDP
 static const int PDP_NUM_MODES =                                  67;
 static const int PDP_NUM_SIZES =                                  18;
@@ -1710,6 +1719,7 @@ static const int CCCM_REF_SAMPLES_MAX =       CCCM_MAX_REF_SAMPLES;
 static constexpr int CABAC_SPATIAL_MAX_BINS                  = 128;
 static constexpr int CABAC_SPATIAL_MAX_BINS_PER_CTX          =   4;
 #endif
+
 
 // ====================================================================================================================
 // Macro functions

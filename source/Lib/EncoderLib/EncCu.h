@@ -274,6 +274,10 @@ private:
 
   CodingStructure    ***m_pTempCS;
   CodingStructure    ***m_pBestCS;
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  CodingStructure    ***m_pTempSSTCS;
+  CodingStructure    ***m_pBestSSTCS;
+#endif
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   CodingStructure    ***m_pTempCS2;
   CodingStructure    ***m_pBestCS2;
@@ -516,7 +520,9 @@ protected:
 #endif
 #endif
   bool xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &pm, const EncTestMode& encTestMode, bool adaptiveColorTrans);
-
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  void xCheckRDCostSeparateTreeIntra( CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &pm, const EncTestMode& encTestMode );
+#endif
   void xCheckDQP              ( CodingStructure& cs, Partitioner& partitioner, bool bKeepCtx = false);
   void xCheckChromaQPOffset   ( CodingStructure& cs, Partitioner& partitioner);
 #if !REMOVE_PCM
