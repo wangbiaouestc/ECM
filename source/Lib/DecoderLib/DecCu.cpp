@@ -1068,7 +1068,11 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
           } 
           else
           {
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+            m_pcIntraPred->searchFracCandidate(tu.cu, m_pcIntraPred->getTargetPatch(), tempType);
+#else
             m_pcIntraPred->searchFracCandidate(tu.cu, m_pcIntraPred->getTargetPatch(floorLog2(std::max(pu.lwidth(), pu.lheight())) - 2), tempType);
+#endif
           }
         }
 #endif		

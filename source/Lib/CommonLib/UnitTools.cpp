@@ -1543,6 +1543,99 @@ void getNeighBv(const PredictionUnit& puOrg, const PredictionUnit* pu, std::vect
 #endif
 }
 
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+void PU::getSparseArBvMergeCandidate(const PredictionUnit& pu, std::vector<Mv>& pBvs, static_vector<TempLibFast, MTMP_NUM_SPARSE> &sparseMtmpCandList)
+{
+  const int numMrgMArbvp = static_cast<int>(pBvs.size());
+  const int totalNum     = numMrgMArbvp + NUM_TMP_ARBVP_S;
+  int       end          = (int) sparseMtmpCandList.size();
+  Position  posCand[5]   = { pu.Y().center(), pu.Y().topLeft(), pu.Y().topRight(), pu.Y().bottomLeft(), pu.Y().bottomRight() };
+  int       offsetX = 0, offsetY = 0;
+  Mv        cMv, arbv, arbv2, bv;
+
+  for (int mergeIndex = 0; mergeIndex < end && pBvs.size() < totalNum; mergeIndex++)
+  {
+    offsetX = sparseMtmpCandList[mergeIndex].m_pX;
+    offsetY = sparseMtmpCandList[mergeIndex].m_pY;
+    cMv     = Mv(offsetX, offsetY);
+
+    for (int n = 0; n < 5 && pBvs.size() < totalNum; n++)
+    {
+      const PredictionUnit* puCascaded = pu.cs->getPURestricted(posCand[n].offset(offsetX, offsetY), pu, pu.chType);
+      if (!puCascaded || ((puCascaded->cu->predMode != MODE_IBC) && (!puCascaded->cu->tmpFlag)))
+      {
+        continue;
+      }
+
+      arbv = cMv + puCascaded->bv;
+      if (PU::validItmpBv(pu, arbv.hor, arbv.ver))
+      {
+        if (!PU::CheckBvAvailable(pBvs, arbv))
+        {
+          pBvs.push_back(arbv);
+          if (pBvs.size() >= totalNum)
+          {
+            break;
+          }
+        }
+      }
+      if (PU::validItmpBv(pu, puCascaded->bv.hor, puCascaded->bv.ver))
+      {
+        if (!PU::CheckBvAvailable(pBvs, puCascaded->bv))
+        {
+          pBvs.push_back(puCascaded->bv);
+          if (pBvs.size() >= totalNum)
+          {
+            break;
+          }
+        }
+      }
+      if ((puCascaded->cu->predMode == MODE_IBC && puCascaded->interDir == 3) || (puCascaded->cu->tmpFlag && puCascaded->cu->tmpIdx > 0
+#if JVET_AG0136_INTRA_TMP_LIC
+        && !puCascaded->cu->tmpLicFlag
+#endif
+        ))
+      {
+        if (puCascaded->cu->predMode == MODE_IBC)
+        {
+          bv = puCascaded->mv[REF_PIC_LIST_1];
+          bv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
+        }
+        else
+        {
+          bv = Mv(puCascaded->cu->tmpXdisp, puCascaded->cu->tmpYdisp);
+        }
+        arbv2 = cMv + bv;
+        if (PU::validItmpBv(pu, arbv2.hor, arbv2.ver))
+        {
+          if (!PU::CheckBvAvailable(pBvs, arbv2))
+          {
+            pBvs.push_back(arbv2);
+            if (pBvs.size() >= totalNum)
+            {
+              break;
+            }
+          }
+        }
+        if (PU::validItmpBv(pu, bv.hor, bv.ver))
+        {
+          if (!PU::CheckBvAvailable(pBvs, bv))
+          {
+            pBvs.push_back(bv);
+
+            if (pBvs.size() >= totalNum)
+            {
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+  return;
+}
+#endif
+
 int PU::getItmpMergeCandidate(const PredictionUnit& pu, std::vector<Mv>& pBvs
 #if JVET_AH0200_INTRA_TMP_BV_REORDER
     , std::vector<Mv>& pSgpmMvs
