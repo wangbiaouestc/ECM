@@ -2239,6 +2239,13 @@ static const int TMP_NUM_MERGE_CANDS = 10;
 static const int NUM_TMP_ARBVP = 20;
 static const int EBVP_RANGE = 1;
 #endif
+
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+static const int NUM_TMP_ARBVP_S  = 5;
+static const int TMP_MRG_REG_ID   = 6;
+static const int INIT_TL_POS      = (MTMP_NUM - TL_NUM_SPARSE);
+#endif
+
 #if JVET_AG0152_SGPM_ITMP_IBC
 static const int SGPM_NUM_BVS = 6; // maximum BVs to be considered into the list for Itmp-Sgpm
 static const int SGPM_BV_START_IDX = NUM_LUMA_MODE;

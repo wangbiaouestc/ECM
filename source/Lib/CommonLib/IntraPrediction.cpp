@@ -128,6 +128,9 @@ IntraPrediction::IntraPrediction()
 #if JVET_W0123_TIMD_FUSION
   m_timdSatdCost = nullptr;
 #endif
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  m_itmpSatdCost = nullptr;
+#endif
 #if JVET_AC0071_DBV
   m_dbvSadCost = nullptr;
 #endif
@@ -217,6 +220,9 @@ void IntraPrediction::destroy()
 #if JVET_W0123_TIMD_FUSION
   delete m_timdSatdCost;
 #endif
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  delete m_itmpSatdCost;
+#endif
 #if JVET_AC0071_DBV
   delete m_dbvSadCost;
 #endif
@@ -291,7 +297,7 @@ void IntraPrediction::destroy()
   }
   m_tempBuffer.clear();
 
-#if JVET_V0130_INTRA_TMP
+#if JVET_V0130_INTRA_TMP && !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
   if( m_pppTarPatch != NULL )
   {
     for( unsigned int uiDepth = 0; uiDepth < USE_MORE_BLOCKSIZE_DEPTH_MAX; uiDepth++ )
@@ -412,6 +418,12 @@ void IntraPrediction::init(ChromaFormat chromaFormatIDC, const unsigned bitDepth
   if (m_timdSatdCost == nullptr)
   {
     m_timdSatdCost = new RdCost;
+  }
+#endif
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  if (m_itmpSatdCost == nullptr)
+  {
+    m_itmpSatdCost = new RdCost;
   }
 #endif
 #if JVET_AC0071_DBV
@@ -574,6 +586,7 @@ void IntraPrediction::init(ChromaFormat chromaFormatIDC, const unsigned bitDepth
   m_calcAeipGroupSum = calcAeipGroupSum;
 #endif
 #if JVET_V0130_INTRA_TMP
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
   unsigned int blkSize;
   if( m_pppTarPatch == NULL )
   {
@@ -590,6 +603,7 @@ void IntraPrediction::init(ChromaFormat chromaFormatIDC, const unsigned bitDepth
       }
     }
   }
+#endif
 
   m_calcTemplateDiff = calcTemplateDiff;
 #if JVET_AG0136_INTRA_TMP_LIC
@@ -7980,6 +7994,13 @@ int IntraPrediction::getBestNonAnglularMode(const CPelBuf& recoBuf, const CompAr
     distParamSad[0].useMR = false;
     distParamSad[1].applyWeight = false;
     distParamSad[1].useMR = false;
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+    DistParam distParamSadItmp[2];
+    distParamSadItmp[0].applyWeight = false;
+    distParamSadItmp[0].useMR = false;
+    distParamSadItmp[1].applyWeight = false;
+    distParamSadItmp[1].useMR = false;
+#endif
     if (eTempType == LEFT_ABOVE_NEIGHBOR)
     {
       m_timdSatdCost->setTimdDistParam(distParamSad[0], piOrg + iTempWidth, piPred + iTempWidth, iOrgStride,
@@ -7988,16 +8009,26 @@ int IntraPrediction::getBestNonAnglularMode(const CPelBuf& recoBuf, const CompAr
       m_timdSatdCost->setTimdDistParam(distParamSad[1], piOrg + iTempHeight * iOrgStride,
         piPred + iTempHeight * uiPredStride, iOrgStride, uiPredStride, channelBitDepth,
         COMPONENT_Y, iTempWidth, uiHeight, 0, 1, true);   // Use HAD (SATD) cost
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+      m_itmpSatdCost->setTimdDistParam(distParamSadItmp[0], piOrg + iTempWidth, piOrg + iTempWidth, iOrgStride, iOrgStride, channelBitDepth, COMPONENT_Y, uiWidth, iTempHeight, 0, 1, true);
+      m_itmpSatdCost->setTimdDistParam(distParamSadItmp[1], piOrg + iTempHeight * iOrgStride, piOrg + iTempHeight * uiPredStride, iOrgStride, iOrgStride, channelBitDepth, COMPONENT_Y, iTempWidth, uiHeight, 0, 1, true);
+#endif
     }
     else if (eTempType == LEFT_NEIGHBOR)
     {
       m_timdSatdCost->setTimdDistParam(distParamSad[1], piOrg, piPred, iOrgStride, uiPredStride, channelBitDepth,
         COMPONENT_Y, iTempWidth, uiHeight, 0, 1, true);
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+      m_itmpSatdCost->setTimdDistParam(distParamSadItmp[1], piOrg, piPred, iOrgStride, iOrgStride, channelBitDepth, COMPONENT_Y, iTempWidth, uiHeight, 0, 1, true);
+#endif
     }
     else if (eTempType == ABOVE_NEIGHBOR)
     {
       m_timdSatdCost->setTimdDistParam(distParamSad[0], piOrg, piPred, iOrgStride, uiPredStride, channelBitDepth,
         COMPONENT_Y, uiWidth, iTempHeight, 0, 1, true);
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+      m_itmpSatdCost->setTimdDistParam(distParamSadItmp[0], piOrg, piOrg, iOrgStride, iOrgStride, channelBitDepth, COMPONENT_Y, uiWidth, iTempHeight, 0, 1, true);
+#endif
     }
     initTimdIntraPatternLuma(cu, area, eTempType != ABOVE_NEIGHBOR ? iTempWidth : 0,
       eTempType != LEFT_NEIGHBOR ? iTempHeight : 0, uiRefWidth, uiRefHeight);
@@ -8026,19 +8057,34 @@ int IntraPrediction::getBestNonAnglularMode(const CPelBuf& recoBuf, const CompAr
         initPredTimdIntraParams(pu, area, i);
         predTimdIntraAng(COMPONENT_Y, pu, i, piPred, uiPredStride, uiRealW, uiRealH, eTempType,
           (eTempType == ABOVE_NEIGHBOR) ? 0 : iTempWidth, (eTempType == LEFT_NEIGHBOR) ? 0 : iTempHeight);
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+        tmpCost0 = distParamSad[0].distFunc(distParamSad[0]);
+        tmpCost1 = distParamSad[1].distFunc(distParamSad[1]);
+        uiCost = tmpCost0 + tmpCost1;
+#endif
       }
       else
       {
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+        distParamSadItmp[0].cur.buf = piOrg + BVs[i - 1].hor + BVs[i - 1].ver * iOrgStride + iTempWidth;
+        tmpCost0 = distParamSadItmp[0].distFunc(distParamSadItmp[0]);
+        distParamSadItmp[1].cur.buf = piOrg + BVs[i - 1].hor + (BVs[i - 1].ver + iTempHeight) * iOrgStride;
+        tmpCost1 = distParamSadItmp[1].distFunc(distParamSadItmp[1]);
+        uiCost = tmpCost0 + tmpCost1;
+#else
         predTimdIbcItmp(COMPONENT_Y, pu, BVs[i - 1], piPred, uiPredStride, uiRealW, uiRealH, eTempType,
           (eTempType == ABOVE_NEIGHBOR) ? 0 : iTempWidth, (eTempType == LEFT_NEIGHBOR) ? 0 : iTempHeight, piOrg, iOrgStride);
+#endif
       }
 
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
       tmpCost0 = distParamSad[0].distFunc(distParamSad[0]);
       tmpCost1 = distParamSad[1].distFunc(distParamSad[1]);
 
 
 
       uiCost = tmpCost0 + tmpCost1;
+#endif
       if (uiCost < uiBestCost)
       {
         uiBestCost = uiCost;
@@ -14461,8 +14507,13 @@ void insertNode( int diff, int& iXOffset, int& iYOffset, int& pDiff, int& pX, in
 void clipMvIntraConstraint( CodingUnit* pcCU, int regionId, int& iHorMin, int& iHorMax, int& iVerMin, int& iVerMax, unsigned int uiTemplateSize, unsigned int uiBlkWidth, unsigned int uiBlkHeight, int iCurrY, int iCurrX, int offsetLCUY, int offsetLCUX, RefTemplateType tempType )
 {
 #if JVET_AD0086_ENHANCED_INTRA_TMP
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  const int searchRangeWidth = std::max((uiBlkWidth  == 64 ? TMP_SEARCH_RANGE_MULT_FACTOR - 1 : TMP_SEARCH_RANGE_MULT_FACTOR) * static_cast<int>(uiBlkWidth), TMP_MINSR);
+  const int searchRangeHeight = std::max((uiBlkHeight == 64 ? TMP_SEARCH_RANGE_MULT_FACTOR - 1 : TMP_SEARCH_RANGE_MULT_FACTOR) * static_cast<int>(uiBlkHeight), TMP_MINSR);
+#else
   int searchRangeWidth  = std::max(TMP_SEARCH_RANGE_MULT_FACTOR * (int) uiBlkWidth, TMP_MINSR);
   int searchRangeHeight = std::max(TMP_SEARCH_RANGE_MULT_FACTOR * (int) uiBlkHeight, TMP_MINSR);
+#endif
 #else  
   int searchRangeWidth = TMP_SEARCH_RANGE_MULT_FACTOR * uiBlkWidth;
   int searchRangeHeight = TMP_SEARCH_RANGE_MULT_FACTOR * uiBlkHeight;
@@ -14566,9 +14617,24 @@ void clipMvIntraConstraintRefine(int& iHorMin, int& iHorMax, int& iVerMin, int& 
 #if JVET_AG0136_INTRA_TMP_LIC
                                  , const int tmpSampling
 #endif
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+                                 , const bool isTransferredLeft, const bool isTransferredTop, const int bestRegionId, const bool isExtLeft, const bool isExtTop, const bool isExceptionAllowed
+#endif
                                  )
 {
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  if (isTransferredLeft)
+  {
+    iHorMin = isExceptionAllowed && (bestRegionId == 3 || bestRegionId == 5) && isExtLeft ? pX : std::max(iHorMin, pX);
+    iHorMax = isExceptionAllowed && bestRegionId == 3 ? pX + tmpSampling - 1 : std::min(iHorMax, pX + tmpSampling - 1);
+  }
+  else
+  {
+#endif
 #if JVET_AD0086_ENHANCED_INTRA_TMP
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  iHorMin = isExceptionAllowed && (bestRegionId == 3 || bestRegionId == 5) && isExtLeft ? pX - refinementRange : std::max(iHorMin, pX - refinementRange);
+#else
   iHorMin = std::max(iHorMin, pX - refinementRange + (
 #if JVET_AG0136_INTRA_TMP_LIC
                                                       tmpSampling
@@ -14576,7 +14642,36 @@ void clipMvIntraConstraintRefine(int& iHorMin, int& iHorMax, int& iVerMin, int& 
                                                       TMP_SAMPLING
 #endif
                                                       % 2 ? 0 : 1));
+#endif
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  iHorMax = isExceptionAllowed && bestRegionId == 3 ? pX + refinementRange - (
+#if JVET_AG0136_INTRA_TMP_LIC
+                                                                              tmpSampling
+#else
+                                                                              TMP_SAMPLING
+#endif
+                                                                              % 2 ? 0 : 1)
+                                  : std::min(iHorMax, pX + refinementRange - (
+#if JVET_AG0136_INTRA_TMP_LIC
+                                                                              tmpSampling
+#else
+                                                                              TMP_SAMPLING
+#endif
+                                                                              % 2 ? 0 : 1));
+#else
   iHorMax = std::min(iHorMax, pX + refinementRange);
+#endif
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  }
+  if (isTransferredTop)
+  {
+    iVerMin = isExceptionAllowed && bestRegionId == 4 && isExtTop ? pY : std::max(iVerMin, pY);
+    iVerMax = isExceptionAllowed && bestRegionId == 1 ? pY + tmpSampling - 1 : std::min(iVerMax, pY + tmpSampling - 1);
+  }
+  else
+  {
+  iVerMin = isExceptionAllowed && bestRegionId == 4 && isExtTop ? pY - refinementRange : std::max(iVerMin, pY - refinementRange);
+#else
   iVerMin = std::max(iVerMin, pY - refinementRange + (
 #if JVET_AG0136_INTRA_TMP_LIC
                                                       tmpSampling
@@ -14584,7 +14679,28 @@ void clipMvIntraConstraintRefine(int& iHorMin, int& iHorMax, int& iVerMin, int& 
                                                       TMP_SAMPLING
 #endif
                                                       % 2 ? 0 : 1));
+#endif
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  iVerMax = isExceptionAllowed && bestRegionId == 1 ? pY + refinementRange - (
+#if JVET_AG0136_INTRA_TMP_LIC
+                                                                              tmpSampling
+#else
+                                                                              TMP_SAMPLING
+#endif
+                                                                              % 2 ? 0 : 1)
+                                 : std::min(iVerMax, pY + refinementRange - (
+#if JVET_AG0136_INTRA_TMP_LIC
+                                                                             tmpSampling
+#else
+                                                                             TMP_SAMPLING
+#endif
+                                                                             % 2 ? 0 : 1));
+#else
   iVerMax = std::min(iVerMax, pY + refinementRange);
+#endif
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  }
+#endif
 #else
   iHorMin = std::max(iHorMin, pX - refinementRange);
   iHorMax = std::min(iHorMax, pX + refinementRange);
@@ -14620,22 +14736,31 @@ void IntraPrediction::getTargetTemplate( CodingUnit* pcCU, unsigned int uiBlkWid
 #endif
 {
   const ComponentID compID = COMPONENT_Y;
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
   unsigned int uiPatchWidth = uiBlkWidth + TMP_TEMPLATE_SIZE;
   unsigned int uiPatchHeight = uiBlkHeight + TMP_TEMPLATE_SIZE;
   unsigned int uiTarDepth = floorLog2( std::max( uiBlkHeight, uiBlkWidth ) ) - 2;
   Pel** tarPatch = m_pppTarPatch[uiTarDepth];
+#endif
   CompArea area = pcCU->blocks[compID];
   Pel* pCurrStart = pcCU->cs->picture->getRecoBuf( area ).buf;
   unsigned int  uiPicStride = pcCU->cs->picture->getRecoBuf( compID ).stride;
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
   unsigned int uiY, uiX;
+#endif
 
   //fill template
   //up-left & up 
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
   Pel* tarTemp;
+#endif
 #if JVET_W0069_TMP_BOUNDARY
   if( tempType == L_SHAPE_TEMPLATE )
   {
 #endif
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+    m_pppTarPatch = pCurrStart - TMP_TEMPLATE_SIZE * uiPicStride - TMP_TEMPLATE_SIZE;
+#else
     Pel* pCurrTemp = pCurrStart - TMP_TEMPLATE_SIZE * uiPicStride - TMP_TEMPLATE_SIZE;
     for( uiY = 0; uiY < TMP_TEMPLATE_SIZE; uiY++ )
     {
@@ -14656,10 +14781,14 @@ void IntraPrediction::getTargetTemplate( CodingUnit* pcCU, unsigned int uiBlkWid
       }
       pCurrTemp += uiPicStride;
     }
+#endif
 #if JVET_W0069_TMP_BOUNDARY
   }
   else if( tempType == ABOVE_TEMPLATE )
   {
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+    m_pppTarPatch = pCurrStart - TMP_TEMPLATE_SIZE * uiPicStride;
+#else
     Pel* pCurrTemp = pCurrStart - TMP_TEMPLATE_SIZE * uiPicStride;
     for( uiY = 0; uiY < TMP_TEMPLATE_SIZE; uiY++ )
     {
@@ -14670,9 +14799,13 @@ void IntraPrediction::getTargetTemplate( CodingUnit* pcCU, unsigned int uiBlkWid
       }
       pCurrTemp += uiPicStride;
     }
+#endif
   }
   else if( tempType == LEFT_TEMPLATE )
   {
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+    m_pppTarPatch = pCurrStart - TMP_TEMPLATE_SIZE;
+#else
     Pel* pCurrTemp = pCurrStart - TMP_TEMPLATE_SIZE;
     for( uiY = TMP_TEMPLATE_SIZE; uiY < uiPatchHeight; uiY++ )
     {
@@ -14683,6 +14816,7 @@ void IntraPrediction::getTargetTemplate( CodingUnit* pcCU, unsigned int uiBlkWid
       }
       pCurrTemp += uiPicStride;
     }
+#endif
   }
 #endif
 }
@@ -14699,9 +14833,15 @@ void IntraPrediction::candidateSearchIntra( CodingUnit* pcCU, unsigned int uiBlk
 {
   unsigned int uiPatchWidth = uiBlkWidth + TMP_TEMPLATE_SIZE;
   unsigned int uiPatchHeight = uiBlkHeight + TMP_TEMPLATE_SIZE;
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
   unsigned int uiTarDepth = floorLog2( std::max( uiBlkWidth, uiBlkHeight ) ) - 2;
+#endif
 
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  Pel* tarPatch = getTargetPatch();
+#else
   Pel** tarPatch = getTargetPatch( uiTarDepth );
+#endif
   //Initialize the library for saving the best candidates
 #if !JVET_AD0086_ENHANCED_INTRA_TMP
   const ComponentID compID = COMPONENT_Y;
@@ -14741,7 +14881,11 @@ void IntraPrediction::candidateSearchIntra( CodingUnit* pcCU, unsigned int uiBlk
 }
 
 #if JVET_W0069_TMP_BOUNDARY
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+void IntraPrediction::searchCandidateFromOnePicIntra(CodingUnit* pcCU, Pel* tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, RefTemplateType tempType
+#else
 void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, RefTemplateType tempType
+#endif
 #if JVET_AG0136_INTRA_TMP_LIC
                                                      , const bool useMR
 #endif
@@ -14821,6 +14965,7 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
   setRefPicUsed( ref ); //facilitate the access of each candidate point 
   setStride( refStride );
 
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
   Mv cTmpMvPred;
   cTmpMvPred.setZero();
 
@@ -14830,10 +14975,17 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
   int          blkY     = 0;
   int          iCurrY   = uiCUPelY + blkY;
   int          iCurrX   = uiCUPelX + blkX;
+#else
+  const int iCurrY = area.pos().y;
+  const int iCurrX = area.pos().x;
+#endif
 
   Position ctuRsAddr  = CU::getCtuXYAddr(*pcCU);
   int      offsetLCUY = iCurrY - ctuRsAddr.y;
   int      offsetLCUX = iCurrX - ctuRsAddr.x;
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  const int offset = TMP_SAMPLING >> 1;
+#endif
 
   int iYOffset, iXOffset;
 #if JVET_AD0086_ENHANCED_INTRA_TMP
@@ -14859,6 +15011,18 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
 #endif
   Pel* refCurr;
 
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  const int iRefine          = 1;
+  const int iRefineRange     = TMP_SAMPLING >> 1;
+  const int tmpMrgRefWind    = 5;
+  const Mv  bvOffSparseTL    = Mv(iRefineRange, iRefineRange);
+  const Mv  bvOffSparseBR    = Mv(iRefineRange, iRefineRange);
+  const Mv  bvOffMerge       = Mv(tmpMrgRefWind, tmpMrgRefWind);
+  const Mv  bvOffArbvp       = Mv(EBVP_RANGE, EBVP_RANGE);
+  Mv        regTL, regBR, bvMrg;
+  Mv        iMrgWindTL, iMrgWindBR;
+  bool      bRegOverlap = false;
+#endif
 #if JVET_AD0086_ENHANCED_INTRA_TMP
 #if JVET_AE0077_EXT_INTRATMP
   const int regionNum = 6;
@@ -14904,7 +15068,11 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
     log2SizeTop = floorLog2(TMP_TEMPLATE_SIZE * uiBlkWidth);
     log2SizeLeft = floorLog2(uiBlkHeight * TMP_TEMPLATE_SIZE);
     sizeTopLeft = (uiBlkHeight + uiPatchWidth) * TMP_TEMPLATE_SIZE;
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+    m_calcTargetMean(tarPatch, m_uiPicStride, uiPatchWidth, uiPatchHeight, tempType, needTopLeft ? 3 : 0, log2SizeTop, log2SizeLeft, sizeTopLeft, topTargetMean, leftTargetMean);
+#else
     m_calcTargetMean(tarPatch, uiPatchWidth, uiPatchHeight, tempType, needTopLeft ? 3 : 0, log2SizeTop, log2SizeLeft, sizeTopLeft, topTargetMean, leftTargetMean);
+#endif
 #if JVET_AH0200_INTRA_TMP_BV_REORDER
     m_log2SizeTop  = log2SizeTop ;
     m_log2SizeLeft = log2SizeLeft;
@@ -14957,19 +15125,95 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
       }
     }
 #endif
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+    const int numInitMrg = static_cast<int>(m_bvBasedMergeCandidates.size());
+    if (uiBlkWidth <= 8 && uiBlkHeight <= 8)
+    {
+      regTL       = Mv(mvXMins[regionId], mvYMins[regionId]);
+      regBR       = Mv(mvXMaxs[regionId], mvYMaxs[regionId]);
+      bRegOverlap = false;
+      for (int mrgIdx = 0; mrgIdx < numInitMrg; mrgIdx++)
+      {
+        bvMrg      = m_bvBasedMergeCandidates[mrgIdx];
+        iMrgWindTL = bvMrg - bvOffMerge;
+        iMrgWindBR = bvMrg + bvOffMerge;
+
+        if ((regTL.hor >= iMrgWindTL.hor) && (regTL.ver >= iMrgWindTL.ver) && (regBR.hor <= iMrgWindBR.hor) && (regBR.ver <= iMrgWindBR.ver))
+        {
+          bRegOverlap = true;
+          break;
+        }
+      }
+      if (bRegOverlap)
+      {
+        continue;
+      }
+    }
+#endif
 #if JVET_AB0130_ITMP_SAMPLING
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+    int shiftX = 0;
+    for (iYOffset = mvYMax; iYOffset >= mvYMin; iYOffset -= TMP_SAMPLING)
+    {
+      shiftX = (mvXMax != mvXMin) ? (shiftX % TMP_SAMPLING) : 0;
+      bool isAvailablePairFound{false};
+      for (iXOffset = mvXMax - shiftX++; iXOffset >= mvXMin; iXOffset -= TMP_SAMPLING)
+      {
+        int iXOffsetMetric = iXOffset + offset;
+        int iYOffsetMetric = iYOffset + offset;
+        bool isTransferredLeft = false;
+        bool isTransferredTop = false;
+        if (iXOffsetMetric > mvXMax)
+        {
+          iXOffsetMetric = iXOffset;
+          isTransferredLeft = true;
+        }
+        if (iYOffsetMetric > mvYMax)
+        {
+          iYOffsetMetric = iYOffset;
+          isTransferredTop = true;
+        }
+#else
     for (iYOffset = mvYMax; iYOffset >= mvYMin; iYOffset -= TMP_SAMPLING)
     {
       for (iXOffset = mvXMax; iXOffset >= mvXMin; iXOffset -= TMP_SAMPLING)
       {
+#endif
 #if JVET_AE0077_EXT_INTRATMP
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+        if ((regionId == 4 || regionId == 5) && !isAvailablePairFound)
+#else
         if (regionId == 4 || regionId == 5)
+#endif
         {
           Position bottomRight(iCurrX + iXOffset + uiBlkWidth - 1, iCurrY + iYOffset + uiBlkHeight - 1);
           if (!pcCU->cs->isDecomp(bottomRight, CHANNEL_TYPE_LUMA))
           {
             continue;
           }
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+          else
+          {
+            if (bJointCalc || useMR)
+            {
+              if (!pcCU->cs->isDecomp(Position(iCurrX + iXOffsetMetric + uiBlkWidth - 1, iCurrY + iYOffsetMetric + uiBlkHeight - 1), CHANNEL_TYPE_LUMA))
+              {
+                iXOffsetMetric = iXOffset;
+                iYOffsetMetric = iYOffset;
+                isTransferredLeft = true;
+                isTransferredTop = true;
+              }
+              else
+              {
+                isAvailablePairFound = true;
+              }
+            }
+            else
+            {
+              isAvailablePairFound = true;
+            }
+          }
+#endif
         }
 #endif
 #else
@@ -14979,16 +15223,39 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
       {
 #endif
         refCurr = ref + iYOffset * refStride + iXOffset;
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+        int licShift = 0;
+        if (!isTransferredLeft)
+        {
+          licShift += offset;
+        }
+        if (!isTransferredTop)
+        {
+          licShift += offset * m_uiPicStride;
+        }
+#endif
 
 #if JVET_AG0136_INTRA_TMP_LIC
         if (bJointCalc)
         {
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+          m_calcTemplateDiffJointSadMrsad(refCurr, refStride, tarPatch, m_uiPicStride, uiPatchWidth, uiPatchHeight, diff, diffSupp, pDiff, pDiffSupp, tempType, log2SizeTop, log2SizeLeft, sizeTopLeft, topTargetMean, leftTargetMean, licShift);
+#else
           m_calcTemplateDiffJointSadMrsad(refCurr, refStride, tarPatch, uiPatchWidth, uiPatchHeight, diff, diffSupp, pDiff, pDiffSupp, tempType, log2SizeTop, log2SizeLeft, sizeTopLeft, topTargetMean, leftTargetMean);
+#endif
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+          for (int temIdx = 0; temIdx < (needTopLeft ? 3 : 1); temIdx++)
+#else
           for (int temIdx = 0; temIdx < 3; temIdx++)
+#endif
           {
             if (diffSupp[temIdx] < pDiffSupp[temIdx])
             {
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+              updateCandList(TempLibFast(iXOffsetMetric, iYOffsetMetric, Mv(iXOffsetMetric, iYOffsetMetric) - bvOffSparseTL, Mv(iXOffsetMetric, iYOffsetMetric) + bvOffSparseBR, isTransferredLeft, isTransferredTop, regionId), diffSupp[temIdx], sparseMtmpCandListSupp[temIdx], sparseMtmpCostListSupp[temIdx], mtmpNumSparseForLic[temIdx]);
+#else
               updateCandList(TempLibFast(iXOffset, iYOffset, regionId), diffSupp[temIdx], sparseMtmpCandListSupp[temIdx], sparseMtmpCostListSupp[temIdx], mtmpNumSparseForLic[temIdx]);
+#endif
               if (sparseMtmpCandListSupp[temIdx].size() == mtmpNumSparseForLic[temIdx])
               {
                 pDiffSupp[temIdx] = std::min((int) sparseMtmpCostListSupp[temIdx][mtmpNumSparseForLic[temIdx] - 1], pDiffSupp[temIdx]);
@@ -14998,18 +15265,32 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
         }
         else
         {
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+          m_calcTemplateDiff(pcCU->tmpLicFlag ? refCurr + licShift : refCurr, refStride, tarPatch, m_uiPicStride, uiPatchWidth, uiPatchHeight, diff, pDiff, tempType, needTopLeft ? 3 : 0, useMR, log2SizeTop, log2SizeLeft, sizeTopLeft, topTargetMean, leftTargetMean);
+#else
           m_calcTemplateDiff(refCurr, refStride, tarPatch, uiPatchWidth, uiPatchHeight, diff, pDiff, tempType, needTopLeft ? 3 : 0, useMR, log2SizeTop, log2SizeLeft, sizeTopLeft, topTargetMean, leftTargetMean);
+#endif
         }
 #else
         m_calcTemplateDiff(refCurr, refStride, tarPatch, uiPatchWidth, uiPatchHeight, diff, pDiff, tempType, needTopLeft ? 3 : 0);
 #endif
 
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+        for (int temIdx = 0; temIdx < (needTopLeft ? 3 : 1); temIdx++)
+#else
         for (int temIdx = 0; temIdx < 3; temIdx++)
+#endif
         {
           if (diff[temIdx] < pDiff[temIdx])
           {
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+            int curXoffset = (!bJointCalc && (useMR)) ? iXOffsetMetric : iXOffset;
+            int curYoffset = (!bJointCalc && (useMR)) ? iYOffsetMetric : iYOffset;
+            updateCandList(TempLibFast(curXoffset, curYoffset, Mv(curXoffset, curYoffset) - bvOffSparseTL, Mv(curXoffset, curYoffset) + bvOffSparseBR, !bJointCalc && (useMR) ? isTransferredLeft : false, !bJointCalc && (useMR) ? isTransferredTop : false, regionId), diff[temIdx], sparseMtmpCandList[temIdx], sparseMtmpCostList[temIdx], mtmpNumSparse[temIdx]);
+#else
             updateCandList(TempLibFast(iXOffset, iYOffset, regionId), diff[temIdx],
                            sparseMtmpCandList[temIdx], sparseMtmpCostList[temIdx], mtmpNumSparse[temIdx]);
+#endif
             if (sparseMtmpCandList[temIdx].size() == mtmpNumSparse[temIdx])
             {
               pDiff[temIdx] = std::min((int) sparseMtmpCostList[temIdx][mtmpNumSparse[temIdx] - 1], pDiff[temIdx]);
@@ -15127,6 +15408,24 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
 
 #if JVET_AG0151_INTRA_TMP_MERGE_MODE
   std::vector<Mv> bvBasedMergeCandidatesITMP;
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  bvBasedMergeCandidatesITMP = m_bvBasedMergeCandidates;
+  std::vector<Mv> bvBasedMergeCandidatesOut;
+  std::vector<Mv> bvBasedMergeCandidatesIn;
+  for (int iBv = 0; iBv < bvRegionIdList.size(); iBv++)
+  {
+    if (bvRegionIdList[iBv] == TMP_MRG_REG_ID)
+    {
+      bvBasedMergeCandidatesOut.push_back(m_bvBasedMergeCandidates[iBv]);
+    }
+    else
+    {
+      bvBasedMergeCandidatesIn.push_back(m_bvBasedMergeCandidates[iBv]);
+    }
+  }
+  bvBasedMergeCandidatesOut.insert(bvBasedMergeCandidatesOut.end(), bvBasedMergeCandidatesIn.begin(), bvBasedMergeCandidatesIn.end());
+  bvBasedMergeCandidatesITMP = bvBasedMergeCandidatesOut;
+#else
   if (m_bvBasedMergeCandidates.size() > TMP_NUM_MERGE_CANDS)
   {
     std::vector<Mv> bvBasedMergeCandidatesOut;
@@ -15162,6 +15461,7 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
   {
     bvBasedMergeCandidatesITMP = m_bvBasedMergeCandidates;
   }
+#endif
 #if JVET_AH0055_INTRA_TMP_ARBVP
   const int numNeighborMerge = (int) bvBasedMergeCandidatesITMP.size();
   const int totalNum = numNeighborMerge + NUM_TMP_ARBVP;
@@ -15260,6 +15560,164 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
     }
   } while (bvBasedMergeCandidatesITMP.size() > end && bvBasedMergeCandidatesITMP.size() < totalNum);
 #endif
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  // Add ARBVPs based on sparse candidates
+  std::vector<Mv> bvBasedMergeCandidatesITMPSupp;
+  bvBasedMergeCandidatesITMPSupp = bvBasedMergeCandidatesITMP;
+
+  PU::getSparseArBvMergeCandidate(pu, bvBasedMergeCandidatesITMP, sparseMtmpCandList[0]);
+  if (bJointCalc)
+  {
+    PU::getSparseArBvMergeCandidate(pu, bvBasedMergeCandidatesITMPSupp, sparseMtmpCandListSupp[0]);
+  }
+
+  // Clustering of the Merge and ARBVP candidates based on refinement window
+  bool clustMrgReg[3]  = { false, false, false };
+  bool clustMrgSupp[3] = { false, false, false };
+  Mv   iMergeWindTL, iMergeWindBR;
+  Mv   iSparseWindTL, iSparseWindBR;
+  Mv   mergeCand, sparseCand;
+  bool bOverlap = false;
+
+  for (int iM = 0; iM < bvBasedMergeCandidatesITMP.size(); iM++)
+  {
+    mergeCand    = bvBasedMergeCandidatesITMP[iM];
+    iMergeWindTL = (iM < numNeighborMerge) ? mergeCand - bvOffMerge : mergeCand - bvOffArbvp;
+    iMergeWindBR = (iM < numNeighborMerge) ? mergeCand + bvOffMerge : mergeCand + bvOffArbvp;
+    regionId     = (iM < numNeighborMerge) ? TMP_MRG_REG_ID : TMP_MRG_REG_ID + 1;
+    refCurr      = ref + mergeCand.ver * refStride + mergeCand.hor;
+
+    for (int temIdx = 0; temIdx < (needTopLeft ? 3 : 1); temIdx++)
+    {
+      m_calcTemplateDiff(refCurr, refStride, tarPatch, m_uiPicStride, uiPatchWidth, uiPatchHeight, diff, pDiff, tempType, needTopLeft ? 3 : 0, useMR, log2SizeTop, log2SizeLeft, sizeTopLeft, topTargetMean, leftTargetMean);
+      bOverlap = false;
+      for (int i = 0; i < sparseMtmpCandList[temIdx].size(); i++)
+      {
+        sparseCand = Mv(sparseMtmpCandList[temIdx][i].m_pX, sparseMtmpCandList[temIdx][i].m_pY);
+        if (mergeCand == sparseCand)
+        {
+          clustMrgReg[temIdx] = true;
+          bOverlap = true;
+          break;
+        }
+
+        iSparseWindTL = sparseMtmpCandList[temIdx][i].m_windTL;
+        iSparseWindBR = sparseMtmpCandList[temIdx][i].m_windBR;
+        if (!((iMergeWindBR.hor < iSparseWindTL.hor) || (iMergeWindTL.hor > iSparseWindBR.hor))
+          && !((iMergeWindBR.ver < iSparseWindTL.ver) || (iMergeWindTL.ver > iSparseWindBR.ver)))
+        {
+          iSparseWindTL =
+            Mv(std::min(iSparseWindTL.hor, iMergeWindTL.hor), std::min(iSparseWindTL.ver, iMergeWindTL.ver));
+          iSparseWindBR =
+            Mv(std::max(iSparseWindBR.hor, iMergeWindBR.hor), std::max(iSparseWindBR.ver, iMergeWindBR.ver));
+
+          if (diff[temIdx] < sparseMtmpCostList[temIdx][i])
+          {
+            sparseMtmpCandList[temIdx].erase(sparseMtmpCandList[temIdx].begin() + i);
+            sparseMtmpCostList[temIdx].erase(sparseMtmpCostList[temIdx].begin() + i);
+            updateCandList(TempLibFast(mergeCand.hor, mergeCand.ver, iSparseWindTL, iSparseWindBR, false, false, regionId),
+              diff[temIdx], sparseMtmpCandList[temIdx], sparseMtmpCostList[temIdx], mtmpNumSparse[temIdx]);
+            if (sparseMtmpCandList[temIdx].size() == mtmpNumSparse[temIdx])
+            {
+              pDiff[temIdx] = std::min(static_cast<int>(sparseMtmpCostList[temIdx][mtmpNumSparse[temIdx] - 1]), pDiff[temIdx]);
+            }
+          }
+          else
+          {
+            sparseMtmpCandList[temIdx][i].m_windTL = iSparseWindTL;
+            sparseMtmpCandList[temIdx][i].m_windBR = iSparseWindBR;
+            sparseMtmpCandList[temIdx][i].m_rId    = regionId;
+          }
+          clustMrgReg[temIdx] = true;
+          bOverlap            = true;
+          break;
+        }
+      }
+      if (!bOverlap)
+      {
+        if (diff[temIdx] < pDiff[temIdx])
+        {
+          updateCandList(TempLibFast(mergeCand.hor, mergeCand.ver, iMergeWindTL, iMergeWindBR, false, false, regionId), diff[temIdx],
+            sparseMtmpCandList[temIdx], sparseMtmpCostList[temIdx], mtmpNumSparse[temIdx]);
+          if (sparseMtmpCandList[temIdx].size() == mtmpNumSparse[temIdx])
+          {
+            pDiff[temIdx] = std::min(static_cast<int>(sparseMtmpCostList[temIdx][mtmpNumSparse[temIdx] - 1]), pDiff[temIdx]);
+          }
+          clustMrgReg[temIdx] = true;
+        }
+      }
+    }
+  }
+
+  if (bJointCalc)
+  {
+    for (int iM = 0; iM < bvBasedMergeCandidatesITMPSupp.size(); iM++)
+    {
+      mergeCand    = bvBasedMergeCandidatesITMPSupp[iM];
+      iMergeWindTL = (iM < numNeighborMerge) ? mergeCand - bvOffMerge : mergeCand - bvOffArbvp;
+      iMergeWindBR = (iM < numNeighborMerge) ? mergeCand + bvOffMerge : mergeCand + bvOffArbvp;
+      regionId     = (iM < numNeighborMerge) ? TMP_MRG_REG_ID : TMP_MRG_REG_ID + 1;
+      refCurr      = ref + mergeCand.ver * refStride + mergeCand.hor;
+
+      for (int temIdx = 0; temIdx < (needTopLeft ? 3 : 1); temIdx++)
+      {
+        m_calcTemplateDiff(refCurr, refStride, tarPatch, m_uiPicStride, uiPatchWidth, uiPatchHeight, diffSupp, pDiffSupp, tempType, needTopLeft ? 3 : 0, true, log2SizeTop, log2SizeLeft, sizeTopLeft, topTargetMean, leftTargetMean);
+        bOverlap = false;
+        for (int i = 0; i < sparseMtmpCandListSupp[temIdx].size(); i++)
+        {
+          sparseCand = Mv(sparseMtmpCandListSupp[temIdx][i].m_pX, sparseMtmpCandListSupp[temIdx][i].m_pY);
+          if (mergeCand == sparseCand)
+          {
+            clustMrgSupp[temIdx] = true;
+            bOverlap = true;
+            break;
+          }
+
+          iSparseWindTL = sparseMtmpCandListSupp[temIdx][i].m_windTL;
+          iSparseWindBR = sparseMtmpCandListSupp[temIdx][i].m_windBR;
+          if (!((iMergeWindBR.hor < iSparseWindTL.hor) || (iMergeWindTL.hor > iSparseWindBR.hor)) && !((iMergeWindBR.ver < iSparseWindTL.ver) || (iMergeWindTL.ver > iSparseWindBR.ver)))
+          {
+            iSparseWindTL = Mv(std::min(iSparseWindTL.hor, iMergeWindTL.hor), std::min(iSparseWindTL.ver, iMergeWindTL.ver));
+            iSparseWindBR = Mv(std::max(iSparseWindBR.hor, iMergeWindBR.hor), std::max(iSparseWindBR.ver, iMergeWindBR.ver));
+
+            if (diffSupp[temIdx] < sparseMtmpCostListSupp[temIdx][i])
+            {
+              sparseMtmpCandListSupp[temIdx].erase(sparseMtmpCandListSupp[temIdx].begin() + i);
+              sparseMtmpCostListSupp[temIdx].erase(sparseMtmpCostListSupp[temIdx].begin() + i);
+              updateCandList(TempLibFast(mergeCand.hor, mergeCand.ver, iSparseWindTL, iSparseWindBR, false, false, regionId), diffSupp[temIdx], sparseMtmpCandListSupp[temIdx], sparseMtmpCostListSupp[temIdx], mtmpNumSparseForLic[temIdx]);
+              if (sparseMtmpCandListSupp[temIdx].size() == mtmpNumSparseForLic[temIdx])
+              {
+                pDiffSupp[temIdx] = std::min(static_cast<int>(sparseMtmpCostListSupp[temIdx][mtmpNumSparseForLic[temIdx] - 1]), pDiffSupp[temIdx]);
+              }
+            }
+            else
+            {
+              sparseMtmpCandListSupp[temIdx][i].m_windTL = iSparseWindTL;
+              sparseMtmpCandListSupp[temIdx][i].m_windBR = iSparseWindBR;
+              sparseMtmpCandListSupp[temIdx][i].m_rId    = regionId;
+            }
+            bOverlap             = true;
+            clustMrgSupp[temIdx] = true;
+            break;
+          }
+        }
+        if (!bOverlap)
+        {
+          if (diffSupp[temIdx] < pDiffSupp[temIdx])
+          {
+            updateCandList(TempLibFast(mergeCand.hor, mergeCand.ver, iMergeWindTL, iMergeWindBR, false, false, regionId),
+              diffSupp[temIdx], sparseMtmpCandListSupp[temIdx], sparseMtmpCostListSupp[temIdx], mtmpNumSparseForLic[temIdx]);
+            if (sparseMtmpCandListSupp[temIdx].size() == mtmpNumSparseForLic[temIdx])
+            {
+              pDiffSupp[temIdx] = std::min(static_cast<int>(sparseMtmpCostListSupp[temIdx][mtmpNumSparseForLic[temIdx] - 1]), pDiffSupp[temIdx]);
+            }
+            clustMrgSupp[temIdx] = true;
+          }
+        }
+      }
+    }
+  }
+#else
 #if JVET_AG0136_INTRA_TMP_LIC
   bool isBvAddedReg = false;
   bool isBvAddedSupp = false;
@@ -15342,6 +15800,7 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
     }
   }
 #endif
+#endif
 
 #if JVET_AD0086_ENHANCED_INTRA_TMP
   static_vector<TempLibFast, MTMP_NUM> refineMtmpCandList[3];
@@ -15373,22 +15832,47 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
         pDiff[i] = 0;
       }
     }
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+    bool bRedundant = false;
+    Mv refineWindTL, refineWindBR;
+    int mvYMin = 0;
+    int mvYMax = 0;
+    int mvXMin = 0;
+    int mvXMax = 0;
+#endif
     for (int candIdx = 0; candIdx < sparseMtmpCandList[temIdx].size(); candIdx++)
     {
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+      refineWindTL = sparseMtmpCandList[temIdx][candIdx].m_windTL;
+      refineWindBR = sparseMtmpCandList[temIdx][candIdx].m_windBR;
+#else
       int iRefine      = 1;
       int iRefineRange = TMP_SAMPLING >> 1;
+#endif
       bestRegionId     = sparseMtmpCandList[temIdx][candIdx].m_rId;
 
 #if JVET_AG0151_INTRA_TMP_MERGE_MODE
-#if JVET_AG0136_INTRA_TMP_LIC
+#if JVET_AG0136_INTRA_TMP_LIC && !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
       const int RefineSizeForLic = pcCU->slice->getSPS()->getItmpLicMode() ? 5 : 2;
 #endif
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
       int mvYMin = 0;
       int mvYMax = 0;
       int mvXMin = 0;
       int mvXMax = 0;
+#endif
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+      if (bestRegionId > 5)
+#else
       if (bestRegionId == 6)
+#endif
       {
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+        mvYMin = refineWindTL.ver;
+        mvYMax = refineWindBR.ver;
+        mvXMin = refineWindTL.hor;
+        mvXMax = refineWindBR.hor; 
+#else
 #if JVET_AG0136_INTRA_TMP_LIC
         if ((!pcCU->cs->pcv->isEncoder || !bJointCalc) && pcCU->tmpFlag && (pcCU->tmpLicFlag || pcCU->ibcLicFlag))
         {
@@ -15410,8 +15894,9 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
         mvXMin = sparseMtmpCandList[temIdx][candIdx].m_pX - 5;
         mvXMax = sparseMtmpCandList[temIdx][candIdx].m_pX + 5;
 #endif
+#endif
       }
-#if JVET_AH0055_INTRA_TMP_ARBVP
+#if JVET_AH0055_INTRA_TMP_ARBVP && !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
       else if (bestRegionId == 7)
       {
         mvYMin = sparseMtmpCandList[temIdx][candIdx].m_pY - EBVP_RANGE;
@@ -15430,6 +15915,9 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
 #if JVET_AG0136_INTRA_TMP_LIC
                                     , TMP_SAMPLING
 #endif
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+                                    , sparseMtmpCandList[temIdx][candIdx].m_isTransferredLeft, sparseMtmpCandList[temIdx][candIdx].m_isTransferredTop, bestRegionId, iCurrX + mvXMin >= TMP_TEMPLATE_SIZE + iRefineRange, iCurrY + mvYMin >= TMP_TEMPLATE_SIZE + iRefineRange, !pcCU->slice->getSPS()->getItmpLicMode()
+#endif
                                     );
       }
 #else
@@ -15443,28 +15931,51 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
 #endif
       );
 #endif
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
       if (!(mvYMax < mvYMin || mvXMax < mvXMin))
       {
+#endif
         for (iYOffset = mvYMax; iYOffset >= mvYMin; iYOffset -= iRefine)
         {
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+          bool isAvailablePairFound{false};
+#endif
           for (iXOffset = mvXMax; iXOffset >= mvXMin; iXOffset -= iRefine)
           {
 #if JVET_AE0077_EXT_INTRATMP
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+            if ((bestRegionId == 4 || bestRegionId == 5 || (!pcCU->slice->getSPS()->getItmpLicMode() && ((bestRegionId == 3 && iXOffset > 0) || (bestRegionId == 1 && iYOffset > 0)))) && !isAvailablePairFound)
+#else
             if (bestRegionId == 4 || bestRegionId == 5)
+#endif
             {
               Position bottomRight(iCurrX + iXOffset + uiBlkWidth - 1, iCurrY + iYOffset + uiBlkHeight - 1);
               if (!pcCU->cs->isDecomp(bottomRight, CHANNEL_TYPE_LUMA))
               {
                 continue;
               }
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+              else
+              {
+                isAvailablePairFound = true;
+              }
+#endif
             }
 #endif
 #if JVET_AG0151_INTRA_TMP_MERGE_MODE
 #if JVET_AG0136_INTRA_TMP_LIC
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+            if (clustMrgReg[temIdx])
+#else
             if (isBvAddedReg)
+#endif
             {
 #endif
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+              bRedundant = false;
+#else
               bool bRedundant = false;
+#endif
               for (int i = 0; i < refineMtmpCandList[temIdx].size(); i++)
               {
                 if (iYOffset == refineMtmpCandList[temIdx][i].m_pY && iXOffset == refineMtmpCandList[temIdx][i].m_pX)
@@ -15500,8 +16011,12 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
             else
             {
               refCurr = ref + iYOffset * refStride + iXOffset;
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+              m_calcTemplateDiff(refCurr, refStride, tarPatch, m_uiPicStride, uiPatchWidth, uiPatchHeight, diff, pDiff, tempType, temIdx
+#else
               m_calcTemplateDiff(refCurr, refStride, tarPatch, uiPatchWidth, uiPatchHeight, diff, pDiff, tempType,
                                  temIdx
+#endif
 #if JVET_AG0136_INTRA_TMP_LIC
                                  , useMR, log2SizeTop, log2SizeLeft, sizeTopLeft, topTargetMean, leftTargetMean
 #endif
@@ -15509,8 +16024,12 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
             }
             if (diff[temIdx] < pDiff[temIdx])
             {
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+              updateCandList(TempLibFast(iXOffset, iYOffset, refineWindTL, refineWindBR, false, false, bestRegionId), diff[temIdx], refineMtmpCandList[temIdx], refineMtmpCostList[temIdx], mtmpNumRefine[temIdx]);
+#else
               updateCandList(TempLibFast(iXOffset, iYOffset, bestRegionId), diff[temIdx],
                              refineMtmpCandList[temIdx], refineMtmpCostList[temIdx], mtmpNumRefine[temIdx]);
+#endif
               if (refineMtmpCandList[temIdx].size() == mtmpNumRefine[temIdx])
               {
                 pDiff[temIdx] = std::min((int) refineMtmpCostList[temIdx][mtmpNumRefine[temIdx] - 1], pDiff[temIdx]);
@@ -15518,7 +16037,9 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
             }
           }
         }
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
       }
+#endif
     }
   }
 
@@ -15541,8 +16062,17 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
 
   if (tempType == L_SHAPE_TEMPLATE && needTopLeft)
   {
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+    // If the list size is less than INIT_TL_POS the Only-TL candidates are skip
+    if (refMtmpCandListTemp.size() >= INIT_TL_POS)
+    {
+      int  cnt        = 0;
+      bool bRedundant = false;
+      int  mvXCur, mvYCur, pos;
+#endif
     for (int temIdx = 2; temIdx >0; temIdx--)
     {
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
       int cnt = 0;
       for (int candIdx = 0; candIdx < refineMtmpCostList[temIdx].size() && cnt < TL_NUM; candIdx++)
       {
@@ -15551,6 +16081,13 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
 
         int  mvXCur     = refineMtmpCandList[temIdx][candIdx].m_pX;
         int  mvYCur     = refineMtmpCandList[temIdx][candIdx].m_pY;
+#else
+      for (int candIdx = 0; candIdx < refineMtmpCandList[temIdx].size(); candIdx++)
+      {
+        bRedundant = false;
+        mvXCur     = refineMtmpCandList[temIdx][candIdx].m_pX;
+        mvYCur     = refineMtmpCandList[temIdx][candIdx].m_pY;
+#endif
 #if JVET_AG0136_INTRA_TMP_LIC
         for (int crIdx = 0; crIdx < refMtmpCandListTemp.size(); crIdx++)
         {
@@ -15570,8 +16107,12 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
 
         if (!bRedundant)
         {
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+          pos = (MTMP_NUM - static_cast<int>(refineMtmpCandList[1].size()) - static_cast<int>(refineMtmpCandList[2].size())) + cnt++;
+#else
           cnt++;
           int pos = MTMP_NUM - 1 - TL_NUM * temIdx + cnt;
+#endif
 #if JVET_AG0136_INTRA_TMP_LIC
           if (pos < refMtmpCandListTemp.size())
           {
@@ -15590,9 +16131,19 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
             m_mtmpCandList[pos] = refineMtmpCandList[temIdx][candIdx];
 #endif
           }
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+          else
+          {
+            // TL candidates are appended sequentially if the list size is less than MTMP_NUM
+            refMtmpCandListTemp.push_back(refineMtmpCandList[temIdx][candIdx]);
+          }
+#endif
         }
       }
     }
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+    }   
+#endif
   }
 #else
 #if JVET_AB0130_ITMP_SAMPLING
@@ -15727,8 +16278,16 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
       pDiffSparse[i] = pDiffSupp[i] + (sparseMtmpCandListSupp[i].size() < mtmpNumSparseForLic[i] ? 0 : 1);
     }
 
-#if JVET_AG0151_INTRA_TMP_MERGE_MODE
+#if JVET_AG0151_INTRA_TMP_MERGE_MODE && (!JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT)
     const int RefineSizeForLic = pcCU->slice->getSPS()->getItmpLicMode() ? 5 : 2;
+#endif
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+    bool bRedundant = false;
+    Mv refineWindTL, refineWindBR;
+    int mvYMin = 0;
+    int mvYMax = 0;
+    int mvXMin = 0;
+    int mvXMax = 0;
 #endif
     for (int temIdx = 0; temIdx < 3; temIdx++)
     {
@@ -15749,12 +16308,27 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
       }
       for (int candIdx = 0; candIdx < sparseMtmpCandListSupp[temIdx].size(); candIdx++)
       {
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+        refineWindTL = sparseMtmpCandListSupp[temIdx][candIdx].m_windTL;
+        refineWindBR = sparseMtmpCandListSupp[temIdx][candIdx].m_windBR;
+#endif
         bestRegionId = sparseMtmpCandListSupp[temIdx][candIdx].m_rId;
 #if JVET_AG0151_INTRA_TMP_MERGE_MODE
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
         int mvYMin = 0;
         int mvYMax = 0;
         int mvXMin = 0;
         int mvXMax = 0;
+#endif
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+        if (bestRegionId >= TMP_MRG_REG_ID)
+        {
+          mvYMin = refineWindTL.ver;
+          mvYMax = refineWindBR.ver;
+          mvXMin = refineWindTL.hor;
+          mvXMax = refineWindBR.hor;
+        }
+#else
         if (bestRegionId == 6)
         {
           mvYMin = sparseMtmpCandListSupp[temIdx][candIdx].m_pY - RefineSizeForLic;
@@ -15771,13 +16345,18 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
           mvXMax = sparseMtmpCandListSupp[temIdx][candIdx].m_pX + EBVP_RANGE;
         }
 #endif 
+#endif 
         else
         {
           mvYMin = mvYMins[bestRegionId];
           mvYMax = mvYMaxs[bestRegionId];
           mvXMin = mvXMins[bestRegionId];
           mvXMax = mvXMaxs[bestRegionId];
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+          clipMvIntraConstraintRefine(mvXMin, mvXMax, mvYMin, mvYMax, sparseMtmpCandListSupp[temIdx][candIdx].m_pX, sparseMtmpCandListSupp[temIdx][candIdx].m_pY, TMP_SAMPLING >> 1, TMP_SAMPLING, sparseMtmpCandListSupp[temIdx][candIdx].m_isTransferredLeft, sparseMtmpCandListSupp[temIdx][candIdx].m_isTransferredTop, bestRegionId, iCurrX + mvXMin >= TMP_TEMPLATE_SIZE + (TMP_SAMPLING >> 1), iCurrY + mvYMin >= TMP_TEMPLATE_SIZE + (TMP_SAMPLING >> 1), !pcCU->slice->getSPS()->getItmpLicMode());
+#else
           clipMvIntraConstraintRefine(mvXMin, mvXMax, mvYMin, mvYMax, sparseMtmpCandListSupp[temIdx][candIdx].m_pX, sparseMtmpCandListSupp[temIdx][candIdx].m_pY, TMP_SAMPLING >> 1, TMP_SAMPLING);
+#endif
         }
 #else
         int mvYMin       = mvYMins[bestRegionId];
@@ -15790,24 +16369,47 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
 #endif
         );
 #endif
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT  
         if (!(mvYMax < mvYMin || mvXMax < mvXMin))
         {
+#endif
           for (iYOffset = mvYMax; iYOffset >= mvYMin; iYOffset -= 1)
           {
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+            bool isAvailablePairFound{false};
+#endif
             for (iXOffset = mvXMax; iXOffset >= mvXMin; iXOffset -= 1)
             {
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+              if ((bestRegionId == 4 || bestRegionId == 5 || (!pcCU->slice->getSPS()->getItmpLicMode() && ((bestRegionId == 3 && iXOffset > 0) || (bestRegionId == 1 && iYOffset > 0)))) && !isAvailablePairFound)
+#else
               if (bestRegionId == 4 || bestRegionId == 5)
+#endif
               {
                 Position bottomRight(iCurrX + iXOffset + uiBlkWidth - 1, iCurrY + iYOffset + uiBlkHeight - 1);
                 if (!pcCU->cs->isDecomp(bottomRight, CHANNEL_TYPE_LUMA))
                 {
                   continue;
                 }
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+                else
+                {
+                  isAvailablePairFound = true;
+                }
+#endif
               }
 #if JVET_AG0151_INTRA_TMP_MERGE_MODE
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+              if (clustMrgSupp[temIdx])
+#else
               if (isBvAddedSupp)
+#endif
               {
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+                bRedundant = false;
+#else
                 bool bRedundant = false;
+#endif
                 for (int i = 0; i < refineMtmpCandList[temIdx].size(); i++)
                 {
                   if (iYOffset == refineMtmpCandList[temIdx][i].m_pY && iXOffset == refineMtmpCandList[temIdx][i].m_pX)
@@ -15840,11 +16442,19 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
               else
               {
                 refCurr = ref + iYOffset * refStride + iXOffset;
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+                m_calcTemplateDiff(refCurr, refStride, tarPatch, m_uiPicStride, uiPatchWidth, uiPatchHeight, diffSupp, pDiffSupp, tempType, temIdx, true, log2SizeTop, log2SizeLeft, sizeTopLeft, topTargetMean, leftTargetMean);
+#else
                 m_calcTemplateDiff(refCurr, refStride, tarPatch, uiPatchWidth, uiPatchHeight, diffSupp, pDiffSupp, tempType, temIdx, true, log2SizeTop, log2SizeLeft, sizeTopLeft, topTargetMean, leftTargetMean);
+#endif
               }
               if (diffSupp[temIdx] < pDiffSupp[temIdx])
               {
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+                updateCandList(TempLibFast(iXOffset, iYOffset, refineWindTL, refineWindBR, false, false, bestRegionId), diffSupp[temIdx], refineMtmpCandList[temIdx], refineMtmpCostList[temIdx], mtmpNumRefine[temIdx]);
+#else
                 updateCandList(TempLibFast(iXOffset, iYOffset, bestRegionId), diffSupp[temIdx], refineMtmpCandList[temIdx], refineMtmpCostList[temIdx], mtmpNumRefine[temIdx]);
+#endif
                 if (refineMtmpCandList[temIdx].size() == mtmpNumRefine[temIdx])
                 {
                   pDiffSupp[temIdx] = std::min((int) refineMtmpCostList[temIdx][mtmpNumRefine[temIdx] - 1], pDiffSupp[temIdx]);
@@ -15852,7 +16462,9 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
               }
             }
           }
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT  
         }
+#endif
       }
     }
 
@@ -15861,14 +16473,30 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
     static_vector<TempLibFast, MTMP_NUM>& refMtmpCandListTemp = m_mtmpCandListUseMR;
     if (tempType == L_SHAPE_TEMPLATE && needTopLeft)
     {
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+      // If the list size is less than INIT_TL_POS the Only-TL candidates are skip
+      if (refMtmpCandListTemp.size() >= INIT_TL_POS)
+      {
+        int  cnt        = 0;
+        bool bRedundant = false;
+        int  mvXCur, mvYCur, pos;
+#endif
       for (int temIdx = 2; temIdx > 0; temIdx--)
       {
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
         int cnt = 0;
         for (int candIdx = 0; candIdx < refineMtmpCostList[temIdx].size() && cnt < TL_NUM; candIdx++)
         {
           bool bRedundant = false;
           const int mvXCur = refineMtmpCandList[temIdx][candIdx].m_pX;
           const int mvYCur = refineMtmpCandList[temIdx][candIdx].m_pY;
+#else
+        for (int candIdx = 0; candIdx < refineMtmpCostList[temIdx].size(); candIdx++)
+        {
+          bRedundant = false;
+          mvXCur = refineMtmpCandList[temIdx][candIdx].m_pX;
+          mvYCur = refineMtmpCandList[temIdx][candIdx].m_pY;
+#endif
           for (int crIdx = 0; crIdx < refMtmpCandListTemp.size(); crIdx++)
           {
             if (mvXCur == refMtmpCandListTemp[crIdx].m_pX && mvYCur == refMtmpCandListTemp[crIdx].m_pY)
@@ -15879,8 +16507,12 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
           }
           if (!bRedundant)
           {
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+            pos = (MTMP_NUM - static_cast<int>(refineMtmpCandList[1].size()) - static_cast<int>(refineMtmpCandList[2].size())) + cnt++;
+#else
             cnt++;
             int pos = MTMP_NUM - 1 - TL_NUM * temIdx + cnt;
+#endif
             if (pos < refMtmpCandListTemp.size())
             {
               for (int updatePos = (int) refMtmpCandListTemp.size() - 1; updatePos > pos; updatePos--)
@@ -15889,9 +16521,19 @@ void IntraPrediction::searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** ta
               }
               refMtmpCandListTemp[pos] = refineMtmpCandList[temIdx][candIdx];
             }
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+            else
+            {
+              // TL candidates are appended sequentially if the list size is less than MTMP_NUM
+              refMtmpCandListTemp.push_back(refineMtmpCandList[temIdx][candIdx]);
+            }
+#endif
           }
         }
       }
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+      }
+#endif
     }
     m_tmpNumCandUseMR = static_cast<int>(m_mtmpCandListUseMR.size());
     for (int i = 0; i < refMtmpCandListTemp.size(); i++)
@@ -16462,7 +17104,11 @@ void IntraPrediction::xCalcTmpFlmRefArea(CodingUnit *cu, unsigned int uiBlkWidth
   int iBlkHeight = uiBlkHeight;
   int bestPosX = iCurrX + pX;
   int bestPosY = iCurrY + pY;
-  if (regionId == 4 || regionId == 5)
+  if (regionId == 4 || regionId == 5
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+      || regionId == 1 || regionId == 3
+#endif
+      )
   {
     if (!cu->cs->isDecomp(Position(bestPosX + iBlkWidth - 1, bestPosY + iBlkHeight), CHANNEL_TYPE_LUMA))
     {
@@ -17660,7 +18306,11 @@ TempLibFracFast::~TempLibFracFast()
 {
 }
 
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+void IntraPrediction::searchFracCandidate(CodingUnit* pcCU, Pel* tarPatch, RefTemplateType tempType)
+#else
 void IntraPrediction::searchFracCandidate( CodingUnit* pcCU, Pel** tarPatch, RefTemplateType tempType)
+#endif
 {
   const int tmpIdx = pcCU->tmpIdx;
   m_mtmpFracCandList[tmpIdx].clear();
@@ -17716,7 +18366,11 @@ void IntraPrediction::searchFracCandidate( CodingUnit* pcCU, Pel** tarPatch, Ref
 
   if(pcCU->tmpLicFlag)
   {
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+    m_calcTemplateDiff(refCurr, predTempStride, tarPatch, m_uiPicStride, pcCU->lwidth() + TMP_TEMPLATE_SIZE, pcCU->lheight() + TMP_TEMPLATE_SIZE, diff, pDiff, tempType, 0, true
+#else
     m_calcTemplateDiff(refCurr, predTempStride, tarPatch, pcCU->lwidth() + TMP_TEMPLATE_SIZE, pcCU->lheight() + TMP_TEMPLATE_SIZE, diff, pDiff, tempType, 0, true
+#endif
             , m_log2SizeTop
             , m_log2SizeLeft
             , m_sizeTopLeft
@@ -17725,7 +18379,11 @@ void IntraPrediction::searchFracCandidate( CodingUnit* pcCU, Pel** tarPatch, Ref
   }
   else
   {
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+    m_calcTemplateDiff(refCurr, predTempStride, tarPatch, m_uiPicStride, pcCU->lwidth() + TMP_TEMPLATE_SIZE, pcCU->lheight() + TMP_TEMPLATE_SIZE, diff, pDiff, tempType, 0, false, 0, 0, 0, 0, 0);
+#else
     m_calcTemplateDiff(refCurr, predTempStride, tarPatch, pcCU->lwidth() + TMP_TEMPLATE_SIZE, pcCU->lheight() + TMP_TEMPLATE_SIZE, diff, pDiff, tempType, 0, false, 0, 0, 0, 0, 0);
+#endif
   }
 
   diff[0] = (int) (diff[0] * TMP_INT_BV_COST_SCALE);
@@ -17754,7 +18412,11 @@ void IntraPrediction::searchFracCandidate( CodingUnit* pcCU, Pel** tarPatch, Ref
 
       if(pcCU->tmpLicFlag)
       {
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+        m_calcTemplateDiff(refCurr, predTempStride, tarPatch, m_uiPicStride, pcCU->lwidth() + TMP_TEMPLATE_SIZE, pcCU->lheight() + TMP_TEMPLATE_SIZE, diff, pDiff, tempType, 0, true
+#else
         m_calcTemplateDiff(refCurr, predTempStride, tarPatch, pcCU->lwidth() + TMP_TEMPLATE_SIZE, pcCU->lheight() + TMP_TEMPLATE_SIZE, diff, pDiff, tempType, 0, true
+#endif
                 , m_log2SizeTop
                 , m_log2SizeLeft
                 , m_sizeTopLeft
@@ -17763,7 +18425,11 @@ void IntraPrediction::searchFracCandidate( CodingUnit* pcCU, Pel** tarPatch, Ref
       }
       else
       {
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+        m_calcTemplateDiff(refCurr, predTempStride, tarPatch, m_uiPicStride, pcCU->lwidth() + TMP_TEMPLATE_SIZE, pcCU->lheight() + TMP_TEMPLATE_SIZE, diff, pDiff, tempType, 0, false, 0, 0, 0, 0, 0);
+#else
         m_calcTemplateDiff(refCurr, predTempStride, tarPatch, pcCU->lwidth() + TMP_TEMPLATE_SIZE, pcCU->lheight() + TMP_TEMPLATE_SIZE, diff, pDiff, tempType, 0, false, 0, 0, 0, 0, 0);
+#endif
       }
       if (diff[0] < pDiff[0])
       {
@@ -17830,22 +18496,35 @@ bool IntraPrediction::generateTmDcPrediction( Pel* piPred, unsigned int uiStride
 #endif
 
 #if JVET_AG0136_INTRA_TMP_LIC 
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+void IntraPrediction::calcTargetMean(Pel* tarPatch, int tarStride, const unsigned int uiPatchWidth, const unsigned int uiPatchHeight, const RefTemplateType tempType, const int requiredTemplate, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, int& topTargetMean, int& leftTargetMean)
+#else
 void IntraPrediction::calcTargetMean(Pel** tarPatch, const unsigned int uiPatchWidth, const unsigned int uiPatchHeight, const RefTemplateType tempType, const int requiredTemplate, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, int& topTargetMean, int& leftTargetMean)
+#endif
 {
   topTargetMean = 0;
   leftTargetMean = 0;
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  const Pel* tarPatchRow = tarPatch;
+#else
   const Pel* tarPatchRow = nullptr;
+#endif
   if (tempType == L_SHAPE_TEMPLATE)
   {
     if (requiredTemplate == 3 || requiredTemplate == 0 || requiredTemplate == 1)
     {
       for (int iY = 0; iY < TMP_TEMPLATE_SIZE; iY++)
       {
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
         tarPatchRow = tarPatch[iY];
+#endif
         for (int iX = TMP_TEMPLATE_SIZE; iX < uiPatchWidth; iX++)
         {
           topTargetMean += tarPatchRow[iX];
         }
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+        tarPatchRow += tarStride;
+#endif
       }
       topTargetMean >>= log2SizeTop;
     }
@@ -17853,11 +18532,16 @@ void IntraPrediction::calcTargetMean(Pel** tarPatch, const unsigned int uiPatchW
     {
       for (int iY = TMP_TEMPLATE_SIZE; iY < uiPatchHeight; iY++)
       {
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
         tarPatchRow = tarPatch[iY];
+#endif
         for (int iX = 0; iX < TMP_TEMPLATE_SIZE; iX++)
         {
           leftTargetMean += tarPatchRow[iX];
         }
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+        tarPatchRow += tarStride;
+#endif
       }
       leftTargetMean >>= log2SizeLeft;
     }
@@ -17866,11 +18550,16 @@ void IntraPrediction::calcTargetMean(Pel** tarPatch, const unsigned int uiPatchW
   {
     for (int iY = 0; iY < TMP_TEMPLATE_SIZE; iY++)
     {
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
       tarPatchRow = tarPatch[iY];
+#endif
       for (int iX = 0; iX < uiPatchWidth - TMP_TEMPLATE_SIZE; iX++)
       {
         topTargetMean += tarPatchRow[iX];
       }
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+      tarPatchRow += tarStride;
+#endif
     }
     topTargetMean >>= log2SizeTop;
   }
@@ -17878,32 +18567,55 @@ void IntraPrediction::calcTargetMean(Pel** tarPatch, const unsigned int uiPatchW
   {
     for (int iY = TMP_TEMPLATE_SIZE; iY < uiPatchHeight; iY++)
     {
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
       tarPatchRow = tarPatch[iY];
+#endif
       for (int iX = 0; iX < TMP_TEMPLATE_SIZE; iX++)
       {
         leftTargetMean += tarPatchRow[iX];
       }
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+      tarPatchRow += tarStride;
+#endif
     }
     leftTargetMean >>= log2SizeLeft;
   }
 }
 
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+void IntraPrediction::calcTemplateDiffJointSadMrsad(const Pel* const ref, const unsigned int uiStride, Pel* tarPatch, int tarStride, const unsigned int uiPatchWidth, const unsigned int uiPatchHeight, int* diffSad, int* diffMrsad, int* iMaxSad, int* iMaxMrsad, const RefTemplateType tempType, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, const int topTargetMean, const int leftTargetMean, const int licShift)
+#else
 void IntraPrediction::calcTemplateDiffJointSadMrsad(const Pel* const ref, const unsigned int uiStride, Pel** tarPatch, const unsigned int uiPatchWidth, const unsigned int uiPatchHeight, int* diffSad, int* diffMrsad, int* iMaxSad, int* iMaxMrsad, const RefTemplateType tempType, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, const int topTargetMean, const int leftTargetMean)
+#endif
 {
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
   Pel intermediate = 0;
+#endif
   int diffSumSad = 0;
   int diffSumMrsad = 0;
   int topDiffSad = MAX_INT;
   int topDiffMrsad = MAX_INT;
   int leftDiffSad = MAX_INT;
   int leftDiffMrsad = MAX_INT;
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  const Pel* const refLic = ref + licShift;
+  const Pel* tarPatchRow = tarPatch;
+#else
   const Pel* tarPatchRow = nullptr;
+#endif
   const Pel* refPatchRow = tempType == L_SHAPE_TEMPLATE ? ref - TMP_TEMPLATE_SIZE * uiStride - TMP_TEMPLATE_SIZE : (tempType == ABOVE_TEMPLATE ? ref - TMP_TEMPLATE_SIZE * uiStride : ref - TMP_TEMPLATE_SIZE);
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  const Pel* refPatchRowLic = tempType == L_SHAPE_TEMPLATE ? refLic - TMP_TEMPLATE_SIZE * uiStride - TMP_TEMPLATE_SIZE : (tempType == ABOVE_TEMPLATE ? refLic - TMP_TEMPLATE_SIZE * uiStride : refLic - TMP_TEMPLATE_SIZE);
+#endif
   int topMeanRef = 0;
   int leftMeanRef = 0;
   if (tempType == L_SHAPE_TEMPLATE)
   {
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+    const Pel* refPatchRowTemp = refPatchRowLic;
+#else
     const Pel* refPatchRowTemp = refPatchRow;
+#endif
     for (int iY = 0; iY < TMP_TEMPLATE_SIZE; iY++, refPatchRowTemp += uiStride)
     {
       for (int iX = TMP_TEMPLATE_SIZE; iX < uiPatchWidth; iX++)
@@ -17912,7 +18624,11 @@ void IntraPrediction::calcTemplateDiffJointSadMrsad(const Pel* const ref, const 
       }
     }
     topMeanRef >>= log2SizeTop;
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+    refPatchRowTemp = refLic - TMP_TEMPLATE_SIZE;
+#else
     refPatchRowTemp = ref - TMP_TEMPLATE_SIZE;
+#endif
     for (int iY = TMP_TEMPLATE_SIZE; iY < uiPatchHeight; iY++, refPatchRowTemp += uiStride)
     {
       for (int iX = 0; iX < TMP_TEMPLATE_SIZE; iX++)
@@ -17924,7 +18640,11 @@ void IntraPrediction::calcTemplateDiffJointSadMrsad(const Pel* const ref, const 
   }
   else if (tempType == ABOVE_TEMPLATE)
   {
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+    const Pel* refPatchRowTemp = refPatchRowLic;
+#else
     const Pel* refPatchRowTemp = refPatchRow;
+#endif
     for (int iY = 0; iY < TMP_TEMPLATE_SIZE; iY++, refPatchRowTemp += uiStride)
     {
       for (int iX = 0; iX < uiPatchWidth - TMP_TEMPLATE_SIZE; iX++)
@@ -17936,7 +18656,11 @@ void IntraPrediction::calcTemplateDiffJointSadMrsad(const Pel* const ref, const 
   }
   else if (tempType == LEFT_TEMPLATE)
   {
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+    const Pel* refPatchRowTemp = refPatchRowLic;
+#else
     const Pel* refPatchRowTemp = refPatchRow;
+#endif
     for (int iY = TMP_TEMPLATE_SIZE; iY < uiPatchHeight; iY++, refPatchRowTemp += uiStride)
     {
       for (int iX = 0; iX < TMP_TEMPLATE_SIZE; iX++)
@@ -17951,8 +18675,10 @@ void IntraPrediction::calcTemplateDiffJointSadMrsad(const Pel* const ref, const 
 #if JVET_AH0200_INTRA_TMP_BV_REORDER
   int tempDiff1 = 0;
   int tempDiff2 = 0;
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
   int tempDiff3 = 0;
   int tempDiff4 = 0;
+#endif
 #endif
   if (tempType == L_SHAPE_TEMPLATE)
   {
@@ -17962,20 +18688,42 @@ void IntraPrediction::calcTemplateDiffJointSadMrsad(const Pel* const ref, const 
     topDiffMrsad = 0;
     leftDiffSad = 0;
     leftDiffMrsad = 0;
-    for (int iY = 0; iY < TMP_TEMPLATE_SIZE; iY++, refPatchRow += uiStride)
+    for (int iY = 0; iY < TMP_TEMPLATE_SIZE; iY++, refPatchRow += uiStride
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+         , refPatchRowLic += uiStride
+#endif
+         )
     {
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
       tarPatchRow = tarPatch[iY];
+#endif
 #if JVET_AH0200_INTRA_TMP_BV_REORDER
       tempDiff1 = 0;
       tempDiff2 = 0;
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
       tempDiff3 = 0;
       tempDiff4 = 0;
 #endif
-      for (int iX = 0; iX < uiPatchWidth; iX++)
+#endif
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+      for (int iX = 0; iX < TMP_TEMPLATE_SIZE; iX++)
       {
+        diffSumSad += abs(refPatchRow[iX] - tarPatchRow[iX]);
+        diffSumMrsad += abs(refPatchRowLic[iX] - tarPatchRow[iX] - topMeanDiff);
+      }
+      for (int iX = TMP_TEMPLATE_SIZE; iX < uiPatchWidth; iX++)
+#else
+      for (int iX = 0; iX < uiPatchWidth; iX++)
+#endif
+      {
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+        iSumSad = abs(refPatchRow[iX] - tarPatchRow[iX]);
+        iSumMrsad = abs(refPatchRowLic[iX] - tarPatchRow[iX] - topMeanDiff);
+#else
         intermediate = refPatchRow[iX] - tarPatchRow[iX];
         iSumSad = abs(intermediate);
         iSumMrsad = abs(intermediate - topMeanDiff);
+#endif
 #if JVET_AH0200_INTRA_TMP_BV_REORDER
         tempDiff1 += iSumSad;
         tempDiff2 += iSumMrsad;
@@ -17983,6 +18731,7 @@ void IntraPrediction::calcTemplateDiffJointSadMrsad(const Pel* const ref, const 
         diffSumSad += iSumSad;
         diffSumMrsad += iSumMrsad;
 #endif
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
         if (iX >= TMP_TEMPLATE_SIZE)
         {
 #if JVET_AH0200_INTRA_TMP_BV_REORDER
@@ -17993,35 +18742,61 @@ void IntraPrediction::calcTemplateDiffJointSadMrsad(const Pel* const ref, const 
           topDiffMrsad += iSumMrsad;
 #endif
         }
+#endif
       }
 #if JVET_AH0200_INTRA_TMP_BV_REORDER
         if (iY == (TMP_TEMPLATE_SIZE - 1))
         {
           tempDiff1 <<= TMP_TEMPLATE_COST_SHIFT;
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
           tempDiff3 <<= TMP_TEMPLATE_COST_SHIFT;
+#endif
           tempDiff2 <<= TMP_TEMPLATE_COST_SHIFT;
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
           tempDiff4 <<= TMP_TEMPLATE_COST_SHIFT;
+#endif
         }
 
         diffSumSad += tempDiff1;
         diffSumMrsad += tempDiff2;
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+        topDiffSad += tempDiff1;
+        topDiffMrsad += tempDiff2;
+#else
         topDiffSad += tempDiff3;
         topDiffMrsad += tempDiff4;
+#endif
 #endif
       if (diffSumSad > iMaxSad[0] && topDiffSad > iMaxSad[1] && diffSumMrsad > iMaxMrsad[0] && topDiffMrsad > iMaxMrsad[1])
       {
         break;
       }
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+      tarPatchRow += tarStride;
+#endif
     }
     refPatchRow = ref - TMP_TEMPLATE_SIZE;
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+    refPatchRowLic = refLic - TMP_TEMPLATE_SIZE;
+    tarPatchRow = tarPatch + TMP_TEMPLATE_SIZE * tarStride;
+    for (int iY = TMP_TEMPLATE_SIZE; iY < uiPatchHeight; iY++, refPatchRow += uiStride, refPatchRowLic += uiStride)
+#else
     for (int iY = TMP_TEMPLATE_SIZE; iY < uiPatchHeight; iY++, refPatchRow += uiStride)
+#endif
     {
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
       tarPatchRow = tarPatch[iY];
+#endif
       for (int iX = 0; iX < TMP_TEMPLATE_SIZE; iX++)
       {
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+        iSumSad = abs(refPatchRow[iX] - tarPatchRow[iX]);
+        iSumMrsad = abs(refPatchRowLic[iX] - tarPatchRow[iX] - leftMeanDiff);
+#else
         intermediate = refPatchRow[iX] - tarPatchRow[iX];
         iSumSad = abs(intermediate);
         iSumMrsad = abs(intermediate - leftMeanDiff);
+#endif
         diffSumSad += iSumSad;
         diffSumMrsad += iSumMrsad;
         leftDiffSad += iSumSad;
@@ -18031,7 +18806,11 @@ void IntraPrediction::calcTemplateDiffJointSadMrsad(const Pel* const ref, const 
       tempDiff1 = (abs(refPatchRow[TMP_TEMPLATE_SIZE - 1] - tarPatchRow[TMP_TEMPLATE_SIZE - 1]))*((1<<TMP_TEMPLATE_COST_SHIFT) - 1);
       diffSumSad += tempDiff1;
       leftDiffSad += tempDiff1;
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+      tempDiff1 = (abs(refPatchRowLic[TMP_TEMPLATE_SIZE - 1] - tarPatchRow[TMP_TEMPLATE_SIZE - 1] - leftMeanDiff))*((1<<TMP_TEMPLATE_COST_SHIFT) - 1);
+#else
       tempDiff1 = (abs(refPatchRow[TMP_TEMPLATE_SIZE - 1] - tarPatchRow[TMP_TEMPLATE_SIZE - 1] - leftMeanDiff))*((1<<TMP_TEMPLATE_COST_SHIFT) - 1);
+#endif
       diffSumMrsad += tempDiff1;  
       leftDiffMrsad += tempDiff1;
 #endif
@@ -18039,23 +18818,39 @@ void IntraPrediction::calcTemplateDiffJointSadMrsad(const Pel* const ref, const 
       {
         break;
       }
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+      tarPatchRow += tarStride;
+#endif
     }
   }
   else if (tempType == ABOVE_TEMPLATE)
   {
-    for (int iY = 0; iY < TMP_TEMPLATE_SIZE; iY++, refPatchRow += uiStride)
+    for (int iY = 0; iY < TMP_TEMPLATE_SIZE; iY++, refPatchRow += uiStride
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+         , refPatchRowLic += uiStride
+#endif
+         )
     {
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
       tarPatchRow = tarPatch[iY];
+#endif
 #if JVET_AH0200_INTRA_TMP_BV_REORDER
       tempDiff1 = 0;
       tempDiff2 = 0;
 #endif
       for (int iX = 0; iX < uiPatchWidth - TMP_TEMPLATE_SIZE; iX++)
       {
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
         intermediate = refPatchRow[iX] - tarPatchRow[iX];
+#endif
 #if JVET_AH0200_INTRA_TMP_BV_REORDER
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+        tempDiff1 += abs(refPatchRow[iX] - tarPatchRow[iX]);
+        tempDiff2 += abs(refPatchRowLic[iX] - tarPatchRow[iX] - topMeanDiff);
+#else
         tempDiff1 += abs(intermediate);
         tempDiff2 += abs(intermediate - topMeanDiff);
+#endif
 #else
         diffSumSad += abs(intermediate);
         diffSumMrsad += abs(intermediate - topMeanDiff);
@@ -18074,29 +18869,50 @@ void IntraPrediction::calcTemplateDiffJointSadMrsad(const Pel* const ref, const 
       {
         break;
       }
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+      tarPatchRow += tarStride;
+#endif
     }
   }
   else if (tempType == LEFT_TEMPLATE)
   {
-    for (int iY = TMP_TEMPLATE_SIZE; iY < uiPatchHeight; iY++, refPatchRow += uiStride)
+    for (int iY = TMP_TEMPLATE_SIZE; iY < uiPatchHeight; iY++, refPatchRow += uiStride
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+         , refPatchRowLic += uiStride
+#endif
+         )
     {
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
       tarPatchRow = tarPatch[iY];
+#endif
       for (int iX = 0; iX < TMP_TEMPLATE_SIZE; iX++)
       {
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+        diffSumSad += abs(refPatchRow[iX] - tarPatchRow[iX]);
+        diffSumMrsad += abs(refPatchRowLic[iX] - tarPatchRow[iX] - leftMeanDiff);
+#else
         intermediate = refPatchRow[iX] - tarPatchRow[iX];
         diffSumSad += abs(intermediate);
         diffSumMrsad += abs(intermediate - leftMeanDiff);
+#endif
       }
 #if JVET_AH0200_INTRA_TMP_BV_REORDER
       tempDiff1 = (abs(refPatchRow[TMP_TEMPLATE_SIZE - 1] - tarPatchRow[TMP_TEMPLATE_SIZE - 1]))*((1<<TMP_TEMPLATE_COST_SHIFT) - 1);
       diffSumSad += tempDiff1;
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+      tempDiff1 = (abs(refPatchRowLic[TMP_TEMPLATE_SIZE - 1] - tarPatchRow[TMP_TEMPLATE_SIZE - 1] - leftMeanDiff))*((1<<TMP_TEMPLATE_COST_SHIFT) - 1);
+#else
       tempDiff1 = (abs(refPatchRow[TMP_TEMPLATE_SIZE - 1] - tarPatchRow[TMP_TEMPLATE_SIZE - 1] - leftMeanDiff))*((1<<TMP_TEMPLATE_COST_SHIFT) - 1);
+#endif
       diffSumMrsad += tempDiff1;  
 #endif
       if (diffSumSad > iMaxSad[0] && diffSumMrsad > iMaxMrsad[0])
       {
         break;
       }
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+      tarPatchRow += tarStride;
+#endif
     }
   }
   diffSad[0] = diffSumSad;
@@ -18109,12 +18925,21 @@ void IntraPrediction::calcTemplateDiffJointSadMrsad(const Pel* const ref, const 
 #endif
 
 #if JVET_AD0086_ENHANCED_INTRA_TMP
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+void IntraPrediction::calcTemplateDiff(Pel* ref, unsigned int uiStride, Pel* tarPatch, int tarStride, unsigned int uiPatchWidth,
+  unsigned int uiPatchHeight, int* diff, int* iMax, RefTemplateType tempType, int requiredTemplate
+#if JVET_AG0136_INTRA_TMP_LIC
+  , const bool isMrSad, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, const int topTargetMean, const int leftTargetMean
+#endif
+)
+#else
 void IntraPrediction::calcTemplateDiff(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsigned int uiPatchWidth,
                                        unsigned int uiPatchHeight, int *diff, int *iMax, RefTemplateType tempType, int requiredTemplate
 #if JVET_AG0136_INTRA_TMP_LIC
                                        , const bool isMrSad, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, const int topTargetMean, const int leftTargetMean
 #endif
                                        )
+#endif
 {
   int diffSum = 0;
   int topDiff  = MAX_INT;
@@ -18136,7 +18961,11 @@ void IntraPrediction::calcTemplateDiff(Pel *ref, unsigned int uiStride, Pel **ta
 #else
   Pel *refPatchRow = ref - TMP_TEMPLATE_SIZE * uiStride - TMP_TEMPLATE_SIZE;
 #endif
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  const Pel* tarPatchRow = tarPatch;
+#else
   Pel *tarPatchRow;
+#endif
 
 #if JVET_AG0136_INTRA_TMP_LIC
   int topMeanDiff = 0;
@@ -18208,7 +19037,9 @@ void IntraPrediction::calcTemplateDiff(Pel *ref, unsigned int uiStride, Pel **ta
 #endif
 #if JVET_AH0200_INTRA_TMP_BV_REORDER
   int tempDiff1 = 0;
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
   int tempDiff2 = 0;
+#endif
 #endif
 #if JVET_W0069_TMP_BOUNDARY
   if (tempType == L_SHAPE_TEMPLATE)
@@ -18223,12 +19054,28 @@ void IntraPrediction::calcTemplateDiff(Pel *ref, unsigned int uiStride, Pel **ta
     {
       for (int iY = 0; iY < TMP_TEMPLATE_SIZE; iY++)
       {
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
         tarPatchRow = tarPatch[iY];
+#endif
 #if JVET_AH0200_INTRA_TMP_BV_REORDER
         tempDiff1 = 0;
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
         tempDiff2 = 0;
 #endif
+#endif
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+        for (int iX = 0; iX < TMP_TEMPLATE_SIZE; iX++)
+        {
+          diffSum += abs(refPatchRow[iX] - tarPatchRow[iX]
+#if JVET_AG0136_INTRA_TMP_LIC
+                         - topMeanDiff
+#endif
+                         );
+        }
+        for (int iX = TMP_TEMPLATE_SIZE; iX < uiPatchWidth; iX++)
+#else
         for (int iX = 0; iX < uiPatchWidth; iX++)
+#endif
         {
 #if JVET_AH0200_INTRA_TMP_BV_REORDER
           tempDiff1 += abs(refPatchRow[iX] - tarPatchRow[iX]
@@ -18240,6 +19087,7 @@ void IntraPrediction::calcTemplateDiff(Pel *ref, unsigned int uiStride, Pel **ta
 #endif
                          );
 
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
           if (iX >= TMP_TEMPLATE_SIZE)
           {
 #if JVET_AH0200_INTRA_TMP_BV_REORDER
@@ -18252,15 +19100,22 @@ void IntraPrediction::calcTemplateDiff(Pel *ref, unsigned int uiStride, Pel **ta
 #endif
                            );
           }
+#endif
         }
 #if JVET_AH0200_INTRA_TMP_BV_REORDER
         if (iY == (TMP_TEMPLATE_SIZE - 1))
         {
           tempDiff1 <<= TMP_TEMPLATE_COST_SHIFT;
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
           tempDiff2 <<= TMP_TEMPLATE_COST_SHIFT;
+#endif
         }
         diffSum += tempDiff1;
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+        topDiff += tempDiff1;
+#else
         topDiff += tempDiff2;
+#endif
 #endif
 
         if (diffSum > iMax[0] && topDiff > iMax[1])
@@ -18269,14 +19124,22 @@ void IntraPrediction::calcTemplateDiff(Pel *ref, unsigned int uiStride, Pel **ta
         }
 
         refPatchRow += uiStride;
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+        tarPatchRow += tarStride;
+#endif
       }
 
       refPatchRow = ref - TMP_TEMPLATE_SIZE;
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+      tarPatchRow = tarPatch + TMP_TEMPLATE_SIZE * tarStride;
+#endif
 
       // vertical difference
       for (int iY = TMP_TEMPLATE_SIZE; iY < uiPatchHeight; iY++)
       {
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
         tarPatchRow = tarPatch[iY];
+#endif
         for (int iX = 0; iX < TMP_TEMPLATE_SIZE; iX++)
         {
           diffSum += abs(refPatchRow[iX] - tarPatchRow[iX]
@@ -18306,17 +19169,34 @@ void IntraPrediction::calcTemplateDiff(Pel *ref, unsigned int uiStride, Pel **ta
         }
 
         refPatchRow += uiStride;
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+        tarPatchRow += tarStride;
+#endif
       }
     }
     else if (requiredTemplate == 0)//TL
     {
       for (int iY = 0; iY < TMP_TEMPLATE_SIZE; iY++)
       {
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
         tarPatchRow = tarPatch[iY];
+#endif
 #if JVET_AH0200_INTRA_TMP_BV_REORDER
         tempDiff1 = 0;
 #endif
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+        for (int iX = 0; iX < TMP_TEMPLATE_SIZE; iX++)
+        {
+          diffSum += abs(refPatchRow[iX] - tarPatchRow[iX]
+#if JVET_AG0136_INTRA_TMP_LIC
+                         - topMeanDiff
+#endif
+                         );
+        }
+        for (int iX = TMP_TEMPLATE_SIZE; iX < uiPatchWidth; iX++)
+#else
         for (int iX = 0; iX < uiPatchWidth; iX++)
+#endif
         {
 #if JVET_AH0200_INTRA_TMP_BV_REORDER
           tempDiff1 += abs(refPatchRow[iX] - tarPatchRow[iX]
@@ -18342,14 +19222,22 @@ void IntraPrediction::calcTemplateDiff(Pel *ref, unsigned int uiStride, Pel **ta
         }
 
         refPatchRow += uiStride;
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+        tarPatchRow += tarStride;
+#endif
       }
 
       refPatchRow = ref - TMP_TEMPLATE_SIZE;
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+      tarPatchRow = tarPatch + TMP_TEMPLATE_SIZE * tarStride;
+#endif
 
       // vertical difference
       for (int iY = TMP_TEMPLATE_SIZE; iY < uiPatchHeight; iY++)
       {
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
         tarPatchRow = tarPatch[iY];
+#endif
         for (int iX = 0; iX < TMP_TEMPLATE_SIZE; iX++)
         {
           diffSum += abs(refPatchRow[iX] - tarPatchRow[iX]
@@ -18373,13 +19261,18 @@ void IntraPrediction::calcTemplateDiff(Pel *ref, unsigned int uiStride, Pel **ta
         }
 
         refPatchRow += uiStride;
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+        tarPatchRow += tarStride;
+#endif
       }
     }
     else if(requiredTemplate == 1) //T  
     {
       for (int iY = 0; iY < TMP_TEMPLATE_SIZE; iY++)
       {
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
         tarPatchRow = tarPatch[iY];
+#endif
 #if JVET_AH0200_INTRA_TMP_BV_REORDER
         tempDiff1 = 0;
 #endif
@@ -18409,16 +19302,24 @@ void IntraPrediction::calcTemplateDiff(Pel *ref, unsigned int uiStride, Pel **ta
         }
 
         refPatchRow += uiStride;
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+        tarPatchRow += tarStride;
+#endif
       }
     }
     else // L
     {
       refPatchRow = ref - TMP_TEMPLATE_SIZE;
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+      tarPatchRow = tarPatch + TMP_TEMPLATE_SIZE * tarStride;
+#endif
 
       // vertical difference
       for (int iY = TMP_TEMPLATE_SIZE; iY < uiPatchHeight; iY++)
       {
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
         tarPatchRow = tarPatch[iY];
+#endif
         for (int iX = 0; iX < TMP_TEMPLATE_SIZE; iX++)
         {
           leftDiff += abs(refPatchRow[iX] - tarPatchRow[iX]
@@ -18442,6 +19343,9 @@ void IntraPrediction::calcTemplateDiff(Pel *ref, unsigned int uiStride, Pel **ta
         }
 
         refPatchRow += uiStride;
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+        tarPatchRow += tarStride;
+#endif
       }
     }
 #if JVET_W0069_TMP_BOUNDARY
@@ -18451,7 +19355,9 @@ void IntraPrediction::calcTemplateDiff(Pel *ref, unsigned int uiStride, Pel **ta
     // top  template difference
     for (int iY = 0; iY < TMP_TEMPLATE_SIZE; iY++)
     {
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
       tarPatchRow = tarPatch[iY];
+#endif
 #if JVET_AH0200_INTRA_TMP_BV_REORDER
       tempDiff1 = 0;
 #endif
@@ -18479,6 +19385,9 @@ void IntraPrediction::calcTemplateDiff(Pel *ref, unsigned int uiStride, Pel **ta
         break;
       }
       refPatchRow += uiStride;
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+      tarPatchRow += tarStride;
+#endif
     }
   }
   else if (tempType == LEFT_TEMPLATE)
@@ -18486,7 +19395,9 @@ void IntraPrediction::calcTemplateDiff(Pel *ref, unsigned int uiStride, Pel **ta
     // left template difference
     for (int iY = TMP_TEMPLATE_SIZE; iY < uiPatchHeight; iY++)
     {
+#if !JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
       tarPatchRow = tarPatch[iY];
+#endif
       for (int iX = 0; iX < TMP_TEMPLATE_SIZE; iX++)
       {
         diffSum += abs(refPatchRow[iX] - tarPatchRow[iX]
@@ -18508,6 +19419,9 @@ void IntraPrediction::calcTemplateDiff(Pel *ref, unsigned int uiStride, Pel **ta
         break;
       }
       refPatchRow += uiStride;
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+      tarPatchRow += tarStride;
+#endif
     }
   }
 #endif

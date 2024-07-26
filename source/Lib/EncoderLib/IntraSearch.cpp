@@ -1984,7 +1984,11 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
                   CHECK(cu.tmpLicFlag, "cu.tmpLicFlag == 1");
                   cu.ibcLicFlag = cu.tmpLicFlag;
                   cu.ibcLicIdx = uiRdModeListTmp[idxInList].tmpLicIdc;
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+                  searchFracCandidate(&cu, getTargetPatch(), templateType);
+#else
                   searchFracCandidate(&cu, getTargetPatch(floorLog2(std::max(cu.lwidth(), cu.lheight())) - 2), templateType);
+#endif
                   for (int spIdx = 0; spIdx < std::min(2, (int) m_mtmpFracCandList[cu.tmpIdx].size()); spIdx++)
                   {
                     cu.tmpIsSubPel = m_mtmpFracCandList[cu.tmpIdx][spIdx].m_subpel;
@@ -2051,7 +2055,11 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
                   CHECK(!cu.tmpLicFlag, "cu.tmpLicFlag != 0");
                   cu.ibcLicFlag = cu.tmpLicFlag;
                   cu.ibcLicIdx = uiRdModeListTmpLic[idxInList].tmpLicIdc;
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+                  searchFracCandidate(&cu, getTargetPatch(), templateType);
+#else
                   searchFracCandidate(&cu, getTargetPatch(floorLog2(std::max(cu.lwidth(), cu.lheight())) - 2), templateType);
+#endif
                   for (int spIdx = 0; spIdx < std::min(2, (int) m_mtmpFracCandList[cu.tmpIdx].size()); spIdx++)
                   {
                     cu.tmpIsSubPel = m_mtmpFracCandList[cu.tmpIdx][spIdx].m_subpel;

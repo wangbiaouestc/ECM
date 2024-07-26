@@ -78,6 +78,12 @@ class TempLibFast
 public:
   int   m_pX;           //offset X
   int   m_pY;           //offset Y
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  Mv    m_windTL;       // TL offset of refine window
+  Mv    m_windBR;       // BR offset of refine window
+  bool m_isTransferredLeft;
+  bool m_isTransferredTop;
+#endif
 #if JVET_AD0086_ENHANCED_INTRA_TMP
   int   m_rId;
 #else
@@ -88,10 +94,20 @@ public:
   TempLibFast();
   ~TempLibFast();
 #if JVET_AD0086_ENHANCED_INTRA_TMP
-  TempLibFast(const int pX, const int pY, const int rId)
+  TempLibFast(const int pX, const int pY
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+    , const Mv windTL, const Mv windBR, const bool isTransferredLeft, const bool isTransferredTop
+#endif
+    , const int rId)
   {
     m_pX = pX;
     m_pY = pY;
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+    m_windTL = windTL;
+    m_windBR = windBR;
+    m_isTransferredLeft = isTransferredLeft;
+    m_isTransferredTop = isTransferredTop;
+#endif
     m_rId = rId;
   };
 #endif
@@ -341,6 +357,9 @@ private:
   static const uint8_t m_aucIntraFilterExt[MAX_INTRA_FILTER_DEPTHS];
   RdCost* m_timdSatdCost;
 #endif
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  RdCost* m_itmpSatdCost;
+#endif
 #if JVET_AC0071_DBV
   RdCost *m_dbvSadCost;
 #endif
@@ -474,7 +493,11 @@ protected:
   Picture*     m_refPicBuf;
   unsigned int m_uiPicStride;
   unsigned int m_uiVaildCandiNum;
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  Pel* m_pppTarPatch;
+#else
   Pel***       m_pppTarPatch;
+#endif
 #endif
 
 #if TMP_FAST_ENC
@@ -1077,16 +1100,34 @@ public:
 #if JVET_W0069_TMP_BOUNDARY
 #if JVET_AD0086_ENHANCED_INTRA_TMP
 #if JVET_AG0136_INTRA_TMP_LIC
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  void (*m_calcTemplateDiffJointSadMrsad) (const Pel* const ref, const unsigned int uiStride, Pel* tarPatch, int tarStride, const unsigned int uiPatchWidth, const unsigned int uiPatchHeight, int* diffSad, int* diffMrsad, int* iMaxSad, int* iMaxMrsad, const RefTemplateType tempType, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, const int topTargetMean, const int leftTargetMean, const int licShift);
+  void(*m_calcTargetMean)           (Pel* tarPatch, int tarStride, const unsigned int uiPatchWidth, const unsigned int uiPatchHeight, const RefTemplateType tempType, const int requiredTemplate, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, int& topTargetMean, int& leftTargetMean);
+  static void calcTemplateDiffJointSadMrsad(const Pel* const ref, const unsigned int uiStride, Pel* tarPatch, int tarStride, const unsigned int uiPatchWidth, const unsigned int uiPatchHeight, int* diffSad, int* diffMrsad, int* iMaxSad, int* iMaxMrsad, const RefTemplateType tempType, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, const int topTargetMean, const int leftTargetMean, const int licShift);
+  static void calcTargetMean(Pel* tarPatch, int tarStride, const unsigned int uiPatchWidth, const unsigned int uiPatchHeight, const RefTemplateType tempType, const int requiredTemplate, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, int& topTargetMean, int& leftTargetMean);
+#else
   void (*m_calcTemplateDiffJointSadMrsad) (const Pel* const ref, const unsigned int uiStride, Pel** tarPatch, const unsigned int uiPatchWidth, const unsigned int uiPatchHeight, int* diffSad, int* diffMrsad, int* iMaxSad, int* iMaxMrsad, const RefTemplateType tempType, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, const int topTargetMean, const int leftTargetMean);
   void(*m_calcTargetMean)           (Pel** tarPatch, const unsigned int uiPatchWidth, const unsigned int uiPatchHeight, const RefTemplateType tempType, const int requiredTemplate, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, int& topTargetMean, int& leftTargetMean);
   static void calcTemplateDiffJointSadMrsad(const Pel* const ref, const unsigned int uiStride, Pel** tarPatch, const unsigned int uiPatchWidth, const unsigned int uiPatchHeight, int* diffSad, int* diffMrsad, int* iMaxSad, int* iMaxMrsad, const RefTemplateType tempType, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, const int topTargetMean, const int leftTargetMean);
   static void calcTargetMean(Pel** tarPatch, const unsigned int uiPatchWidth, const unsigned int uiPatchHeight, const RefTemplateType tempType, const int requiredTemplate, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, int& topTargetMean, int& leftTargetMean);
+#endif //
 #endif
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  void(*m_calcTemplateDiff)      (Pel* ref, unsigned int uiStride, Pel* tarPatch, int tarStride, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int* diff, int* iMax, RefTemplateType TempType, int requiredTemplate
+#else
   void(*m_calcTemplateDiff)      (Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int *diff, int *iMax, RefTemplateType TempType, int requiredTemplate
+#endif
 #if JVET_AG0136_INTRA_TMP_LIC
                                   , const bool isMrSad, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, const int topTargetMean, const int leftTargetMean
 #endif
                                   );
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  static void calcTemplateDiff(Pel* ref, unsigned int uiStride, Pel* tarPatch, int tarStride, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int* diff, int* iMax, RefTemplateType TempType, int requiredTemplate
+#if JVET_AG0136_INTRA_TMP_LIC
+                               , const bool isMrSad, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, const int topTargetMean, const int leftTargetMean
+#endif
+                               );
+#else
   static void calcTemplateDiff(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsigned int uiPatchWidth,
                                unsigned int uiPatchHeight, int *diff, int *iMax, RefTemplateType TempType,
                                int requiredTemplate
@@ -1094,6 +1135,7 @@ public:
                                , const bool isMrSad, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, const int topTargetMean, const int leftTargetMean
 #endif
                                );
+#endif
 #else
   int( *m_calcTemplateDiff )      ( Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int iMax, RefTemplateType TempType );
   static int calcTemplateDiff     ( Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int iMax, RefTemplateType TempType );
@@ -1102,7 +1144,11 @@ public:
   int( *m_calcTemplateDiff )      (Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int iMax);
   static int calcTemplateDiff     ( Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int iMax );
 #endif
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  Pel* getTargetPatch() { return m_pppTarPatch; }
+#else
   Pel** getTargetPatch            ( unsigned int uiDepth )      { return m_pppTarPatch[uiDepth]; }
+#endif
   Pel* getRefPicUsed              ()                            { return m_refPicUsed;           }
   void setRefPicUsed              ( Pel* ref )                  { m_refPicUsed = ref;            }
   unsigned int getStride          ()                            { return m_uiPicStride;          }
@@ -1110,7 +1156,11 @@ public:
 
 #if JVET_W0069_TMP_BOUNDARY
   RefTemplateType getRefTemplateType ( CodingUnit& cu, CompArea& area );
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  void searchCandidateFromOnePicIntra(CodingUnit* pcCU, Pel* tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, RefTemplateType tempType
+#else
   void searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, RefTemplateType tempType
+#endif
 #if JVET_AG0136_INTRA_TMP_LIC
                                       , const bool useMR
 #endif
@@ -1126,7 +1176,11 @@ public:
 #if JVET_AH0200_INTRA_TMP_BV_REORDER
   void xPadForFracSearchInterpolation (CodingUnit* pcCU, RefTemplateType tempType);
   void xTmpFracSearchIF(PredictionUnit& pu, Pel* padbf0, unsigned int padStride, Pel* preTmpbf0, unsigned int predTempStride, Pel* tmp0, unsigned int tmpStride, int extUiWidth, int extUiHeight, int fracPrec, int fracDir);
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  void searchFracCandidate(CodingUnit* pcCU, Pel* tarPatch, RefTemplateType tempType);
+#else
   void searchFracCandidate( CodingUnit* pcCU, Pel** tarPatch, RefTemplateType tempType);
+#endif
   InterPrediction *m_pcInterPred;
   void setInterPrediction( InterPrediction *inter);
 #endif

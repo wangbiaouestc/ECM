@@ -223,6 +223,9 @@ namespace PU
 #if JVET_AH0200_INTRA_TMP_BV_REORDER
   bool validIBCItmpMv(const PredictionUnit& pu, Mv curMv, int templateSize);
 #endif
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  void  getSparseArBvMergeCandidate(const PredictionUnit& pu, std::vector<Mv>& pBvs, static_vector<TempLibFast, MTMP_NUM_SPARSE>& sparseMtmpCandList);
+#endif
 #endif
 #if JVET_AD0184_REMOVAL_OF_DIVISION_OPERATIONS
   int getMeanValue(int sum, int div);
