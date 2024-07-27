@@ -68,6 +68,15 @@ struct MultiHypPredictionData
 typedef static_vector<MultiHypPredictionData, MULTI_HYP_PRED_MAX_CANDS> MultiHypVec;
 #endif
 
+#if JVET_AI0183_MVP_EXTENSION
+struct IntersectingMvData
+{
+  int8_t intersectingNr;
+  int8_t intersectingRefIdx[INTERSECTING_MV_MAX_NR][2];
+  Mv     intersectingMv[INTERSECTING_MV_MAX_NR][2];
+};
+#endif
+
 /// parameters for AMVP
 struct AMVPInfo
 {

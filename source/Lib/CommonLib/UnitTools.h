@@ -727,7 +727,11 @@ namespace PU
     , int subIdx, MergeCtx mergeCtxIn
     , int col = 0
 #if JVET_AH0119_SUBBLOCK_TM
+#if JVET_AI0183_MVP_EXTENSION
+    , int fixRefIdx = 0
+#else
     , bool fixRefIdx = false
+#endif
 #endif
 #else
     , int mmvdList

@@ -2529,7 +2529,13 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
       "The value of five_minus_max_num_subblock_merge_cand shall be in the range of 0 to 5 - sps_sbtmvp_enabled_flag");
 #endif
     CHECK(AFFINE_MRG_MAX_NUM_CANDS < uiCode, "The value of five_minus_max_num_subblock_merge_cand shall be in the range of 0 to 5 - sps_sbtmvp_enabled_flag");
+#if JVET_AI0183_MVP_EXTENSION
+    const uint32_t uiCodeAffMrgMaxNumCands = uiCode;
+    READ_FLAG( uiCode, "sps_scaled_mv_ext_b_configure_flag" );                      pcSPS->setConfigScaledMvExtTmvp( uiCode == 1 );
+    pcSPS->setMaxNumAffineMergeCand(AFFINE_MRG_MAX_NUM_CANDS - uiCodeAffMrgMaxNumCands - (pcSPS->getConfigScaledMvExtTmvp() ? 0 : 2));
+#else
     pcSPS->setMaxNumAffineMergeCand(AFFINE_MRG_MAX_NUM_CANDS - uiCode);
+#endif
     READ_FLAG( uiCode,  "sps_affine_type_flag" );                       pcSPS->setUseAffineType          ( uiCode != 0 );
 #if AFFINE_MMVD
     READ_FLAG( uiCode, "sps_affine_mmvd_enabled_flag" );                pcSPS->setUseAffineMmvdMode      ( uiCode != 0 );
@@ -2697,6 +2703,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
     pcSPS->setMaxNumMHPCand((uint32_t)(pcSPS->getMaxNumMergeCand() - uiCode));
 #endif
   }
+#endif
+#if JVET_AI0183_MVP_EXTENSION
+  READ_FLAG( uiCode, "sps_scaled_mv_ext_c_configure_flag" );                      pcSPS->setConfigScaledMvExtBiTmvp( uiCode == 1 );
 #endif
 
   READ_UVLC(uiCode, "log2_parallel_merge_level_minus2");

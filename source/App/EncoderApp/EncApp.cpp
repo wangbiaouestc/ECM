@@ -1110,6 +1110,10 @@ void EncApp::xInitLibCfg()
 #if JVET_AH0209_PDP
   m_cEncLib.setUsePDP                                           ( m_pdp );
 #endif
+#if JVET_AI0183_MVP_EXTENSION
+  m_cEncLib.setConfigScaledMvExtTmvp                             ( m_scaledMvExtTmvp );
+  m_cEncLib.setConfigScaledMvExtBiTmvp                           ( m_scaledMvExtBiTmvp );
+#endif
 
   // ADD_NEW_TOOL : (encoder app) add setting of tool enabling flags and associated parameters here
   m_cEncLib.setVirtualBoundariesEnabledFlag                      ( m_virtualBoundariesEnabledFlag );

@@ -391,7 +391,13 @@ private:
   bool m_gdrEnabled;
 #endif
 
+#if JVET_AI0183_MVP_EXTENSION
+  IntersectingMvData *m_intersectingMvBuf;
 public:
+  IntersectingMvData* getIntersectingMvBuf()     { return m_intersectingMvBuf; };
+#else
+public:
+#endif
   CodingStructure *bestParent;
   double        tmpColorSpaceCost;
   bool          firstColorSpaceSelected;

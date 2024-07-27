@@ -131,7 +131,10 @@ static const double REFINE_THRESHOLD_AFFINE_MERGE = 0.75;
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
 static const int SUB_TMVP_CANDIDATE_NUM = 10;
 static const int SUB_TMVP_INDEX = 3;  // 1: 2 subtmvp; 2: 4 subtmvp
-#if JVET_AH0119_SUBBLOCK_TM
+#if JVET_AI0183_MVP_EXTENSION
+static const int SUB_TMVP_NUM = 11;
+static const int COLIDX_MAP[2 * SUB_TMVP_INDEX * 3] = { 0,1,7,2,3,8,4,5,9,-1,-1,-1,-1,6,10,-1,-1,-1 };
+#elif JVET_AH0119_SUBBLOCK_TM
 static const int SUB_TMVP_NUM = 2 * SUB_TMVP_INDEX * 2 - 5;
 static const int COLIDX_MAP[2 * SUB_TMVP_INDEX * 2] = { 0,1,2,3,7,5,4,9,8,6,10,11 };
 #else
@@ -224,7 +227,9 @@ static const int AFF_NON_ADJACENT_DIST    =                          4;
 #endif
 
 #if JVET_Z0139_HIST_AFF || JVET_Z0139_NA_AFF
-#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+#if JVET_AI0183_MVP_EXTENSION
+static const int AFFINE_MRG_MAX_NUM_CANDS =                         18; ///< AFFINE MERGE
+#elif JVET_AF0163_TM_SUBBLOCK_REFINEMENT
 static const int AFFINE_MRG_MAX_NUM_CANDS =                         16; ///< AFFINE MERGE
 #else
 static const int AFFINE_MRG_MAX_NUM_CANDS =                         15; ///< AFFINE MERGE
@@ -234,14 +239,22 @@ static const int AFFINE_MRG_MAX_NUM_CANDS =                         5; ///< AFFI
 #endif
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
 static const int AFF_MAX_NON_ADJACENT_INHERITED_CANDS = 6;
-#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+#if JVET_AI0183_MVP_EXTENSION
+static const int ADAPT_SBTMVP_CAND_NUM = 2;
+static const int RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE = 33 + ADAPT_SBTMVP_CAND_NUM;
+static const int RMVF_AFFINE_MRG_MAX_CAND_LIST_EFFECT_SIZE = 33;
+#elif JVET_AF0163_TM_SUBBLOCK_REFINEMENT
 static const int RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE = 31;
 #else
 static const int RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE = 30;
 #endif
 #if JVET_AI0197_AFFINE_TMVP
 static const int ADDITIONAL_AFFINE_CAND_NUM   = 24;
+#if JVET_AI0183_MVP_EXTENSION
+static const int AFFINE_MRG_MAX_NUM_CANDS_ALL = AFFINE_MRG_MAX_NUM_CANDS + ADDITIONAL_AFFINE_CAND_NUM + ADAPT_SBTMVP_CAND_NUM;
+#else
 static const int AFFINE_MRG_MAX_NUM_CANDS_ALL = AFFINE_MRG_MAX_NUM_CANDS + ADDITIONAL_AFFINE_CAND_NUM;
+#endif
 #else
 static const int ADDITIONAL_AFFINE_CAND_NUM = 15;
 #endif
@@ -1767,6 +1780,13 @@ static constexpr int CABAC_SPATIAL_MAX_BINS                  = 128;
 static constexpr int CABAC_SPATIAL_MAX_BINS_PER_CTX          =   4;
 #endif
 
+#if JVET_AI0183_MVP_EXTENSION
+static const int SCALE_FRAC_INTERNAL_PLUS_CU_LOG2 = MIN_CU_LOG2 + MV_FRACTIONAL_BITS_INTERNAL;
+static const int SCALE_FRAC_INTERNAL_PLUS_CU_LOG2_OFFSET = 1 << (SCALE_FRAC_INTERNAL_PLUS_CU_LOG2 - 1);
+static const int INTERSECTING_MV_MAX_NR = 4;
+static const int INTERSECTING_MV_MAX_REF_IDX_NR = 4;
+static const int INTERSECTING_MV_PU_GET_ICT_MAX_DIM_NR = 8;
+#endif
 
 // ====================================================================================================================
 // Macro functions

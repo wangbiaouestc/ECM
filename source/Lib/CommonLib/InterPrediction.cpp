@@ -17036,7 +17036,11 @@ void  InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMer
   if (maxNumAffineMergeCand > 2)
   {
     Distortion cost = pu.cs->slice->getCostForARMC();
+#if JVET_AI0183_MVP_EXTENSION
+    uint32_t   candToBeRemoved = std::min((uint32_t)AFFINE_MRG_MAX_NUM_CANDS, pu.cs->slice->getPicHeader()->getMaxNumAffineMergeCand()) - 1;
+#else
     uint32_t   candToBeRemoved = AFFINE_MRG_MAX_NUM_CANDS - 1;
+#endif
     Distortion min = MAX_UINT64;
 
     for (int sizeCandList = maxNumAffineMergeCand; sizeCandList > 1; sizeCandList--)
@@ -17050,7 +17054,11 @@ void  InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMer
           candToBeRemoved = uiMergeCand + 1;
         }
       }
+#if JVET_AI0183_MVP_EXTENSION
+      if (candToBeRemoved > std::min((uint32_t)AFFINE_MRG_MAX_NUM_CANDS, pu.cs->slice->getPicHeader()->getMaxNumAffineMergeCand()) - 2)
+#else
       if (candToBeRemoved > AFFINE_MRG_MAX_NUM_CANDS - 2)
+#endif
       {
         continue;
       }
@@ -17058,7 +17066,11 @@ void  InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMer
       {
         uint32_t candToBeReplaced = sizeCandList - 1;
 
+#if JVET_AI0183_MVP_EXTENSION
+        for (uint32_t uiMergeCand = std::min( (int) (candToBeRemoved + 1), (int) (std::min((uint32_t)AFFINE_MRG_MAX_NUM_CANDS, pu.cs->slice->getPicHeader()->getMaxNumAffineMergeCand()) - 1) );uiMergeCand < std::min((int)sizeCandList, (int)(std::min((uint32_t)AFFINE_MRG_MAX_NUM_CANDS, pu.cs->slice->getPicHeader()->getMaxNumAffineMergeCand()) - 1)); ++uiMergeCand)
+#else
         for (uint32_t uiMergeCand = std::min( (int) (candToBeRemoved + 1), (int) (AFFINE_MRG_MAX_NUM_CANDS - 1) ); uiMergeCand < std::min((int)sizeCandList, (int)(AFFINE_MRG_MAX_NUM_CANDS - 1)); ++uiMergeCand)
+#endif
         {
           if (cost < abs((int)(candCostList[0][uiMergeCand] - candCostList[0][candToBeRemoved])))
           {
@@ -17109,7 +17121,11 @@ void  InterPrediction::updateAffineCandInfo(PredictionUnit &pu, AffineMergeCtx& 
 {
   AffineMergeCtx affMrgCtxTmp;
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+#if JVET_AI0183_MVP_EXTENSION
+  const uint32_t maxNumAffineMergeCand = pu.cs->slice->getPicHeader()->getMaxNumAffineMergeCand() + ADDITIONAL_AFFINE_CAND_NUM + (pu.cs->slice->getCheckLDC() ? 0 : ADAPT_SBTMVP_CAND_NUM);
+#else
   const uint32_t maxNumAffineMergeCand = pu.cs->slice->getPicHeader()->getMaxNumAffineMergeCand() + ADDITIONAL_AFFINE_CAND_NUM;
+#endif
   const uint32_t outputListSize = pu.cs->slice->getPicHeader()->getMaxNumAffineMergeCand();
 #else
   const uint32_t maxNumAffineMergeCand = pu.cs->slice->getPicHeader()->getMaxNumAffineMergeCand();
@@ -17707,7 +17723,11 @@ void InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMerg
   if (maxNumAffineMergeCand > 2)
   {
     Distortion cost = pu.cs->slice->getCostForARMC();
+#if JVET_AI0183_MVP_EXTENSION
+    uint32_t   candToBeRemoved = std::min((uint32_t)AFFINE_MRG_MAX_NUM_CANDS, pu.cs->slice->getPicHeader()->getMaxNumAffineMergeCand()) - 1;
+#else
     uint32_t   candToBeRemoved = AFFINE_MRG_MAX_NUM_CANDS - 1;
+#endif
     Distortion min = MAX_UINT64;
 
     for (int sizeCandList = maxNumAffineMergeCand; sizeCandList > 1; sizeCandList--)
@@ -17721,7 +17741,11 @@ void InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMerg
           candToBeRemoved = uiMergeCand + 1;
         }
       }
+#if JVET_AI0183_MVP_EXTENSION
+      if (candToBeRemoved > std::min((uint32_t)AFFINE_MRG_MAX_NUM_CANDS, pu.cs->slice->getPicHeader()->getMaxNumAffineMergeCand()) - 2)
+#else
       if (candToBeRemoved > AFFINE_MRG_MAX_NUM_CANDS - 2)
+#endif
       {
         continue;
       }
@@ -17729,7 +17753,11 @@ void InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMerg
       {
         uint32_t candToBeReplaced = sizeCandList - 1;
 
+#if JVET_AI0183_MVP_EXTENSION
+        for (uint32_t uiMergeCand = std::min((int)(candToBeRemoved + 1), (int)(std::min((uint32_t)AFFINE_MRG_MAX_NUM_CANDS, pu.cs->slice->getPicHeader()->getMaxNumAffineMergeCand()) - 1)); uiMergeCand < std::min((int)sizeCandList, (int)(std::min((uint32_t)AFFINE_MRG_MAX_NUM_CANDS, pu.cs->slice->getPicHeader()->getMaxNumAffineMergeCand()) - 1)); ++uiMergeCand)
+#else
         for (uint32_t uiMergeCand = std::min((int)(candToBeRemoved + 1), (int)(AFFINE_MRG_MAX_NUM_CANDS - 1)); uiMergeCand < std::min((int)sizeCandList, (int)(AFFINE_MRG_MAX_NUM_CANDS - 1)); ++uiMergeCand)
+#endif
         {
           if (cost < abs((int)(candCostList[uiMergeCand] - candCostList[candToBeRemoved])))
           {

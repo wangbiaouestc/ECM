@@ -1848,6 +1848,14 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
   sps.setUseFastSubTmvp                     ((m_sourceWidth * m_sourceHeight) > (m_intraPeriod == -1 ? 0 : 832 * 480));
 #endif
+#if JVET_AI0183_MVP_EXTENSION
+  sps.setConfigScaledMvExtTmvp( m_scaledMvExtTmvp );
+  if (m_intraPeriod == -1)
+  {
+    sps.setConfigScaledMvExtTmvp( false );
+    setMaxNumAffineMergeCand(getMaxNumAffineMergeCand() - 2);
+  }
+#endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   sps.setUseArmcRefinedMotion               ( m_armcRefinedMotion );
 #endif
@@ -2161,6 +2169,13 @@ void EncLib::xInitSPS( SPS& sps )
 #endif
 #if JVET_AH0209_PDP
   sps.setUsePDP( m_pdp );
+#endif
+#if JVET_AI0183_MVP_EXTENSION
+  sps.setConfigScaledMvExtBiTmvp( m_scaledMvExtBiTmvp );
+  if (getBaseQP() < 27 && ((getSourceWidth() * getSourceHeight()) < (3840 * 2160)))
+  {
+    sps.setConfigScaledMvExtBiTmvp( false );
+  }
 #endif
   // ADD_NEW_TOOL : (encoder lib) set tool enabling flags and associated parameters here
   sps.setUseISP                             ( m_ISP );

@@ -680,6 +680,10 @@ protected:
 #if JVET_AH0209_PDP
   bool      m_pdp;
 #endif
+#if JVET_AI0183_MVP_EXTENSION
+  bool      m_scaledMvExtTmvp;
+  bool      m_scaledMvExtBiTmvp;
+#endif
   
   // ADD_NEW_TOOL : (encoder app) add tool enabling flags and associated parameters here
   bool      m_virtualBoundariesEnabledFlag;

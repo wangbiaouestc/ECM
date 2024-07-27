@@ -1195,6 +1195,11 @@ protected:
   bool         m_pdp;
 #endif
 
+#if JVET_AI0183_MVP_EXTENSION
+  bool         m_scaledMvExtTmvp;
+  bool         m_scaledMvExtBiTmvp;
+#endif
+
 public:
   EncCfg()
   {
@@ -1991,6 +1996,12 @@ public:
 #if JVET_AH0209_PDP
   void      setUsePDP( bool n )                             { m_pdp = n; }
   bool      getUsePDP()                               const { return m_pdp; }
+#endif
+#if JVET_AI0183_MVP_EXTENSION
+  void      setConfigScaledMvExtTmvp( bool n )                 { m_scaledMvExtTmvp = n; }
+  bool      getConfigScaledMvExtTmvp()                   const { return m_scaledMvExtTmvp; }
+  void      setConfigScaledMvExtBiTmvp( bool n )                 { m_scaledMvExtBiTmvp = n; }
+  bool      getConfigScaledMvExtBiTmvp()                   const { return m_scaledMvExtBiTmvp; }
 #endif
 
   // ADD_NEW_TOOL : (encoder lib) add access functions here
