@@ -1032,6 +1032,294 @@ void Slice::generateEqualPocDist()
 }
 #endif
 
+#if JVET_AI0183_MVP_EXTENSION
+void Slice::generateIntersectingMv()
+{
+  if (getSPS()->getConfigScaledMvExtBiTmvp() == false)
+  {
+    return;
+  }
+  CHECK(m_pcPic->cs->getMotionBuf().width != m_pcPic->cs->getMotionBuf().stride, "this is not possible");
+  if (getSliceType() != B_SLICE || getCheckLDC() == true)
+  {
+    return;
+  }
+  const int intersectingMvBufStride = m_pcPic->cs->getMotionBuf().stride;
+  const int motionBufWidth        = m_pcPic->cs->getMotionBuf().width;
+  const int motionBufHeight       = m_pcPic->cs->getMotionBuf().height;
+  const Position boundaryPosMin(-SCALE_FRAC_INTERNAL_PLUS_CU_LOG2_OFFSET, -SCALE_FRAC_INTERNAL_PLUS_CU_LOG2_OFFSET);
+  const Position boundaryPosMax((m_pcPic->getPicWidthInLumaSamples() << MV_FRACTIONAL_BITS_INTERNAL) - SCALE_FRAC_INTERNAL_PLUS_CU_LOG2_OFFSET,
+                                  (m_pcPic->getPicHeightInLumaSamples() << MV_FRACTIONAL_BITS_INTERNAL) - SCALE_FRAC_INTERNAL_PLUS_CU_LOG2_OFFSET);
+  IntersectingMvData* intersectingMvBufPtr = m_pcPic->cs->getIntersectingMvBuf();
+  for (int ictIdx = 0; ictIdx <  motionBufWidth * motionBufHeight; ictIdx++)
+  {
+    (intersectingMvBufPtr + ictIdx)->intersectingNr = 0;
+  }
+  MotionInfo* srcRefPicMotionInfoPtr;
+  Picture* srcRefPic;
+  IntersectingMvData* currentIntersectingMvDataBufPtr;
+  Mv srcIntersectingMv, dstIntersectingMv;
+  Position intersectingScaledPosTL(-1, -1), sourceSubBlkPos(-1, -1);
+  RefPicList srcRefList = REF_PIC_LIST_X, dstRefList = REF_PIC_LIST_X;
+  for (int8_t srcRefIdxInList = 0; srcRefIdxInList < INTERSECTING_MV_MAX_REF_IDX_NR; srcRefIdxInList++)
+  {
+    for (int srcRefListIdx_ = 0; srcRefListIdx_ < NUM_REF_PIC_LIST_01; srcRefListIdx_++)
+    {
+      srcRefList = RefPicList(srcRefListIdx_);
+      if (srcRefIdxInList >= getNumRefIdx(srcRefList))
+      {
+        continue;
+      }
+      srcRefPic = getRefPic(srcRefList, srcRefIdxInList);
+      if (srcRefPic->cs->slice->getSliceType() == I_SLICE)
+      {
+        continue;
+      }
+      dstRefList = RefPicList(1 - srcRefListIdx_);
+      bool availableDstRefPic = false;
+      // this is B slice, get motion buf, loop through the motion buf to check each 4x4 MV information
+      int8_t dstRefIdxInListList[MAX_NUM_REF << 1] = { -1 };
+      int scaleFactorToCurrent[MAX_NUM_REF << 1] = { -1 };
+      for (int srcRefIdxInRefList0 = 0; srcRefIdxInRefList0 < srcRefPic->cs->slice->getNumRefIdx(REF_PIC_LIST_0); srcRefIdxInRefList0++)
+      {
+        dstRefIdxInListList[srcRefIdxInRefList0] = -1;
+        const int dstRefPicPoc = srcRefPic->cs->slice->getRefPOC(REF_PIC_LIST_0, srcRefIdxInRefList0);
+        if ((srcRefPic->getPOC() - getPOC()) * (dstRefPicPoc - getPOC()) < 0)
+        {
+          // check dstRefPic is in current picture reference list (other list)
+          for (int curRefIdxInList = 0; curRefIdxInList < getNumRefIdx(dstRefList) && (dstRefIdxInListList[srcRefIdxInRefList0] < 0); curRefIdxInList++)
+          {
+            if (getRefPic(dstRefList, curRefIdxInList)->getPOC() == dstRefPicPoc)
+            {
+              dstRefIdxInListList[srcRefIdxInRefList0] = curRefIdxInList;
+              scaleFactorToCurrent[srcRefIdxInRefList0] = PU::getDistScaleFactor(srcRefPic->getPOC(), getPOC(), srcRefPic->getPOC(), dstRefPicPoc);
+              availableDstRefPic = true;
+            }
+          }
+        }
+      }
+      for (int srcRefIdxInRefList1 = 0; srcRefIdxInRefList1 < srcRefPic->cs->slice->getNumRefIdx(REF_PIC_LIST_1); srcRefIdxInRefList1++)
+      {
+        dstRefIdxInListList[srcRefPic->cs->slice->getNumRefIdx(REF_PIC_LIST_0) + srcRefIdxInRefList1] = -1;
+        const int dstRefPicPoc = srcRefPic->cs->slice->getRefPOC(REF_PIC_LIST_1, srcRefIdxInRefList1);
+        if ((srcRefPic->getPOC() - getPOC()) * (dstRefPicPoc - getPOC()) < 0)
+        {
+          // check dstRefPic is in current picture reference list (other list)
+          for (int curRefIdxInList = 0; curRefIdxInList < getNumRefIdx(dstRefList) && (dstRefIdxInListList[srcRefPic->cs->slice->getNumRefIdx(REF_PIC_LIST_0) + srcRefIdxInRefList1] < 0); curRefIdxInList++)
+          {
+            if (getRefPic(dstRefList, curRefIdxInList)->getPOC() == dstRefPicPoc)
+            {
+              dstRefIdxInListList[srcRefPic->cs->slice->getNumRefIdx(REF_PIC_LIST_0) + srcRefIdxInRefList1] = curRefIdxInList;
+              scaleFactorToCurrent[srcRefPic->cs->slice->getNumRefIdx(REF_PIC_LIST_0) + srcRefIdxInRefList1] = PU::getDistScaleFactor(srcRefPic->getPOC(), getPOC(), srcRefPic->getPOC(), dstRefPicPoc);
+              availableDstRefPic = true;
+            }
+          }
+        }
+      }
+      if (availableDstRefPic == false)
+      {
+        continue;
+      }
+      srcRefPicMotionInfoPtr = srcRefPic->cs->getMotionBuf().buf - 1;
+      for (int yy = 0; yy < motionBufHeight; yy++)
+      {
+        for (int xx = 0; xx < motionBufWidth; xx++)
+        {
+          srcRefPicMotionInfoPtr += 1;
+          sourceSubBlkPos.x = xx;
+          sourceSubBlkPos.y = yy;
+          // check current motionInfo has a intersecting motion
+          if (srcRefPicMotionInfoPtr->isInter == true && srcRefPicMotionInfoPtr->isIBCmot == false)
+          {
+            for (int refListIdxInMotionInfo = 0; refListIdxInMotionInfo < 2; refListIdxInMotionInfo++)
+            {
+              if ((srcRefPicMotionInfoPtr->interDir & (refListIdxInMotionInfo + 1)) == 0)
+              {
+                continue;
+              }
+              int dstLookUpRefIdx = refListIdxInMotionInfo * srcRefPic->cs->slice->getNumRefIdx(REF_PIC_LIST_0) + srcRefPicMotionInfoPtr->refIdx[refListIdxInMotionInfo];
+              if (dstRefIdxInListList[dstLookUpRefIdx] < 0)
+              {
+                continue;
+              }
+              // find a candidate for intersecting MV
+              bool validIntersectingMv_NotYetExistInList = getIntersectingPositionMv(intersectingScaledPosTL, srcIntersectingMv, dstIntersectingMv, sourceSubBlkPos,
+                  srcRefPicMotionInfoPtr->mv[refListIdxInMotionInfo], srcRefPic, getRefPic(dstRefList, dstRefIdxInListList[dstLookUpRefIdx]), boundaryPosMin, boundaryPosMax, scaleFactorToCurrent[dstLookUpRefIdx]);
+              if (validIntersectingMv_NotYetExistInList == true)
+              {
+                currentIntersectingMvDataBufPtr = intersectingMvBufPtr + intersectingScaledPosTL.x + intersectingScaledPosTL.y * intersectingMvBufStride;
+                if (checkValidIntersectingMv(currentIntersectingMvDataBufPtr, srcRefList, srcRefIdxInList, srcIntersectingMv, dstRefList, dstRefIdxInListList[dstLookUpRefIdx], dstIntersectingMv) == true)
+                {
+                  currentIntersectingMvDataBufPtr->intersectingMv[currentIntersectingMvDataBufPtr->intersectingNr][srcRefList] = srcIntersectingMv;
+                  currentIntersectingMvDataBufPtr->intersectingMv[currentIntersectingMvDataBufPtr->intersectingNr][dstRefList] = dstIntersectingMv;
+                  currentIntersectingMvDataBufPtr->intersectingRefIdx[currentIntersectingMvDataBufPtr->intersectingNr][srcRefList] = srcRefIdxInList;
+                  currentIntersectingMvDataBufPtr->intersectingRefIdx[currentIntersectingMvDataBufPtr->intersectingNr][dstRefList] = dstRefIdxInListList[dstLookUpRefIdx];
+                  currentIntersectingMvDataBufPtr->intersectingNr += 1;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+struct IntersectingData
+{
+  int8_t intersectingRefIdx[2];
+  Mv intersectingMv[2];
+  int countNr;
+  Distortion rankCostSum;
+};
+bool compareIntersectingDataBmBasedSort(IntersectingData i1, IntersectingData i2)
+{
+  return (i1.rankCostSum * i2.countNr < i2.rankCostSum * i1.countNr);
+}
+void Slice::getPuIntersectingMv(Position topLeftPuPos, Size puSize, IntersectingMvData* resultIntersectingMvDataPtr)
+{
+  const int intersectingMvBufStride = m_pcPic->cs->getMotionBuf().stride;
+  resultIntersectingMvDataPtr->intersectingNr = 0;
+  Position topLeftScaledPuPos = Position(topLeftPuPos.x >> MIN_CU_LOG2, topLeftPuPos.y >> MIN_CU_LOG2);
+  IntersectingMvData* curIntersectingMvBufPtr = m_pcPic->cs->getIntersectingMvBuf() + topLeftScaledPuPos.x + topLeftScaledPuPos.y * intersectingMvBufStride;
+  Size scaledPuSize = Size(puSize.width >> MIN_CU_LOG2, puSize.height >> MIN_CU_LOG2);
+  std::vector<IntersectingData> reorderedIntersectingDataVector;
+  Mv addMv[2];
+  int8_t addRefIdx[2];
+  IntersectingData tmpIntersectingData;
+  const int incrRow    = std::max(1, (int)scaledPuSize.width / INTERSECTING_MV_PU_GET_ICT_MAX_DIM_NR);
+  const int incrCol    = std::max(1, (int)scaledPuSize.height / INTERSECTING_MV_PU_GET_ICT_MAX_DIM_NR);
+  const int incrColumn = intersectingMvBufStride * incrCol - scaledPuSize.width;
+  int srcL0Poc = -1, srcL1Poc = -1, dstL0Poc = -1, dstL1Poc = -1;
+  bool findInVector = false;
+  Mv srcIntersectingDiffMv, dstIntersectingDiffMv;
+  for (int yy = 0; yy < scaledPuSize.height; yy += incrCol)
+  {
+    for (int xx = 0; xx < scaledPuSize.width; xx += incrRow)
+    {
+      for (int8_t ictIdx = 0; ictIdx < curIntersectingMvBufPtr->intersectingNr; ictIdx++)
+      {
+        findInVector = false;
+        addRefIdx[0] = curIntersectingMvBufPtr->intersectingRefIdx[ictIdx][0];
+        addRefIdx[1] = curIntersectingMvBufPtr->intersectingRefIdx[ictIdx][1];
+        addMv[0] = curIntersectingMvBufPtr->intersectingMv[ictIdx][0];
+        addMv[1] = curIntersectingMvBufPtr->intersectingMv[ictIdx][1];
+        for(int ictIdxV = 0; ictIdxV < reorderedIntersectingDataVector.size() && findInVector == false; ictIdxV++)
+        {
+          srcL0Poc = getRefPic( REF_PIC_LIST_0, reorderedIntersectingDataVector.at(ictIdxV).intersectingRefIdx[0] )->getPOC();
+          srcL1Poc = getRefPic( REF_PIC_LIST_1, reorderedIntersectingDataVector.at(ictIdxV).intersectingRefIdx[1] )->getPOC();
+          dstL0Poc = getRefPic( REF_PIC_LIST_0, addRefIdx[0] )->getPOC();
+          dstL1Poc = getRefPic( REF_PIC_LIST_1, addRefIdx[1] )->getPOC();
+          if (srcL0Poc == dstL0Poc && srcL1Poc == dstL1Poc)
+          {
+            srcIntersectingDiffMv = reorderedIntersectingDataVector.at(ictIdxV).intersectingMv[0] - addMv[0];
+            dstIntersectingDiffMv = reorderedIntersectingDataVector.at(ictIdxV).intersectingMv[1] - addMv[1];
+          }
+          else if (srcL0Poc == dstL1Poc && srcL1Poc == dstL0Poc)
+          {
+            srcIntersectingDiffMv = reorderedIntersectingDataVector.at(ictIdxV).intersectingMv[0] - addMv[1];
+            dstIntersectingDiffMv = reorderedIntersectingDataVector.at(ictIdxV).intersectingMv[1] - addMv[0];
+          }
+          else
+          {
+            continue;
+          }
+          if (srcIntersectingDiffMv.getAbsHor() < 8 && srcIntersectingDiffMv.getAbsVer() < 8 &&
+              dstIntersectingDiffMv.getAbsHor() < 8 && dstIntersectingDiffMv.getAbsVer() < 8)
+          {
+            findInVector = true;
+            reorderedIntersectingDataVector.at(ictIdxV).countNr += 1;
+            reorderedIntersectingDataVector.at(ictIdxV).rankCostSum += ictIdx;
+            if (std::abs(dstL0Poc - getPOC()) + std::abs(dstL1Poc - getPOC()) <= std::abs(srcL0Poc - getPOC()) + std::abs(srcL1Poc - getPOC()) &&
+                ictIdx * reorderedIntersectingDataVector.at(ictIdxV).countNr < reorderedIntersectingDataVector.at(ictIdxV).rankCostSum)
+            {
+              reorderedIntersectingDataVector.at(ictIdxV).intersectingMv[0] = addMv[0];
+              reorderedIntersectingDataVector.at(ictIdxV).intersectingMv[1] = addMv[1];
+              reorderedIntersectingDataVector.at(ictIdxV).intersectingRefIdx[0] = addRefIdx[0];
+              reorderedIntersectingDataVector.at(ictIdxV).intersectingRefIdx[1] = addRefIdx[1];
+            }
+          }
+        }
+        if (findInVector == false)
+        {
+          tmpIntersectingData.countNr = 1;
+          tmpIntersectingData.intersectingRefIdx[0] = addRefIdx[0];
+          tmpIntersectingData.intersectingRefIdx[1] = addRefIdx[1];
+          tmpIntersectingData.intersectingMv[0]     = addMv[0];
+          tmpIntersectingData.intersectingMv[1]     = addMv[1];
+          tmpIntersectingData.rankCostSum           = ictIdx;
+          reorderedIntersectingDataVector.push_back(tmpIntersectingData);
+        }
+      }
+      curIntersectingMvBufPtr += incrRow;
+    }
+    curIntersectingMvBufPtr += incrColumn;
+  }
+  if (reorderedIntersectingDataVector.size() > 1)
+  {
+    stable_sort(reorderedIntersectingDataVector.begin(), reorderedIntersectingDataVector.end(), compareIntersectingDataBmBasedSort);
+  }
+  for (int ictIdxV = 0; ictIdxV < std::min(INTERSECTING_MV_MAX_NR, (int)reorderedIntersectingDataVector.size()); ictIdxV++)
+  {
+    resultIntersectingMvDataPtr->intersectingRefIdx[resultIntersectingMvDataPtr->intersectingNr][0] = reorderedIntersectingDataVector.at(ictIdxV).intersectingRefIdx[0];
+    resultIntersectingMvDataPtr->intersectingRefIdx[resultIntersectingMvDataPtr->intersectingNr][1] = reorderedIntersectingDataVector.at(ictIdxV).intersectingRefIdx[1];
+    resultIntersectingMvDataPtr->intersectingMv[resultIntersectingMvDataPtr->intersectingNr][0]     = reorderedIntersectingDataVector.at(ictIdxV).intersectingMv[0];
+    resultIntersectingMvDataPtr->intersectingMv[resultIntersectingMvDataPtr->intersectingNr][1]     = reorderedIntersectingDataVector.at(ictIdxV).intersectingMv[1];
+    resultIntersectingMvDataPtr->intersectingNr += 1;
+  }
+}
+bool Slice::getIntersectingPositionMv(Position& intersectingScaledPosTL, Mv& srcIntersectingMv, Mv& dstIntersectingMv, Position srcScaledPosTL, Mv srcRefMv,
+    Picture* srcRefPic, Picture* dstRefPic, const Position boundaryPosMin, const Position boundaryPosMax, const int scaleFactorToCurrent)
+{
+  if (srcRefMv.getAbsHor() < 8 && srcRefMv.getAbsVer() < 8)
+  {
+    return false;
+  }
+  // scale the positions to MV precision
+  Position srcMvScaledPosTL = Position((srcScaledPosTL.x << SCALE_FRAC_INTERNAL_PLUS_CU_LOG2), (srcScaledPosTL.y << SCALE_FRAC_INTERNAL_PLUS_CU_LOG2));
+  Position dstMvScaledPosTL = Position(srcMvScaledPosTL.x + srcRefMv.hor, srcMvScaledPosTL.y + srcRefMv.ver);
+  if (dstMvScaledPosTL.x <= boundaryPosMin.x || dstMvScaledPosTL.y <= boundaryPosMin.y ||
+      dstMvScaledPosTL.x >= boundaryPosMax.x || dstMvScaledPosTL.y >= boundaryPosMax.y)
+  {
+    return false;
+  }
+  Mv scaledMvToCurPic = srcRefMv.scaleMv(scaleFactorToCurrent);
+  srcIntersectingMv = Mv(0, 0) - scaledMvToCurPic;
+  dstIntersectingMv = srcRefMv - scaledMvToCurPic;
+  if (srcIntersectingMv.getAbsHor() < 8 && srcIntersectingMv.getAbsVer() < 8 && dstIntersectingMv.getAbsHor() < 8 && dstIntersectingMv.getAbsVer() < 8)
+  {
+    return false;
+  }
+  Position intersectingMvScaledPosTL = Position(srcMvScaledPosTL.x + scaledMvToCurPic.hor, srcMvScaledPosTL.y + scaledMvToCurPic.ver);
+  intersectingScaledPosTL.x = (intersectingMvScaledPosTL.x + SCALE_FRAC_INTERNAL_PLUS_CU_LOG2_OFFSET) >> SCALE_FRAC_INTERNAL_PLUS_CU_LOG2;
+  intersectingScaledPosTL.y = (intersectingMvScaledPosTL.y + SCALE_FRAC_INTERNAL_PLUS_CU_LOG2_OFFSET) >> SCALE_FRAC_INTERNAL_PLUS_CU_LOG2;
+  return true;
+}
+bool Slice::checkValidIntersectingMv(IntersectingMvData* curIntersectingMvDataBufPtr,RefPicList srcRefListIdx, int8_t srcRefIdx, Mv srcMv, RefPicList dstRefListIdx, int8_t dstRefIdx, Mv dstMv)
+{
+  if (curIntersectingMvDataBufPtr->intersectingNr < INTERSECTING_MV_MAX_NR)
+  {
+    for (uint8_t bufIndex = 0; bufIndex < curIntersectingMvDataBufPtr->intersectingNr; bufIndex++)
+    {
+      if (curIntersectingMvDataBufPtr->intersectingRefIdx[bufIndex][srcRefListIdx] == srcRefIdx &&
+          curIntersectingMvDataBufPtr->intersectingRefIdx[bufIndex][dstRefListIdx] == dstRefIdx)
+      {
+        Mv diffMvSrc = curIntersectingMvDataBufPtr->intersectingMv[bufIndex][srcRefListIdx] - srcMv;
+        Mv diffMvDst = curIntersectingMvDataBufPtr->intersectingMv[bufIndex][dstRefListIdx] - dstMv;
+        if (diffMvSrc.getAbsHor() < 8 && diffMvSrc.getAbsVer() < 8 && diffMvDst.getAbsHor() < 8 && diffMvDst.getAbsVer() < 8)
+        {
+          return false;
+        }
+      }
+    }
+  }
+  else
+  {
+    return false;
+  }
+  return true;
+}
+#endif
+
 void Slice::constructRefPicList(PicList& rcListPic)
 {
   ::memset(m_bIsUsedAsLongTerm, 0, sizeof(m_bIsUsedAsLongTerm));

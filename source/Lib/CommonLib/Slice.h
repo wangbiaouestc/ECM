@@ -49,6 +49,7 @@
 #include "HRD.h"
 #include <unordered_map>
 #include "AlfParameters.h"
+#include "Unit.h"
 #if MULTI_HYP_PRED
 #include "MotionInfo.h"
 #endif
@@ -1984,6 +1985,11 @@ private:
   bool              m_pdp;
 #endif
 
+#if JVET_AI0183_MVP_EXTENSION
+  bool              m_scaledMvExtTmvp;
+  bool              m_scaledMvExtBiTmvp;
+#endif
+
 public:
 
   SPS();
@@ -2751,6 +2757,13 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if JVET_AI0136_ADAPTIVE_DUAL_TREE
   void     setUseInterSliceSeparateTree     ( bool b )                              { m_interSliceSeparateTree = b;    }
   bool     getInterSliceSeparateTreeEnabled ()                            const     { return m_interSliceSeparateTree; }
+#endif
+
+#if JVET_AI0183_MVP_EXTENSION
+  void      setConfigScaledMvExtTmvp( bool n )                     { m_scaledMvExtTmvp = n; }
+  bool      getConfigScaledMvExtTmvp()                       const { return m_scaledMvExtTmvp; }
+  void      setConfigScaledMvExtBiTmvp( bool n )                   { m_scaledMvExtBiTmvp = n; }
+  bool      getConfigScaledMvExtBiTmvp()                     const { return m_scaledMvExtBiTmvp; }
 #endif
 };
 
@@ -3735,6 +3748,10 @@ private:
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   std::vector<int>           m_implicitRefIdx[2][NUM_REF_PIC_LIST_01][NUM_REF_PIC_LIST_01][MAX_NUM_REF + 1];
+#if JVET_AI0183_MVP_EXTENSION
+  std::vector<int>           m_implicitRefIdx2nd[2][NUM_REF_PIC_LIST_01][NUM_REF_PIC_LIST_01][MAX_NUM_REF + 1];
+  std::vector<int>           m_implicitRefIdx3rd[2][NUM_REF_PIC_LIST_01][NUM_REF_PIC_LIST_01][MAX_NUM_REF + 1];
+#endif
 #else
   std::vector<int>           m_implicitRefIdx[NUM_REF_PIC_LIST_01][NUM_REF_PIC_LIST_01][MAX_NUM_REF + 1];
 #endif
@@ -3961,11 +3978,52 @@ public:
 
       m_implicitRefIdx[col][REF_PIC_LIST_1][REF_PIC_LIST_1][refIdx].resize(numSlices);
       std::fill(m_implicitRefIdx[col][REF_PIC_LIST_1][REF_PIC_LIST_1][refIdx].begin(), m_implicitRefIdx[col][REF_PIC_LIST_1][REF_PIC_LIST_1][refIdx].end(), -1);
+#if JVET_AI0183_MVP_EXTENSION
+      m_implicitRefIdx2nd[col][REF_PIC_LIST_0][REF_PIC_LIST_0][refIdx].resize(numSlices);
+      std::fill(m_implicitRefIdx2nd[col][REF_PIC_LIST_0][REF_PIC_LIST_0][refIdx].begin(),
+                m_implicitRefIdx2nd[col][REF_PIC_LIST_0][REF_PIC_LIST_0][refIdx].end(), -1);
+
+      m_implicitRefIdx2nd[col][REF_PIC_LIST_0][REF_PIC_LIST_1][refIdx].resize(numSlices);
+      std::fill(m_implicitRefIdx2nd[col][REF_PIC_LIST_0][REF_PIC_LIST_1][refIdx].begin(),
+                m_implicitRefIdx2nd[col][REF_PIC_LIST_0][REF_PIC_LIST_1][refIdx].end(), -1);
+
+      m_implicitRefIdx2nd[col][REF_PIC_LIST_1][REF_PIC_LIST_0][refIdx].resize(numSlices);
+      std::fill(m_implicitRefIdx2nd[col][REF_PIC_LIST_1][REF_PIC_LIST_0][refIdx].begin(),
+                m_implicitRefIdx2nd[col][REF_PIC_LIST_1][REF_PIC_LIST_0][refIdx].end(), -1);
+
+      m_implicitRefIdx2nd[col][REF_PIC_LIST_1][REF_PIC_LIST_1][refIdx].resize(numSlices);
+      std::fill(m_implicitRefIdx2nd[col][REF_PIC_LIST_1][REF_PIC_LIST_1][refIdx].begin(),
+                m_implicitRefIdx2nd[col][REF_PIC_LIST_1][REF_PIC_LIST_1][refIdx].end(), -1);
+      m_implicitRefIdx3rd[col][REF_PIC_LIST_0][REF_PIC_LIST_0][refIdx].resize(numSlices);
+      std::fill(m_implicitRefIdx3rd[col][REF_PIC_LIST_0][REF_PIC_LIST_0][refIdx].begin(),
+                m_implicitRefIdx3rd[col][REF_PIC_LIST_0][REF_PIC_LIST_0][refIdx].end(), -1);
+
+      m_implicitRefIdx3rd[col][REF_PIC_LIST_0][REF_PIC_LIST_1][refIdx].resize(numSlices);
+      std::fill(m_implicitRefIdx3rd[col][REF_PIC_LIST_0][REF_PIC_LIST_1][refIdx].begin(),
+                m_implicitRefIdx3rd[col][REF_PIC_LIST_0][REF_PIC_LIST_1][refIdx].end(), -1);
+
+      m_implicitRefIdx3rd[col][REF_PIC_LIST_1][REF_PIC_LIST_0][refIdx].resize(numSlices);
+      std::fill(m_implicitRefIdx3rd[col][REF_PIC_LIST_1][REF_PIC_LIST_0][refIdx].begin(),
+                m_implicitRefIdx3rd[col][REF_PIC_LIST_1][REF_PIC_LIST_0][refIdx].end(), -1);
+
+      m_implicitRefIdx3rd[col][REF_PIC_LIST_1][REF_PIC_LIST_1][refIdx].resize(numSlices);
+      std::fill(m_implicitRefIdx3rd[col][REF_PIC_LIST_1][REF_PIC_LIST_1][refIdx].begin(),
+                m_implicitRefIdx3rd[col][REF_PIC_LIST_1][REF_PIC_LIST_1][refIdx].end(), -1);
+#endif
     }
   }
   void                        setImRefIdx(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int colRefIdx, int curRefIdx, int col) { m_implicitRefIdx[col][colRefPicList][curRefPicList][colRefIdx][sliceIdx] = curRefIdx; }
   int                         getImRefIdx(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int colRefIdx, int col = 0) { return m_implicitRefIdx[col][colRefPicList][curRefPicList][colRefIdx][sliceIdx]; }
   int                         getImRefIdx(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int colRefIdx, int col = 0) const { return m_implicitRefIdx[col][colRefPicList][curRefPicList][colRefIdx][sliceIdx]; }
+#if JVET_AI0183_MVP_EXTENSION
+  void                        setImRefIdx2nd(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int colRefIdx, int curRefIdx, int col) { m_implicitRefIdx2nd[col][colRefPicList][curRefPicList][colRefIdx][sliceIdx] = curRefIdx; }
+  int                         getImRefIdx2nd(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int colRefIdx, int col = 0) { return m_implicitRefIdx2nd[col][colRefPicList][curRefPicList][colRefIdx][sliceIdx]; }
+  int                         getImRefIdx2nd(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int colRefIdx, int col = 0) const { return m_implicitRefIdx2nd[col][colRefPicList][curRefPicList][colRefIdx][sliceIdx]; }
+  void                        setImRefIdx3rd(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int colRefIdx, int curRefIdx, int col) { m_implicitRefIdx3rd[col][colRefPicList][curRefPicList][colRefIdx][sliceIdx] = curRefIdx; }
+  int                         getImRefIdx3rd(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int colRefIdx, int col = 0) { return m_implicitRefIdx3rd[col][colRefPicList][curRefPicList][colRefIdx][sliceIdx]; }
+  int                         getImRefIdx3rd(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int colRefIdx, int col = 0) const { return m_implicitRefIdx3rd[col][colRefPicList][curRefPicList][colRefIdx][sliceIdx]; }
+#endif
+
 #else
   void resizeImBuf(int numSlices)
   {
@@ -4066,6 +4124,13 @@ public:
 #if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
   void                        generateEqualPocDist();
   bool                        getPairEqualPocDist(int refIdx0, int refIdx1) const { return m_pairEqualPocDist[refIdx0][refIdx1]; };
+#endif
+#if JVET_AI0183_MVP_EXTENSION
+  void                        generateIntersectingMv();
+  void                        getPuIntersectingMv(Position topLeftPuPos, Size puSize, IntersectingMvData* resultIntersectingMvDataPtr);
+  bool                        getIntersectingPositionMv(Position& intersectingScaledPosTL, Mv& srcIntersectingMv, Mv& dstIntersectingMv, Position srcScaledPosTL,
+                                                        Mv srcRefMv, Picture* srcRefPic, Picture* dstRefPic, const Position boundaryPosMin, const Position boundaryPosMax, const int scaleFactorToCurrent);
+  bool                        checkValidIntersectingMv(IntersectingMvData* curIntersectingMvDataBufPtr, RefPicList srcRefListIdx, int8_t srcRefIdx, Mv srcMv, RefPicList dstRefListIdx, int8_t dstRefIdx, Mv dstMv);
 #endif
 #if MULTI_HYP_PRED
   void                        setMultiHypRefPicList();

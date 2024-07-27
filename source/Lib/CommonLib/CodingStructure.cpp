@@ -173,6 +173,9 @@ CodingStructure::CodingStructure(CUCache& cuCache, PUCache& puCache, TUCache& tu
   picHeader = nullptr;
   m_gdrEnabled = false;
 #endif
+#if JVET_AI0183_MVP_EXTENSION
+  m_intersectingMvBuf = nullptr;
+#endif
 }
 
 void CodingStructure::destroy()
@@ -303,6 +306,13 @@ void CodingStructure::destroyTemporaryCsData()
   }
   m_cuCache.cache(cus);
   m_numCUs = 0;
+#if JVET_AI0183_MVP_EXTENSION
+  if (m_intersectingMvBuf != nullptr)
+  {
+    delete[] m_intersectingMvBuf;
+    m_intersectingMvBuf = nullptr;
+  }
+#endif
 }
 
 void CodingStructure::createTemporaryCsData(const bool isPLTused)
@@ -331,6 +341,9 @@ void CodingStructure::createTemporaryCsData(const bool isPLTused)
     mcMask[i] = (bool*)xMalloc(bool, extendLumaArea);
     mcMaskChroma[i] = (bool*)xMalloc(bool, extendLumaArea);
   }
+#endif
+#if JVET_AI0183_MVP_EXTENSION
+  m_intersectingMvBuf = new IntersectingMvData[unitScale[0].scale(area.blocks[0].size()).area()];
 #endif
 }
 

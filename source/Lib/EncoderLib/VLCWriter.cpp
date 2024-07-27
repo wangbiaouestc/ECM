@@ -1591,7 +1591,12 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #endif
   if ( pcSPS->getUseAffine() )
   {
+#if JVET_AI0183_MVP_EXTENSION
+    WRITE_UVLC(AFFINE_MRG_MAX_NUM_CANDS - pcSPS->getMaxNumAffineMergeCand() - (pcSPS->getConfigScaledMvExtTmvp() ? 0 : 2), "five_minus_max_num_subblock_merge_cand");
+    WRITE_FLAG( pcSPS->getConfigScaledMvExtTmvp() ? 1 : 0,                                 "sps_scaled_mv_ext_b_configure_flag");
+#else
     WRITE_UVLC(AFFINE_MRG_MAX_NUM_CANDS - pcSPS->getMaxNumAffineMergeCand(), "five_minus_max_num_subblock_merge_cand");
+#endif
     WRITE_FLAG( pcSPS->getUseAffineType() ? 1 : 0,                                             "sps_affine_type_flag" );
 #if AFFINE_MMVD
     WRITE_FLAG( pcSPS->getUseAffineMmvdMode() ? 1 : 0,                                         "sps_affine_mmvd_enabled_flag" );
@@ -1726,6 +1731,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
       "max_num_merge_cand_minus_max_num_mhp_cand");
 #endif
   }
+#endif
+#if JVET_AI0183_MVP_EXTENSION
+  WRITE_FLAG( pcSPS->getConfigScaledMvExtBiTmvp() ? 1 : 0,                                 "sps_scaled_mv_ext_c_configure_flag");
 #endif
 
   WRITE_UVLC(pcSPS->getLog2ParallelMergeLevelMinus2(), "log2_parallel_merge_level_minus2");
