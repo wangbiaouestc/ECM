@@ -666,6 +666,9 @@ void MergeCtx::copyRegularMergeCand(int dstCandIdx, MergeCtx& srcCtx, int srcCan
 #if MULTI_HYP_PRED
   addHypNeighbours  [dstCandIdx] = srcCtx.addHypNeighbours  [srcCandIdx];
 #endif
+#if JVET_AI0187_TMVP_FOR_CMVP
+  candtype[dstCandIdx] = srcCtx.candtype[srcCandIdx];
+#endif
 }
 
 void MergeCtx::convertRegularMergeCandToBi(int candIdx)
@@ -1725,6 +1728,9 @@ void MergeCtx::initMrgCand(int cnt)
 #endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
   candCost[cnt] = MAX_UINT64;
+#endif
+#if JVET_AI0187_TMVP_FOR_CMVP
+  candtype[cnt] = -1;
 #endif
 }
 #endif

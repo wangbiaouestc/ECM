@@ -1197,7 +1197,11 @@ public:
   );
 #endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
+#if JVET_AI0187_TMVP_FOR_CMVP
+  void    adjustMergeCandidatesInOneCandidateGroup(PredictionUnit &pu, MergeCtx& mvpMergeCandCtx, int numRetrievedMergeCand, int mrgCandIdx = -1, bool ReduceCandsForSimilarTMCost = false);
+#else
   void    adjustMergeCandidatesInOneCandidateGroup(PredictionUnit &pu, MergeCtx& smvpMergeCandCtx, int numRetrievedMergeCand, int mrgCandIdx = -1);
+#endif
   void    updateCandInOneCandidateGroup(MergeCtx& mrgCtx, uint32_t* RdCandList, int numCandInCategory = -1);
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
   void    updateCandInTwoCandidateGroups(MergeCtx& mrgCtx, uint32_t* rdCandList, int numCandInCategory, MergeCtx mrgCtx2);

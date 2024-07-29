@@ -346,6 +346,7 @@
 #define JVET_AH0069_CMVP                                  1 // JVET-AH0069: Chained motion vector prediction
 #if JVET_AH0069_CMVP
 #define JVET_AI0103_ADDITIONAL_CMVP                       1 // JVET-AI0103: Additional chained motion vector prediction candidates
+#define JVET_AI0187_TMVP_FOR_CMVP                         1 // JVET-AI0187: TMVP for chained motion vector prediction
 #endif
 #define JVET_AH0314_ADAPTIVE_GPM_BLENDING_IMPROV          1 // JVET-AH0314: Adaptive GPM blending
 #define JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0        1 // JVET-AH0066 & JVET-AH0202: Inter CCP merge mode with zero luma CBF
