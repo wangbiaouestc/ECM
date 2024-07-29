@@ -193,6 +193,12 @@ Slice::Slice()
   resetTileGroupCcAlCrfEnabledFlag();
 
   m_sliceMap.initSliceMap();
+
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+  m_idxCorrChroma[0] = 0;
+  m_idxCorrChroma[1] = 0;
+  m_idxCorrChroma[2] = 0;
+#endif
 }
 
 Slice::~Slice()
@@ -265,6 +271,11 @@ void Slice::initSlice()
   m_tileGroupCcAlfCrApsId = -1;
 #if JVET_AG0196_CABAC_RETRAIN
   m_cabacInitSliceType = I_SLICE;
+#endif
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+  m_idxCorrChroma[0] = 0;
+  m_idxCorrChroma[1] = 0;
+  m_idxCorrChroma[2] = 0;
 #endif
 #if JVET_AI0136_ADAPTIVE_DUAL_TREE
   m_separateTreeEnabled           = false;
@@ -2154,6 +2165,12 @@ void Slice::copySliceInfo(Slice *pSrc, bool cpyAlmostAll)
   m_lumaPelMax                              = pSrc->m_lumaPelMax;
   m_lumaPelMin                              = pSrc->m_lumaPelMin;
   m_adaptiveClipQuant                       = pSrc->m_adaptiveClipQuant;
+#endif
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+  for ( int c=0 ; c<MAX_NUM_COMPONENT ; c++ )
+  {
+    m_idxCorrChroma[c]                      = pSrc->m_idxCorrChroma[c];
+  }
 #endif
 }
 
@@ -4173,6 +4190,10 @@ SPS::SPS()
 #if JVET_AH0135_TEMPORAL_PARTITIONING
   , m_enableMaxMttIncrease(false)
 #endif
+#endif
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+, m_alfScaleMode              ( 0 )
+, m_alfScalePrevEnabled       ( false )
 #endif
 , m_SBT                       ( false )
 , m_ISP                       ( false )

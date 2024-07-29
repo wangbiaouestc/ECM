@@ -198,6 +198,9 @@ public:
 #else
   void  parseSliceHeader    ( Slice* pcSlice, PicHeader* picHeader, ParameterSetManager *parameterSetManager, const int prevTid0POC, const int prevPicPOC );
 #endif
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+  void  parseScaleAlf       ( Slice* pcSlice, SPS* sps, ParameterSetManager* parameterSetManager, int alfCbUsedFlag, int alfCrUsedFlag );
+#endif
 
   void  getSlicePoc ( Slice* pcSlice, PicHeader* picHeader, ParameterSetManager *parameterSetManager, const int prevTid0POC );
   void  parseTerminatingBit ( uint32_t& ruiBit );

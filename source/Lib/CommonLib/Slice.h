@@ -1624,6 +1624,10 @@ private:
 #if JVET_AH0135_TEMPORAL_PARTITIONING
   bool              m_enableMaxMttIncrease;
 #endif
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+  int               m_alfScaleMode;
+  bool              m_alfScalePrevEnabled;
+#endif
   bool              m_SBT;
 #if JVET_AI0050_INTER_MTSS
   bool              m_interMTSS; 
@@ -2615,6 +2619,13 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if JVET_AH0135_TEMPORAL_PARTITIONING
   bool      getEnableMaxMttIncrease()                                  const     { return m_enableMaxMttIncrease; }
   void      setEnableMaxMttIncrease(bool b)                                      { m_enableMaxMttIncrease = b; }
+#endif
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+  int       getAlfScaleMode    ()                                      const     { return m_alfScaleMode; }
+  void      setAlfScaleMode    ( int m )                                         { m_alfScaleMode = m; }
+  int       getAlfScaleNbCorr  ()                                      const     { return ( m_alfScaleMode ? ((m_alfScaleMode == 1) ? 5 : 9) : 0 ); }
+  bool      getAlfScalePrevEnabled()                                   const     { return m_alfScalePrevEnabled; }
+  void      setAlfScalePrevEnabled(bool b)                                       { m_alfScalePrevEnabled = b;    }
 #endif
   void      setUseCiip         ( bool b )                                        { m_ciip = b; }
   bool      getUseCiip         ()                                      const     { return m_ciip; }
@@ -3817,6 +3828,11 @@ private:
   int                        m_tileGroupCcAlfCrApsId;
   bool                       m_disableSATDForRd;
   bool                       m_isLossless;
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+  bool                       m_useScaleAlf; // at least one APS uses alf-residuals-rescaling
+  ScaleAlf                   m_scaleAlfParam[ALF_CTB_MAX_NUM_APS][MAX_NUM_ALF_ALTERNATIVES_LUMA];
+  int                        m_idxCorrChroma[3];
+#endif
 
 #if JVET_AG0145_ADAPTIVE_CLIPPING
   int                        m_lumaPelMax;
@@ -3868,6 +3884,48 @@ public:
 
   void                        setAlfAPSs(APS** apss)                                 { memcpy(m_alfApss, apss, sizeof(m_alfApss));                   }
   APS**                       getAlfAPSs()                                           { return m_alfApss;                                             }
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+  bool                        getUseAlfScale()                                       { return m_useScaleAlf; }
+  void                        setUseAlfScale( bool s )                               { m_useScaleAlf = s; }
+  void                        resetAlfScale()
+  {
+    for (int i = 0; i < ALF_CTB_MAX_NUM_APS; i++)
+    {
+      for (int j = 0; j < MAX_NUM_ALF_ALTERNATIVES_LUMA; j++)
+      {
+        m_scaleAlfParam[i][j].reset();
+      }
+    }
+  }
+  ScaleAlf*                   getAlfScalePtr( const int apsId, const int altNum )   { return &m_scaleAlfParam[m_tileGroupLumaApsId[apsId]][altNum]; }
+  ScaleAlf&                   getAlfScale( const int apsId, const int altNum )      { return m_scaleAlfParam[m_tileGroupLumaApsId[apsId]][altNum];  }
+  void  copyAlfScale( Slice& slice )
+  {
+    m_useScaleAlf = slice.m_useScaleAlf;
+    for (int i = 0; i < ALF_CTB_MAX_NUM_APS; i++)
+    {
+      for (int j = 0; j < MAX_NUM_ALF_ALTERNATIVES_LUMA; j++)
+      {
+        ScaleAlf& scaleAlfParam = slice.m_scaleAlfParam[i][j];
+        if ( scaleAlfParam.initDone ) 
+        {
+          scaleAlfParam.setMinMax( slice.getLumaPelMin(), slice.getLumaPelMax() );
+          scaleAlfParam.setGroupSize( scaleAlfParam.groupShift );
+          scaleAlfParam.fillIdxCorr();
+
+          m_scaleAlfParam[i][j] = scaleAlfParam;
+        }
+      }
+    }
+    for (int c = 0; c < MAX_NUM_COMPONENT; c++)
+    {
+      m_idxCorrChroma[c] = slice.m_idxCorrChroma[c];
+    }
+  }
+  void                        setAlfScaleChroma( int compIdx, const int s )          { m_idxCorrChroma[compIdx] = s;    }
+  int                         getAlfScaleChroma( int compIdx ) const                 { return m_idxCorrChroma[compIdx]; }
+#endif
+
   void                        setSaoEnabledFlag(ChannelType chType, bool s)          {m_saoEnabledFlag[chType] =s;                                   }
   bool                        getSaoEnabledFlag(ChannelType chType) const            { return m_saoEnabledFlag[chType];                              }
 #if JVET_W0066_CCSAO

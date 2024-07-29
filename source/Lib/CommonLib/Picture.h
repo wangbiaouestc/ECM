@@ -362,6 +362,9 @@ public:
 
   void              copyBIF( const Picture& src )            { m_bifParams[COMPONENT_Y] = src.m_bifParams[COMPONENT_Y]; m_bifParams[COMPONENT_Cb] = src.m_bifParams[COMPONENT_Cb]; m_bifParams[COMPONENT_Cr] = src.m_bifParams[COMPONENT_Cr]; }
 #endif
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+  std::vector<int>        m_alfScalePrev[ALF_CTB_MAX_NUM_APS][MAX_NUM_ALF_ALTERNATIVES_LUMA];  // back-up storage for DebugBitstream
+#endif
 #if ENABLE_QPA
   std::vector<double>     m_uEnerHpCtu;                         ///< CTU-wise L2 or squared L1 norm of high-passed luma input
   std::vector<Pel>        m_iOffsetCtu;                         ///< CTU-wise DC offset (later QP index offset) of luma input

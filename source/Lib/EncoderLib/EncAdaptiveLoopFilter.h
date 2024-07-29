@@ -430,6 +430,9 @@ private:
   bool                   m_isLowDelayConfig;
   double                 m_chromaFactor;
 #endif
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+  ScaleAlfEnc            m_scaleAlfEncParam[ALF_CTB_MAX_NUM_APS][MAX_NUM_ALF_ALTERNATIVES_LUMA];
+#endif
 
 public:
   EncAdaptiveLoopFilter( int& apsIdStart );
@@ -448,6 +451,13 @@ public:
 #endif
   );
   void   alfReconstructor(CodingStructure& cs, const PelUnitBuf& recExtBuf);
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+  ScaleAlfEnc* getAlfScaleEncPtr( const int apsId, const int altNum ) { return &m_scaleAlfEncParam[apsId][altNum]; }
+  ScaleAlfEnc& getAlfScaleEnc( const int apsId, const int altNum ) { return m_scaleAlfEncParam[apsId][altNum]; }
+  void         alfCorrection( CodingStructure& cs, const PelUnitBuf& origBuf, const PelUnitBuf& recExtBuf, bool mode=false );
+  void         alfCorrectionChroma( CodingStructure& cs, PelUnitBuf& recYuvSao );
+#endif
+
   void ALFProcess(CodingStructure& cs, const double *lambdas
 #if ENABLE_QPA
     , const double lambdaChromaWeight

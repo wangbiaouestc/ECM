@@ -523,6 +523,161 @@ struct AlfFilterShape
 #endif
 };
 
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+static const int shiftPrecis = 3;
+
+static const int shiftCorr    = 3;
+static const int oneCorr      = (1 << shiftCorr);
+static const int offCorr      = (1 << (shiftCorr - 1));
+
+static const int shiftCorrChroma  = 3;
+static const int oneCorrChroma    = (1 << shiftCorrChroma);
+static const int offCorrChroma    = (1 << (shiftCorrChroma - 1));
+
+static const int nbCorrAlfScale[4] = { 0, 5, 5, 9 };
+
+static const int nbCorrChromaAlfScale[4] = { 5, 5, 5, 5 };
+
+
+struct ScaleAlfEnc 
+{
+  static const int nbCorr = 12;
+
+  std::vector<int>  num;
+  uint64_t  mse[MAX_NUM_ALF_CLASSES][nbCorr];
+  double bestCost[MAX_NUM_ALF_CLASSES];
+
+  void reset() 
+  {
+    num.resize( MAX_NUM_ALF_CLASSES, 0 );
+    memset( num.data(), 0, sizeof(int) * num.size() );
+    memset( mse, 0, sizeof(mse) );
+  }
+
+  void addMse( const int idxClass, const int idxCorr, const int s )
+  {
+    mse[idxClass][idxCorr] += s * s;
+    if ( idxCorr == 0 )
+    {
+      num[idxClass]++;
+    }
+  }
+
+};
+
+struct ScaleAlf 
+{
+  static const int maxGroupShift = 4;
+
+  bool  initDone = false;
+  bool  initMinMaxDone = false;
+  int filterSetIndex;
+  int classifierIdx;
+  int alt_num;
+  std::vector<int>  idxCorr;
+  int idxClassMin, idxClassMax;
+  // group :
+  std::vector<int>  groupIdxCorr;
+  int groupShift;
+  int groupSize;
+  int groupNum;
+  bool usePrev;
+
+  int apsIdx;
+
+  void reset() 
+  {
+    idxCorr.resize(MAX_NUM_ALF_CLASSES, 0);
+    groupIdxCorr.resize(MAX_NUM_ALF_CLASSES, 0);
+
+    std::fill( idxCorr.begin(), idxCorr.end(), 0 );
+    idxClassMin = 0;
+    idxClassMax = MAX_NUM_ALF_CLASSES - 1;
+
+    std::fill( groupIdxCorr.begin(), groupIdxCorr.end(), 0 );
+    groupShift = groupNum = 0;
+    groupSize = MAX_NUM_ALF_CLASSES;
+
+    apsIdx = -1;
+
+    usePrev = false;
+
+    initDone = false;
+  }
+
+  void setMinMax( const Pel lumaMin = 0, const Pel lumaMax = 1024, const bool bCheckClassifier = true ) 
+  {
+    const int c = classifierIdx;
+    const int bitDepth = 10;
+    idxClassMin = (!bCheckClassifier || c == 1) ? ((lumaMin * ALF_NUM_CLASSES_CLASSIFIER[c]) >> bitDepth) : 0 ;
+    idxClassMax = (!bCheckClassifier || c == 1) ? ((lumaMax * ALF_NUM_CLASSES_CLASSIFIER[c]) >> bitDepth) : (ALF_NUM_CLASSES_CLASSIFIER[c] - 1) ;
+
+    initMinMaxDone = true;
+  }
+
+  void init( const int f, const int a, const int c ) 
+  {
+    filterSetIndex  = f;
+    alt_num         = a;
+    classifierIdx   = c;
+
+    reset();
+
+    idxClassMin = 0 ;
+    idxClassMax = ALF_NUM_CLASSES_CLASSIFIER[c] - 1 ;
+
+    initDone = true;
+  }
+
+  int setGroupSize( const int _groupShift ) 
+  {
+    groupShift  = _groupShift;
+    groupNum    = 1 << groupShift;
+
+    const int kMin = idxClassMin;
+    const int kMax = idxClassMax;
+    groupSize = (kMax - kMin + 1) >> groupShift;
+    return groupSize;
+  }
+
+  void  fillIdxCorr() 
+  {
+    if ( usePrev )
+    {
+      return;
+    }
+
+    const int kMin = idxClassMin;
+    const int kMax = idxClassMax;
+
+    CHECK( groupSize != ((kMax - kMin + 1) >> groupShift), "fillIdxCorr() check groupSize failed.");
+
+    memset( idxCorr.data(), 0, sizeof(int) * idxCorr.size() );
+    for ( int g = 0; g < groupNum; g++ )
+    {
+      int kMinG = kMin + g * groupSize;
+      int kMaxG = (g == groupNum - 1) ? (kMax + 1) : (kMin + (g + 1) * groupSize);
+      for ( int k = kMinG; k < kMaxG; k++ ) 
+      {
+        idxCorr[k] = groupIdxCorr[g];
+      }
+    }
+
+  }
+
+  void setApsIdx( const int _apsIdx ) 
+  {
+    apsIdx = _apsIdx;
+  }
+
+  void copyFrom( ScaleAlf& other ) 
+  {
+    *this = other;
+  }
+
+};
+#endif
+
 struct AlfParam
 {
   bool                         enabledFlag[MAX_NUM_COMPONENT];                          // alf_slice_enable_flag, alf_chroma_idc
@@ -720,6 +875,7 @@ struct AlfParam
   {
     return !( *this == other );
   }
+
 };
 
 struct CcAlfFilterParam

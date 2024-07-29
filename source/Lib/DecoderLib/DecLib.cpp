@@ -208,7 +208,9 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
                 pcEncPic->lumaClpRngforQuant.min = pic->cs->slice->getLumaPelMin();
                 pcEncPic->lumaClpRngforQuant.max = pic->cs->slice->getLumaPelMax();
 #endif
-
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+                pcEncPic->cs->slice->copyAlfScale( *pic->cs->slice );
+#endif
                 if( debugCTU >= 0 && poc == debugPOC )
                 {
                   pcEncPic->cs->initStructData();
@@ -325,6 +327,12 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
                 {
                   pcEncPic->copySAO( *pic, 1 );
                 }
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+                if ( pic->cs->sps->getALFEnabledFlag() )
+                {
+                  pcDecLib->backupAlfScalePrev( pcEncPic->m_alfScalePrev );
+                }
+#endif
                 pcEncPic->cs->initStructData();
                 pcEncPic->cs->copyStructure( *pic->cs, CH_L, true, true );
 

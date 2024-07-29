@@ -2159,6 +2159,24 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   if( pcSPS->getALFEnabledFlag() )
   {
     READ_FLAG( uiCode, "sps_alf_precision_flag" );                  pcSPS->setAlfPrecisionFlag( uiCode ? true : false );
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+    int alfScaleMode = 0;
+    READ_FLAG( uiCode, "sps_alf_scale_mode0");     
+    if ( uiCode )
+    {
+      alfScaleMode = 1;
+      READ_FLAG( uiCode, "sps_alf_scale_mode1");
+      alfScaleMode += uiCode;
+      if ( uiCode )
+      {
+        READ_FLAG( uiCode, "sps_alf_scale_mode2");
+        alfScaleMode += uiCode;
+      }
+    }
+    pcSPS->setAlfScaleMode( alfScaleMode );
+
+    pcSPS->setAlfScalePrevEnabled( alfScaleMode==2 ? false : true );
+#endif
   }
   else
   {
@@ -4620,6 +4638,123 @@ void  HLSyntaxReader::checkAlfNaluTidAndPicTid(Slice* pcSlice, PicHeader* picHea
   }
 }
 
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+void HLSyntaxReader::parseScaleAlf( Slice* pcSlice, SPS* sps, ParameterSetManager* parameterSetManager, int alfCbUsedFlag, int alfCrUsedFlag )
+{
+  uint32_t  uiCode;
+  const int nbCorrMax = nbCorrAlfScale[ sps->getAlfScaleMode() ];
+  bool  bReadUseAlfScale = false;
+
+  pcSlice->resetAlfScale();
+
+  pcSlice->setUseAlfScale( false );
+
+  if ( !sps->getAlfScaleMode() )
+  {
+    return;
+  }
+
+  for (int i = 0; i < pcSlice->getTileGroupNumAps(); i++)
+  {
+    const int apsIdx = pcSlice->getTileGroupApsIdLuma()[i];
+
+    APS* curAps = parameterSetManager->getAPS(apsIdx, ALF_APS);
+    const AlfParam& alfParam = curAps->getAlfAPSParam();
+
+    const int numAlts = alfParam.numAlternativesLuma;
+
+    for ( int j = 0; j < numAlts; j++ )
+    {
+      ScaleAlf& curScaleAlfParam = pcSlice->getAlfScale( i , j );
+
+      curScaleAlfParam.init( apsIdx, j, alfParam.lumaClassifierIdx[j] );
+      curScaleAlfParam.apsIdx = apsIdx;
+
+      if ( !bReadUseAlfScale ) 
+      {
+        READ_FLAG( uiCode, "slice_alf_use_scale" );
+        pcSlice->setUseAlfScale( uiCode ? true : false );
+        bReadUseAlfScale = true;
+      }
+
+      if ( !pcSlice->getUseAlfScale() ) 
+      {
+        continue;
+      }
+
+      if ( sps->getAlfScalePrevEnabled() )
+      {
+        READ_FLAG( uiCode, "slice_alf_scale_use_prev");
+        curScaleAlfParam.usePrev = uiCode ? true : false;
+        if ( curScaleAlfParam.usePrev ) 
+        {
+          continue;
+        }
+      }
+      else
+      {
+        curScaleAlfParam.usePrev = false;
+      }
+
+      int groupShift = 0;
+      READ_FLAG( uiCode, "slice_alf_scale_groupShift" );
+      while ( uiCode )
+      {
+        groupShift++;
+        READ_FLAG( uiCode, "slice_alf_scale_groupShift" );
+      }
+
+      curScaleAlfParam.groupShift = groupShift;
+
+      int nbGroup = 1 << groupShift;
+      curScaleAlfParam.groupNum = nbGroup;
+
+      for ( int g=0 ; g < nbGroup; g++ ) 
+      {
+        curScaleAlfParam.groupIdxCorr[g] = 0;
+
+        READ_FLAG( uiCode, "slice_alf_scale_groupIdxCorr");
+
+        if ( uiCode ) 
+        {
+          curScaleAlfParam.groupIdxCorr[g]++;
+          if ( nbCorrMax > 2 ) 
+          {
+            int length = ceilLog2(nbCorrMax - 1);
+            READ_CODE( length, uiCode, "slice_alf_scale_groupIdxCorr" );
+            curScaleAlfParam.groupIdxCorr[g] += uiCode;
+          }
+        }
+      }
+
+    }
+  }
+
+  for ( int comp = 1; comp < MAX_NUM_COMPONENT; comp++ )
+  {
+    if ( (comp == 1) ? alfCbUsedFlag : alfCrUsedFlag )
+    {
+      int s = 0;
+      READ_FLAG( uiCode, "slice_alf_chroma_scale_enabled" );
+      s = (int)uiCode;
+      if ( s )
+      {
+        const int nbCorr = nbCorrChromaAlfScale[ sps->getAlfScaleMode() ];
+        int length = ceilLog2(nbCorr - 1);
+        READ_CODE( length, uiCode, "slice_alf_chroma_scale_enabled" );
+        s += (int)uiCode;
+      }
+      pcSlice->setAlfScaleChroma( comp, s );
+    }
+    else
+    {
+      pcSlice->setAlfScaleChroma( comp, 0 );
+    }
+  }
+
+}
+#endif
+
 #if EMBEDDED_APS
 void HLSyntaxReader::parseSliceHeader(Slice* pcSlice, PicHeader* picHeader, ParameterSetManager *parameterSetManager, const int prevTid0POC, const int prevPicPOC, const int layerId, std::vector<int>& accessUnitApsNals)
 #else
@@ -4832,6 +4967,13 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
   //   set default values in case slice overrides are disabled
   pcSlice->inheritFromPicHeader(picHeader, pps, sps);
 
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+  for (int comp = 1; comp < MAX_NUM_COMPONENT; comp++)
+  {
+    pcSlice->setAlfScaleChroma( comp, 0 );
+  }
+#endif
+
   if (sps->getALFEnabledFlag() && !pps->getAlfInfoInPhFlag())
   {
     READ_FLAG(uiCode, "slice_alf_enabled_flag");
@@ -4839,6 +4981,11 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
 
     int alfCbEnabledFlag = 0;
     int alfCrEnabledFlag = 0;
+
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+    int alfCbUsedFlag = 0;
+    int alfCrUsedFlag = 0;
+#endif
 
     if (uiCode)
     {
@@ -4904,7 +5051,18 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
     pcSlice->setTileGroupAlfEnabledFlag(COMPONENT_Cb, alfCbEnabledFlag);
     pcSlice->setTileGroupAlfEnabledFlag(COMPONENT_Cr, alfCrEnabledFlag);
 
-    CcAlfFilterParam &filterParam = pcSlice->m_ccAlfFilterParam;
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+    if (alfCbEnabledFlag)
+    {
+      alfCbUsedFlag += 1;
+    }
+    if (alfCrEnabledFlag)
+    {
+      alfCrUsedFlag += 1;
+    }
+#endif
+
+    CcAlfFilterParam& filterParam = pcSlice->m_ccAlfFilterParam;
     if (sps->getCCALFEnabledFlag() && pcSlice->getTileGroupAlfEnabledFlag(COMPONENT_Y))
     {
       READ_FLAG(uiCode, "slice_cc_alf_cb_enabled_flag");
@@ -4929,6 +5087,18 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
         READ_CODE(3, uiCode, "slice_cc_alf_cr_aps_id");
         pcSlice->setTileGroupCcAlfCrApsId(uiCode);
       }
+
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+      if (filterParam.ccAlfFilterEnabled[COMPONENT_Cb - 1])
+      {
+        alfCbUsedFlag += 1;
+      }
+      if (filterParam.ccAlfFilterEnabled[COMPONENT_Cr - 1])
+      {
+        alfCrUsedFlag += 1;
+      }
+#endif
+
     }
     else
     {
@@ -4937,6 +5107,10 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
       pcSlice->setTileGroupCcAlfCbApsId(-1);
       pcSlice->setTileGroupCcAlfCrApsId(-1);
     }
+
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+    parseScaleAlf( pcSlice, sps, parameterSetManager, alfCbUsedFlag, alfCrUsedFlag );
+#endif
   }
   if (picHeader->getLmcsEnabledFlag() && !pcSlice->getPictureHeaderInSliceHeader())
   {

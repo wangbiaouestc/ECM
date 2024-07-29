@@ -432,6 +432,19 @@ public:
     , char coeffBits
 #endif
   );
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+  void    alfAddCorrect( AlfClassifier** classifier, const PelUnitBuf& recDst, const CPelUnitBuf& recSrc, const Area& blkDst, const Area& blk, const ComponentID compId, char coeffBits, int* idxCorr );
+  void    alfAddCorrectChroma( CodingStructure& cs, PelUnitBuf& tmpYuv_recSAO );
+  void    setAlfScaleMode( const int mode );
+  int     getScaleCorrInt   ( const int s );
+  double  getScaleCorrDouble( const int s );
+  void    storeAlfScalePrev( CodingStructure& cs, Slice& slice );
+  void    backupAlfScalePrev( std::vector<int> (&alfScalePrevBckup)[ALF_CTB_MAX_NUM_APS][MAX_NUM_ALF_ALTERNATIVES_LUMA] ) const;
+  void    restoreAlfScalePrev( const std::vector<int> (&alfScalePrevBckup)[ALF_CTB_MAX_NUM_APS][MAX_NUM_ALF_ALTERNATIVES_LUMA] );
+  void    getAlfScalePrev( CodingStructure& cs, Slice& slice );
+  std::vector<int>&  getAlfScalePrev( const int apsIdx, const int alt ) { return m_idxCorrPrev[apsIdx][alt]; }
+  void    resetAlfScalePrev( Slice& slice );
+#endif
   void (*m_filter9x9Blk)(AlfClassifier **classifier, const PelUnitBuf &recDst, const PelUnitBuf &recBeforeDb, const PelUnitBuf &resi, const CPelUnitBuf &recSrc, const Area &blkDst, const Area &blk, const ComponentID compId, const short *filterSet, const Pel *fClipSet, const ClpRng &clpRng, CodingStructure &cs, Pel ***fixedFilterResults, Pel ***fixedFilterResiResults, int fixedFilterSetIdx
 #if JVET_AB0184_ALF_MORE_FIXED_FILTER_OUTPUT_TAPS
                          , Pel ***fixedFilterResultsPerCtu, bool isFixedFilterPaddedPerCtu
@@ -834,6 +847,9 @@ protected:
   uint8_t*                     m_ctuAlternative[MAX_NUM_COMPONENT];
   PelStorage                   m_tempBuf;
   PelStorage                   m_tempBuf2;
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+  PelStorage                   m_tempBuf3;
+#endif
 #if JVET_AA0095_ALF_WITH_SAMPLES_BEFORE_DBF
   PelStorage                   m_tempBufBeforeDb;
   PelStorage                   m_tempBufBeforeDb2;
@@ -867,6 +883,14 @@ protected:
 #endif
   ChromaFormat                 m_chromaFormat;
   ClpRngs                      m_clpRngs;
+
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+  int                          m_nbCorr;
+  std::vector<int>             m_scaleCorr;
+  int                          m_nbCorrChroma;
+  std::vector<int>             m_scaleCorrChroma;
+  std::vector<int>             m_idxCorrPrev[ALF_CTB_MAX_NUM_APS][MAX_NUM_ALF_ALTERNATIVES_LUMA];
+#endif
 };
 
 #endif

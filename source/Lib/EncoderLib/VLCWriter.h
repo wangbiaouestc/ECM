@@ -149,6 +149,10 @@ public:
 #else
   void  codeSliceHeader         ( Slice* pcSlice );
 #endif
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+  void  writeScaleAlf           ( const SPS* sps, ScaleAlf& curScaleAlfParam, const int nbCorr );
+  void  writeScaleAlf           ( Slice* pcSlice );
+#endif
   void  codeConstraintInfo      ( const ConstraintInfo* cinfo );
   void  codeProfileTierLevel    ( const ProfileTierLevel* ptl, bool profileTierPresentFlag, int maxNumSubLayersMinus1 );
   void  codeOlsHrdParameters(const GeneralHrdParams * generalHrd, const OlsHrdParams *olsHrd , const uint32_t firstSubLayer, const uint32_t maxNumSubLayersMinus1);

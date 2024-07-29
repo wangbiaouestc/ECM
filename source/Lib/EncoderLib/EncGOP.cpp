@@ -3469,6 +3469,12 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
     bool encPic = false;
     // test if we can skip the picture entirely or decode instead of encoding
     trySkipOrDecodePicture( decPic, encPic, *m_pcCfg, pcPic, m_pcEncLib->getApsMap() );
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+    if ( decPic && pcPic != nullptr && pcPic->cs->sps->getALFEnabledFlag() )
+    {
+      m_pcALF->restoreAlfScalePrev( pcPic->m_alfScalePrev );
+    }
+#endif
 
     pcPic->cs->slice = pcSlice; // please keep this
 #if ENABLE_QPA
@@ -3987,7 +3993,9 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
         {
           pcPic->slices[s]->setTileGroupAlfEnabledFlag(COMPONENT_Y, false);
         }
+
         m_pcALF->initCABACEstimator(m_pcEncLib->getCABACEncoder(), m_pcEncLib->getCtxCache(), pcSlice, m_pcEncLib->getApsMap());
+
         m_pcALF->ALFProcess(cs, pcSlice->getLambdas()
 #if ENABLE_QPA
           , (m_pcCfg->getUsePerceptQPA() && !m_pcCfg->getUseRateCtrl() && pcSlice->getPPS()->getUseDQP() ? m_pcEncLib->getRdCost(PARL_PARAM0(0))->getChromaWeight() : 0.0)
@@ -4803,7 +4811,6 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
       msg( NOTICE, "\n" );
       fflush( stdout );
     }
-
 
     DTRACE_UPDATE( g_trace_ctx, ( std::make_pair( "final", 0 ) ) );
 

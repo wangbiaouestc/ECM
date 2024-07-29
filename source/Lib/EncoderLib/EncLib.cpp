@@ -2254,6 +2254,30 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setTempCabacInitMode( m_tempCabacInitMode );
 #endif
 
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+  sps.setAlfScalePrevEnabled( true );
+  if ( getIntraPeriod() == 1 )
+  {
+    sps.setAlfScaleMode( 0 );
+  }
+  else if ( getIntraPeriod() < 0 )
+  {
+    if ( m_sourceWidth * m_sourceHeight < 1920 * 1080 )
+    {
+      sps.setAlfScaleMode( 2 );
+      sps.setAlfScalePrevEnabled( false );
+    }
+    else
+    {
+      sps.setAlfScaleMode( 3 );
+    }
+  }
+  else
+  {
+    sps.setAlfScaleMode( 1 );
+  }
+#endif
+
   if (sps.getVuiParametersPresentFlag())
   {
     VUI* pcVUI = sps.getVuiParameters();

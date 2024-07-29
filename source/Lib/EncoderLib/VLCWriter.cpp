@@ -1332,6 +1332,17 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
   if( pcSPS->getALFEnabledFlag() )
   {
     WRITE_FLAG( pcSPS->getAlfPrecisionFlag(),                                        "sps_alf_precision_flag" );
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+    WRITE_FLAG( pcSPS->getAlfScaleMode() > 0,                                        "sps_alf_scale_mode0" );
+    if ( pcSPS->getAlfScaleMode() )
+    {
+      WRITE_FLAG( pcSPS->getAlfScaleMode() > 1,                                      "sps_alf_scale_mode1" );
+      if ( pcSPS->getAlfScaleMode() > 1 )
+      {
+        WRITE_FLAG( pcSPS->getAlfScaleMode() - 2,                                    "sps_alf_scale_mode2" );
+      }
+    }
+#endif
   }
 #endif
   if (pcSPS->getALFEnabledFlag() && pcSPS->getChromaFormatIdc() != CHROMA_400)
@@ -3134,7 +3145,7 @@ void HLSWriter::codeSliceHeader         ( Slice* pcSlice )
 #endif
 #endif
       WRITE_CODE(pcSlice->getTileGroupNumAps(), 3, "slice_num_alf_aps_ids_luma");
-      const std::vector<int>&   apsId = pcSlice->getTileGroupApsIdLuma();
+      const std::vector<int>& apsId = pcSlice->getTileGroupApsIdLuma();
       for (int i = 0; i < pcSlice->getTileGroupNumAps(); i++)
       {
         WRITE_CODE(apsId[i], 3, "slice_alf_aps_id_luma");
@@ -3163,7 +3174,7 @@ void HLSWriter::codeSliceHeader         ( Slice* pcSlice )
 
       if (pcSlice->getSPS()->getCCALFEnabledFlag())
       {
-        CcAlfFilterParam &filterParam = pcSlice->m_ccAlfFilterParam;
+        CcAlfFilterParam& filterParam = pcSlice->m_ccAlfFilterParam;
         WRITE_FLAG(filterParam.ccAlfFilterEnabled[COMPONENT_Cb - 1] ? 1 : 0, "slice_cc_alf_cb_enabled_flag");
         if (filterParam.ccAlfFilterEnabled[COMPONENT_Cb - 1])
         {
@@ -3178,6 +3189,10 @@ void HLSWriter::codeSliceHeader         ( Slice* pcSlice )
           WRITE_CODE(pcSlice->getTileGroupCcAlfCrApsId(), 3, "slice_cc_alf_cr_aps_id");
         }
       }
+
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+      writeScaleAlf( pcSlice );
+#endif
     }
   }
 
@@ -3659,6 +3674,122 @@ void HLSWriter::codeSliceHeader         ( Slice* pcSlice )
   }
 #endif
 }
+
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+void  HLSWriter::writeScaleAlf( const SPS* sps, ScaleAlf& curScaleAlfParam, const int nbCorrMax )
+{
+  if ( !sps->getAlfScaleMode() )
+  {
+    return;
+  }
+
+  if ( !curScaleAlfParam.initDone ) 
+  {
+    // this aps is not used in this slice
+    if ( sps->getAlfScalePrevEnabled() )
+    {
+      //printf("codeScaleCorrLumaAlf( apsIdx=%d, alt=%d, usePrev=%d, nbCorrMax=%d ) this aps is not used.\n", curScaleAlfParam.apsIdx, curScaleAlfParam.alt_num, curScaleAlfParam.usePrev ? 1 : 0, nbCorrMax );
+      WRITE_FLAG( 1, "slice_alf_scale_use_prev");
+    }
+    else
+    {
+      //printf("codeScaleCorrLumaAlf( apsIdx=%d, alt=%d ) this aps is not used.\n", curScaleAlfParam.apsIdx, curScaleAlfParam.alt_num );
+      WRITE_FLAG( 0, "slice_alf_scale_groupShift");   // groupShift = 0
+      WRITE_FLAG( 0, "slice_alf_scale_groupShift");   // curScaleAlfParam.groupIdxCorr[0] = 0
+    }
+    return;
+  }
+
+  if ( sps->getAlfScalePrevEnabled() )
+  {
+    bool  usePrev = curScaleAlfParam.usePrev;
+    WRITE_FLAG( usePrev ? 1 : 0, "slice_alf_scale_use_prev");
+    if ( usePrev )
+    {
+      return;
+    }
+  }
+
+  int groupShift = curScaleAlfParam.groupShift;
+  WRITE_FLAG( groupShift > 0 ? 1 : 0, "slice_alf_scale_groupShift" );
+  while ( groupShift )
+  {
+    groupShift--;
+    WRITE_FLAG( groupShift > 0 ? 1 : 0, "slice_alf_scale_groupShift");
+  }
+
+  for ( int g = 0 ; g < curScaleAlfParam.groupNum ; g++ ) 
+  {
+    int value = curScaleAlfParam.groupIdxCorr[g];
+    uint32_t  uiCode = value ? 1 : 0;  // if not used in the pic, initDone=false and groupIdxCorr.size()=0
+    WRITE_FLAG( uiCode ? 1 : 0, "slice_alf_scale_groupIdxCorr");
+
+    if ( uiCode && nbCorrMax > 2 ) 
+    {
+      int length = ceilLog2(nbCorrMax - 1);
+      WRITE_CODE( value - 1, length, "slice_alf_scale_groupIdxCorr");
+    }
+  }
+}
+
+void  HLSWriter::writeScaleAlf( Slice* pcSlice )
+{
+  if ( !pcSlice->getSPS()->getAlfScaleMode() )
+  {
+    return;
+  }
+
+  const int nbCorrMax = nbCorrAlfScale[ pcSlice->getSPS()->getAlfScaleMode() ];
+  bool  bCodedUseAlfScale = false;
+
+  const std::vector<int32_t>& tabTileGroupApsIdLuma = pcSlice->getTileGroupApsIdLuma();
+  for (int i = 0; i < pcSlice->getTileGroupNumAps(); i++)
+  {
+    if ( i >= tabTileGroupApsIdLuma.size() ) 
+    {
+      continue; 
+    }
+    const int apsIdx = tabTileGroupApsIdLuma[i];
+    const AlfParam& alfParam = pcSlice->getAlfAPSs()[apsIdx]->getAlfAPSParam();
+    const int numAlts = alfParam.numAlternativesLuma;
+
+    for ( int j = 0; j < numAlts; j++ )
+    {
+      ScaleAlf& curScaleAlfParam = pcSlice->getAlfScale( i, j );
+
+      if ( !bCodedUseAlfScale ) 
+      {
+        WRITE_FLAG( pcSlice->getUseAlfScale() ? 1 : 0, "slice_alf_use_scale");
+        bCodedUseAlfScale = true;
+      }
+
+      if ( !pcSlice->getUseAlfScale() ) 
+      {
+        continue;
+      }
+
+      curScaleAlfParam.apsIdx = apsIdx;
+      writeScaleAlf( pcSlice->getSPS(), curScaleAlfParam, nbCorrMax );
+    }
+  }
+
+  for ( int comp = 1; comp < MAX_NUM_COMPONENT; comp++ )
+  {
+    if ( pcSlice->getTileGroupAlfEnabledFlag( (ComponentID)comp ) || pcSlice->m_ccAlfFilterParam.ccAlfFilterEnabled[comp - 1] )
+    {
+      const int  s = pcSlice->getAlfScaleChroma( comp );
+      WRITE_FLAG( (s > 0) ? 1 : 0, "slice_alf_chroma_scale_enabled");
+      if ( s )
+      {
+        const int nbCorrMax = nbCorrChromaAlfScale[ pcSlice->getSPS()->getAlfScaleMode() ];
+        int length = ceilLog2(nbCorrMax - 1);
+        WRITE_CODE( s - 1, length, "slice_alf_chroma_scale_enabled");
+      }
+    }
+  }
+
+}
+#endif
 
 void  HLSWriter::codeConstraintInfo  ( const ConstraintInfo* cinfo )
 {
