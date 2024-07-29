@@ -2119,7 +2119,12 @@ void PelStorage::create( const ChromaFormat &_chromaFormat, const Area& _area, c
 {
   CHECK( !bufs.empty(), "Trying to re-create an already initialized buffer" );
 
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+  bool      lumaEmpty   = _chromaFormat == CHROMA_ONLY_420 ? true : false;
+  chromaFormat          = _chromaFormat == CHROMA_ONLY_420 ? CHROMA_420 : _chromaFormat;
+#else
   chromaFormat = _chromaFormat;
+#endif
 
   const uint32_t numCh = getNumberValidComponents( _chromaFormat );
 
@@ -2135,9 +2140,8 @@ void PelStorage::create( const ChromaFormat &_chromaFormat, const Area& _area, c
   for( uint32_t i = 0; i < numCh; i++ )
   {
     const ComponentID compID = ComponentID( i );
-    const unsigned scaleX = ::getComponentScaleX( compID, _chromaFormat );
-    const unsigned scaleY = ::getComponentScaleY( compID, _chromaFormat );
-
+    const unsigned scaleX = ::getComponentScaleX( compID, chromaFormat );
+    const unsigned scaleY = ::getComponentScaleY( compID, chromaFormat );
     unsigned scaledHeight = extHeight >> scaleY;
     unsigned scaledWidth  = extWidth  >> scaleX;
     unsigned ymargin      = _margin >> (_scaleChromaMargin?scaleY:0);
@@ -2154,8 +2158,21 @@ void PelStorage::create( const ChromaFormat &_chromaFormat, const Area& _area, c
     uint32_t area = totalWidth * totalHeight;
     CHECK( !area, "Trying to create a buffer with zero area" );
 
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+    Pel* topLeft  = nullptr;
+    if ( lumaEmpty && i == 0 ) 
+    {
+      m_origin[i]   = (Pel*)xMalloc( Pel, 1 );  // this component is dummy
+    }
+    else
+    {
+      m_origin[i] = (Pel*)xMalloc( Pel, area );
+      topLeft     = m_origin[i] + totalWidth * ymargin + xmargin;
+    }
+#else
     m_origin[i] = ( Pel* ) xMalloc( Pel, area );
     Pel* topLeft = m_origin[i] + totalWidth * ymargin + xmargin;
+#endif
     bufs.push_back( PelBuf( topLeft, totalWidth, _area.width >> scaleX, _area.height >> scaleY ) );
   }
 }

@@ -52,6 +52,7 @@
 #include <cstdint>
 
 
+
 #define BASE_ENCODER                                      1
 #define BASE_NORMATIVE                                    1
 #define TOOLS                                             1
@@ -465,6 +466,7 @@
 #define JVET_AI0096_ADAPTIVE_CLIPPING_BIT_DEPTH_FIX       1 // JVET-AI0096: Fix to adaptive clipping for handling bit depths other than 10
 #endif
 #define JVET_AH0057_CCALF_COEFF_PRECISION                 1 // JVET-AH0057: adaptive precision for CCALF coefficients
+#define JVET_AI0084_ALF_RESIDUALS_SCALING                 1 // JVET_AI0084: non-fixed ALF residuals scaling
 #define JVET_AI0058_ALF_RELAXED_RDO_LUMA                  1 // JVET-AI0058: Relaxed ALF Luma RDO
 #define JVET_AI0166_CCALF_CHROMA_SAO_INPUT                1 // JVET-AI0166: CCALF with Chroma inputs
 
@@ -1016,6 +1018,9 @@ enum SliceType
 /// chroma formats (according to how the monochrome or the color planes are intended to be coded)
 enum ChromaFormat
 {
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+  CHROMA_ONLY_420   = 5,
+#endif
   CHROMA_400        = 0,
   CHROMA_420        = 1,
   CHROMA_422        = 2,

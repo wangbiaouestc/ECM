@@ -508,6 +508,7 @@ void Picture::finalInit( const VPS* vps, const SPS& sps, const PPS& pps, PicHead
 #endif
 
   memcpy(cs->alfApss, alfApss, sizeof(cs->alfApss));
+
   cs->lmcsAps = lmcsAps;
   cs->scalinglistAps = scalingListAps;
   cs->pcv     = pps.pcv;

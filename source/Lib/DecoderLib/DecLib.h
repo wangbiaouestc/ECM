@@ -312,6 +312,12 @@ public:
 #endif
 
   const SPS *getActiveSPS() { return m_parameterSetManager.getActiveSPS(); }
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+  void backupAlfScalePrev( std::vector<int> (&alfScalePrevBckup)[ALF_CTB_MAX_NUM_APS][MAX_NUM_ALF_ALTERNATIVES_LUMA]) const
+  { 
+    m_cALF.backupAlfScalePrev( alfScalePrevBckup );
+  }
+#endif
 
 protected:
   void  xUpdateRasInit(Slice* slice);

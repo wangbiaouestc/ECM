@@ -9738,7 +9738,6 @@ void CABACWriter::codeAlfCtuEnableFlag( CodingStructure& cs, uint32_t ctuRsAddr,
   }
 }
 
-
 #if JVET_X0071_LONGER_CCALF
 void CABACWriter::codeCcAlfFilterControlIdc(uint8_t idcVal, CodingStructure &cs, const ComponentID compID,
   const int curIdx, const uint8_t *filterControlIdc, Position lumaPos,
