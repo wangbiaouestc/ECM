@@ -811,6 +811,9 @@ public:
   bool          altLMFlag[NUM_MERGE_CANDS];
   AltLMInterUnit altLMParaNeighbours[NUM_MERGE_CANDS];
 #endif
+#if JVET_AI0187_TMVP_FOR_CMVP
+  int           candtype[NUM_MERGE_CANDS];
+#endif
 #else
   MergeCtx() : numValidMergeCand( 0 ), hasMergedCandList( false ) { }
   ~MergeCtx() {}

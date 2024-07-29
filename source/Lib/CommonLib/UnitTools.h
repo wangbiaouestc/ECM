@@ -368,6 +368,9 @@ namespace PU
 #endif
   uint32_t getAltMergeMvdThreshold  (const PredictionUnit &pu);
 #endif
+#if JVET_AI0187_TMVP_FOR_CMVP
+  void getBMCMVPMergeCandidates(const PredictionUnit &pu, MergeCtx& mergeCtx, MergeCtx& tmpMrgCtx, int maxNumMergeCand, int& cnt);
+#endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   void getNonAdjacentMergeCandSubTMVP(const PredictionUnit &pu, MergeCtx& mvpMrgCtx, int col);
@@ -753,6 +756,9 @@ namespace PU
   bool isBiPredFromDifferentDirEqDistPoc(const PredictionUnit& pu, int refIdx0, int refIdx1);
   bool addBMMergeHMVPCand(const CodingStructure &cs, MergeCtx& mrgCtx, const int& mrgCandIdx, const uint32_t maxNumMergeCandMin1, int &cnt
     , const bool isAvailableA1, const MotionInfo miLeft, const bool isAvailableB1, const MotionInfo miAbove
+#if JVET_AI0187_TMVP_FOR_CMVP
+    , MergeCtx& tmpMrgCtx, int& tmpMrgIdx
+#endif
 #if !JVET_Z0075_IBC_HMVP_ENLARGE
     , const bool ibcFlag
     , const bool isGt4x4
@@ -762,6 +768,9 @@ namespace PU
 #endif
   );
   void getInterBMCandidates(const PredictionUnit &pu, MergeCtx& mrgCtx,
+#if JVET_AI0187_TMVP_FOR_CMVP
+    MergeCtx& tmpMrgCtx1,
+#endif
     const int& mrgCandIdx = -1
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
     , MergeCtx* mvpMrgCtx1 = NULL
@@ -769,8 +778,13 @@ namespace PU
 #endif
   );
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
+#if JVET_AI0187_TMVP_FOR_CMVP
+  void getTmvpBMCand(const PredictionUnit &pu, MergeCtx& mvpMrgCtx, MergeCtx& tmpMrgCtx);
+  void getNonAdjacentBMCand(const PredictionUnit &pu, MergeCtx& mvpMrgCtx, MergeCtx& tmpMrgCtx);
+#else
   void getTmvpBMCand(const PredictionUnit &pu, MergeCtx& mvpMrgCtx);
   void getNonAdjacentBMCand(const PredictionUnit &pu, MergeCtx& mvpMrgCtx);
+#endif
 #endif
 #endif
   bool getInterMergeSubPuRecurCand(const PredictionUnit &pu, MergeCtx &mrgCtx, const int count);

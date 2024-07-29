@@ -4086,6 +4086,32 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
             if (pu.bmMergeFlag)
             {
               auto mergeIdx = pu.bmDir == 2 ? pu.mergeIdx - BM_MRG_MAX_NUM_CANDS : pu.mergeIdx;
+#if JVET_AI0187_TMVP_FOR_CMVP
+              MergeCtx tmpBMMergeCtx;
+              for (uint32_t ui = 0; ui < NUM_MERGE_CANDS; ++ui)
+              {
+                tmpBMMergeCtx.bcwIdx[ui] = BCW_DEFAULT;
+#if JVET_AG0276_NLIC
+                tmpBMMergeCtx.altLMFlag[ui] = false;
+                tmpBMMergeCtx.altLMParaNeighbours[ui].resetAltLinearModel();
+#endif
+#if INTER_LIC
+                tmpBMMergeCtx.licFlags[ui] = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+                tmpBMMergeCtx.setDefaultLICParamToCtx(ui);
+#endif
+#endif
+                tmpBMMergeCtx.interDirNeighbours[ui] = 0;
+                tmpBMMergeCtx.mvFieldNeighbours[(ui << 1)].refIdx = NOT_VALID;
+                tmpBMMergeCtx.mvFieldNeighbours[(ui << 1) + 1].refIdx = NOT_VALID;
+                tmpBMMergeCtx.useAltHpelIf[ui] = false;
+#if MULTI_HYP_PRED
+                tmpBMMergeCtx.addHypNeighbours[ui].clear();
+#endif
+                tmpBMMergeCtx.candCost[ui] = MAX_UINT64;
+              }
+              tmpBMMergeCtx.numValidMergeCand = 0;
+#endif
 #if JVET_W0090_ARMC_TM
               if (pu.cs->sps->getUseAML()
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
@@ -4112,7 +4138,11 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                 if ( tplAvail)
                 {
 #endif
+#if JVET_AI0187_TMVP_FOR_CMVP
+                  PU::getTmvpBMCand(pu, tmvpMergeCandCtx, tmpBMMergeCtx);
+#else
                 PU::getTmvpBMCand(pu, tmvpMergeCandCtx);
+#endif
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
                 }
 #endif
@@ -4132,7 +4162,11 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                 if ( tplAvail)
                 {
 #endif
+#if JVET_AI0187_TMVP_FOR_CMVP
+                  PU::getNonAdjacentBMCand(pu, namvpMergeCandCtx, tmpBMMergeCtx);
+#else
                 PU::getNonAdjacentBMCand(pu, namvpMergeCandCtx);
+#endif
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
                 }
 #endif
@@ -4150,6 +4184,9 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                 if (!tplAvail)
                 {
                   PU::getInterBMCandidates(pu, mrgCtx
+#if JVET_AI0187_TMVP_FOR_CMVP
+                    , tmpBMMergeCtx
+#endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
                     , -1
                     , NULL
@@ -4159,7 +4196,11 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
               }
                 else
 #endif
+#if JVET_AI0187_TMVP_FOR_CMVP
+                  PU::getInterBMCandidates(pu, mrgCtx, tmpBMMergeCtx, -1, &tmvpMergeCandCtx, &namvpMergeCandCtx);
+#else
                 PU::getInterBMCandidates(pu, mrgCtx, -1, &tmvpMergeCandCtx, &namvpMergeCandCtx);
+#endif
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS
                 }
 #endif
@@ -4170,7 +4211,11 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                 {
 #endif
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+#if JVET_AI0187_TMVP_FOR_CMVP
+                  PU::getInterBMCandidates(pu, mrgCtx, tmpBMMergeCtx, -1);
+#else
                 PU::getInterBMCandidates(pu, mrgCtx, -1);
+#endif
 #else
 #if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
                 PU::getInterBMCandidates(pu, mrgCtx, pu.cs->sps->getUseAML() && pu.cs->sps->getTMToolsEnableFlag() && (((mergeIdx / ADAPTIVE_SUB_GROUP_SIZE + 1)*ADAPTIVE_SUB_GROUP_SIZE < pu.cs->sps->getMaxNumBMMergeCand()) || (mergeIdx / ADAPTIVE_SUB_GROUP_SIZE) == 0) ? mergeIdx / ADAPTIVE_SUB_GROUP_SIZE * ADAPTIVE_SUB_GROUP_SIZE + ADAPTIVE_SUB_GROUP_SIZE - 1 : mergeIdx);
@@ -4372,7 +4417,11 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
               }
               else
 #endif
+#if JVET_AI0187_TMVP_FOR_CMVP
+              PU::getInterBMCandidates(pu, mrgCtx, tmpBMMergeCtx, mergeIdx);
+#else
               PU::getInterBMCandidates(pu, mrgCtx, mergeIdx);
+#endif
             }
             else
 #endif
@@ -4398,6 +4447,10 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
               {
 #endif
               PU::getTmvpMergeCand(pu, tmvpMergeCandCtx);
+#if JVET_AI0187_TMVP_FOR_CMVP
+              bool isLD = pu.cs->slice->getCheckLDC();
+              m_pcInterPred->adjustMergeCandidatesInOneCandidateGroup(pu, tmvpMergeCandCtx, pu.tmMergeFlag ? (isLD ? TM_ARMC_NUM_LD : TM_ARMC_NUM) : (isLD ? REGULAR_ARMC_NUM_LD : REGULAR_ARMC_NUM), -1, true);
+#endif
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
               }
 #endif

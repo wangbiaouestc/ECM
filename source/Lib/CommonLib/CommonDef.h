@@ -226,6 +226,13 @@ static const int MRG_MAX_NUM_CANDS =                                6; ///< MERG
 static const int AFF_NON_ADJACENT_DIST    =                          4;
 #endif
 
+#if JVET_AI0187_TMVP_FOR_CMVP
+static const int REGULAR_ARMC_NUM       =                             4;
+static const int REGULAR_ARMC_NUM_LD    =                             8;
+static const int TM_ARMC_NUM            =                             2;
+static const int TM_ARMC_NUM_LD         =                             5;
+#endif
+
 #if JVET_Z0139_HIST_AFF || JVET_Z0139_NA_AFF
 #if JVET_AI0183_MVP_EXTENSION
 static const int AFFINE_MRG_MAX_NUM_CANDS =                         18; ///< AFFINE MERGE

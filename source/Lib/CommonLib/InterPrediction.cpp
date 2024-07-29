@@ -13315,7 +13315,11 @@ void InterPrediction::adjustMergeCandidatesInOneCandidateGroupSubTMVP(Prediction
 #endif
 #if JVET_W0090_ARMC_TM
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
+#if JVET_AI0187_TMVP_FOR_CMVP
+void InterPrediction::adjustMergeCandidatesInOneCandidateGroup(PredictionUnit &pu, MergeCtx& mvpMergeCandCtx, int numRetrievedMergeCand, int mrgCandIdx, bool ReduceCandsForSimilarTMCost)
+#else
 void InterPrediction::adjustMergeCandidatesInOneCandidateGroup(PredictionUnit &pu, MergeCtx& mvpMergeCandCtx, int numRetrievedMergeCand, int mrgCandIdx)
+#endif
 {
   if (mvpMergeCandCtx.numValidMergeCand <= 1)
   {
@@ -13324,10 +13328,17 @@ void InterPrediction::adjustMergeCandidatesInOneCandidateGroup(PredictionUnit &p
 
   const int numCandInCategory = std::min(numRetrievedMergeCand, mvpMergeCandCtx.numValidMergeCand);
 
+#if JVET_AI0187_TMVP_FOR_CMVP
+  uint32_t rdCandList[NUM_MERGE_CANDS];
+  Distortion candCostList[NUM_MERGE_CANDS];
+
+  for (uint32_t j = 0; j < NUM_MERGE_CANDS; j++)
+#else
   uint32_t rdCandList[MRG_MAX_NUM_CANDS];
   Distortion candCostList[MRG_MAX_NUM_CANDS];
 
   for (uint32_t j = 0; j < MRG_MAX_NUM_CANDS; j++)
+#endif
   {
     rdCandList[j] = j;
     candCostList[j] = MAX_UINT;
@@ -13340,6 +13351,29 @@ void InterPrediction::adjustMergeCandidatesInOneCandidateGroup(PredictionUnit &p
 
   int nWidth = pu.lumaSize().width;
   int nHeight = pu.lumaSize().height;
+
+#if JVET_AI0187_TMVP_FOR_CMVP
+  bool CheckLic = true;
+  if (!pu.cu->slice->getCheckLDB())
+  {
+    int tplSize = 0;
+    if (m_bAMLTemplateAvailabe[0])
+    {
+      tplSize += nWidth;
+    }
+
+    if (m_bAMLTemplateAvailabe[1])
+    {
+      tplSize += nHeight;
+    }
+    int   ctuSize = pu.cs->slice->getSPS()->getCTUSize();
+    int thres = (256 == ctuSize) ? 32 : 16;
+    if (tplSize < thres)
+    {
+      CheckLic = false;
+    }
+  }
+#endif
 
   auto origMergeIdx = pu.mergeIdx;
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
@@ -13364,6 +13398,64 @@ void InterPrediction::adjustMergeCandidatesInOneCandidateGroup(PredictionUnit &p
 
       getBlkAMLRefTemplate(pu, pcBufPredRefTop, pcBufPredRefLeft);
 
+#if JVET_AI0187_TMVP_FOR_CMVP
+      if (ReduceCandsForSimilarTMCost && CheckLic && mvpMergeCandCtx.interDirNeighbours[uiMergeCand] != 3)
+      {
+        Distortion uiNoLICCost = MAX_UINT64;
+        Distortion uiBestCost = MAX_UINT64;
+        Distortion scaledCost = MAX_UINT64;
+        bool bestLICFlag = false;
+        for (int idx = 0; idx < 2; idx++)
+        {
+          bool licFlag = (idx == 0) ? false : true;
+#if INTER_LIC
+          uiCost = 0;
+          cDistParam.useMR = licFlag;
+#endif
+          if (m_bAMLTemplateAvailabe[0])
+          {
+            m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+
+            uiCost += cDistParam.distFunc(cDistParam);
+          }
+
+          if (m_bAMLTemplateAvailabe[1])
+          {
+            m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+
+            uiCost += cDistParam.distFunc(cDistParam);
+          }
+
+          if (licFlag == false)
+          {
+            uiNoLICCost = uiCost;
+            if (pu.cu->slice->getCheckLDB())
+            {
+              scaledCost = (uiCost >> 1) + (uiCost >> 4);
+            }
+            else
+            {
+              scaledCost = (uiCost >> 1);
+            }
+          }
+          else
+          {
+            scaledCost = uiCost;
+          }
+
+          if (scaledCost < uiBestCost)
+          {
+            uiBestCost = scaledCost;
+            bestLICFlag = licFlag;
+          }
+        }
+        uiCost = uiNoLICCost;
+        mvpMergeCandCtx.licFlags[uiMergeCand] = bestLICFlag;
+      }
+      else
+      {
+        cDistParam.useMR = false;
+#endif
       if (m_bAMLTemplateAvailabe[0])
       {
         m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
@@ -13377,15 +13469,77 @@ void InterPrediction::adjustMergeCandidatesInOneCandidateGroup(PredictionUnit &p
 
         uiCost += cDistParam.distFunc(cDistParam);
       }
+#if JVET_AI0187_TMVP_FOR_CMVP
+    }
+#endif
     }
     else
     {
       uiCost = mvpMergeCandCtx.candCost[uiMergeCand];
     }
 
-    updateCandList(uiMergeCand, uiCost, numCandInCategory, rdCandList, candCostList);
+#if JVET_AI0187_TMVP_FOR_CMVP
+    if (ReduceCandsForSimilarTMCost)
+    {
+      updateCandList(uiMergeCand, uiCost, mvpMergeCandCtx.numValidMergeCand, rdCandList, candCostList);
+    }
+    else
+    {
+#endif
+      updateCandList(uiMergeCand, uiCost, numCandInCategory, rdCandList, candCostList);
+#if JVET_AI0187_TMVP_FOR_CMVP
+    }
+#endif
   }
   pu.mergeIdx = origMergeIdx;
+#if JVET_AI0187_TMVP_FOR_CMVP
+  if (ReduceCandsForSimilarTMCost)
+  {
+    Distortion cost = pu.cs->slice->getCostForARMC();
+    uint32_t   candToBeRemoved = MRG_MAX_NUM_CANDS;
+    Distortion min = MAX_UINT64;
+    for (int sizeCandList = mvpMergeCandCtx.numValidMergeCand; sizeCandList > numRetrievedMergeCand; sizeCandList--)
+    {
+      min = MAX_UINT64;
+#if TM_MRG
+      if (pu.tmMergeFlag
+#if JVET_AA0132_CONFIGURABLE_TM_TOOLS
+        && pu.cs->sps->getUseTMMrgMode()
+#endif
+        )
+      {
+        candToBeRemoved = 0;
+        min = candCostList[0];
+      }
+#endif
+      for (uint32_t uiMergeCand = 0; uiMergeCand < sizeCandList - 1; ++uiMergeCand)
+      {
+        if (min > abs((int)(candCostList[uiMergeCand + 1] - candCostList[uiMergeCand])))
+        {
+          min = abs((int)(candCostList[uiMergeCand + 1] - candCostList[uiMergeCand]));
+          candToBeRemoved = uiMergeCand + 1;
+        }
+      }
+      if (min < cost)
+      {
+        uint32_t candToBeReplaced = sizeCandList - 1;
+        uint32_t   rdCand = rdCandList[candToBeRemoved];
+        Distortion candCost = candCostList[(candToBeRemoved)];
+        for (int ui = candToBeRemoved; ui < (candToBeReplaced > sizeCandList - 1 ? sizeCandList - 1 : candToBeReplaced); ui++)
+        {
+          candCostList[ui] = candCostList[(ui + 1)];
+          rdCandList[ui] = rdCandList[(ui + 1)];
+        }
+        candCostList[candToBeReplaced] = candCost;
+        rdCandList[candToBeReplaced] = rdCand;
+      }
+      else
+      {
+        break;
+      }
+    }
+  }
+#endif
 
   updateCandInOneCandidateGroup(mvpMergeCandCtx, rdCandList, numCandInCategory);
 
@@ -14101,6 +14255,19 @@ void InterPrediction::adjustMergeCandidatesLicFlag(PredictionUnit& pu, MergeCtx&
     {
       continue;
     }
+#if JVET_AI0187_TMVP_FOR_CMVP
+    if (mrgCtx.candtype[uiMergeCand] == 2)
+    {
+      pu.cu->licFlag = mrgCtx.licFlags[uiMergeCand];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+      if (!pu.cu->licFlag)
+      {
+        mrgCtx.setDefaultLICParamToCtx(uiMergeCand);
+      }
+#endif
+      continue;
+    }
+#endif
     mrgCtx.setMergeInfo(pu, uiMergeCand);
     origLICFlag = pu.cu->licFlag;
     pu.cu->licFlag = false;
@@ -15252,6 +15419,9 @@ void InterPrediction::updateCandInMultiCandidateGroups(uint32_t* rdCandList, uin
 #if MULTI_HYP_PRED
     mrgCtx.addHypNeighbours[uiMergeCand] = srcMrgCtx.addHypNeighbours[srcMrgIdx];
 #endif
+#if JVET_AI0187_TMVP_FOR_CMVP
+    mrgCtx.candtype[uiMergeCand] = srcMrgCtx.candtype[uiMergeCand];
+#endif
   }
 }
 #else
@@ -15368,6 +15538,9 @@ void  InterPrediction::updateCandInTwoCandidateGroups(MergeCtx& mrgCtx, uint32_t
 #if MULTI_HYP_PRED
     mrgCtxTmp.addHypNeighbours[uiMergeCand] = mrgCtx.addHypNeighbours[uiMergeCand];
 #endif
+#if JVET_AI0187_TMVP_FOR_CMVP
+    mrgCtxTmp.candtype[uiMergeCand] = mrgCtx.candtype[uiMergeCand];
+#endif
 
   }
   //update
@@ -15393,6 +15566,9 @@ void  InterPrediction::updateCandInTwoCandidateGroups(MergeCtx& mrgCtx, uint32_t
 #if MULTI_HYP_PRED
       mrgCtx.addHypNeighbours[uiMergeCand] = mrgCtx2.addHypNeighbours[rdCandList[uiMergeCand] - mrgCtx.numValidMergeCand];
 #endif
+#if JVET_AI0187_TMVP_FOR_CMVP
+      mrgCtx.candtype[uiMergeCand] = mrgCtx2.candtype[rdCandList[uiMergeCand] - mrgCtx.numValidMergeCand];
+#endif
 
     }
     else
@@ -15414,6 +15590,9 @@ void  InterPrediction::updateCandInTwoCandidateGroups(MergeCtx& mrgCtx, uint32_t
 #endif
 #if MULTI_HYP_PRED
       mrgCtx.addHypNeighbours[uiMergeCand] = mrgCtxTmp.addHypNeighbours[rdCandList[uiMergeCand]];
+#endif
+#if JVET_AI0187_TMVP_FOR_CMVP
+      mrgCtx.candtype[uiMergeCand] = mrgCtxTmp.candtype[rdCandList[uiMergeCand]];
 #endif
     }
   }
@@ -15443,6 +15622,9 @@ void  InterPrediction::updateCandInOneCandidateGroup(MergeCtx& mrgCtx, uint32_t*
 #if MULTI_HYP_PRED
     mrgCtxTmp.addHypNeighbours[uiMergeCand] = mrgCtx.addHypNeighbours[uiMergeCand];
 #endif
+#if JVET_AI0187_TMVP_FOR_CMVP
+    mrgCtxTmp.candtype[uiMergeCand] = mrgCtx.candtype[uiMergeCand];
+#endif
   }
   //update
   for (uint32_t uiMergeCand = 0; uiMergeCand < numCandInCategory; uiMergeCand++)
@@ -15464,6 +15646,9 @@ void  InterPrediction::updateCandInOneCandidateGroup(MergeCtx& mrgCtx, uint32_t*
 #endif
 #if MULTI_HYP_PRED
     mrgCtx.addHypNeighbours[uiMergeCand] = mrgCtxTmp.addHypNeighbours[rdCandList[uiMergeCand]];
+#endif
+#if JVET_AI0187_TMVP_FOR_CMVP
+    mrgCtx.candtype[uiMergeCand] = mrgCtxTmp.candtype[uiMergeCand];
 #endif
   }
 }
@@ -15688,6 +15873,9 @@ void  InterPrediction::updateCandInOneCandidateGroup(MergeCtx& mrgCtx, uint32_t*
 #if MULTI_HYP_PRED
     mrgCtxTmp.addHypNeighbours[uiMergeCand] = mrgCtx.addHypNeighbours[uiMergeCand];
 #endif
+#if JVET_AI0187_TMVP_FOR_CMVP
+    mrgCtxTmp.candtype[uiMergeCand] = mrgCtx.candtype[uiMergeCand];
+#endif
     if (applyBDMVR)
     {
       applyBDMVRTmp[uiMergeCand] = applyBDMVR[uiMergeCand];
@@ -15713,6 +15901,9 @@ void  InterPrediction::updateCandInOneCandidateGroup(MergeCtx& mrgCtx, uint32_t*
 #endif
 #if MULTI_HYP_PRED
     mrgCtx.addHypNeighbours[uiMergeCand] = mrgCtxTmp.addHypNeighbours[rdCandList[uiMergeCand]];
+#endif
+#if JVET_AI0187_TMVP_FOR_CMVP
+    mrgCtx.candtype[uiMergeCand] = mrgCtxTmp.candtype[uiMergeCand];
 #endif
     if (applyBDMVR)
     {
@@ -15901,6 +16092,9 @@ void  InterPrediction::updateCandInfo(MergeCtx& mrgCtx, uint32_t(*RdCandList)[MR
 #if MULTI_HYP_PRED
     mrgCtxTmp.addHypNeighbours[ui].clear();
 #endif
+#if JVET_AI0187_TMVP_FOR_CMVP
+    mrgCtx.candtype[ui] = -1;
+#endif
   }
   for (uint32_t uiMergeCand = ((mrgCandIdx < 0) ? 0 : (mrgCandIdx / ADAPTIVE_SUB_GROUP_SIZE)*ADAPTIVE_SUB_GROUP_SIZE); uiMergeCand < (((mrgCandIdx < 0) || ((mrgCandIdx / ADAPTIVE_SUB_GROUP_SIZE + 1)*ADAPTIVE_SUB_GROUP_SIZE > mrgCtx.numValidMergeCand)) ? mrgCtx.numValidMergeCand : ((mrgCandIdx / ADAPTIVE_SUB_GROUP_SIZE + 1)*ADAPTIVE_SUB_GROUP_SIZE)); ++uiMergeCand)
   {
@@ -15927,6 +16121,9 @@ void  InterPrediction::updateCandInfo(MergeCtx& mrgCtx, uint32_t(*RdCandList)[MR
 #endif
 #if MULTI_HYP_PRED
     mrgCtxTmp.addHypNeighbours[uiMergeCand] = mrgCtx.addHypNeighbours[uiMergeCand];
+#endif
+#if JVET_AI0187_TMVP_FOR_CMVP
+    mrgCtxTmp.candtype[uiMergeCand] = mrgCtx.candtype[uiMergeCand];
 #endif
   }
   //update
@@ -15958,6 +16155,9 @@ void  InterPrediction::updateCandInfo(MergeCtx& mrgCtx, uint32_t(*RdCandList)[MR
 #endif
 #if MULTI_HYP_PRED
     mrgCtx.addHypNeighbours  [uiMergeCand]            = mrgCtxTmp.addHypNeighbours  [srcCand];
+#endif
+#if JVET_AI0187_TMVP_FOR_CMVP
+    mrgCtx.candtype[uiMergeCand] = mrgCtxTmp.candtype[srcCand];
 #endif
 #else
     mrgCtx.bcwIdx[uiMergeCand] = mrgCtxTmp.bcwIdx[RdCandList[uiMergeCand / ADAPTIVE_SUB_GROUP_SIZE][uiMergeCand%ADAPTIVE_SUB_GROUP_SIZE]];

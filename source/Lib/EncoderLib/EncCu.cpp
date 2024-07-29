@@ -4713,6 +4713,10 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
       )
     {
       PU::getTmvpMergeCand(pu, tmvpMergeCandCtx);
+#if JVET_AI0187_TMVP_FOR_CMVP
+      bool isLD = pu.cs->slice->getCheckLDC();
+      m_pcInterSearch->adjustMergeCandidatesInOneCandidateGroup(pu, tmvpMergeCandCtx, (isLD ? REGULAR_ARMC_NUM_LD : REGULAR_ARMC_NUM), -1, true);
+#endif
     }
 #else
     if (sps.getUseAML()
@@ -5256,6 +5260,10 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
         )
       {
         PU::getTmvpMergeCand(pu, tmvpTmMergeCandCtx);
+#if JVET_AI0187_TMVP_FOR_CMVP
+        bool isLD = pu.cs->slice->getCheckLDC();
+        m_pcInterSearch->adjustMergeCandidatesInOneCandidateGroup(pu, tmvpTmMergeCandCtx, (isLD ? TM_ARMC_NUM_LD : TM_ARMC_NUM), -1, true);
+#endif
       }
 #else
       if (sps.getUseAML()
@@ -6979,6 +6987,32 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
         admvrRefinedMotion &= tplAvail;
 #endif
         pu.bmMergeFlag = true;
+#if JVET_AI0187_TMVP_FOR_CMVP 
+        MergeCtx tmpBMMergeCtx;
+        for (uint32_t ui = 0; ui < NUM_MERGE_CANDS; ++ui)
+        {
+          tmpBMMergeCtx.bcwIdx[ui] = BCW_DEFAULT;
+#if JVET_AG0276_NLIC
+          tmpBMMergeCtx.altLMFlag[ui] = false;
+          tmpBMMergeCtx.altLMParaNeighbours[ui].resetAltLinearModel();
+#endif
+#if INTER_LIC
+          tmpBMMergeCtx.licFlags[ui] = false;
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+          tmpBMMergeCtx.setDefaultLICParamToCtx(ui);
+#endif
+#endif
+          tmpBMMergeCtx.interDirNeighbours[ui] = 0;
+          tmpBMMergeCtx.mvFieldNeighbours[(ui << 1)].refIdx = NOT_VALID;
+          tmpBMMergeCtx.mvFieldNeighbours[(ui << 1) + 1].refIdx = NOT_VALID;
+          tmpBMMergeCtx.useAltHpelIf[ui] = false;
+#if MULTI_HYP_PRED
+          tmpBMMergeCtx.addHypNeighbours[ui].clear();
+#endif
+          tmpBMMergeCtx.candCost[ui] = MAX_UINT64;
+        }
+        tmpBMMergeCtx.numValidMergeCand = 0;
+#endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
         MergeCtx tmvpMergeCandCtx2;
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
@@ -6988,7 +7022,11 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
           )
         {
+#if JVET_AI0187_TMVP_FOR_CMVP
+          PU::getTmvpBMCand(pu, tmvpMergeCandCtx2, tmpBMMergeCtx);
+#else
           PU::getTmvpBMCand(pu, tmvpMergeCandCtx2);
+#endif
         }
 #else
         if (sps.getUseAML()
@@ -7017,7 +7055,11 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
           )
         {
+#if JVET_AI0187_TMVP_FOR_CMVP
+          PU::getNonAdjacentBMCand(pu, namvpMergeCandCtx2, tmpBMMergeCtx);
+#else
           PU::getNonAdjacentBMCand(pu, namvpMergeCandCtx2);
+#endif
         }
 #else        
         if (sps.getUseAML()
@@ -7042,6 +7084,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
         if (!tplAvail)
         {
           PU::getInterBMCandidates(pu, bmMrgCtx
+#if JVET_AI0187_TMVP_FOR_CMVP 
+            , tmpBMMergeCtx
+#endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
             , -1
             , NULL
@@ -7054,6 +7099,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
 #endif
 
         PU::getInterBMCandidates(pu, bmMrgCtx
+#if JVET_AI0187_TMVP_FOR_CMVP
+          , tmpBMMergeCtx
+#endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
           , -1
           , (sps.getUseAML()
