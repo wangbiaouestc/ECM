@@ -2683,7 +2683,11 @@ bool xPredIntraOpt_SIMD(PelBuf &pDst, const PredictionUnit &pu, const uint32_t m
   {
     return false;
   }
+#if JVET_AI0208_PDP_MIP
+  if ( !pu.cu->mipFlag && sizeIdx > 12 && modeIdx > 1 && (modeIdx % 4 != 2))
+#else
   if (sizeIdx > 12 && modeIdx > 1 && (modeIdx % 4 != 2))
+#endif
   {
     return false;
   }
@@ -2696,7 +2700,26 @@ bool xPredIntraOpt_SIMD(PelBuf &pDst, const PredictionUnit &pu, const uint32_t m
   const int refLen = shortLen ? g_sizeData[sizeIdx][10] : g_sizeData[sizeIdx][7];
   auto ref = shortLen ? refS : refF;
 
+#if JVET_AI0208_PDP_MIP
+  int16_t*** filter;
+  if(pu.cu->mipFlag)
+  {
+    if(pu.mipTransposedFlag)
+    {
+      filter = g_pdpFiltersMip[modeIdx+16][sizeIdx];
+    }
+    else
+    {
+      filter = g_pdpFiltersMip[modeIdx][sizeIdx];
+    }
+  }
+  else
+  {
+    filter = g_pdpFilters[modeIdx][sizeIdx];
+  }
+#else
   int16_t*** filter = g_pdpFilters[modeIdx][sizeIdx];
+#endif
   const int addShift = 1 << 13;
 
   const __m128i offset = _mm_set1_epi32( addShift );
@@ -2704,7 +2727,11 @@ bool xPredIntraOpt_SIMD(PelBuf &pDst, const PredictionUnit &pu, const uint32_t m
   const __m128i zeros = _mm_setzero_si128();
   __m128i vmat[ 4 ], vcoef[ 4 ], vsrc;
 
+#if JVET_AI0208_PDP_MIP
+  bool isHeightLarge = (height == 32) && !pu.cu->mipFlag;
+#else
   bool isHeightLarge = (height == 32);
+#endif
   int startY = isHeightLarge? 1 : 0;
   int strideOffset = isHeightLarge ? (stride << 1) : stride;
   int offsetY = isHeightLarge ? 2 : 1;
@@ -2757,7 +2784,11 @@ bool xPredIntraOpt_SIMD(PelBuf &pDst, const PredictionUnit &pu, const uint32_t m
     }
   }
 
+#if JVET_AI0208_PDP_MIP
+  if (sizeIdx > 12 && !pu.cu->mipFlag)
+#else
   if (sizeIdx > 12)
+#endif
   {
     int sampFacHor = pDst.width / 16;
     int sampFacVer = pDst.height / 16;

@@ -47,6 +47,11 @@
 #if JVET_AH0209_PDP
 #include "RomMIPFIlters.h"
 #endif
+#if JVET_AI0208_PDP_MIP
+const int16_t g_filterDataPdpMip[] = {
+#include "RomMIPFIlters2.h"
+};
+#endif
 
 // ====================================================================================================================
 // Initialize / destroy functions
@@ -100,7 +105,114 @@ const int g_modeGroupSym[PDP_NUM_MODES] = { 0, 1, 66, 65, 64, 63, 62, 61, 60, 59
 const int g_modeGroup[PDP_NUM_MODES] = { 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66 }; //BR
 int16_t*** g_pdpFilters[PDP_NUM_GROUPS][PDP_NUM_SIZES] = { {nullptr} };
 int g_validSize[PDP_NUM_SIZES] = { 0 };
+#if JVET_AI0208_PDP_MIP
+int16_t*** g_pdpFiltersMip[PDP_NUM_GROUPS][PDP_NUM_SIZES] = { {nullptr} };
+int g_validSizeMip[PDP_NUM_SIZES] = { 0 };
 
+void createMipFilters()
+{
+
+  auto create_buf = [](int16_t***& f, int w, int h, int len, int aligned=1, int log_row_interleave = 0)
+  {
+    if(!f)
+    {
+      int len_align = aligned > 1 ? (len + aligned - 1) / aligned * aligned : len;
+
+      auto mem_size = len_align * h * w;
+
+      int16_t *pMem = new int16_t[mem_size];
+      ::memset(pMem, 0, sizeof(int16_t) * mem_size);
+
+      int buff_w = w>>log_row_interleave;
+
+      f = new int16_t**[h];
+      for( int i = 0; i < h; ++i)
+      {
+        f[i] = new int16_t *[buff_w];
+        for( int j = 0; j < buff_w; ++j)
+        {
+          f[i][j] = pMem;
+          pMem += len_align << log_row_interleave;
+        }
+      }
+    }
+  };
+  auto transpose_matrix_line = []( int16_t *src, int16_t *dst, int w, int h, int ts)
+  {
+    int stride1 = ts + w * 2;
+    int stride2 = ts + h * 2;
+
+    AreaBuf<int16_t> src_corner(src,                stride1, ts,      ts);
+    AreaBuf<int16_t> src_top   (src + ts,           stride1, w * 2, ts);
+    AreaBuf<int16_t> src_left  (src + ts * stride1, ts,      ts,      h * 2);
+    AreaBuf<int16_t> dst_corner(dst,                stride2, ts,      ts);
+    AreaBuf<int16_t> dst_top   (dst + ts,           stride2, h * 2, ts);
+    AreaBuf<int16_t> dst_left  (dst + ts * stride2, ts,      ts,      w * 2);
+
+    dst_corner.copyTranspose(src_corner);
+    dst_top.copyTranspose(src_left);
+    dst_left.copyTranspose(src_top);
+  };
+  auto interleave_matrix_lines = []( AreaBuf<int16_t> &src, AreaBuf<int16_t> &dst, int sublen)
+  {
+    int ratio = src.height / dst.height;
+    for( auto i = 0; i < dst.height; ++i)
+    {
+      for( auto j = 0; j < dst.width; j += ratio * sublen)
+      {
+        int16_t *pSubDst = &dst.at(j, i);
+        AreaBuf<int16_t> subDst( pSubDst, sublen, ratio );
+        int src_subLen = std::min(sublen, int(src.width - j / ratio) );
+        AreaBuf<int16_t> subSrc = src.subBuf( Position(j/ratio, i*ratio), Size(src_subLen, ratio) );
+
+        subDst.copyFromFill(subSrc, sublen, ratio,  0);
+      }
+
+    }
+  };
+  static int16_t read_buffer[266240];
+  static int16_t read_bufferT[266240];
+  const int16_t *pData = g_filterDataPdpMip;
+  while ( pData < g_filterDataPdpMip + sizeof(g_filterDataPdpMip)/sizeof(int16_t))
+  {
+    int tuWidth, tuHeight, groupID;
+    tuWidth = *pData++;
+    tuHeight = *pData++;
+    groupID = *pData++;
+    int sizeID = g_size[(tuWidth << 8) + tuHeight];
+    g_validSizeMip[sizeID] = 1;
+    g_validSizeMip[g_size[(tuHeight << 8) + tuWidth]] = 1;
+    int dsWidth = g_sizeData[sizeID][3], dsHeight = g_sizeData[sizeID][4];
+
+    bool shortLen = false;
+    int len = shortLen ? g_sizeData[sizeID][10] : g_sizeData[sizeID][7];
+    int16_t***& f = g_pdpFiltersMip[groupID][sizeID];
+
+    create_buf(f, dsWidth, dsHeight, len, 8, 2);
+    int16_t***& f_sym = g_pdpFiltersMip[groupID+16][g_size[(tuHeight << 8) + tuWidth]];
+    create_buf(f_sym, dsHeight, dsWidth, len, 8, 2);
+    memcpy(read_buffer, pData, sizeof(int16_t)*len*dsWidth*dsHeight);
+    pData += len*dsWidth*dsHeight;
+    AreaBuf<int16_t> srcBuf(read_buffer, len, dsWidth*dsHeight);
+    AreaBuf<int16_t> dstBuf( f[0][0], (len + 7) / 8 * 8 * 4, dsWidth*dsHeight/4 );
+    interleave_matrix_lines( srcBuf, dstBuf, 8);
+
+    int ts_x = g_sizeData[sizeID][5];
+    int ts_y = g_sizeData[sizeID][6];
+    CHECK( ts_x != ts_y, "Symmetry not true");
+    for( auto i = 0; i < dsHeight; ++i)
+    {
+      for( auto j = 0; j < dsWidth; ++j)
+      {
+        transpose_matrix_line(read_buffer + (i * dsWidth + j) * len, read_bufferT + (j * dsHeight + i) * len, dsWidth, dsHeight, ts_x );
+      }
+    }
+    AreaBuf<int16_t> srcBufT(read_bufferT, len, dsWidth*dsHeight);
+    AreaBuf<int16_t> dstBufT( f_sym[0][0], (len + 7) / 8 * 8 * 4, dsWidth*dsHeight/4 );
+    interleave_matrix_lines( srcBufT, dstBufT, 8);
+  }
+}
+#endif
 void createPdpFilters()
 {
   for (int sizeID = 0; sizeID < 16; sizeID++)
@@ -449,6 +561,29 @@ void createPdpFilters()
     }
   }
 }
+#if JVET_AI0208_PDP_MIP
+void destroyMipFilters()
+{
+  for (int size = 0; size < PDP_NUM_SIZES; ++size)
+  {
+    //int currHeight = g_sizeData[size][4];
+    for (int group = 0; group < PDP_NUM_GROUPS; ++group)
+    {
+      if (g_pdpFiltersMip[group][size])
+      {
+        if(g_pdpFiltersMip[group][size][0][0])
+        {
+          delete[] g_pdpFiltersMip[group][size][0][0];
+        }
+        if(g_pdpFiltersMip[group][size])
+        {
+          delete[] g_pdpFiltersMip[group][size];
+        }
+      }
+    }
+  }
+}
+#endif
 void destroyPdpFilters()
 {
   for (int size = 0; size < PDP_NUM_SIZES; ++size)
