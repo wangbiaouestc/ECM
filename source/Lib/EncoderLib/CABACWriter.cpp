@@ -49,9 +49,7 @@
 
 
 #if JVET_AI0136_ADAPTIVE_DUAL_TREE
-Partitioner *g_encPartitionerSST=nullptr;
-#else
-Partitioner* g_encPartitionerSST;
+static Partitioner *g_encPartitionerSST=nullptr;
 #endif
 
 //! \ingroup EncoderLib
