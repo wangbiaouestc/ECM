@@ -208,6 +208,10 @@ struct AreaBuf : public Size
   void copyFrom             ( const AreaBuf<const T> &other );
 #if JVET_AH0209_PDP
   void padCopyFrom(const AreaBuf<const T> &other, int w, int h, int pw, int ph);
+#if JVET_AI0208_PDP_MIP
+  void copyTranspose           ( const AreaBuf<const T> &other );
+  void copyFromFill             ( const AreaBuf<const T> &other, int w, int h, T fill);
+#endif
 #endif
   void roundToOutputBitdepth(const AreaBuf<const T> &src, const ClpRng& clpRng);
 
@@ -489,6 +493,58 @@ void AreaBuf<T>::padCopyFrom(const AreaBuf<const T> &other, int w, int h, int pw
     subBuf(Position(w - pw, h - ph), Size(pw, ph)).fill(other.at(w - pw - 1, h - ph - 1));
   }
 }
+#if JVET_AI0208_PDP_MIP
+template<typename T>
+void AreaBuf<T>::copyTranspose           ( const AreaBuf<const T> &other )
+{
+  int tw = width;
+  int th = height;
+  int sw = other.width;
+  int sh = other.height;
+
+  if( tw != sh || th != sw )
+  {
+    CHECK(1, "Size not compatible");
+  }
+
+  for( auto i = 0; i < th; ++i)
+  {
+    for( auto j = 0; j < tw; ++j)
+    {
+      at(j,i) = other.at(i,j);
+    }
+  }
+}
+template<typename T>
+void AreaBuf<T>::copyFromFill             ( const AreaBuf<const T> &other, int w, int h, T fill)
+{
+  int pw = w - (int)other.width;
+  int ph = h - (int)other.height;
+
+  CHECK(pw < 0 || ph < 0, "Bad source/target buffer specified!" );
+
+  subBuf( Position(0,0), Size(w -pw, h -ph)).copyFrom(other.subBuf( Position(0,0), Size(w -pw, h -ph)));
+
+  if(pw)
+  {
+    for( auto i = 0; i < h - ph; ++i)
+    {
+      subBuf( Position(w-pw,i), Size(pw, 1)).fill(fill);
+    }
+  }
+  if(ph)
+  {
+    for( auto i = 0; i < w - pw; ++i)
+    {
+      subBuf( Position(i,h-ph), Size(1, ph)).fill(fill);
+    }
+  }
+  if(pw && ph)
+  {
+    subBuf( Position(w-pw,h-ph), Size(pw, ph)).fill(fill);
+  }
+}
+#endif
 #endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
 template<typename T>

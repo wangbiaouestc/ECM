@@ -70,6 +70,13 @@ extern int16_t*** g_pdpFilters[PDP_NUM_GROUPS][PDP_NUM_SIZES];
 extern int g_validSize[PDP_NUM_SIZES];
 void createPdpFilters();
 void destroyPdpFilters();
+#if JVET_AI0208_PDP_MIP
+extern const int16_t g_filterDataPdpMip[];
+extern int16_t*** g_pdpFiltersMip[PDP_NUM_GROUPS][PDP_NUM_SIZES];
+extern int g_validSizeMip[PDP_NUM_SIZES];
+void createMipFilters();
+void destroyMipFilters();
+#endif
 #endif
 
 #if SIGN_PREDICTION

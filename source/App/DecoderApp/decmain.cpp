@@ -121,6 +121,9 @@ int main(int argc, char* argv[])
 
 #if JVET_AH0209_PDP
   destroyPdpFilters();
+#if JVET_AI0208_PDP_MIP
+  destroyMipFilters();
+#endif
 #endif
   delete pcDecApp;
 

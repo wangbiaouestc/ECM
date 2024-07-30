@@ -126,6 +126,9 @@ int main(int argc, char* argv[])
 #if JVET_AH0209_PDP
   createPdpFilters();
 #endif
+#if JVET_AI0208_PDP_MIP
+  createMipFilters();
+#endif
   char** layerArgv = new char*[argc];
 
   do
