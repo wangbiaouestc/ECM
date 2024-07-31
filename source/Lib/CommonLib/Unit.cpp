@@ -260,6 +260,9 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   depth             = other.depth;
   btDepth           = other.btDepth;
   mtDepth           = other.mtDepth;
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  mtImplicitDepth   = other.mtImplicitDepth;
+#endif
   splitSeries       = other.splitSeries;
   skip              = other.skip;
 #if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
@@ -283,6 +286,9 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   mtsFlag           = other.mtsFlag;
 #if JVET_AG0061_INTER_LFNST_NSPT
   lfnstFlag         = other.lfnstFlag;
+#if JVET_AI0050_INTER_MTSS
+  lfnstIntra        = other.lfnstIntra;
+#endif
 #endif
   lfnstIdx          = other.lfnstIdx;
   tileIdx           = other.tileIdx;
@@ -345,6 +351,23 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   }
 #endif
 #endif
+#if JVET_AH0136_CHROMA_REORDERING
+  for (uint32_t i = 0; i < 7; i++)
+  {
+    chromaList[i] = other.chromaList[i];
+  }
+  for (int i = 0; i < 5; i++)
+  {
+    dimdBlendModeChroma[i] = other.dimdBlendModeChroma[i];
+  }
+  for (int i = 0; i < 10; i++)
+  {
+    mvs[i] = other.mvs[i];
+    bvs[i] = other.bvs[i];
+    rribcTypes[i] = other.rribcTypes[i];
+  }
+  mvsNum = other.mvsNum;
+#endif
 #if TMP_FAST_ENC
 #if JVET_AD0086_ENHANCED_INTRA_TMP
 #if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
@@ -359,6 +382,9 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #endif
   tmpIsSubPel  = other.tmpIsSubPel;
   tmpSubPelIdx = other.tmpSubPelIdx;
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+  tmpFracIdx    = other.tmpFracIdx;
+#endif
 #endif
 #endif
 #if JVET_W0123_TIMD_FUSION
@@ -406,6 +432,17 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #endif
   imv               = other.imv;
   imvNumCand        = other.imvNumCand;
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  isSST                          = other.isSST;
+  separateTree                   = other.separateTree;
+  intraRegionRootDepth           = other.intraRegionRootDepth;  
+  intraRegionRootQtDepth         = other.intraRegionRootQtDepth;
+  intraRegionRootBtDepth         = other.intraRegionRootBtDepth;
+  intraRegionRootMtDepth         = other.intraRegionRootMtDepth;
+  intraRegionRootImplicitBtDepth = other.intraRegionRootImplicitBtDepth;
+#endif
+
   bcwIdx            = other.bcwIdx;
   for (int i = 0; i<2; i++)
     refIdxBi[i] = other.refIdxBi[i];
@@ -423,6 +460,9 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
 #endif
 #if JVET_AG0061_INTER_LFNST_NSPT
   dimdDerivedIntraDir = other.dimdDerivedIntraDir;
+#if JVET_AI0050_INTER_MTSS
+  dimdDerivedIntraDir2nd = other.dimdDerivedIntraDir2nd;
+#endif
 #endif
 #endif
 #if JVET_AG0276_NLIC
@@ -518,6 +558,9 @@ void CodingUnit::initData()
   depth             = 0;
   btDepth           = 0;
   mtDepth           = 0;
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  mtImplicitDepth   = 0;
+#endif
   splitSeries       = 0;
   skip              = false;
 #if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
@@ -540,6 +583,9 @@ void CodingUnit::initData()
   mtsFlag           = 0;
 #if JVET_AG0061_INTER_LFNST_NSPT
   lfnstFlag         = 0;
+#if JVET_AI0050_INTER_MTSS
+  lfnstIntra        = 0;
+#endif
 #endif
   lfnstIdx          = 0;
   tileIdx           = 0;
@@ -602,6 +648,23 @@ void CodingUnit::initData()
   }
 #endif
 #endif
+#if JVET_AH0136_CHROMA_REORDERING
+  for (uint32_t i = 0; i < 7; i++)
+  {
+    chromaList[i] = -1;
+  }
+  for (int i = 0; i < 5; i++)
+  {
+    dimdBlendModeChroma[i] = -1;
+  }
+  for (int i = 0; i < 10; i++)
+  {
+    mvs[i].setZero();
+    bvs[i].setZero();
+    rribcTypes[i] = 0;
+  }
+  mvsNum = 0;
+#endif
 #if TMP_FAST_ENC
 #if JVET_AD0086_ENHANCED_INTRA_TMP
 #if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
@@ -613,6 +676,9 @@ void CodingUnit::initData()
   tmpFlmFlag    = false;
   tmpIsSubPel  = 0;
   tmpSubPelIdx = -1;
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+  tmpFracIdx    = -1;
+#endif
 #if JVET_AG0136_INTRA_TMP_LIC
   tmpLicFlag   = false;
 #endif
@@ -681,6 +747,9 @@ void CodingUnit::initData()
 #endif
 #if JVET_AG0061_INTER_LFNST_NSPT
   dimdDerivedIntraDir = 0;
+#if JVET_AI0050_INTER_MTSS
+  dimdDerivedIntraDir2nd = 0;
+#endif
 #endif
 #endif
 #if JVET_AG0276_NLIC
@@ -764,6 +833,16 @@ void CodingUnit::initData()
   treeType          = TREE_D;
   modeType          = MODE_TYPE_ALL;
   modeTypeSeries    = 0;
+#endif
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  isSST                          = false;
+  separateTree                   = false;
+  intraRegionRootDepth           = -1;
+  intraRegionRootQtDepth         = -1;
+  intraRegionRootBtDepth         = -1;
+  intraRegionRootMtDepth         = -1;
+  intraRegionRootImplicitBtDepth = -1;
 #endif
 }
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
@@ -893,7 +972,7 @@ const uint8_t CodingUnit::checkAllowedSbt() const
   {
     return 0;
   }
-#if JVET_Y0065_GPM_INTRA
+#if JVET_Y0065_GPM_INTRA && !JVET_AI0050_SBT_LFNST
   if (firstPU->gpmIntraFlag)
   {
     return 0;
@@ -1043,6 +1122,9 @@ void PredictionUnit::initData()
   geoMergeIdx1 = MAX_UCHAR;
 #if JVET_Y0065_GPM_INTRA
   gpmIntraFlag = false;
+#endif
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+  gpmInterIbcFlag = false;
 #endif
 #if JVET_W0097_GPM_MMVD_TM
   geoMMVDFlag0 = false;
@@ -1267,6 +1349,9 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
 #if JVET_Y0065_GPM_INTRA
   gpmIntraFlag = predData.gpmIntraFlag;
 #endif
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+  gpmInterIbcFlag = predData.gpmInterIbcFlag;
+#endif
 #if JVET_W0097_GPM_MMVD_TM
   geoMMVDFlag0 = predData.geoMMVDFlag0;
   geoMMVDIdx0 = predData.geoMMVDIdx0;
@@ -1415,6 +1500,7 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
 PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 {
 
+
   for( uint32_t i = 0; i < MAX_NUM_CHANNEL_TYPE; i++ )
   {
     intraDir[ i ] = other.intraDir[ i ];
@@ -1497,6 +1583,9 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
   geoMergeIdx1 = other.geoMergeIdx1;
 #if JVET_Y0065_GPM_INTRA
   gpmIntraFlag = other.gpmIntraFlag;
+#endif
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+  gpmInterIbcFlag = other.gpmInterIbcFlag;
 #endif
 #if JVET_W0097_GPM_MMVD_TM
   geoMMVDFlag0 = other.geoMMVDFlag0;
@@ -1758,7 +1847,11 @@ const MotionInfo& PredictionUnit::getMotionInfo( const Position& pos ) const
     }
   }
 #endif
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  CHECKD( Y().valid() && !Y().contains(pos), "Trying to access motion info outsied of PU");
+#else
   CHECKD( !Y().contains( pos ), "Trying to access motion info outsied of PU" );
+#endif
   return cs->getMotionInfo( pos );
 }
 
@@ -1937,6 +2030,9 @@ void TransformUnit::initData()
     mtsIdx[i]        = MTS_DCT2_DCT2;
 #if JVET_AG0061_INTER_LFNST_NSPT
     lfnstIdx[i]      = 0;
+#if JVET_AI0050_INTER_MTSS
+    lfnstIntra[i]    = 0;
+#endif
 #endif
   }
   depth              = 0;
@@ -2033,6 +2129,9 @@ TransformUnit& TransformUnit::operator=(const TransformUnit& other)
     mtsIdx[i]        = other.mtsIdx[i];
 #if JVET_AG0061_INTER_LFNST_NSPT
     lfnstIdx[i]      = other.lfnstIdx[i];
+#if JVET_AI0050_INTER_MTSS
+    lfnstIntra[i]    = other.lfnstIntra[i];
+#endif
 #endif
   }
   depth              = other.depth;
@@ -2080,6 +2179,9 @@ void TransformUnit::copyComponentFrom(const TransformUnit& other, const Componen
   mtsIdx[i]        = other.mtsIdx[i];
 #if JVET_AG0061_INTER_LFNST_NSPT
   lfnstIdx[i]      = other.lfnstIdx[i];
+#if JVET_AI0050_INTER_MTSS
+  lfnstIntra[i]    = other.lfnstIntra[i];
+#endif
 #endif
   noResidual       = other.noResidual;
   jointCbCr        = isChroma( i ) ? other.jointCbCr : jointCbCr;
@@ -2213,7 +2315,11 @@ bool TransformUnit::checkLFNSTApplied(ComponentID compID)
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   bool  lfnstApplied = lfnstIdx && this->mtsIdx[compID] != MTS_SKIP && (this->cu->isSepTree() ? true : isLuma(compID));
 #else
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  bool  lfnstApplied = lfnstIdx && this->mtsIdx[compID] != MTS_SKIP && (cu->separateTree ? true : isLuma(compID));
+#else
   bool  lfnstApplied = lfnstIdx && this->mtsIdx[compID] != MTS_SKIP && (CS::isDualITree(*this->cs) ? true : isLuma(compID));
+#endif
 #endif
   return lfnstApplied;
 }

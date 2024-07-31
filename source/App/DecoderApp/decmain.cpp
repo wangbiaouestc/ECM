@@ -119,6 +119,12 @@ int main(int argc, char* argv[])
   dResult = (double)(clock()-lBefore) / CLOCKS_PER_SEC;
   printf("\n Total Time: %12.3f sec.\n", dResult);
 
+#if JVET_AH0209_PDP
+  destroyPdpFilters();
+#if JVET_AI0208_PDP_MIP
+  destroyMipFilters();
+#endif
+#endif
   delete pcDecApp;
 
   return returnCode;

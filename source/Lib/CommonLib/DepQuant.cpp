@@ -2684,7 +2684,13 @@ const CtxSet &ctxSetGt4 = isLfnst ? Ctx::GtxFlagL[6 + chType] : Ctx::GtxFlag[6 +
     {
 #if JVET_W0119_LFNST_EXTENSION
 #if JVET_AC0130_NSPT
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+      bool spsIntraLfnstEnabled = ( ( tu.cu->slice->getSliceType() == I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTISlice() ) ||
+                                    ( tu.cu->slice->getSliceType() != I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTPBSlice() ) );
+      bool allowNSPT = CU::isNSPTAllowed( tu, compID, width, height, spsIntraLfnstEnabled && CU::isIntra( *( tu.cu ) ) );
+#else
       bool allowNSPT = CU::isNSPTAllowed(tu, compID, width, height, CU::isIntra(*(tu.cu)));
+#endif
 
       if (allowNSPT)
       {
@@ -2699,7 +2705,13 @@ const CtxSet &ctxSetGt4 = isLfnst ? Ctx::GtxFlagL[6 + chType] : Ctx::GtxFlag[6 +
 #endif
 #else
 #if JVET_AC0130_NSPT
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+      bool spsIntraLfnstEnabled = ( ( tu.cu->slice->getSliceType() == I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTISlice() ) ||
+                                    ( tu.cu->slice->getSliceType() != I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTPBSlice() ) );
+      bool allowNSPT = CU::isNSPTAllowed( tu, compID, width, height, spsIntraLfnstEnabled && CU::isIntra( *( tu.cu ) ) );
+#else
       bool allowNSPT = CU::isNSPTAllowed(tu, compID, width, height, CU::isIntra(*(tu.cu)));
+#endif
 
       if (allowNSPT)
       {
@@ -3154,7 +3166,11 @@ void DepQuant::dequant(const TransformUnit &tu, CoeffBuf &dstCoeff, const Compon
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
     const bool isLfnstApplied = tu.cu->lfnstIdx > 0 && (tu.cu->isSepTree() ? true : isLuma(compID));
 #else
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    const bool isLfnstApplied = tu.cu->lfnstIdx > 0 && (tu.cu->separateTree ? true : isLuma(compID));
+#else
     const bool isLfnstApplied = tu.cu->lfnstIdx > 0 && (CS::isDualITree(*tu.cs) ? true : isLuma(compID));
+#endif
 #endif
     const bool disableSMForACT =
       tu.cs->slice->getSPS()->getScalingMatrixForAlternativeColourSpaceDisabledFlag()

@@ -52,6 +52,7 @@
 #include <cstdint>
 
 
+
 #define BASE_ENCODER                                      1
 #define BASE_NORMATIVE                                    1
 #define TOOLS                                             1
@@ -141,6 +142,9 @@
 #define JVET_AG0151_INTRA_TMP_MERGE_MODE                  1 // JVET-AG0151: Intra TMP with merge candidates
 #define JVET_AG0152_SGPM_ITMP_IBC                         1 // JVET-AG0152: SGPM with Intra TMP and IBC
 #define JVET_AG0146_DIMD_ITMP_IBC                         1 // JVET-AG0146: DIMD with Intra TMP and IBC
+#define JVET_AH0055_INTRA_TMP_ARBVP                       1 // JVET-AH0055: AR-BVP for intra TMP merge candidates
+#define JVET_AH0200_INTRA_TMP_BV_REORDER                  1 // JVET-AH0200: Intra TMP BV reordering
+#define JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT      1 // JVET-AI0129: Intra TMP candidates with overlapping refinement window enhanced.
 #endif
 
 #define JVET_W0123_TIMD_FUSION                            1 // JVET-W0123: Template based intra mode derivation and fusion
@@ -202,10 +206,20 @@
 #define JVET_AD0120_LBCCP                                 1 // JVET-AD0120: Local-Boosting Cross-Component Prediction, wherein the template part is controlled by CCCM SPS
 #define JVET_AE0043_CCP_MERGE_TEMPORAL                    1 // JVET-AE0043: Cross-component merge mode with temporal candidates
 #define JVET_AG0058_EIP                                   1 // JVET-AG0058: Extrapolation filter-based intra prediction mode
+#if JVET_AG0058_EIP
+#define JVET_AI0066_REGULARIZED_EIP                       1 // JVET-AI0066: L2 Regularization for EIP
+#endif
 #define JVET_AG0154_DECODER_DERIVED_CCP_FUSION            1 // JVET-AG0154: Decoder derived CCP mode with fusion candidates
 #define JVET_AG0059_CCP_MERGE_ENHANCEMENT                 1 // JVET-AG0059: Enhancements on CCP merge for chroma intra coding
 #define JVET_AH0065_RELAX_LINE_BUFFER                     1 // JVET-AH0065: Relaxing line buffer restriction
 #define JVET_AH0086_EIP_BIAS_AND_CLIP                     1 // JVET-AH0086: EIP with bias and clipping
+#define JVET_AH0136_CHROMA_REORDERING                     1 // JVET-AH0136: Non-CCP intra chroma mode reordering
+#define JVET_AH0135_TEMPORAL_PARTITIONING                 1 // JVET_AH0135: Temporal partitioning prediction
+#define JVET_AH0209_PDP                                   1 // JVET_AH0209: Matrix based position dependent intra prediction replacing conventional intra modes
+#if JVET_AH0209_PDP
+#define JVET_AI0208_PDP_MIP                               1 // JVET_AI0208: Modifications to Matrix-based intra prediction
+#endif
+#define JVET_AI0136_ADAPTIVE_DUAL_TREE                    1 // JVET-AI0136: Adaptive dual tree in inter slices
 
 //IBC
 #define JVET_Y0058_IBC_LIST_MODIFY                        1 // JVET-Y0058: Modifications of IBC merge/AMVP list construction, ARMC-TM-IBC part is included under JVET_W0090_ARMC_TM
@@ -242,6 +256,7 @@
 #define JVET_AE0174_NONINTER_TM_TOOLS_CONTROL             1 // JVET-AE0174: Add non-inter TM sps flag to control whether template matching is used for non-inter (Intra and IBC) tools
 #define JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES    1 // JVET-AE0094: IBC with non-adjacent spatial candidates
 #define JVET_AG0091_ARBVP                                 1 // JVET-AG0091: Auto-relocated block vector prediction
+#define JVET_AI0082_TEMPORAL_BV                           1 // JVET-AI0081: Temporal BV for IBC merge list construction
 
 #if JVET_AC0071_DBV && JVET_V0130_INTRA_TMP
 #define JVET_AF0066_ENABLE_DBV_4_SINGLE_TREE              1 // JVET-AF0066: Enable DBV mode in single tree configuration
@@ -298,6 +313,7 @@
 #define JVET_Z0139_HIST_AFF                               1 // JVET-Z0139: Affine HMVP 
 #define JVET_Z0139_NA_AFF                                 1 // JVET-Z0139: Constructed non-adjacent spatial neighbors for affine mode
 #define JVET_AA0058_GPM_ADAPTIVE_BLENDING                 1 // JVET-AA0058: GPM adaptive blending
+#define JVET_AI0082_GPM_WITH_INTER_IBC                    1 // JVET-AI0082: GPM with inter prediction and IBC
 #define JVET_AA0146_WRAP_AROUND_FIX                       1 // JVET-AA0146: bugfix&cleanup for wrap around motion compensation
 #define JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION          1 // JVET-AA0107 Regression based affine merge candidate derivation
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
@@ -332,9 +348,19 @@
 #define JVET_AG0098_AMVP_WITH_SBTMVP                      1 // JVET-AG0098: AMVP with SbTMVP mode
 #define JVET_AG0067_DMVR_EXTENSIONS                       1 // JVET-AG0067: On DMVR Extensions
 #define JVET_AH0069_CMVP                                  1 // JVET-AH0069: Chained motion vector prediction
+#if JVET_AH0069_CMVP
+#define JVET_AI0103_ADDITIONAL_CMVP                       1 // JVET-AI0103: Additional chained motion vector prediction candidates
+#define JVET_AI0187_TMVP_FOR_CMVP                         1 // JVET-AI0187: TMVP for chained motion vector prediction
+#endif
 #define JVET_AH0314_ADAPTIVE_GPM_BLENDING_IMPROV          1 // JVET-AH0314: Adaptive GPM blending
 #define JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0        1 // JVET-AH0066 & JVET-AH0202: Inter CCP merge mode with zero luma CBF
-
+#define JVET_AH0068_RM_TEMP_BUFF_CONSTRAINT               1 // JVET-AH0068 test a: Removing the one-CTU-row temporal buffer constraint for all relevant tools
+#define JVET_AI0046_HIGH_PRECISION_BDOF_SAMPLE            1 // JVET-AI0046: High Precision Sample Based BDOF
+#define JVET_AI0197_AFFINE_TMVP                           1 // JVET-AI0197: Affine candidates derived from temporal collocated pictures
+#define JVET_AH0119_SUBBLOCK_TM                           1 // JVET-AH0119 extend affine TM and apply sbtmvp TM
+#define JVET_AI0094_SHARP_MC_FILTER_FOR_BIPRED            1 // JVET-AI0094: Sharp motion compensation filter for bi-prediction
+#define JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE           1 // JVET-AI0185 adaptive cost function selection in merge mode
+#define JVET_AI0183_MVP_EXTENSION                         1 // JVET-AI0183 MVP extension
 // Inter template matching tools
 #define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction
 #if ENABLE_INTER_TEMPLATE_MATCHING
@@ -378,6 +404,7 @@
 #if SIGN_PREDICTION
 #define JVET_Y0141_SIGN_PRED_IMPROVE                      1 // JVET-Y0141 test3: Sign prediction improvement                          
 #define JVET_AD0105_ASPECT1_NUM_SIGN_PRED_BY_QP           1 // JVET-AD0105 Aspect1: NumSignPred based on QP
+#define JVET_AI0096_SIGN_PRED_BIT_DEPTH_FIX               1 // JVET-AI0096: Fix to sign prediction for handling bit depths other than 10
 #endif
 #define JVET_W0103_INTRA_MTS                              1 // JVET-W0103: Extended Intra MTS
 #if JVET_W0103_INTRA_MTS
@@ -398,6 +425,9 @@
 #define JVET_AG0061_INTER_LFNST_NSPT                      1 // JVET-AG0061: 3.3 Utilizing LFNST/NSPT for inter coding
 #define JVET_AG0100_TRANSFORM_COEFFICIENT_CODING          1 // JVET_AG0100: 3.2b Transform coefficient coding
 #define JVET_AG0143_INTER_INTRA                           1 // JVET_AG0143: 3.1c CABAC inter/intra model switch
+#define JVET_AH0103_LOW_DELAY_LFNST_NSPT                  1 // JVET_AH0103: Low-delay configurations for LFNST/NSPT
+#define JVET_AI0050_INTER_MTSS                            1 // JVET_AI0050: Multiple LFNST/NSPT kernel set selection for GPM coded block
+#define JVET_AI0050_SBT_LFNST                             1 // JVET_AI0050: Enable LFNST/NSPT for SBT coded block
 
 // Entropy Coding
 #define EC_HIGH_PRECISION                                 1 // CABAC high precision
@@ -410,6 +440,7 @@
 #define JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE             1 // JVET-AG0196 5.2: window offsets per slice type
 #define JVET_AG0117_CABAC_SPATIAL_TUNING                  1 // JVET-AG0117 5.3: spatial CABAC tuning
 #define JVET_AH0176_LOW_DELAY_B_CTX                       1 // JVET-AH0176 6.1: context initialization for B-slice
+#define JVET_AI0281_CABAC_RETRAIN                         1 // JVET-AI0281: context initialization training
 
 // Loop filters
 #define ALF_IMPROVEMENT                                   1 // ALF improvement
@@ -436,6 +467,13 @@
 #define JVET_AG0157_ALF_CHROMA_FIXED_FILTER               1 // JVET-AG0157: Fixed filter for chroma ALF
 #define JVET_AG0158_ALF_LUMA_COEFF_PRECISION              1 // JVET-AG0158: adaptive precision for luma ALF coefficients
 #define JVET_AG0145_ADAPTIVE_CLIPPING                     1 // JVET-AG0145: Adaptive clipping with signalled lower and upper bounds
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+#define JVET_AI0096_ADAPTIVE_CLIPPING_BIT_DEPTH_FIX       1 // JVET-AI0096: Fix to adaptive clipping for handling bit depths other than 10
+#endif
+#define JVET_AH0057_CCALF_COEFF_PRECISION                 1 // JVET-AH0057: adaptive precision for CCALF coefficients
+#define JVET_AI0084_ALF_RESIDUALS_SCALING                 1 // JVET_AI0084: non-fixed ALF residuals scaling
+#define JVET_AI0058_ALF_RELAXED_RDO_LUMA                  1 // JVET-AI0058: Relaxed ALF Luma RDO
+#define JVET_AI0166_CCALF_CHROMA_SAO_INPUT                1 // JVET-AI0166: CCALF with Chroma inputs
 
 // SIMD optimizations
 #if IF_12TAP
@@ -985,6 +1023,9 @@ enum SliceType
 /// chroma formats (according to how the monochrome or the color planes are intended to be coded)
 enum ChromaFormat
 {
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+  CHROMA_ONLY_420   = 5,
+#endif
   CHROMA_400        = 0,
   CHROMA_420        = 1,
   CHROMA_422        = 2,

@@ -68,6 +68,15 @@ struct MultiHypPredictionData
 typedef static_vector<MultiHypPredictionData, MULTI_HYP_PRED_MAX_CANDS> MultiHypVec;
 #endif
 
+#if JVET_AI0183_MVP_EXTENSION
+struct IntersectingMvData
+{
+  int8_t intersectingNr;
+  int8_t intersectingRefIdx[INTERSECTING_MV_MAX_NR][2];
+  Mv     intersectingMv[INTERSECTING_MV_MAX_NR][2];
+};
+#endif
+
 /// parameters for AMVP
 struct AMVPInfo
 {
@@ -201,14 +210,69 @@ struct MotionInfo
   MultiHypVec addHypData;
 #endif
   Mv      bv;
-
+#if JVET_AI0197_AFFINE_TMVP
+  bool   isAffine;
+  int8_t affineType;
+  int    y;
+  int    x;
+  int    height;
+  int    width;
+#endif
 #if JVET_AG0164_AFFINE_GPM
   int8_t     gpmPartIdx;
+#if JVET_AI0197_AFFINE_TMVP
+  MotionInfo()
+    : isSCC(false)
+    , isRefSCC(false)
+    , isRefRefSCC(false)
+    , isInter(false)
+    , isIBCmot(false)
+    , interDir(0)
+    , useAltHpelIf(false)
+    , sliceIdx(0)
+    , refIdx{ NOT_VALID, NOT_VALID }
+    , bcwIdx(0)
+    , usesLIC(false)
+    , isAffine(false)
+    , affineType(0)
+    , y(-1)
+    , x(-1)
+    , height(0)
+    , width(0)
+    , gpmPartIdx(-1)
+  {
+  }
+  // ensure that MotionInfo(0) produces '\x000....' bit pattern - needed to work with AreaBuf - don't use this
+  // constructor for anything else
+  MotionInfo(int i)
+    : isSCC(false)
+    , isRefSCC(false)
+    , isRefRefSCC(false)
+    , isInter(i != 0)
+    , isIBCmot(false)
+    , interDir(0)
+    , useAltHpelIf(false)
+    , sliceIdx(0)
+    , refIdx{ 0, 0 }
+    , bcwIdx(0)
+    , usesLIC(false)
+    , isAffine(false)
+    , affineType(0)
+    , y(-1)
+    , x(-1)
+    , height(0)
+    , width(0)
+    , gpmPartIdx(-1)
+  {
+    CHECKD(i != 0, "The argument for this constructor has to be '0'");
+  }
+#else
   MotionInfo() : isSCC(false), isRefSCC(false), isRefRefSCC(false), isInter(false), isIBCmot(false), interDir(0), useAltHpelIf(false), sliceIdx(0), refIdx{ NOT_VALID, NOT_VALID }, bcwIdx(0), usesLIC(false),gpmPartIdx(-1)
   {
   }
   // ensure that MotionInfo(0) produces '\x000....' bit pattern - needed to work with AreaBuf - don't use this constructor for anything else
   MotionInfo(int i) : isSCC(false), isRefSCC(false), isRefRefSCC(false), isInter(i != 0), isIBCmot(false), interDir(0), useAltHpelIf(false), sliceIdx(0), refIdx{ 0,         0 }, bcwIdx(0), usesLIC(false), gpmPartIdx(-1){ CHECKD(i != 0, "The argument for this constructor has to be '0'"); }
+#endif
 #else
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
 #if INTER_LIC

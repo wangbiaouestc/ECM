@@ -2258,6 +2258,20 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
     }
 #endif
 
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    if ( pcSlice->isIntra() )
+    {
+      pcSlice->setSeparateTreeEnabled( pcSlice->getSPS()->getUseDualITree()  );
+    }
+    else
+    {
+      //CHECK( !rpcSlice->getSPS()->getSpsNext().getInterSliceSeparateTreeEnabled(), "Error separate trees not enabled\n" )
+      pcSlice->setSeparateTreeEnabled( pcSlice->getSPS()->getInterSliceSeparateTreeEnabled()  );
+    }
+    pcSlice->setProcessingIntraRegion( false );
+#endif
+
     // Set the nal unit type
     pcSlice->setNalUnitType(getNalUnitType(pocCurr, m_iLastIDR, isField));
     // set two flags according to slice type presented in the picture
@@ -2488,6 +2502,20 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
     }
 
     xPicInitHashME( pcPic, pcSlice->getPPS(), rcListPic );
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    if ( !pcSlice->isIntra() )
+    { 
+      if ( (picWidth * picHeight) <= (1280*720) && ( pcSlice->getTLayer()>0 ) )
+      {
+        pcSlice->setSeparateTreeEnabled(false);
+      }
+      else if ( pcSlice->getTLayer()>=ID_SEP_TREE_TID_OFF ) 
+      {
+        pcSlice->setSeparateTreeEnabled(false);
+      }
+    }
+#endif
 
     if( m_pcCfg->getUseAMaxBT() )
     {
@@ -2975,12 +3003,194 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
             {
               for (int colRefIdx = 0; colRefIdx < pColSlice->getNumRefIdx(RefPicList(colRefPicListIdx)); colRefIdx++)
               {
+#if JVET_AI0183_MVP_EXTENSION
+                const bool bIsColRefLongTerm = pColSlice->getIsUsedAsLongTerm(RefPicList(colRefPicListIdx), colRefIdx);
+                const int colRefPOC = pColSlice->getRefPOC(RefPicList(colRefPicListIdx), colRefIdx);
+                for (int curRefPicListIdx = 0; curRefPicListIdx < (pcSlice->isInterB() ? 2 : 1); curRefPicListIdx++)
+                {
+                  double bestDistScale = MAX_DOUBLE;
+                  int targetRefIdx = -1;
+                  for (int curRefIdx = 0; curRefIdx < pcSlice->getNumRefIdx(RefPicList(curRefPicListIdx)); curRefIdx++)
+                  {
+                    const int currRefPOC = pcSlice->getRefPic(RefPicList(curRefPicListIdx), curRefIdx)->getPOC();
+                    const bool bIsCurrRefLongTerm = pcSlice->getRefPic(RefPicList(curRefPicListIdx), curRefIdx)->longTerm;
+                    if (bIsCurrRefLongTerm != bIsColRefLongTerm)
+                    {
+                      continue;
+                    }
+                    if (bIsCurrRefLongTerm)
+                    {
+                      targetRefIdx = curRefIdx;
+                      bestDistScale = 1;
+                      break;
+                    }
+                    else if (colPOC - colRefPOC == currPOC - currRefPOC)
+                    {
+                      targetRefIdx = curRefIdx;
+                      bestDistScale = 1;
+                      break;
+                    }
+                    else
+                    {
+                      if (abs(1.0 - (abs(currPOC - currRefPOC) * 1.0 / abs(colPOC - colRefPOC) * 1.0)) < bestDistScale)
+                      {
+                        bestDistScale = abs(1.0 - (abs(currPOC - currRefPOC) * 1.0 / abs(colPOC - colRefPOC) * 1.0));
+                        targetRefIdx = curRefIdx;
+                      }
+                    }
+                  } // curRefIdx
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+                  pcSlice->setImRefIdx(sliceIdx, RefPicList(colRefPicListIdx), RefPicList(curRefPicListIdx), colRefIdx, targetRefIdx, colFrameIdx);
+#else
+                  pcSlice->setImRefIdx(sliceIdx, RefPicList(colRefPicListIdx), RefPicList(curRefPicListIdx), colRefIdx, targetRefIdx);
+#endif
+                  if (pcSlice->getCheckLDC() == true)
+                  {
+                    continue;
+                  }
+                  int targetRefIdx1st = targetRefIdx;
+                  double bestOverScale = 0;
+                  double scale         = 0;
+                  int    curPOCMax, curPOCMin;
+                  int    colPOCMax, colPOCMin;
+                  int    bestTargetRefIdx = -1;
+                  bestDistScale = MAX_DOUBLE;
+                  targetRefIdx  = -1;
+                  for (int curRefIdx = 0; curRefIdx < pcSlice->getNumRefIdx(RefPicList(curRefPicListIdx)); curRefIdx++)
+                  {
+                    if (curRefIdx == targetRefIdx1st)
+                    {
+                      continue;
+                    }
+                    const int  currRefPOC = pcSlice->getRefPic(RefPicList(curRefPicListIdx), curRefIdx)->getPOC();
+                    const bool bIsCurrRefLongTerm =
+                      pcSlice->getRefPic(RefPicList(curRefPicListIdx), curRefIdx)->longTerm;
+                    if (bIsCurrRefLongTerm != bIsColRefLongTerm)
+                    {
+                      continue;
+                    }
+                    if (bIsCurrRefLongTerm)
+                    {
+                      targetRefIdx  = curRefIdx;
+                      bestDistScale = 1;
+                      bestTargetRefIdx = -1;
+                      break;
+                    }
+                    else if (colRefPOC == currRefPOC)
+                    {
+                      targetRefIdx  = curRefIdx;
+                      bestDistScale = 1;
+                      bestTargetRefIdx = -1;
+                      break;
+                    }
+                    else
+                    {
+                      curPOCMax = std::max(currPOC, currRefPOC);
+                      curPOCMin = std::min(currPOC, currRefPOC);
+                      colPOCMax = std::max(colPOC, colRefPOC);
+                      colPOCMin = std::min(colPOC, colRefPOC);
+                      scale = std::max(0, std::min(curPOCMax, colPOCMax) - std::max(curPOCMin, colPOCMin));
+                      scale = scale * scale / (abs(currPOC - currRefPOC) * abs(colPOC - colRefPOC));
+                      if (scale > bestOverScale)
+                      {
+                        bestOverScale    = scale;
+                        bestTargetRefIdx = curRefIdx;
+                      }
+                      if (abs(1.0 - (abs(currPOC - currRefPOC) * 1.0 / abs(colPOC - colRefPOC) * 1.0)) < bestDistScale)
+                      {
+                        bestDistScale = abs(1.0 - (abs(currPOC - currRefPOC) * 1.0 / abs(colPOC - colRefPOC) * 1.0));
+                        targetRefIdx  = curRefIdx;
+                      }
+                    }
+                  }   // curRefIdx
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+                  if (bestTargetRefIdx != -1)
+                  {
+                    targetRefIdx = bestTargetRefIdx;
+                  }
+                  if (targetRefIdx == -1)
+                  {
+                    targetRefIdx = 0;
+                  }
+                  pcSlice->setImRefIdx2nd(sliceIdx, RefPicList(colRefPicListIdx), RefPicList(curRefPicListIdx), colRefIdx,
+                                       targetRefIdx, colFrameIdx  );
+#else
+                  pcSlice->setImRefIdx(sliceIdx, RefPicList(colRefPicListIdx), RefPicList(curRefPicListIdx), colRefIdx,
+                                       targetRefIdx);
+#endif
+                    bestOverScale = 0;
+                    scale         = 0;
+                    bestTargetRefIdx = -1;
+                    bestDistScale = MAX_DOUBLE;
+                    targetRefIdx  = -1;
+                    for (int curRefIdx = 0; curRefIdx < pcSlice->getNumRefIdx(RefPicList(curRefPicListIdx));
+                         curRefIdx++)
+                    {
+                      const int  currRefPOC = pcSlice->getRefPic(RefPicList(curRefPicListIdx), curRefIdx)->getPOC();
+                      const bool bIsCurrRefLongTerm =
+                        pcSlice->getRefPic(RefPicList(curRefPicListIdx), curRefIdx)->longTerm;
+                      if (bIsCurrRefLongTerm != bIsColRefLongTerm)
+                      {
+                        continue;
+                      }
+                      if (bIsCurrRefLongTerm)
+                      {
+                        targetRefIdx  = curRefIdx;
+                        bestDistScale = 1;
+                        bestTargetRefIdx = -1;
+                        break;
+                      }
+                      else if (colRefPOC == currRefPOC)
+                      {
+                        targetRefIdx  = curRefIdx;
+                        bestDistScale = 1;
+                        bestTargetRefIdx = -1;
+                        break;
+                      }
+                      else
+                      {
+                        curPOCMax = std::max(currPOC, currRefPOC);
+                        curPOCMin = std::min(currPOC, currRefPOC);
+                        colPOCMax = std::max(colPOC, colRefPOC);
+                        colPOCMin = std::min(colPOC, colRefPOC);
+                        scale = std::max(0, std::min(curPOCMax, colPOCMax) - std::max(curPOCMin, colPOCMin));
+                        scale = scale * scale / (abs(currPOC - currRefPOC) * abs(colPOC - colRefPOC));
+                        if (scale > bestOverScale)
+                        {
+                          bestOverScale    = scale;
+                          bestTargetRefIdx = curRefIdx;
+                        }
+                        if (abs(1.0 - (abs(currPOC - currRefPOC) * 1.0 / abs(colPOC - colRefPOC) * 1.0))
+                            < bestDistScale)
+                        {
+                          bestDistScale = abs(1.0 - (abs(currPOC - currRefPOC) * 1.0 / abs(colPOC - colRefPOC) * 1.0));
+                          targetRefIdx  = curRefIdx;
+                        }
+                      }
+                    }   // curRefIdx
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+                    if (bestTargetRefIdx != -1)
+                    {
+                      targetRefIdx = bestTargetRefIdx;
+                    }
+                    if (targetRefIdx == -1)
+                    {
+                      targetRefIdx = 0;
+                    }
+                    pcSlice->setImRefIdx3rd(sliceIdx, RefPicList(colRefPicListIdx), RefPicList(curRefPicListIdx),
+                                            colRefIdx, targetRefIdx, colFrameIdx);
+#else
+                    pcSlice->setImRefIdx(sliceIdx, RefPicList(colRefPicListIdx), RefPicList(curRefPicListIdx),
+                                         colRefIdx, targetRefIdx);
+#endif
+                } // curRefPicListIdx
+#else
                 const bool bIsColRefLongTerm = pColSlice->getIsUsedAsLongTerm(RefPicList(colRefPicListIdx), colRefIdx);
                 const int colRefPOC = pColSlice->getRefPOC(RefPicList(colRefPicListIdx), colRefIdx);
 
                 for (int curRefPicListIdx = 0; curRefPicListIdx < (pcSlice->isInterB() ? 2 : 1); curRefPicListIdx++)
                 {
-                  double bestDistScale = 1000;
+                  double bestDistScale = MAX_DOUBLE;
                   int targetRefIdx = -1;
                   for (int curRefIdx = 0; curRefIdx < pcSlice->getNumRefIdx(RefPicList(curRefPicListIdx)); curRefIdx++)
                   {
@@ -3021,6 +3231,7 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
                   pcSlice->setImRefIdx(sliceIdx, RefPicList(colRefPicListIdx), RefPicList(curRefPicListIdx), colRefIdx, targetRefIdx);
 #endif
                 } // curRefPicListIdx
+#endif
               }
             }
           }
@@ -3189,6 +3400,9 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
 #if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
     pcSlice->generateEqualPocDist();
 #endif
+#if JVET_AI0183_MVP_EXTENSION
+    pcSlice->generateIntersectingMv();
+#endif
 
     double lambda            = 0.0;
     int actualHeadBits       = 0;
@@ -3255,10 +3469,20 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
     bool encPic = false;
     // test if we can skip the picture entirely or decode instead of encoding
     trySkipOrDecodePicture( decPic, encPic, *m_pcCfg, pcPic, m_pcEncLib->getApsMap() );
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+    if ( decPic && pcPic != nullptr && pcPic->cs->sps->getALFEnabledFlag() )
+    {
+      m_pcALF->restoreAlfScalePrev( pcPic->m_alfScalePrev );
+    }
+#endif
 
     pcPic->cs->slice = pcSlice; // please keep this
 #if ENABLE_QPA
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    if ( pcSlice->getPPS()->getSliceChromaQpFlag() && pcSlice->getPic()->cs->slice->isIntra() && !pcSlice->getPic()->cs->pcv->ISingleTree && !m_pcCfg->getUsePerceptQPA() && (m_pcCfg->getSliceChromaOffsetQpPeriodicity() == 0))
+#else
     if (pcSlice->getPPS()->getSliceChromaQpFlag() && CS::isDualITree (*pcSlice->getPic()->cs) && !m_pcCfg->getUsePerceptQPA() && (m_pcCfg->getSliceChromaOffsetQpPeriodicity() == 0))
+#endif
 #else
     if (pcSlice->getPPS()->getSliceChromaQpFlag() && CS::isDualITree (*pcSlice->getPic()->cs))
 #endif
@@ -3769,7 +3993,9 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
         {
           pcPic->slices[s]->setTileGroupAlfEnabledFlag(COMPONENT_Y, false);
         }
+
         m_pcALF->initCABACEstimator(m_pcEncLib->getCABACEncoder(), m_pcEncLib->getCtxCache(), pcSlice, m_pcEncLib->getApsMap());
+
         m_pcALF->ALFProcess(cs, pcSlice->getLambdas()
 #if ENABLE_QPA
           , (m_pcCfg->getUsePerceptQPA() && !m_pcCfg->getUseRateCtrl() && pcSlice->getPPS()->getUseDQP() ? m_pcEncLib->getRdCost(PARL_PARAM0(0))->getChromaWeight() : 0.0)
@@ -4586,7 +4812,6 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
       fflush( stdout );
     }
 
-
     DTRACE_UPDATE( g_trace_ctx, ( std::make_pair( "final", 0 ) ) );
 
     pcPic->reconstructed = true;
@@ -4607,6 +4832,9 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
     }
 
     pcPic->destroyTempBuffers();
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+    pcPic->cs->SetSplitPred();
+#endif
     pcPic->cs->destroyTemporaryCsData();
 #if JVET_AA0096_MC_BOUNDARY_PADDING
     m_pcFrameMcPadPrediction->init(m_pcEncLib->getRdCost(), pcSlice->getSPS()->getChromaFormatIdc(),

@@ -473,11 +473,21 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   if( lfnstIdx && tu.mtsIdx[compID] != MTS_SKIP && (tu.cu->isSepTree() ? true : isLuma(compID)) )
 #else
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  if (lfnstIdx && tu.mtsIdx[compID] != MTS_SKIP && (tu.cu->separateTree ? true : isLuma(compID)))
+#else
   if (lfnstIdx && tu.mtsIdx[compID] != MTS_SKIP && (CS::isDualITree(*tu.cs) ? true : isLuma(compID)))
+#endif
 #endif
   {
 #if JVET_AC0130_NSPT
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+    bool spsIntraLfnstEnabled = ( ( tu.cu->slice->getSliceType() == I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTISlice() ) ||
+                                  ( tu.cu->slice->getSliceType() != I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTPBSlice() ) );
+    bool allowNSPT = CU::isNSPTAllowed( tu, compID, width, height, spsIntraLfnstEnabled && CU::isIntra( *( tu.cu ) ) );
+#else
     bool allowNSPT = CU::isNSPTAllowed( tu, compID, width, height, CU::isIntra( *( tu.cu ) ) );
+#endif
     if( allowNSPT )
     {
       return;
@@ -518,7 +528,17 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
     }
     if (tu.cu->geoFlag)
     {
+#if JVET_AI0050_INTER_MTSS
+      intraMode = tu.cu->dimdDerivedIntraDir;
+#else
       intraMode = g_geoAngle2IntraAng[g_geoParams[tu.cu->firstPU->geoSplitDir][0]];
+#endif
+    }
+#endif
+#if JVET_AI0050_INTER_MTSS
+    if (tu.cu->lfnstIntra)
+    {
+      intraMode = tu.cu->dimdDerivedIntraDir2nd;
     }
 #endif
 #if JVET_AB0155_SGPM
@@ -544,7 +564,11 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
     }
 #endif
 #if JVET_AC0071_DBV
+#if JVET_AH0136_CHROMA_REORDERING
+    if (compID != COMPONENT_Y && PU::isDbvMode(intraMode))
+#else
     if (compID != COMPONENT_Y && intraMode == DBV_CHROMA_IDX)
+#endif
     {
       intraMode = PLANAR_IDX;
     }
@@ -759,14 +783,27 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
   const uint32_t  width    = area.width;
   const uint32_t  height   = area.height;
   const uint32_t  lfnstIdx = tu.cu->lfnstIdx;
+#if JVET_AI0050_INTER_MTSS
+  const uint32_t  lfnstIntra = tu.cu->lfnstIntra;
+#endif
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   if( lfnstIdx && tu.mtsIdx[compID] != MTS_SKIP && (tu.cu->isSepTree() ? true : isLuma(compID)) )
 #else
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  if (lfnstIdx && tu.mtsIdx[compID] != MTS_SKIP && (tu.cu->separateTree ? true : isLuma(compID)))
+#else
   if (lfnstIdx && tu.mtsIdx[compID] != MTS_SKIP && (CS::isDualITree(*tu.cs) ? true : isLuma(compID)))
+#endif
 #endif
   {
 #if JVET_AC0130_NSPT
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+    bool spsIntraLfnstEnabled = ( ( tu.cu->slice->getSliceType() == I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTISlice() ) ||
+                                  ( tu.cu->slice->getSliceType() != I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTPBSlice() ) );
+    bool allowNSPT = CU::isNSPTAllowed( tu, compID, width, height, spsIntraLfnstEnabled && CU::isIntra( *( tu.cu ) ) );
+#else
     bool allowNSPT = CU::isNSPTAllowed( tu, compID, width, height, CU::isIntra( *( tu.cu ) ) );
+#endif
     if( allowNSPT )
     {
       return;
@@ -817,7 +854,17 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
     }
     if (tu.cu->geoFlag)
     {
+#if JVET_AI0050_INTER_MTSS
+      intraMode = tu.cu->dimdDerivedIntraDir;
+#else
       intraMode = g_geoAngle2IntraAng[g_geoParams[tu.cu->firstPU->geoSplitDir][0]];
+#endif
+    }
+#endif
+#if JVET_AI0050_INTER_MTSS
+    if (tu.cu->lfnstIntra)
+    {
+      intraMode = tu.cu->dimdDerivedIntraDir2nd;
     }
 #endif
 #if JVET_AB0155_SGPM
@@ -833,7 +880,11 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
     }
 #endif
 #if JVET_AC0071_DBV
+#if JVET_AH0136_CHROMA_REORDERING
+    if (compID != COMPONENT_Y && PU::isDbvMode(intraMode))
+#else
     if (compID != COMPONENT_Y && intraMode == DBV_CHROMA_IDX)
+#endif
     {
       intraMode = PLANAR_IDX;
     }
@@ -887,7 +938,11 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
       TCoeff*         lfnstTemp;
       TCoeff*         coeffTemp;
 #if JVET_AG0061_INTER_LFNST_NSPT
+#if JVET_AI0050_INTER_MTSS
+      TCoeff *        tempCoeff = loadTr ? m_mtsCoeffs[lfnstIdx ? lfnstIdx + NUM_TRAFO_MODES_MTS + 3 * lfnstIntra - 1 : tu.mtsIdx[compID]] : m_tempCoeff;
+#else
       TCoeff *        tempCoeff = loadTr ? m_mtsCoeffs[lfnstIdx ? lfnstIdx + NUM_TRAFO_MODES_MTS - 1 : tu.mtsIdx[compID]] : m_tempCoeff;
+#endif
 #else
       TCoeff *        tempCoeff = loadTr ? m_mtsCoeffs[tu.mtsIdx[compID]] : m_tempCoeff;
 #endif
@@ -1049,7 +1104,13 @@ void TrQuant::invTransformNxN( TransformUnit &tu, const ComponentID &compID, Pel
 
   DTRACE_COEFF_BUF(D_TCOEFF, tempCoeff, tu, tu.cu->predMode, compID);
 
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  bool spsIntraLfnstEnabled = ( ( tu.cu->slice->getSliceType() == I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTISlice() ) ||
+                                ( tu.cu->slice->getSliceType() != I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTPBSlice() ) );
+  if( ( spsIntraLfnstEnabled && CU::isIntra( *tu.cu ) ) || ( tu.cs->sps->getUseInterLFNST() && CU::isInter( *tu.cu ) ) )
+#else
   if (tu.cs->sps->getUseLFNST())
+#endif
   {
     xInvLfnst(tu, compID);
   }
@@ -1152,6 +1213,12 @@ void TrQuant::getTrTypes(const TransformUnit tu, const ComponentID compID, int &
 
   trTypeHor = DCT2;
   trTypeVer = DCT2;
+#if JVET_AI0050_SBT_LFNST
+  if (isSBT && tu.cu->lfnstIdx)
+  {
+    return;
+  }
+#endif
 
   if (isISP && tu.cu->lfnstIdx)
   {
@@ -1385,7 +1452,13 @@ void TrQuant::xT( const TransformUnit &tu, const ComponentID &compID, const CPel
 #endif
 
 #if JVET_AC0130_NSPT
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  bool spsIntraLfnstEnabled = ( ( tu.cu->slice->getSliceType() == I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTISlice() ) ||
+                                ( tu.cu->slice->getSliceType() != I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTPBSlice() ) );
+  bool allowNSPT = CU::isNSPTAllowed( tu, compID, width, height, spsIntraLfnstEnabled && CU::isIntra( *( tu.cu ) ) );
+#else
   const bool allowNSPT = CU::isNSPTAllowed( tu, compID, width, height, CU::isIntra( *(tu.cu) ) );
+#endif
 #endif
 
 #if EXTENDED_LFNST
@@ -1397,10 +1470,18 @@ void TrQuant::xT( const TransformUnit &tu, const ComponentID &compID, const CPel
     skipHeight = height - lfnst_threshold;
   }
 #else
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+#if JVET_AC0130_NSPT
+  if( ( ( spsIntraLfnstEnabled && CU::isIntra( *( tu.cu ) ) ) || ( tu.cs->sps->getUseInterLFNST() && CU::isInter( *( tu.cu ) ) ) ) && tu.cu->lfnstIdx && !allowNSPT )
+#else
+  if( ( ( spsIntraLfnstEnabled && CU::isIntra( *( tu.cu ) ) ) || ( tu.cs->sps->getUseInterLFNST() && CU::isInter( *( tu.cu ) ) ) ) && tu.cu->lfnstIdx )
+#endif
+#else
 #if JVET_AC0130_NSPT
   if( tu.cs->sps->getUseLFNST() && tu.cu->lfnstIdx && !allowNSPT )
 #else
   if( tu.cs->sps->getUseLFNST() && tu.cu->lfnstIdx )
+#endif
 #endif
   {
     if( ( width == 4 && height > 16 ) || ( width > 16 && height == 4 ) )
@@ -1508,7 +1589,13 @@ void TrQuant::xIT( const TransformUnit &tu, const ComponentID &compID, const CCo
 #endif
 
 #if JVET_AC0130_NSPT
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  bool spsIntraLfnstEnabled = ( ( tu.cu->slice->getSliceType() == I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTISlice() ) ||
+                                ( tu.cu->slice->getSliceType() != I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTPBSlice() ) );
+  bool allowNSPT = CU::isNSPTAllowed( tu, compID, width, height, spsIntraLfnstEnabled && CU::isIntra( *( tu.cu ) ) );
+#else
   const bool allowNSPT = CU::isNSPTAllowed( tu, compID, width, height, CU::isIntra( *(tu.cu) ) );
+#endif
 #endif
 
 #if EXTENDED_LFNST
@@ -1520,10 +1607,18 @@ void TrQuant::xIT( const TransformUnit &tu, const ComponentID &compID, const CCo
     skipHeight = height - lfnst_threshold;
   }
 #else
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+#if JVET_AC0130_NSPT
+  if( ( ( spsIntraLfnstEnabled && CU::isIntra( *( tu.cu ) ) ) || ( tu.cs->sps->getUseInterLFNST() && CU::isInter( *( tu.cu ) ) ) ) && tu.cu->lfnstIdx && !allowNSPT )
+#else
+  if( ( ( spsIntraLfnstEnabled && CU::isIntra( *( tu.cu ) ) ) || ( tu.cs->sps->getUseInterLFNST() && CU::isInter( *( tu.cu ) ) ) ) && tu.cu->lfnstIdx )
+#endif
+#else
 #if JVET_AC0130_NSPT
   if( tu.cs->sps->getUseLFNST() && tu.cu->lfnstIdx && !allowNSPT )
 #else
   if( tu.cs->sps->getUseLFNST() && tu.cu->lfnstIdx )
+#endif
 #endif
   {
     if( ( width == 4 && height > 16 ) || ( width > 16 && height == 4 ) )
@@ -1951,10 +2046,23 @@ void TrQuant::transformNxN( TransformUnit& tu, const ComponentID& compID, const 
   {
 #if JVET_AG0061_INTER_LFNST_NSPT
     tu.mtsIdx[compID]   = it->first < NUM_TRAFO_MODES_MTS ? it->first : 0;
+#if JVET_AI0050_INTER_MTSS
+    int factor = (it->first - NUM_TRAFO_MODES_MTS) / 3;
+    tu.lfnstIdx[compID] = it->first < NUM_TRAFO_MODES_MTS ? 0 : it->first - NUM_TRAFO_MODES_MTS - 3 * factor + 1;
+    tu.lfnstIntra[compID] = it->first < (NUM_TRAFO_MODES_MTS + 3) ? 0 : (it->first < (NUM_TRAFO_MODES_MTS + 6) ? 1 : 2);
+#else
     tu.lfnstIdx[compID] = it->first < NUM_TRAFO_MODES_MTS ? 0 : it->first - NUM_TRAFO_MODES_MTS + 1;
+#endif
+#if JVET_AI0050_SBT_LFNST
+    if ((compID == COMPONENT_Y && !tu.cu->sbtInfo) || (!tu.noResidual && compID == COMPONENT_Y && tu.cu->sbtInfo))
+#else
     if (compID == COMPONENT_Y)
+#endif
     {
       tu.cu->lfnstIdx = tu.lfnstIdx[compID];
+#if JVET_AI0050_INTER_MTSS
+      tu.cu->lfnstIntra = tu.lfnstIntra[compID];
+#endif
     }
     CoeffBuf tempCoeff(m_mtsCoeffs[it->first], rect);
 #else
@@ -2105,7 +2213,11 @@ void TrQuant::transformNxN( TransformUnit& tu, const ComponentID& compID, const 
   CHECK(cs.sps->getMaxTbSize() < uiWidth, "Unsupported transformation size");
 
 #if JVET_AG0061_INTER_LFNST_NSPT
+#if JVET_AI0050_INTER_MTSS
+  CoeffBuf tempCoeff(loadTr ? m_mtsCoeffs[tu.lfnstIdx[compID] ? (tu.lfnstIdx[compID] + NUM_TRAFO_MODES_MTS + 3 * tu.lfnstIntra[compID] - 1) : tu.mtsIdx[compID]] : m_tempCoeff, rect);
+#else
   CoeffBuf tempCoeff(loadTr ? m_mtsCoeffs[tu.lfnstIdx[compID] ? tu.lfnstIdx[compID] + NUM_TRAFO_MODES_MTS - 1 : tu.mtsIdx[compID]] : m_tempCoeff, rect);
+#endif
 #else
   CoeffBuf tempCoeff(loadTr ? m_mtsCoeffs[tu.mtsIdx[compID]] : m_tempCoeff, rect);
 #endif
@@ -2122,14 +2234,26 @@ void TrQuant::transformNxN( TransformUnit& tu, const ComponentID& compID, const 
       xT(tu, compID, resiBuf, tempCoeff, uiWidth, uiHeight);
     }
 #if JVET_AG0061_INTER_LFNST_NSPT
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+    bool spsIntraLfnstEnabled = ( ( tu.cu->slice->getSliceType() == I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTISlice() ) ||
+                                  ( tu.cu->slice->getSliceType() != I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTPBSlice() ) );
+    if( ( spsIntraLfnstEnabled && CU::isIntra( *tu.cu ) ) || ( sps.getUseInterLFNST() && CU::isInter( *tu.cu ) ) )
+#else
     if (sps.getUseLFNST())
+#endif
     {
       xFwdLfnst(tu, compID);
     }
 #endif
   }
 #if !JVET_AG0061_INTER_LFNST_NSPT
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  bool spsIntraLfnstEnabled = ( ( tu.cu->slice->getSliceType() == I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTISlice() ) ||
+                                ( tu.cu->slice->getSliceType() != I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTPBSlice() ) );
+  if( ( spsIntraLfnstEnabled && CU::isIntra( *tu.cu ) ) || ( sps.getUseInterLFNST() && CU::isInter( *tu.cu ) ) )
+#else
   if (sps.getUseLFNST())
+#endif
   {
     xFwdLfnst(tu, compID, loadTr);
   }
@@ -2168,6 +2292,10 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
   bool bIsJCCR = tu.jointCbCr && isChroma(compID);
   ComponentID residCompID = compID;
   bool bJccrWithCr = bIsJCCR && !(tu.jointCbCr >> 1);
+#if JVET_AI0096_SIGN_PRED_BIT_DEPTH_FIX
+  const int signPredShift = 10 + SIGN_PRED_RESIDUAL_BITS  - tu.cs->sps->getBitDepth(toChannelType(COMPONENT_Y));
+  const int signPredOffset = 1 << (signPredShift - 1);
+#endif
   if(bJccrWithCr)
   {
     residCompID = COMPONENT_Cr;
@@ -2241,7 +2369,11 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
   };
 #endif
 
+#if JVET_AI0096_SIGN_PRED_BIT_DEPTH_FIX
+  auto createTemplate = [this, tu, signPredShift](ComponentID comp, uint32_t width, uint32_t height, uint32_t mtsIdx) -> void
+#else
   auto createTemplate = [this,tu](ComponentID comp, uint32_t width, uint32_t height, uint32_t mtsIdx) -> void
+#endif
   {
     // This is the function used to generate template values stored in g_initRomSignPred[]
     TCoeff *memCoeff = (TCoeff *)xMalloc(TCoeff, width*height);
@@ -2279,8 +2411,12 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
       Position curr(j%SIGN_PRED_FREQ_RANGE, j/SIGN_PRED_FREQ_RANGE);
 #endif
       coeff.at(prev) = 0;
+#if JVET_AI0096_SIGN_PRED_BIT_DEPTH_FIX
+      coeff.at(curr) = 1 << signPredShift;
+#else
       // Is this the correct value to use? Shouldn't it depend on bit depth?
       coeff.at(curr) = 1 << SIGN_PRED_SHIFT;
+#endif
 
       xIT( tu, comp, coeff, resi);
 
@@ -2315,7 +2451,11 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
   };
 
 #if JVET_Y0141_SIGN_PRED_IMPROVE
+#if JVET_AI0096_SIGN_PRED_BIT_DEPTH_FIX
+  auto createTemplateLFNST = [this, tu, signPredShift](ComponentID comp, uint32_t width, uint32_t height, uint32_t lfnstIdx) -> void
+#else
   auto createTemplateLFNST = [this, tu](ComponentID comp, uint32_t width, uint32_t height, uint32_t lfnstIdx) -> void
+#endif
   {
     const uint32_t stride = width + height;
     const uint32_t length = width + height;
@@ -2332,7 +2472,11 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
     {
       coeff.fill(0);
       Position curr((j%signPredWidth), (j / signPredWidth));
+#if JVET_AI0096_SIGN_PRED_BIT_DEPTH_FIX
+      coeff.at(curr) = 1 << signPredShift;
+#else
       coeff.at(curr) = 1 << SIGN_PRED_SHIFT;
+#endif
 
       xInvLfnst(tu, comp);
       xIT(tu, comp, coeff, resi);
@@ -2380,7 +2524,13 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
   int log2Width = floorLog2(uiWidth);
   int log2Height = floorLog2(uiHeight);
   int actualTrIdx = 0, actualLfnstIdx = 0;
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  bool spsIntraLfnstEnabled = ( ( tu.cu->slice->getSliceType() == I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTISlice() ) ||
+                                ( tu.cu->slice->getSliceType() != I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTPBSlice() ) );
+  bool lfnstEnabled = ( ( ( spsIntraLfnstEnabled && CU::isIntra( *( tu.cu ) ) ) || ( tu.cu->cs->sps->getUseInterLFNST() && CU::isInter( *( tu.cu ) ) ) ) && tu.checkLFNSTApplied( residCompID ) );
+#else
   bool lfnstEnabled = tu.checkLFNSTApplied(residCompID);
+#endif
   if (lfnstEnabled)
   {
     actualLfnstIdx = getLfnstIdx(tu, residCompID);
@@ -2514,7 +2664,11 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
     {
       // coeffVal should be in -32768..32767 range and templateBasisVec[j] in -63..63
       // output range should be about -8064..8064
+#if JVET_AI0096_SIGN_PRED_BIT_DEPTH_FIX
+      templateVec[j] = (coeffVal * templateBasisVec[j] + signPredOffset) >> signPredShift;
+#else
       templateVec[j] = (coeffVal * templateBasisVec[j] + SIGN_PRED_OFFSET) >> SIGN_PRED_SHIFT;
+#endif
     }
   }
 
@@ -2719,7 +2873,17 @@ int TrQuant::getLfnstIdx(const TransformUnit &tu, ComponentID compID)
   }
   if (tu.cu->geoFlag)
   {
+#if JVET_AI0050_INTER_MTSS
+    intraMode = tu.cu->dimdDerivedIntraDir;
+#else
     intraMode = g_geoAngle2IntraAng[g_geoParams[tu.cu->firstPU->geoSplitDir][0]];
+#endif
+  }
+#endif
+#if JVET_AI0050_INTER_MTSS
+  if (tu.cu->lfnstIntra)
+  {
+    intraMode = tu.cu->dimdDerivedIntraDir2nd;
   }
 #endif
 #if JVET_AB0155_SGPM
@@ -2735,7 +2899,11 @@ int TrQuant::getLfnstIdx(const TransformUnit &tu, ComponentID compID)
   }
 #endif
 #if JVET_AC0071_DBV
+#if JVET_AH0136_CHROMA_REORDERING
+  if (compID != COMPONENT_Y && PU::isDbvMode(intraMode))
+#else
   if (compID != COMPONENT_Y && intraMode == DBV_CHROMA_IDX)
+#endif
   {
     intraMode = PLANAR_IDX;
   }
@@ -2773,7 +2941,13 @@ int TrQuant::getLfnstIdx(const TransformUnit &tu, ComponentID compID)
   CHECK((lfnstIdx != 1) && (lfnstIdx != 2), "invalid lfnst idx");
 #endif
 #if JVET_AC0130_NSPT
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  bool spsIntraLfnstEnabled = ( ( tu.cu->slice->getSliceType() == I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTISlice() ) ||
+                                ( tu.cu->slice->getSliceType() != I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTPBSlice() ) );
+  bool allowNSPT = CU::isNSPTAllowed( tu, compID, area.width, area.height, spsIntraLfnstEnabled && CU::isIntra( *( tu.cu ) ) );
+#else
   bool allowNSPT = CU::isNSPTAllowed( tu, compID, area.width, area.height, CU::isIntra( *( tu.cu ) ) );
+#endif
   intraMode = allowNSPT ? PU::getNSPTIntraMode( PU::getWideAngle( tu, intraMode, compID ) ) : getLFNSTIntraMode( PU::getWideAngle( tu, intraMode, compID ) );
 #else
   intraMode = getLFNSTIntraMode(PU::getWideAngle(tu, intraMode, compID));

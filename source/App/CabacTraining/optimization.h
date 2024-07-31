@@ -25,7 +25,7 @@ inline ModelParameters getBestGreedy( const DataDb &db, SliceType st )
     {
       for( int winSizesIdx = winSizesIdxStart; winSizesIdx <= winSizesIdxEnd; ++winSizesIdx )
       {
-        for( int weightIdx = weightIdxStart; weightIdx < weightIdxEnd; ++weightIdx )
+        for( int weightIdx = weightIdxStart; weightIdx <= weightIdxEnd; ++weightIdx )
         {
           prm.initId = (slope << 3) | (offset);
           prm.log2windowsize = log2winsize[winSizesIdx];

@@ -158,6 +158,41 @@ struct UnitScale
   Size     scale( const Size     &size ) const { return { size.width >> posx, size.height >> posy }; }
   Area     scale( const Area    &_area ) const { return Area( scale( _area.pos() ), scale( _area.size() ) ); }
 };
+
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+
+struct SplitPred
+{
+  uint8_t  minqtDetphCol;
+  uint8_t  qtDetphCol;
+  uint8_t  maxBtDetphCol;
+  uint8_t  mttDetphCol;
+
+  SplitPred() : minqtDetphCol(0),
+                qtDetphCol(0),
+                maxBtDetphCol(0),
+                mttDetphCol(0)
+  { }
+  SplitPred(int i) : minqtDetphCol((uint8_t)i),
+                     qtDetphCol((uint8_t)i),
+                     maxBtDetphCol((uint8_t)i),
+                     mttDetphCol((uint8_t)i)
+  { }
+  bool operator==(const SplitPred& sp) const
+  {
+    if (minqtDetphCol != sp.minqtDetphCol) return false;
+    if (qtDetphCol != sp.qtDetphCol) return false;
+    if (maxBtDetphCol != sp.maxBtDetphCol) return false;
+    if (mttDetphCol != sp.mttDetphCol) return false;
+    return true;
+  }
+
+  bool operator!=(const SplitPred& sp) const
+  {
+    return !(*this == sp);
+  }
+};
+#endif
 namespace std
 {
   template<> struct hash<Position>

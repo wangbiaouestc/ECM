@@ -3461,6 +3461,20 @@ static void simdFilter13x13BlkExtDbResiDirect(
   const size_t dstStride         = dstBuffer.stride;
   const size_t srcBeforeDbStride = scrBufferBeforeDb.stride;
   const size_t srcResiStride     = scrBufferResi.stride;
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+  int adjustShift = coeffBits - 1;
+  const bool  bScalingCorr = isLuma(compId) && fixedFilterSetIdx < 0;
+  if ( bScalingCorr )
+  {
+    fixedFilterSetIdx = -fixedFilterSetIdx - 1;
+    adjustShift -= shiftPrecis; // add more precision
+  }
+  const int shift = adjustShift;
+  const Pel currBase = 512;
+  int round = 1 << (shift - 1);
+
+  __m128i curBase = _mm_set_epi16( currBase, currBase, currBase, currBase, currBase, currBase, currBase, currBase );
+#else
 #if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
   int shift = coeffBits;
   shift -= 1;
@@ -3468,6 +3482,7 @@ static void simdFilter13x13BlkExtDbResiDirect(
 #else
   constexpr int shift = AdaptiveLoopFilter::m_NUM_BITS - 1;
   constexpr int round = 1 << (shift - 1);
+#endif
 #endif
 
   const size_t width  = blk.width;
@@ -3992,6 +4007,13 @@ static void simdFilter13x13BlkExtDbResiDirect(
       accumB = _mm_srai_epi32(accumB, shift);
 
       accumA = _mm_packs_epi32(accumA, accumB);
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+      if ( bScalingCorr )
+      {
+        accumA = _mm_add_epi16(accumA, curBase);
+      }
+      else
+#endif
       accumA = _mm_add_epi16(accumA, cur);
       accumA = _mm_min_epi16(mmMax, _mm_max_epi16(accumA, mmMin));
 
@@ -4034,6 +4056,20 @@ static void simdFilter13x13BlkExtDbResi(
   const size_t dstStride         = dstBuffer.stride;
   const size_t srcBeforeDbStride = scrBufferBeforeDb.stride;
   const size_t srcResiStride     = scrBufferResi.stride;
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+  int adjustShift = coeffBits - 1;
+  const bool  bScalingCorr = isLuma(compId) && fixedFilterSetIdx < 0;
+  if ( bScalingCorr )
+  {
+    fixedFilterSetIdx = -fixedFilterSetIdx - 1;
+    adjustShift -= shiftPrecis; // add more precision
+  }
+  const int shift = adjustShift;
+  const Pel currBase = 512;
+  int round = 1 << (shift - 1);
+
+  __m128i curBase = _mm_set_epi16( currBase, currBase, currBase, currBase, currBase, currBase, currBase, currBase );
+#else
 #if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
   int shift = coeffBits;
   shift -= 1;
@@ -4041,6 +4077,7 @@ static void simdFilter13x13BlkExtDbResi(
 #else
   constexpr int shift = AdaptiveLoopFilter::m_NUM_BITS - 1;
   constexpr int round = 1 << (shift - 1);
+#endif
 #endif
 
   const size_t width  = blk.width;
@@ -4532,6 +4569,13 @@ static void simdFilter13x13BlkExtDbResi(
       accumB = _mm_srai_epi32(accumB, shift);
 
       accumA = _mm_packs_epi32(accumA, accumB);
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+      if ( bScalingCorr )
+      {
+        accumA = _mm_add_epi16(accumA, curBase);
+      }
+      else
+#endif
       accumA = _mm_add_epi16(accumA, cur);
       accumA = _mm_min_epi16(mmMax, _mm_max_epi16(accumA, mmMin));
 

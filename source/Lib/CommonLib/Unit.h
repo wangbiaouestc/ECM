@@ -298,6 +298,9 @@ struct CodingUnit : public UnitArea
   // a triple split would increase the mtDepth by 1, but the qtDepth by 2 in the first and last part and by 1 in the middle part (because of the 1-2-1 split proportions)
   uint8_t        btDepth; // number of applied binary splits, after switching to the mtt (or it's equivalent)
   uint8_t        mtDepth; // the actual number of splits after switching to mtt (equals btDepth if only binary splits are allowed)
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  uint8_t        mtImplicitDepth;
+#endif
   int8_t         chromaQpAdj;
   int8_t         qp;
   SplitSeries    splitSeries;
@@ -362,6 +365,14 @@ struct CodingUnit : public UnitArea
   int8_t         dimdRelWeight[3]; // max number of predictions to blend
 #endif
 #endif
+#if JVET_AH0136_CHROMA_REORDERING
+  int8_t         dimdBlendModeChroma[DIMD_FUSION_NUM - 1];
+  uint8_t        chromaList[7];
+  Mv             mvs[10];
+  Mv             bvs[10];
+  int            rribcTypes[10];
+  int            mvsNum;
+#endif
 #if TMP_FAST_ENC
 #if JVET_AD0086_ENHANCED_INTRA_TMP
 #if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
@@ -376,6 +387,9 @@ struct CodingUnit : public UnitArea
   bool               tmpFusionFlag;
   int                tmpIsSubPel;
   int                tmpSubPelIdx;
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+  int                tmpFracIdx;
+#endif
 #endif
 #endif
 #if JVET_W0123_TIMD_FUSION
@@ -420,9 +434,15 @@ struct CodingUnit : public UnitArea
   uint8_t        mtsFlag;
 #if JVET_AG0061_INTER_LFNST_NSPT
   uint8_t        lfnstFlag;
+#if JVET_AI0050_INTER_MTSS
+  uint8_t        lfnstIntra;
+#endif
 #endif
 #if JVET_AG0061_INTER_LFNST_NSPT
   int            dimdDerivedIntraDir;
+#if JVET_AI0050_INTER_MTSS
+  int            dimdDerivedIntraDir2nd;
+#endif
 #endif
   uint8_t        lfnstIdx;
   uint8_t        bcwIdx;
@@ -500,7 +520,19 @@ struct CodingUnit : public UnitArea
   uint8_t        curPLTSize[MAX_NUM_CHANNEL_TYPE];
   Pel            curPLT[MAX_NUM_COMPONENT][MAXPLTSIZE];
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  bool           isSST;
+  bool           separateTree;
+  int            intraRegionRootDepth;  
+  int            intraRegionRootQtDepth;
+  int            intraRegionRootBtDepth;
+  int            intraRegionRootMtDepth;
+  int            intraRegionRootImplicitBtDepth;
+
+  CodingUnit() : chType( CH_L ), isSST( false ) { }
+#else
   CodingUnit() : chType( CH_L ) { }
+#endif
   CodingUnit(const UnitArea &unit);
   CodingUnit(const ChromaFormat _chromaFormat, const Area &area);
 
@@ -546,7 +578,7 @@ struct CodingUnit : public UnitArea
 
 struct IntraPredictionData
 {
-#if ENABLE_DIMD || JVET_W0123_TIMD_FUSION
+#if ENABLE_DIMD || JVET_W0123_TIMD_FUSION || JVET_AH0136_CHROMA_REORDERING
   bool      parseLumaMode = false;
   int8_t    candId = -1;
   bool      parseChromaMode = false;
@@ -628,6 +660,9 @@ struct InterPredictionData
   uint8_t     geoMergeIdx1;
 #if JVET_Y0065_GPM_INTRA
   bool        gpmIntraFlag;
+#endif
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+  bool        gpmInterIbcFlag;
 #endif
 #if JVET_W0097_GPM_MMVD_TM
   bool        geoMMVDFlag0;
@@ -894,6 +929,9 @@ struct TransformUnit : public UnitArea
   uint8_t        mtsIdx     [ MAX_NUM_TBLOCKS ];
 #if JVET_AG0061_INTER_LFNST_NSPT
   uint8_t        lfnstIdx   [ MAX_NUM_TBLOCKS ];
+#if JVET_AI0050_INTER_MTSS
+  uint8_t        lfnstIntra [ MAX_NUM_TBLOCKS ];
+#endif
 #endif
   bool           noResidual;
   uint8_t        jointCbCr;

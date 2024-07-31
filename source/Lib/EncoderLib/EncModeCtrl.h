@@ -69,6 +69,9 @@ enum EncTestModeType
 #endif
   ETM_MERGE_GEO,
   ETM_INTRA,
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  ETM_SEPARATE_TREE_INTRA,
+#endif
   ETM_PALETTE,
   ETM_SPLIT_QT,
   ETM_SPLIT_BT_H,
@@ -219,6 +222,7 @@ struct ComprCUCtx
     , skipSecondMTSPass
                     ( false )
     , interHad      (std::numeric_limits<Distortion>::max())
+
 #if ENABLE_SPLIT_PARALLELISM
     , isLevelSplitParallel
                     ( false )
@@ -248,6 +252,9 @@ struct ComprCUCtx
                     ( false )
 #if JVET_AG0058_EIP
     , eipFlag      ( false )
+#endif
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    , skipSplits    ( false )
 #endif
   {
     getAreaIdx( cs.area.Y(), *cs.pcv, cuX, cuY, cuW, cuH );
@@ -305,6 +312,9 @@ struct ComprCUCtx
 #if JVET_AG0058_EIP
   bool                              eipFlag;
 #endif
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  bool                              skipSplits;
+#endif
 
   template<typename T> T    get( int ft )       const { return typeid(T) == typeid(double) ? (T&)extraFeaturesd[ft] : T(extraFeatures[ft]); }
   template<typename T> void set( int ft, T val )      { extraFeatures [ft] = int64_t( val ); }
@@ -334,7 +344,12 @@ protected:
   std::map<int, int*>  *m_bimQPMap;
 #endif
   bool                  m_fastDeltaQP;
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  static_vector<ComprCUCtx, ( MAX_CU_DEPTH << 2 )> m_ComprCUCtxList[MAX_TREE_TYPE];
+  ComprCUCtx           *m_nonIntraCUECtx;
+#else
   static_vector<ComprCUCtx, ( MAX_CU_DEPTH << 2 )> m_ComprCUCtxList;
+#endif
 #if ENABLE_SPLIT_PARALLELISM
   int                   m_runNextInParallel;
 #endif
@@ -343,6 +358,12 @@ protected:
   bool                  m_doPlt;
 #if JVET_AE0057_MTT_ET
   double                m_noSplitIntraRdCost;   
+#endif
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  bool                  m_avoidComplexIntraInInterSlice;
+  Distortion            m_savedInterHad;
+  unsigned              m_treeIdx;
 #endif
 
 public:
@@ -377,14 +398,26 @@ public:
   EncTestMode  currTestMode         () const;
   EncTestMode  lastTestMode         () const;
   void         setEarlySkipDetected ();
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  void         setIsHashPerfectMatch( bool b ) { m_ComprCUCtxList[m_treeIdx].back().isHashPerfectMatch = b; }
+  bool         getIsHashPerfectMatch() { return m_ComprCUCtxList[m_treeIdx].back().isHashPerfectMatch; }
+#else
   void         setIsHashPerfectMatch( bool b ) { m_ComprCUCtxList.back().isHashPerfectMatch = b; }
   bool         getIsHashPerfectMatch() { return m_ComprCUCtxList.back().isHashPerfectMatch; }
+#endif
   virtual void setBest              ( CodingStructure& cs );
   bool         anyMode              () const;
 #if JVET_AE0057_MTT_ET
   void         setNoSplitIntraCost  (double cost) { m_noSplitIntraRdCost = cost; }
 #endif
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  ComprCUCtx&       getComprCUCtx    ()                      { CHECK( m_ComprCUCtxList[m_treeIdx].empty(), "Accessing empty list!"); return m_ComprCUCtxList[m_treeIdx].back(); }
+  void              setNonIntraCUECtx( ComprCUCtx& c )       { m_nonIntraCUECtx = &c; }
+  const Slice*      getSlice()                               { return m_slice; }
+  virtual void      setTreeIdx() = 0;
+#else
   const ComprCUCtx& getComprCUCtx   () { CHECK( m_ComprCUCtxList.empty(), "Accessing empty list!"); return m_ComprCUCtxList.back(); }
+#endif
 
 #if SHARP_LUMA_DELTA_QP
   void                  initLumaDeltaQpLUT();
@@ -393,6 +426,52 @@ public:
   void setFastDeltaQp                 ( bool b )                {        m_fastDeltaQP = b;                               }
   bool getFastDeltaQp                 ()                  const { return m_fastDeltaQP;                                   }
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  void popLastCmprCUCtx               () { m_ComprCUCtxList[m_treeIdx].pop_back(); }
+  void skipSplits                     () { m_ComprCUCtxList[m_treeIdx].back().skipSplits = true; }
+
+  double getBestInterCost             ()                  const { return m_ComprCUCtxList[m_treeIdx].back().bestInterCost;           }
+  Distortion getInterHad              ()                  const { return m_ComprCUCtxList[m_treeIdx].back().interHad;                }
+  void enforceInterHad                ( Distortion had )        {        m_ComprCUCtxList[m_treeIdx].back().interHad = had;          }
+  double getMtsSize2Nx2NFirstPassCost ()                  const { return m_ComprCUCtxList[m_treeIdx].back().bestMtsSize2Nx2N1stPass; }
+  bool   getSkipSecondMTSPass         ()                  const { return m_ComprCUCtxList[m_treeIdx].back().skipSecondMTSPass;       }
+  void   setSkipSecondMTSPass         ( bool b )                { m_ComprCUCtxList[m_treeIdx].back().skipSecondMTSPass = b;          }
+  double getBestCostWithoutSplitFlags ()                  const { return m_ComprCUCtxList[m_treeIdx].back().bestCostWithoutSplitFlags;         }
+  void   setBestCostWithoutSplitFlags ( double cost )           { m_ComprCUCtxList[m_treeIdx].back().bestCostWithoutSplitFlags = cost;         }
+  double getMtsFirstPassNoIspCost     ()                  const { return m_ComprCUCtxList[m_treeIdx].back().bestCostMtsFirstPassNoIsp;         }
+  void   setMtsFirstPassNoIspCost     ( double cost )           { m_ComprCUCtxList[m_treeIdx].back().bestCostMtsFirstPassNoIsp = cost;         }
+  double getIspCost                   ()                  const { return m_ComprCUCtxList[m_treeIdx].back().bestCostIsp; }
+  void   setIspCost                   ( double val )            { m_ComprCUCtxList[m_treeIdx].back().bestCostIsp = val; }
+#if INTRA_TRANS_ENC_OPT
+  void   resetLfnstCost               ()                        { m_ComprCUCtxList[m_treeIdx].back().bestLfnstCost[0] = m_ComprCUCtxList[m_treeIdx].back().bestLfnstCost[1] = MAX_DOUBLE; }
+#endif
+  bool   getISPWasTested              ()                  const { return m_ComprCUCtxList[m_treeIdx].back().ispWasTested; }
+  void   setISPWasTested              ( bool val )              { m_ComprCUCtxList[m_treeIdx].back().ispWasTested = val; }
+  void   setBestPredModeDCT2          ( uint16_t val )          { m_ComprCUCtxList[m_treeIdx].back().bestPredModeDCT2 = val; }
+  uint16_t getBestPredModeDCT2        ()                  const { return m_ComprCUCtxList[m_treeIdx].back().bestPredModeDCT2; }
+  bool   getRelatedCuIsValid          ()                  const { return m_ComprCUCtxList[m_treeIdx].back().relatedCuIsValid; }
+  void   setRelatedCuIsValid          ( bool val )              { m_ComprCUCtxList[m_treeIdx].back().relatedCuIsValid = val; }
+  uint16_t getIspPredModeValRelCU     ()                  const { return m_ComprCUCtxList[m_treeIdx].back().ispPredModeVal; }
+  void   setIspPredModeValRelCU       ( uint16_t val )          { m_ComprCUCtxList[m_treeIdx].back().ispPredModeVal = val; }
+  double getBestDCT2NonISPCostRelCU   ()                  const { return m_ComprCUCtxList[m_treeIdx].back().bestDCT2NonISPCost; }
+  void   setBestDCT2NonISPCostRelCU   ( double val )            { m_ComprCUCtxList[m_treeIdx].back().bestDCT2NonISPCost = val; }
+  double getBestNonDCT2Cost           ()                  const { return m_ComprCUCtxList[m_treeIdx].back().bestNonDCT2Cost; }
+  void   setBestNonDCT2Cost           ( double val )            { m_ComprCUCtxList[m_treeIdx].back().bestNonDCT2Cost = val; }
+  uint8_t getBestISPIntraModeRelCU    ()                  const { return m_ComprCUCtxList[m_treeIdx].back().bestISPIntraMode; }
+  void   setBestISPIntraModeRelCU     ( uint8_t val )           { m_ComprCUCtxList[m_treeIdx].back().bestISPIntraMode = val; }
+#if JVET_V0130_INTRA_TMP
+  void   setTPMFlagISPPass            (bool val)                { m_ComprCUCtxList[m_treeIdx].back().tmpFlag = val; }
+#endif
+#if JVET_AG0058_EIP
+  void   setAeipFlagISPPass           (bool val)                { m_ComprCUCtxList[m_treeIdx].back().eipFlag = val; }
+#endif
+  void   setMIPFlagISPPass            ( bool val )              { m_ComprCUCtxList[m_treeIdx].back().mipFlag = val; }
+  void   setISPMode                   ( uint8_t val )           { m_ComprCUCtxList[m_treeIdx].back().ispMode = val; }
+  void   setISPLfnstIdx               ( uint8_t val )           { m_ComprCUCtxList[m_treeIdx].back().ispLfnstIdx = val; }
+  bool   getStopNonDCT2Transforms     ()                  const { return m_ComprCUCtxList[m_treeIdx].back().stopNonDCT2Transforms; }
+  void   setStopNonDCT2Transforms     ( bool val )              { m_ComprCUCtxList[m_treeIdx].back().stopNonDCT2Transforms = val; }
+
+#else
   double getBestInterCost             ()                  const { return m_ComprCUCtxList.back().bestInterCost;           }
   Distortion getInterHad              ()                  const { return m_ComprCUCtxList.back().interHad;                }
   void enforceInterHad                ( Distortion had )        {        m_ComprCUCtxList.back().interHad = had;          }
@@ -433,6 +512,8 @@ public:
   void   setISPLfnstIdx               ( uint8_t val )           { m_ComprCUCtxList.back().ispLfnstIdx = val; }
   bool   getStopNonDCT2Transforms     ()                  const { return m_ComprCUCtxList.back().stopNonDCT2Transforms; }
   void   setStopNonDCT2Transforms     ( bool val )              { m_ComprCUCtxList.back().stopNonDCT2Transforms = val; }
+#endif 
+
   void setInterSearch                 (InterSearch* pcInterSearch)   { m_pcInterSearch = pcInterSearch; }
   void   setPltEnc                    ( bool b )                { m_doPlt = b; }
   bool   getPltEnc()                                      const { return m_doPlt; }
@@ -448,15 +529,27 @@ public:
 #if JVET_Z0118_GDR
 void forceIntraMode()
 { 
-  // remove all inter or split to force make intra      
-  int n = (int)m_ComprCUCtxList.back().testModes.size();   
+  // remove all inter or split to force make intra
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  int n = (int)m_ComprCUCtxList[m_treeIdx].back().testModes.size();   
+#else
+  int n = (int)m_ComprCUCtxList.back().testModes.size(); 
+#endif
   for (int j = 0; j < n; j++) 
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    const EncTestMode etm = m_ComprCUCtxList[m_treeIdx].back().testModes[j];
+#else
     const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+#endif
 
     if (isModeInter(etm.type))
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[m_treeIdx].back().testModes.erase(m_ComprCUCtxList[m_treeIdx].back().testModes.begin() + j);
+#else
       m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+#endif
       j--;
       n--;          
     }
@@ -466,15 +559,26 @@ void forceIntraMode()
 void forceIntraNoSplit()
 {
   // remove all inter or split to force make intra        
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  int n = (int)m_ComprCUCtxList[m_treeIdx].back().testModes.size();
+#else
   int n = (int)m_ComprCUCtxList.back().testModes.size();
+#endif
 
   for (int j = 0; j < n; j++) 
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    const EncTestMode etm = m_ComprCUCtxList[m_treeIdx].back().testModes[j];
+#else
     const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
-
+#endif
     if (isModeInter(etm.type) || isModeSplit(etm.type)) 
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[m_treeIdx].back().testModes.erase(m_ComprCUCtxList[m_treeIdx].back().testModes.begin() + j);
+#else
       m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+#endif
       j--;
       n--;
     }
@@ -484,13 +588,25 @@ void forceIntraNoSplit()
 // Note: ForceInterMode
 void forceInterMode()
 {    
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  int n = (int)m_ComprCUCtxList[m_treeIdx].back().testModes.size();
+#else
   int n = (int)m_ComprCUCtxList.back().testModes.size();
+#endif
   for (int j = 0; j < n; j++) 
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    const EncTestMode etm = m_ComprCUCtxList[m_treeIdx].back().testModes[j];
+#else
     const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+#endif
     if (etm.type == ETM_INTRA) 
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[m_treeIdx].back().testModes.erase(m_ComprCUCtxList[m_treeIdx].back().testModes.begin() + j);
+#else
       m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+#endif
       j--;
       n--;        
     }
@@ -499,13 +615,25 @@ void forceInterMode()
 
 void removeHashInter()
 {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  int n = (int)m_ComprCUCtxList[m_treeIdx].back().testModes.size();
+#else
   int n = (int)m_ComprCUCtxList.back().testModes.size();
+#endif
   for (int j = 0; j < n; j++) 
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    const EncTestMode etm = m_ComprCUCtxList[m_treeIdx].back().testModes[j];
+#else
     const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+#endif
     if (etm.type == ETM_HASH_INTER) 
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[m_treeIdx].back().testModes.erase(m_ComprCUCtxList[m_treeIdx].back().testModes.begin() + j);
+#else
       m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+#endif
       j--;
       n--;
     }
@@ -514,13 +642,25 @@ void removeHashInter()
 
 void removeMergeSkip()
 {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  int n = (int)m_ComprCUCtxList[m_treeIdx].back().testModes.size();
+#else
   int n = (int)m_ComprCUCtxList.back().testModes.size();
+#endif
   for (int j = 0; j < n; j++) 
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    const EncTestMode etm = m_ComprCUCtxList[m_treeIdx].back().testModes[j];
+#else
     const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+#endif
     if (etm.type == ETM_MERGE_SKIP) 
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[m_treeIdx].back().testModes.erase(m_ComprCUCtxList[m_treeIdx].back().testModes.begin() + j);
+#else
       m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+#endif
       j--;
       n--;
     }
@@ -529,13 +669,25 @@ void removeMergeSkip()
 
 void removeInterME()
 {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  int n = (int)m_ComprCUCtxList[m_treeIdx].back().testModes.size();
+#else
   int n = (int)m_ComprCUCtxList.back().testModes.size();
+#endif
   for (int j = 0; j < n; j++) 
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    const EncTestMode etm = m_ComprCUCtxList[m_treeIdx].back().testModes[j];
+#else
     const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+#endif
     if (etm.type == ETM_INTER_ME) 
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[m_treeIdx].back().testModes.erase(m_ComprCUCtxList[m_treeIdx].back().testModes.begin() + j);
+#else
       m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+#endif
       j--;
       n--;
     }
@@ -545,13 +697,13 @@ void removeInterME()
 #if !MERGE_ENC_OPT
 void removeAffine()
 {
-  int n = (int)m_ComprCUCtxList.back().testModes.size();
+  int n = (int)m_ComprCUCtxList[m_treeIdx].back().testModes.size();
   for (int j = 0; j < n; j++) 
   {
-    const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+    const EncTestMode etm = m_ComprCUCtxList[m_treeIdx].back().testModes[j];
     if (etm.type == ETM_AFFINE) 
     {
-      m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+      m_ComprCUCtxList[m_treeIdx].back().testModes.erase(m_ComprCUCtxList[m_treeIdx].back().testModes.begin() + j);
       j--;
       n--;
     }
@@ -561,13 +713,25 @@ void removeAffine()
 
 void removeMergeGeo()
 {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  int n = (int)m_ComprCUCtxList[m_treeIdx].back().testModes.size();
+#else
   int n = (int)m_ComprCUCtxList.back().testModes.size();
+#endif
   for (int j = 0; j < n; j++) 
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    const EncTestMode etm = m_ComprCUCtxList[m_treeIdx].back().testModes[j];
+#else
     const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+#endif
     if (etm.type == ETM_MERGE_GEO) 
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[m_treeIdx].back().testModes.erase(m_ComprCUCtxList[m_treeIdx].back().testModes.begin() + j);
+#else
       m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+#endif
       j--;
       n--;
     }
@@ -576,13 +740,25 @@ void removeMergeGeo()
 
 void removeIntra()
 {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  int n = (int)m_ComprCUCtxList[m_treeIdx].back().testModes.size();
+#else
   int n = (int)m_ComprCUCtxList.back().testModes.size();
+#endif
   for (int j = 0; j < n; j++) 
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    const EncTestMode etm = m_ComprCUCtxList[m_treeIdx].back().testModes[j];
+#else
     const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+#endif
     if (etm.type == ETM_INTRA) 
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[m_treeIdx].back().testModes.erase(m_ComprCUCtxList[m_treeIdx].back().testModes.begin() + j);
+#else
       m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+#endif
       j--;
       n--;
     }
@@ -591,14 +767,26 @@ void removeIntra()
 
 void removeBadMode()
 {  
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  int n = (int)m_ComprCUCtxList[m_treeIdx].back().testModes.size();
+#else
   int n = (int)m_ComprCUCtxList.back().testModes.size();
+#endif
   for (int j = 0; j < n; j++) 
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    const EncTestMode etm = m_ComprCUCtxList[m_treeIdx].back().testModes[j];
+#else
     const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+#endif
 
     if (etm.type == ETM_INTER_ME && ((etm.opts & ETO_IMV) >> ETO_IMV_SHIFT) > 2) 
     {  
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[m_treeIdx].back().testModes.erase(m_ComprCUCtxList[m_treeIdx].back().testModes.begin() + j);
+#else
       m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+#endif
       j--;
       n--;
       break;
@@ -608,10 +796,18 @@ void removeBadMode()
 
 bool anyPredModeLeft()
 { 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  int n = (int)m_ComprCUCtxList[m_treeIdx].back().testModes.size();
+#else
   int n = (int)m_ComprCUCtxList.back().testModes.size();
+#endif
   for (int j = 0; j < n; j++) 
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    const EncTestMode etm = m_ComprCUCtxList[m_treeIdx].back().testModes[j];
+#else
     const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+#endif
 
     if (etm.type == ETM_HASH_INTER ||
         etm.type == ETM_MERGE_SKIP || 
@@ -633,10 +829,19 @@ bool anyPredModeLeft()
 
 bool anyIntraIBCMode()
 {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  int n = (int)m_ComprCUCtxList[m_treeIdx].back().testModes.size();
+#else
   int n = (int)m_ComprCUCtxList.back().testModes.size();
+#endif
+
   for (int j = 0; j < n; j++) 
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    const EncTestMode etm = m_ComprCUCtxList[m_treeIdx].back().testModes[j];
+#else
     const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+#endif
 
     if (etm.type == ETM_INTRA || etm.type == ETM_IBC) 
     {
@@ -649,10 +854,19 @@ bool anyIntraIBCMode()
 
 void forceRemovePredMode()
 {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  int n = (int)m_ComprCUCtxList[m_treeIdx].back().testModes.size();
+#else
   int n = (int)m_ComprCUCtxList.back().testModes.size();
+#endif
+
   for (int j = 0; j < n; j++)
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    const EncTestMode etm = m_ComprCUCtxList[m_treeIdx].back().testModes[j];
+#else
     const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+#endif
 
     if (
       etm.type == ETM_HASH_INTER
@@ -677,7 +891,11 @@ void forceRemovePredMode()
 #endif
       )
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[m_treeIdx].back().testModes.erase(m_ComprCUCtxList[m_treeIdx].back().testModes.begin() + j);
+#else
       m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+#endif
       j--;
       n--;
     }
@@ -686,14 +904,27 @@ void forceRemovePredMode()
 
 void forceRemoveDontSplit()
 {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  int n = (int)m_ComprCUCtxList[m_treeIdx].back().testModes.size();
+#else
   int n = (int)m_ComprCUCtxList.back().testModes.size();
+#endif
+
   for (int j = 0; j < n; j++) 
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    const EncTestMode etm = m_ComprCUCtxList[m_treeIdx].back().testModes[j];
+#else
     const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+#endif
 
     if (etm.type == ETM_POST_DONT_SPLIT) 
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[m_treeIdx].back().testModes.erase(m_ComprCUCtxList[m_treeIdx].back().testModes.begin() + j);
+#else
       m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+#endif
       j--;
       n--;
     }
@@ -702,14 +933,26 @@ void forceRemoveDontSplit()
 
 void forceVerSplitOnly()
 {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  int n = (int)m_ComprCUCtxList[m_treeIdx].back().testModes.size();
+#else
   int n = (int)m_ComprCUCtxList.back().testModes.size();
+#endif
   for (int j = 0; j < n; j++) 
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    const EncTestMode etm = m_ComprCUCtxList[m_treeIdx].back().testModes[j];       
+#else
     const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];       
-     
+#endif
+
     if (etm.type == ETM_SPLIT_BT_H || etm.type == ETM_SPLIT_TT_H)
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[m_treeIdx].back().testModes.erase(m_ComprCUCtxList[m_treeIdx].back().testModes.begin() + j);
+#else
       m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+#endif
       j--;
       n--;
     }
@@ -718,14 +961,26 @@ void forceVerSplitOnly()
 
 void forceRemoveTTH()
 {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  int n = (int)m_ComprCUCtxList[m_treeIdx].back().testModes.size();
+#else
   int n = (int)m_ComprCUCtxList.back().testModes.size();
+#endif
   for (int j = 0; j < n; j++)
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    const EncTestMode etm = m_ComprCUCtxList[m_treeIdx].back().testModes[j];
+#else
     const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+#endif
 
     if (etm.type == ETM_SPLIT_TT_H)
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[m_treeIdx].back().testModes.erase(m_ComprCUCtxList[m_treeIdx].back().testModes.begin() + j);
+#else
       m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+#endif
       j--;
       n--;
     }
@@ -734,14 +989,26 @@ void forceRemoveTTH()
 
 void forceRemoveTTV()
 {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  int n = (int)m_ComprCUCtxList[m_treeIdx].back().testModes.size();
+#else
   int n = (int)m_ComprCUCtxList.back().testModes.size();
+#endif
   for (int j = 0; j < n; j++) 
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    const EncTestMode etm = m_ComprCUCtxList[m_treeIdx].back().testModes[j];
+#else
     const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+#endif
     
     if (etm.type == ETM_SPLIT_TT_V) 
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[m_treeIdx].back().testModes.erase(m_ComprCUCtxList[m_treeIdx].back().testModes.begin() + j);
+#else
       m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+#endif
       j--;
       n--;
     }
@@ -750,14 +1017,26 @@ void forceRemoveTTV()
 
 void forceRemoveBTH()
 {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  int n = (int)m_ComprCUCtxList[m_treeIdx].back().testModes.size();
+#else
   int n = (int)m_ComprCUCtxList.back().testModes.size();
+#endif
   for (int j = 0; j < n; j++)
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    const EncTestMode etm = m_ComprCUCtxList[m_treeIdx].back().testModes[j];
+#else
     const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+#endif
 
     if (etm.type == ETM_SPLIT_BT_H)
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[m_treeIdx].back().testModes.erase(m_ComprCUCtxList[m_treeIdx].back().testModes.begin() + j);
+#else
       m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+#endif
       j--;
       n--;
     }
@@ -766,14 +1045,26 @@ void forceRemoveBTH()
 
 void forceRemoveBTV()
 {  
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  int n = (int)m_ComprCUCtxList[m_treeIdx].back().testModes.size();
+#else
   int n = (int)m_ComprCUCtxList.back().testModes.size();
+#endif
   for (int j = 0; j < n; j++) 
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    const EncTestMode etm = m_ComprCUCtxList[m_treeIdx].back().testModes[j];
+#else
     const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+#endif
 
     if (etm.type == ETM_SPLIT_BT_V) 
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[m_treeIdx].back().testModes.erase(m_ComprCUCtxList[m_treeIdx].back().testModes.begin() + j);
+#else
       m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+#endif
       j--;
       n--;
     }
@@ -782,14 +1073,27 @@ void forceRemoveBTV()
 
 void forceRemoveQT()
 {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  int n = (int)m_ComprCUCtxList[m_treeIdx].back().testModes.size();
+#else
   int n = (int)m_ComprCUCtxList.back().testModes.size();
+#endif
+
   for (int j = 0; j < n; j++) 
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    const EncTestMode etm = m_ComprCUCtxList[m_treeIdx].back().testModes[j];
+#else
     const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
- 
+#endif
+
     if (etm.type == ETM_SPLIT_QT) 
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[m_treeIdx].back().testModes.erase(m_ComprCUCtxList[m_treeIdx].back().testModes.begin() + j);
+#else
       m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+#endif
       j--;
       n--;
     }
@@ -798,14 +1102,27 @@ void forceRemoveQT()
 
 void forceRemoveHT()
 {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  int n = (int)m_ComprCUCtxList[m_treeIdx].back().testModes.size();
+#else
   int n = (int)m_ComprCUCtxList.back().testModes.size();
+#endif
   for (int j = 0; j < n; j++) 
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    const EncTestMode etm = m_ComprCUCtxList[m_treeIdx].back().testModes[j];
+#else
     const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+#endif
 
     if (etm.type == ETM_SPLIT_BT_H || etm.type == ETM_SPLIT_TT_H) 
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[m_treeIdx].back().testModes.erase(m_ComprCUCtxList[m_treeIdx].back().testModes.begin() + j);
+#else
       m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+#endif
+
       j--;
       n--;
     }
@@ -814,14 +1131,26 @@ void forceRemoveHT()
 
 void forceRemoveQTHT()
 {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  int n = (int)m_ComprCUCtxList[m_treeIdx].back().testModes.size();
+#else
   int n = (int)m_ComprCUCtxList.back().testModes.size();
+#endif
   for (int j = 0; j < n; j++) 
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    const EncTestMode etm = m_ComprCUCtxList[m_treeIdx].back().testModes[j];
+#else
     const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
-    
+#endif
+
     if (etm.type == ETM_SPLIT_QT || etm.type == ETM_SPLIT_BT_H || etm.type == ETM_SPLIT_TT_H) 
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[m_treeIdx].back().testModes.erase(m_ComprCUCtxList[m_treeIdx].back().testModes.begin() + j);
+#else
       m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+#endif
       j--;
       n--;
     }
@@ -830,14 +1159,26 @@ void forceRemoveQTHT()
 
 void forceRemoveAllSplit()
 {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  int n = (int)m_ComprCUCtxList[m_treeIdx].back().testModes.size();
+#else
   int n = (int)m_ComprCUCtxList.back().testModes.size();
+#endif
   for (int j = 0; j < n; j++) 
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    const EncTestMode etm = m_ComprCUCtxList[m_treeIdx].back().testModes[j];
+#else
     const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
+#endif
 
     if (etm.type == ETM_SPLIT_QT || etm.type == ETM_SPLIT_BT_H || etm.type == ETM_SPLIT_BT_V || etm.type == ETM_SPLIT_TT_H || etm.type == ETM_SPLIT_TT_V) 
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[m_treeIdx].back().testModes.erase(m_ComprCUCtxList[m_treeIdx].back().testModes.begin() + j);
+#else
       m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+#endif
       j--;
       n--;
     }
@@ -847,14 +1188,25 @@ void forceRemoveAllSplit()
 void forceQTonlyMode()
 {
   // remove all split except QT  
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  int n = (int)m_ComprCUCtxList[m_treeIdx].back().testModes.size();
+#else
   int n = (int)m_ComprCUCtxList.back().testModes.size();
+#endif
   for (int j = 0; j < n; j++) 
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    const EncTestMode etm = m_ComprCUCtxList[m_treeIdx].back().testModes[j];
+#else
     const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];
-
+#endif
     if (etm.type != ETM_SPLIT_QT) 
     {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      m_ComprCUCtxList[m_treeIdx].back().testModes.erase(m_ComprCUCtxList[m_treeIdx].back().testModes.begin() + j);
+#else
       m_ComprCUCtxList.back().testModes.erase(m_ComprCUCtxList.back().testModes.begin() + j);
+#endif
       j--;
       n--;        
     }
@@ -907,12 +1259,20 @@ const char* printType(EncTestModeType type)
 
 void printMode()
 {
-  // remove all inter or split to force make intra          
+  // remove all inter or split to force make intra        
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  int n = (int)m_ComprCUCtxList[m_treeIdx].back().testModes.size();
+#else
   int n = (int)m_ComprCUCtxList.back().testModes.size();
+#endif
   printf("-:[");
   for (int j = 0; j < n; j++) 
   {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    const EncTestMode etm = m_ComprCUCtxList[m_treeIdx].back().testModes[j];      
+#else
     const EncTestMode etm = m_ComprCUCtxList.back().testModes[j];      
+#endif
     printf(" %s", printType(etm.type));      
   }
   printf("]\n");   
@@ -998,6 +1358,10 @@ struct CodedCUInfo
   bool     isRribcCoded;
   bool     isRribcTested;
 #endif
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+  bool     skipFracTmp;
+#endif
+
   bool     validMv[NUM_REF_PIC_LIST_01][MAX_STORED_CU_INFO_REFS];
   Mv       saveMv [NUM_REF_PIC_LIST_01][MAX_STORED_CU_INFO_REFS];
 
@@ -1032,7 +1396,11 @@ private:
   unsigned         m_numWidths, m_numHeights;
   Slice const     *m_slice_chblk;
   // x in CTU, y in CTU, width, height
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  CodedCUInfo   ***m_codedCUInfo[MAX_TREE_TYPE][MAX_CU_SIZE >> MIN_CU_LOG2][MAX_CU_SIZE >> MIN_CU_LOG2];
+#else
   CodedCUInfo   ***m_codedCUInfo[MAX_CU_SIZE >> MIN_CU_LOG2][MAX_CU_SIZE >> MIN_CU_LOG2];
+#endif
 
 protected:
 
@@ -1058,7 +1426,9 @@ protected:
 public:
 #endif
   CodedCUInfo& getBlkInfo( const UnitArea& area );
-
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  CodedCUInfo* getBlkInfoPtr(const UnitArea& area);
+#endif
 public:
 
   virtual ~CacheBlkInfoCtrl() {}
@@ -1073,6 +1443,9 @@ public:
   uint8_t getBcwIdx( const UnitArea& area );
 
   char  getSelectColorSpaceOption(const UnitArea& area);
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  unsigned  m_treeIdx;
+#endif
 };
 
 #if REUSE_CU_RESULTS
@@ -1102,6 +1475,19 @@ private:
 
   unsigned            m_numWidths, m_numHeights;
   const Slice        *m_slice_bencinf;
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  BestEncodingInfo ***m_bestEncInfo[MAX_TREE_TYPE][MAX_CU_SIZE >> MIN_CU_LOG2][MAX_CU_SIZE >> MIN_CU_LOG2];
+  TCoeff             *m_pCoeff[MAX_TREE_TYPE];
+#if SIGN_PREDICTION
+  SIGN_PRED_TYPE     *m_pCoeffSign[MAX_TREE_TYPE];
+#if JVET_Y0141_SIGN_PRED_IMPROVE
+  unsigned           *m_pCoeffSignScanIdx[MAX_TREE_TYPE];
+#endif
+#endif
+  Pel                *m_pPcmBuf[MAX_TREE_TYPE];
+
+  bool               *m_runType[MAX_TREE_TYPE];
+#else
   BestEncodingInfo ***m_bestEncInfo[MAX_CU_SIZE >> MIN_CU_LOG2][MAX_CU_SIZE >> MIN_CU_LOG2];
   TCoeff             *m_pCoeff;
 #if SIGN_PREDICTION
@@ -1111,7 +1497,10 @@ private:
 #endif
 #endif
   Pel                *m_pPcmBuf;
+
   bool               *m_runType;
+#endif
+
   CodingStructure     m_dummyCS;
   XUCache             m_dummyCache;
 #if ENABLE_SPLIT_PARALLELISM
@@ -1148,6 +1537,9 @@ public:
 #endif
   void     init     ( const Slice &slice );
   bool     setCsFrom( CodingStructure& cs, EncTestMode& testMode, const Partitioner& partitioner ) const;
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  unsigned m_treeIdx;
+#endif
 };
 
 #endif
@@ -1245,6 +1637,9 @@ public:
   virtual bool checkSkipOtherLfnst( const EncTestMode& encTestmode, CodingStructure*& tempCS, Partitioner& partitioner );
 #if JVET_Y0152_TT_ENC_SPEEDUP
   bool xSkipTreeCandidate(const PartSplit split, const double* splitRdCostBest, const SliceType& sliceType) const;
+#endif
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  void setTreeIdx();
 #endif
 };
 

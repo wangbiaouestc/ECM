@@ -97,7 +97,11 @@ public:
                              Position lumaPos, int filterCount);
 
   // coding (quad)tree (clause 7.3.8.4)
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  void        coding_tree               ( CodingStructure&              cs,     Partitioner&    pm,       CUCtx& cuCtx, int (&qps)[2]);
+#else
   void        coding_tree               ( CodingStructure&              cs,     Partitioner&    pm,       CUCtx& cuCtx, Partitioner* pPartitionerChroma = nullptr, CUCtx* pCuCtxChroma = nullptr);
+#endif
   PartSplit   split_cu_mode             ( CodingStructure&              cs,     Partitioner&    pm );
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS  
   ModeType    mode_constraint           ( CodingStructure&              cs,     Partitioner&    pm,       const PartSplit splitMode );
@@ -106,6 +110,10 @@ public:
   void        coding_unit               ( CodingUnit&                   cu,     Partitioner&    pm,       CUCtx& cuCtx );
   void        cu_skip_flag              ( CodingUnit&                   cu );
   void        pred_mode                 ( CodingUnit&                   cu );
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  void        separate_tree_cu_flag     ( CodingUnit&                   cu,     Partitioner&    pm );
+  void        coding_unit_pred_mode     ( CodingUnit&                   cu,     Partitioner&    pm );
+#endif
   void        bdpcm_mode                ( CodingUnit&                   cu,     const ComponentID compID );
   void        cu_pred_data              ( CodingUnit&                   cu );
 #if ENABLE_OBMC
@@ -212,7 +220,11 @@ public:
   void        geo_mmvd_idx(PredictionUnit&          pu, RefPicList eRefPicList);
   void        geo_merge_idx(PredictionUnit&          pu);
 #if JVET_Y0065_GPM_INTRA
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+  void        geo_merge_idx1          ( PredictionUnit&          pu, bool isIntra0, bool isIntra1, bool isIbc0, bool isIbc1);
+#else
   void        geo_merge_idx1          ( PredictionUnit&          pu, bool isIntra0, bool isIntra1);
+#endif
 #else
   void        geo_merge_idx1          ( PredictionUnit&          pu);
 #endif

@@ -272,6 +272,7 @@ public:
   const SPS*     getActiveSPS()const                                         { return m_spsMap.getPS(m_activeSPSId); };
   void           checkAuApsContent( APS *aps, std::vector<int>& accessUnitApsNals ) { m_apsMap.checkAuApsContent( aps, accessUnitApsNals ); }
 
+
 protected:
   ParameterSetMap<SPS> m_spsMap;
   ParameterSetMap<PPS> m_ppsMap;

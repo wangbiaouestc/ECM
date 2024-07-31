@@ -450,6 +450,56 @@ const CtxSet ContextSetCfg::GPMIntraFlag = ContextSetCfg::addCtxSet({
  { 133 }, 
 });
 
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+const CtxSet ContextSetCfg::GpmInterIbcFlag = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  { DWE, },
+  { DWE, },
+  { DWE, },
+  { DWE, },
+  { DWO, },
+  { DWO, },
+  { DWO, },
+  { DWO, },
+  { DWO, },
+  { DWO, },
+  { DWO, },
+  { DWO, },
+  });
+
+const CtxSet ContextSetCfg::GpmInterIbcIdx = ContextSetCfg::addCtxSet
+({
+  { CNU, CNU, CNU, },
+  { CNU, CNU, CNU, },
+  { CNU, CNU, CNU, },
+  { CNU, CNU, CNU, },
+  { DWS, DWS, DWS, },
+  { DWS, DWS, DWS, },
+  { DWS, DWS, DWS, },
+  { DWS, DWS, DWS, },
+  { DWE, DWE, DWE, },
+  { DWE, DWE, DWE, },
+  { DWE, DWE, DWE, },
+  { DWE, DWE, DWE, },
+  { DWO, DWO, DWO, },
+  { DWO, DWO, DWO, },
+  { DWO, DWO, DWO, },
+  { DWO, DWO, DWO, },
+  { DWO, DWO, DWO, },
+  { DWO, DWO, DWO, },
+  { DWO, DWO, DWO, },
+  { DWO, DWO, DWO, },
+  });
+#endif
+
 const CtxSet ContextSetCfg::MmvdFlag = ContextSetCfg::addCtxSet({
 // ctx 81 84
  {  25,  34,  35,  35 },
@@ -1219,6 +1269,28 @@ const CtxSet ContextSetCfg::MipFlag = ContextSetCfg::addCtxSet({
 
 const CtxSet ContextSetCfg::TmpFlag = ContextSetCfg::addCtxSet({
 // ctx 162 168
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+ {  25,  19,  29,  25,  43,  21,  41, CNU },
+ {   9,  19,  60,   9,  13,   5,  49, CNU },
+ {  25,  34,  28,  25,  21,  13,  48, CNU },
+ {  25,  19,  29,  25,  28,  13,  41, CNU },
+ {   2,   1,   1,   2,   1,  10,   9, DWS },
+ {   5,   1,   0,   5,   1,   9,   8, DWS },
+ {   6,   5,   1,   2,   1,   8,   4, DWS },
+ {   5,   1,   1,   2,   1,   9,   9, DWS },
+ {  11,  11,   4,  11,  11,  25,  25, DWE },
+ {  11,   4,  11,  11,  11,  25,  25, DWE },
+ {  18,  18,   4,  18,  18,  18,  11, DWE },
+ {  11,  11,   4,  11,  11,  25,  25, DWE },
+ { 117, 122, 124, 116, 227, 249,  83, DWO },
+ { 131, 116, 116, 130, 117,  84, 163, DWO },
+ { 104, 133, 121, 102, 132, 155,  82, DWO },
+ { 242, 195, 132, 114, 118,  83, 218, DWO },
+ { 102, 102, 125, 115, 131, 250, 100, DWO },
+ { 146, 115, 163, 130, 118,  85, 135, DWO },
+ { 101, 121, 124, 116, 132, 251,  83, DWO },
+ { 242, 116, 116, 130, 117,  83, 243, DWO },
+#else
  {  25,  19,  29,  25,  43,  21,  41 },
  {   9,  19,  60,   9,  13,   5,  49 },
  {  25,  34,  28,  25,  21,  13,  48 },
@@ -1239,6 +1311,7 @@ const CtxSet ContextSetCfg::TmpFlag = ContextSetCfg::addCtxSet({
  { 146, 115, 163, 130, 118,  85, 135 },
  { 101, 121, 124, 116, 132, 251,  83 },
  { 242, 116, 116, 130, 117,  83, 243 },
+#endif
 });
 
 const CtxSet ContextSetCfg::TmpIdx = ContextSetCfg::addCtxSet({
@@ -6344,6 +6417,33 @@ const CtxSet ContextSetCfg::CCPMergeFusionType = ContextSetCfg::addCtxSet({
   { 119 },
   { 119 },
 });
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+const CtxSet ContextSetCfg::SeparateTree = ContextSetCfg::addCtxSet
+({
+  { CNU, CNU, CNU },
+  { CNU, CNU, CNU },
+  { CNU, CNU, CNU },
+  { CNU, CNU, CNU },
+  { DWS, DWS, DWS },
+  { DWS, DWS, DWS },
+  { DWS, DWS, DWS },
+  { DWS, DWS, DWS },
+  { DWE, DWE, DWE },
+  { DWE, DWE, DWE },
+  { DWE, DWE, DWE },
+  { DWE, DWE, DWE },
+  { DWO, DWO, DWO },
+  { DWO, DWO, DWO },
+  { DWO, DWO, DWO },
+  { DWO, DWO, DWO },
+  { DWO, DWO, DWO },
+  { DWO, DWO, DWO },
+  { DWO, DWO, DWO },
+  { DWO, DWO, DWO },
+  });
+#endif
+
 #endif
 #if JVET_AH0076_OBIC
 const CtxSet ContextSetCfg::obicFlag = ContextSetCfg::addCtxSet

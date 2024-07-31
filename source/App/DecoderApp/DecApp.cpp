@@ -574,7 +574,12 @@ void DecApp::writeLineToOutputLog(Picture * pcPic)
 void DecApp::xCreateDecLib()
 {
   initROM();
-
+#if JVET_AH0209_PDP
+  createPdpFilters();
+#endif
+#if JVET_AI0208_PDP_MIP
+  createMipFilters();
+#endif
   // create decoder class
   m_cDecLib.create();
 

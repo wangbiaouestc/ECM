@@ -179,6 +179,9 @@ public:
   const PredictionUnit *getPU(const Position &pos, const ChannelType _chType) const;
   const TransformUnit  *getTU(const Position &pos, const ChannelType _chType, const int subTuIdx = -1) const;
 
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  CodingUnit     *getCUTempo(const Position& pos, const ChannelType effChType);
+#endif
   CodingUnit     *getCU(const Position &pos, const ChannelType _chType);
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   CodingUnit     *getLumaCU( const Position &pos );
@@ -199,7 +202,11 @@ public:
   const PredictionUnit *getPURestricted(const Position &pos, const PredictionUnit& curPu,                           const ChannelType _chType) const;
   const TransformUnit  *getTURestricted(const Position &pos, const TransformUnit& curTu,                            const ChannelType _chType) const;
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  CodingUnit&     addCU(const UnitArea &unit, const ChannelType _chType, const PartSplit& implicitSplit = CU_DONT_SPLIT);
+#else
   CodingUnit&     addCU(const UnitArea &unit, const ChannelType _chType);
+#endif
   PredictionUnit& addPU(const UnitArea &unit, const ChannelType _chType);
   TransformUnit&  addTU(const UnitArea &unit, const ChannelType _chType);
   void            addEmptyTUs(Partitioner &partitioner);
@@ -211,6 +218,7 @@ public:
   cCUTraverser    traverseCUs(const UnitArea& _unit, const ChannelType _chType) const;
   cPUTraverser    traversePUs(const UnitArea& _unit, const ChannelType _chType) const;
   cTUTraverser    traverseTUs(const UnitArea& _unit, const ChannelType _chType) const;
+
   // ---------------------------------------------------------------------------
   // encoding search utilities
   // ---------------------------------------------------------------------------
@@ -264,6 +272,8 @@ public:
   std::vector<PredictionUnit*> pus;
   std::vector< TransformUnit*> tus;
 
+
+
   LutMotionCand motionLut;
 
 #if JVET_AD0188_CCP_MERGE
@@ -291,6 +301,7 @@ public:
   void reorderPrevPLT(PLTBuf& prevPLT, uint8_t curPLTSize[MAX_NUM_CHANNEL_TYPE], Pel curPLT[MAX_NUM_COMPONENT][MAXPLTSIZE], bool reuseflag[MAX_NUM_CHANNEL_TYPE][MAXPLTPREDSIZE], uint32_t compBegin, uint32_t numComp, bool jointPLT);
   void setPrevPLT(PLTBuf predictor);
   void storePrevPLT(PLTBuf& predictor);
+
 private:
 
   // needed for TU encoding
@@ -365,6 +376,9 @@ private:
 #else
   MotionInfo *m_motionBuf;
 #endif
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  SplitPred *currQtDepthBuf;
+#endif
 
 #if JVET_W0123_TIMD_FUSION
 #if JVET_Z0118_GDR
@@ -379,7 +393,13 @@ private:
   bool m_gdrEnabled;
 #endif
 
+#if JVET_AI0183_MVP_EXTENSION
+  IntersectingMvData *m_intersectingMvBuf;
 public:
+  IntersectingMvData* getIntersectingMvBuf()     { return m_intersectingMvBuf; };
+#else
+public:
+#endif
   CodingStructure *bestParent;
   double        tmpColorSpaceCost;
   bool          firstColorSpaceSelected;
@@ -401,6 +421,14 @@ public:
   MotionInfo& getMotionInfo( const Position& pos );
   const MotionInfo& getMotionInfo( const Position& pos ) const;
 
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  void SetSplitPred();
+
+  QTDepthBuf getQtDepthBuf(const Area& _area);
+  QTDepthBuf getQTDepthBuf()                      { return getQtDepthBuf(area.Y()); }
+
+  SplitPred& getQtDepthInfo(const Position& pos);
+#endif
 #if JVET_AE0043_CCP_MERGE_TEMPORAL
   CCPModelIdxBuf getCcpmIdxBuf( const     Area& bufArea);
   CCPModelIdxBuf getCcpmIdxBuf( const UnitArea& bufArea) { return getCcpmIdxBuf( bufArea.Cb() ); }
@@ -468,6 +496,33 @@ public:
   const uint8_t& getIpmInfo(const Position& pos, PictureType pt) const;
 #endif
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  std::vector<    CodingUnit*> *m_lumaCUs;
+  std::vector<PredictionUnit*> *m_lumaPUs;
+  std::vector< TransformUnit*> *m_lumaTUs;
+  UnitScale                    *m_lumaUnitScale;
+  UnitArea                     *m_lumaArea;
+  unsigned                     *m_lumaCuIdx;
+  unsigned                     *m_lumaPuIdx;
+  unsigned                     *m_lumaTuIdx;
+  CodingStructure              *m_lumaParent;
+  CodingUnit                   *m_bestCU;
+  CodingUnit                   *m_lastCodedCU;
+  double                        m_savedCost;
+  uint64_t                      m_lumaFracBits;
+  Distortion                    m_lumaDist;
+  double                        m_lumaCost;
+
+  void copyLumaPointers( CodingStructure& cs );
+  void setLumaPointers ( CodingStructure& cs );
+  void popLastCU( const PartSplit& implicitSplit );
+  void deriveSeparateTreeFlagInference( int& separateTreeFlag, bool& inferredSeparateTreeFlag, int width, int height, bool canSplit );
+  void determineIfSeparateTreeFlagInferred( bool& inferredSeparateTreeFlag, int width, int height, bool canSplit );
+
+  /*const*/ CodingUnit     *getLumaCU(const Position &pos, const ChannelType _chType) const;
+  const PredictionUnit *getLumaPU(const Position &pos, const ChannelType _chType) const;
+  const TransformUnit  *getLumaTU(const Position &pos, const ChannelType _chType) const;
+#endif
 
 public:
   // ---------------------------------------------------------------------------

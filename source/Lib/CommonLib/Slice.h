@@ -49,6 +49,7 @@
 #include "HRD.h"
 #include <unordered_map>
 #include "AlfParameters.h"
+#include "Unit.h"
 #if MULTI_HYP_PRED
 #include "MotionInfo.h"
 #endif
@@ -66,6 +67,10 @@ class TrQuant;
 // Constants
 // ====================================================================================================================
 class PreCalcValues;
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+class Partitioner;
+#endif
+
 static const uint32_t REF_PIC_LIST_NUM_IDX=32;
 
 typedef std::list<Picture*> PicList;
@@ -1616,7 +1621,20 @@ private:
 #if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
   bool              m_useGeoBlend;
 #endif
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  bool              m_enableMaxMttIncrease;
+#endif
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+  int               m_alfScaleMode;
+  bool              m_alfScalePrevEnabled;
+#endif
   bool              m_SBT;
+#if JVET_AI0050_INTER_MTSS
+  bool              m_interMTSS; 
+#endif
+#if JVET_AI0050_SBT_LFNST
+  bool              m_sbtLFNST;
+#endif
   bool              m_ISP;
   ChromaFormat      m_chromaFormatIdc;
 #if !JVET_S0052_RM_SEPARATE_COLOUR_PLANE
@@ -1720,6 +1738,9 @@ private:
 #if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
   bool              m_alfPrecisionFlag;
 #endif
+#if JVET_AH0057_CCALF_COEFF_PRECISION
+  bool              m_ccalfPrecisionFlag;
+#endif
   bool              m_bTemporalIdNestingFlag; // temporal_id_nesting_flag
 
   bool              m_scalingListEnabledFlag;
@@ -1771,14 +1792,26 @@ private:
   bool              m_MTS;
   bool              m_IntraMTS;                   // 18
   bool              m_InterMTS;                   // 19
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  bool              m_intraLFNSTISlice;
+  bool              m_intraLFNSTPBSlice;
+  bool              m_interLFNST;
+#else
   bool              m_LFNST;
+#endif
   bool              m_SMVD;
   bool              m_Affine;
   bool              m_AffineType;
+#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+  bool              m_useAltCost;
+#endif
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
   bool              m_useAffineTM;
 #if JVET_AG0276_NLIC
   bool              m_useAffAltLMTM;
+#endif
+#if JVET_AH0119_SUBBLOCK_TM
+  bool              m_useSbTmvpTM;
 #endif
 #endif
   bool              m_PROF;
@@ -1803,6 +1836,9 @@ private:
 #endif
 #if JVET_AD0085_MPM_SORTING
   bool              m_mpmSorting;
+#endif
+#if JVET_AH0136_CHROMA_REORDERING
+  bool              m_chromaReordering;
 #endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   int               m_cccm;
@@ -1837,6 +1873,9 @@ private:
   bool              m_ciipAffine;
 #endif
   bool              m_Geo;
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+  bool              m_geoInterIbc;
+#endif
 #if INTER_LIC
   bool              m_licEnabledFlag;
 #if JVET_AG0276_LIC_SLOPE_ADJUST
@@ -1941,6 +1980,18 @@ private:
 #endif
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   unsigned int      m_tempCabacInitMode;
+#endif
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  bool        m_interSliceSeparateTree;
+#endif
+
+#if JVET_AH0209_PDP
+  bool              m_pdp;
+#endif
+
+#if JVET_AI0183_MVP_EXTENSION
+  bool              m_scaledMvExtTmvp;
+  bool              m_scaledMvExtBiTmvp;
 #endif
 
 public:
@@ -2172,6 +2223,10 @@ public:
 #if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
   bool                    getAlfPrecisionFlag() const                                                 { return m_alfPrecisionFlag; }
   void                    setAlfPrecisionFlag( bool b )                                               { m_alfPrecisionFlag = b;    }
+#endif
+#if JVET_AH0057_CCALF_COEFF_PRECISION
+  bool                    getCCALFPrecisionFlag() const                                                   { return m_ccalfPrecisionFlag; }
+  void                    setCCALFPrecisionFlag( bool b )                                                 { m_ccalfPrecisionFlag = b; }
 #endif
   bool                    getALFEnabledFlag() const                                                       { return m_alfEnabledFlag; }
   void                    setALFEnabledFlag( bool b )                                                     { m_alfEnabledFlag = b; }
@@ -2424,6 +2479,14 @@ void                    setCCALFEnabledFlag( bool b )                           
   unsigned                getPLTMode() const                                                              { return m_PLTMode; }
   void                    setUseSBT( bool b )                                                             { m_SBT = b; }
   bool                    getUseSBT() const                                                               { return m_SBT; }
+#if JVET_AI0050_INTER_MTSS
+  void                    setUseInterMTSS(bool b)                                                         { m_interMTSS = b; }
+  bool                    getUseInterMTSS() const                                                         { return m_interMTSS; }
+#endif
+#if JVET_AI0050_SBT_LFNST
+  void                    setUseSbtLFNST(bool b)                                                          { m_sbtLFNST = b; }
+  bool                    getUseSbtLFNST() const                                                          { return m_sbtLFNST; }
+#endif
   void                    setUseISP( bool b )                                                             { m_ISP = b; }
   bool                    getUseISP() const                                                               { return m_ISP; }
 
@@ -2449,8 +2512,17 @@ void                    setCCALFEnabledFlag( bool b )                           
   bool      getUseIntraMTS        ()                                      const     { return m_IntraMTS; }
   void      setUseInterMTS        ( bool b )                                        { m_InterMTS = b; }
   bool      getUseInterMTS        ()                                      const     { return m_InterMTS; }
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  void      setUseIntraLFNSTISlice  ( bool b )                                      { m_intraLFNSTISlice = b; }
+  bool      getUseIntraLFNSTISlice  ()                                    const     { return m_intraLFNSTISlice; }
+  void      setUseIntraLFNSTPBSlice ( bool b )                                      { m_intraLFNSTPBSlice = b; }
+  bool      getUseIntraLFNSTPBSlice ()                                    const     { return m_intraLFNSTPBSlice; }
+  void      setUseInterLFNST      ( bool b )                                        { m_interLFNST = b; }
+  bool      getUseInterLFNST      ()                                      const     { return m_interLFNST; }
+#else
   void      setUseLFNST           ( bool b )                                        { m_LFNST = b; }
   bool      getUseLFNST           ()                                      const     { return m_LFNST; }
+#endif
   void      setUseSMVD(bool b)                                                      { m_SMVD = b; }
   bool      getUseSMVD()                                                  const     { return m_SMVD; }
   void      setUseBcw             ( bool b )                                        { m_bcw = b; }
@@ -2516,6 +2588,10 @@ void                    setCCALFEnabledFlag( bool b )                           
   void      setUseMpmSorting   (bool b)                                          { m_mpmSorting = b; }
   bool      getUseMpmSorting   ()                                      const     { return m_mpmSorting; }
 #endif
+#if JVET_AH0136_CHROMA_REORDERING
+  void      setUseChromaReordering(bool b)                                       { m_chromaReordering = b; }
+  bool      getUseChromaReordering()                                   const     { return m_chromaReordering; }
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   void      setUseCccm( int i )                                                  { m_cccm = i; }
   int       getUseCccm()                                               const     { return m_cccm; }
@@ -2540,6 +2616,17 @@ void                    setCCALFEnabledFlag( bool b )                           
   bool      getUseGeoBlend     ()                                      const     { return m_useGeoBlend; }
   void      setUseGeoBlend     ( bool b )                                        { m_useGeoBlend = b; }
 #endif
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  bool      getEnableMaxMttIncrease()                                  const     { return m_enableMaxMttIncrease; }
+  void      setEnableMaxMttIncrease(bool b)                                      { m_enableMaxMttIncrease = b; }
+#endif
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+  int       getAlfScaleMode    ()                                      const     { return m_alfScaleMode; }
+  void      setAlfScaleMode    ( int m )                                         { m_alfScaleMode = m; }
+  int       getAlfScaleNbCorr  ()                                      const     { return ( m_alfScaleMode ? ((m_alfScaleMode == 1) ? 5 : 9) : 0 ); }
+  bool      getAlfScalePrevEnabled()                                   const     { return m_alfScalePrevEnabled; }
+  void      setAlfScalePrevEnabled(bool b)                                       { m_alfScalePrevEnabled = b;    }
+#endif
   void      setUseCiip         ( bool b )                                        { m_ciip = b; }
   bool      getUseCiip         ()                                      const     { return m_ciip; }
 #if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
@@ -2552,6 +2639,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #endif
   void      setUseGeo             ( bool b )                                        { m_Geo = b; }
   bool      getUseGeo             ()                                      const     { return m_Geo; }
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+  void      setUseGeoInterIbc     ( bool b )                                        { m_geoInterIbc = b; }
+  bool      getUseGeoInterIbc     ()                                      const     { return m_geoInterIbc; }
+#endif
 #if INTER_LIC
   void      setLicEnabledFlag     ( bool b )                                        { m_licEnabledFlag = b; }
   bool      getLicEnabledFlag     ()                                     const      { return m_licEnabledFlag; }
@@ -2602,12 +2693,20 @@ void                    setCCALFEnabledFlag( bool b )                           
   void      setUseFastSubTmvp     ( bool b )                                        { m_fastSubTmvp = b; }
   bool      getUseFastSubTmvp     ()                                      const     { return m_fastSubTmvp; }
 #endif
+#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+  void      setUseAltCost         ( bool b )                                        { m_useAltCost = b; }
+  bool      getUseAltCost         ()                                      const     { return m_useAltCost; }
+#endif
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
   void      setUseAffineTM        ( bool b )                                        { m_useAffineTM = b; }
   bool      getUseAffineTM        ()                                     const      { return  m_useAffineTM; }
 #if JVET_AG0276_NLIC
   void      setUseAffAltLMTM      ( bool b )                                        { m_useAffAltLMTM = b; }
   bool      getUseAffAltLMTM      ()                                      const     { return m_useAffAltLMTM; }
+#endif
+#if JVET_AH0119_SUBBLOCK_TM
+  void      setUseSbTmvpTM        ( bool b )                                        { m_useSbTmvpTM = b; }
+  bool      getUseSbTmvpTM        ()                                      const     { return m_useSbTmvpTM; }
 #endif
 #endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
@@ -2659,6 +2758,23 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   void         setTempCabacInitMode( unsigned n )                                { m_tempCabacInitMode = n; }
   unsigned int getTempCabacInitMode()                                      const { return m_tempCabacInitMode; }
+#endif
+
+#if JVET_AH0209_PDP
+  void      setUsePDP( bool b )                                                 { m_pdp = b; }
+  bool      getUsePDP()                                                   const { return m_pdp; }
+#endif
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  void     setUseInterSliceSeparateTree     ( bool b )                              { m_interSliceSeparateTree = b;    }
+  bool     getInterSliceSeparateTreeEnabled ()                            const     { return m_interSliceSeparateTree; }
+#endif
+
+#if JVET_AI0183_MVP_EXTENSION
+  void      setConfigScaledMvExtTmvp( bool n )                     { m_scaledMvExtTmvp = n; }
+  bool      getConfigScaledMvExtTmvp()                       const { return m_scaledMvExtTmvp; }
+  void      setConfigScaledMvExtBiTmvp( bool n )                   { m_scaledMvExtBiTmvp = n; }
+  bool      getConfigScaledMvExtBiTmvp()                     const { return m_scaledMvExtBiTmvp; }
 #endif
 };
 
@@ -3643,6 +3759,10 @@ private:
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   std::vector<int>           m_implicitRefIdx[2][NUM_REF_PIC_LIST_01][NUM_REF_PIC_LIST_01][MAX_NUM_REF + 1];
+#if JVET_AI0183_MVP_EXTENSION
+  std::vector<int>           m_implicitRefIdx2nd[2][NUM_REF_PIC_LIST_01][NUM_REF_PIC_LIST_01][MAX_NUM_REF + 1];
+  std::vector<int>           m_implicitRefIdx3rd[2][NUM_REF_PIC_LIST_01][NUM_REF_PIC_LIST_01][MAX_NUM_REF + 1];
+#endif
 #else
   std::vector<int>           m_implicitRefIdx[NUM_REF_PIC_LIST_01][NUM_REF_PIC_LIST_01][MAX_NUM_REF + 1];
 #endif
@@ -3708,6 +3828,11 @@ private:
   int                        m_tileGroupCcAlfCrApsId;
   bool                       m_disableSATDForRd;
   bool                       m_isLossless;
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+  bool                       m_useScaleAlf; // at least one APS uses alf-residuals-rescaling
+  ScaleAlf                   m_scaleAlfParam[ALF_CTB_MAX_NUM_APS][MAX_NUM_ALF_ALTERNATIVES_LUMA];
+  int                        m_idxCorrChroma[3];
+#endif
 
 #if JVET_AG0145_ADAPTIVE_CLIPPING
   int                        m_lumaPelMax;
@@ -3726,6 +3851,19 @@ private:
 #endif
   std::vector<RefListAndRefIdx> m_multiHypRefPics;
 #endif
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  bool                       m_separateTreeEnabled;
+  bool                       m_processingIntraRegion;
+  bool                       m_processingSeparateTrees;
+  ChannelType                m_processingChannelType;
+  int                        m_intraRegionRootDepth;
+  int                        m_intraRegionRootQtDepth;
+  int                        m_intraRegionRootBtDepth;
+  int                        m_intraRegionRootMtDepth;
+  int                        m_intraRegionRootImplicitBtDepth;
+  bool                       m_intraRegionNoSplitTest;
+#endif
+
 public:
                               Slice();
   virtual                     ~Slice();
@@ -3746,6 +3884,48 @@ public:
 
   void                        setAlfAPSs(APS** apss)                                 { memcpy(m_alfApss, apss, sizeof(m_alfApss));                   }
   APS**                       getAlfAPSs()                                           { return m_alfApss;                                             }
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+  bool                        getUseAlfScale()                                       { return m_useScaleAlf; }
+  void                        setUseAlfScale( bool s )                               { m_useScaleAlf = s; }
+  void                        resetAlfScale()
+  {
+    for (int i = 0; i < ALF_CTB_MAX_NUM_APS; i++)
+    {
+      for (int j = 0; j < MAX_NUM_ALF_ALTERNATIVES_LUMA; j++)
+      {
+        m_scaleAlfParam[i][j].reset();
+      }
+    }
+  }
+  ScaleAlf*                   getAlfScalePtr( const int apsId, const int altNum )   { return &m_scaleAlfParam[m_tileGroupLumaApsId[apsId]][altNum]; }
+  ScaleAlf&                   getAlfScale( const int apsId, const int altNum )      { return m_scaleAlfParam[m_tileGroupLumaApsId[apsId]][altNum];  }
+  void  copyAlfScale( Slice& slice )
+  {
+    m_useScaleAlf = slice.m_useScaleAlf;
+    for (int i = 0; i < ALF_CTB_MAX_NUM_APS; i++)
+    {
+      for (int j = 0; j < MAX_NUM_ALF_ALTERNATIVES_LUMA; j++)
+      {
+        ScaleAlf& scaleAlfParam = slice.m_scaleAlfParam[i][j];
+        if ( scaleAlfParam.initDone ) 
+        {
+          scaleAlfParam.setMinMax( slice.getLumaPelMin(), slice.getLumaPelMax() );
+          scaleAlfParam.setGroupSize( scaleAlfParam.groupShift );
+          scaleAlfParam.fillIdxCorr();
+
+          m_scaleAlfParam[i][j] = scaleAlfParam;
+        }
+      }
+    }
+    for (int c = 0; c < MAX_NUM_COMPONENT; c++)
+    {
+      m_idxCorrChroma[c] = slice.m_idxCorrChroma[c];
+    }
+  }
+  void                        setAlfScaleChroma( int compIdx, const int s )          { m_idxCorrChroma[compIdx] = s;    }
+  int                         getAlfScaleChroma( int compIdx ) const                 { return m_idxCorrChroma[compIdx]; }
+#endif
+
   void                        setSaoEnabledFlag(ChannelType chType, bool s)          {m_saoEnabledFlag[chType] =s;                                   }
   bool                        getSaoEnabledFlag(ChannelType chType) const            { return m_saoEnabledFlag[chType];                              }
 #if JVET_W0066_CCSAO
@@ -3856,11 +4036,52 @@ public:
 
       m_implicitRefIdx[col][REF_PIC_LIST_1][REF_PIC_LIST_1][refIdx].resize(numSlices);
       std::fill(m_implicitRefIdx[col][REF_PIC_LIST_1][REF_PIC_LIST_1][refIdx].begin(), m_implicitRefIdx[col][REF_PIC_LIST_1][REF_PIC_LIST_1][refIdx].end(), -1);
+#if JVET_AI0183_MVP_EXTENSION
+      m_implicitRefIdx2nd[col][REF_PIC_LIST_0][REF_PIC_LIST_0][refIdx].resize(numSlices);
+      std::fill(m_implicitRefIdx2nd[col][REF_PIC_LIST_0][REF_PIC_LIST_0][refIdx].begin(),
+                m_implicitRefIdx2nd[col][REF_PIC_LIST_0][REF_PIC_LIST_0][refIdx].end(), -1);
+
+      m_implicitRefIdx2nd[col][REF_PIC_LIST_0][REF_PIC_LIST_1][refIdx].resize(numSlices);
+      std::fill(m_implicitRefIdx2nd[col][REF_PIC_LIST_0][REF_PIC_LIST_1][refIdx].begin(),
+                m_implicitRefIdx2nd[col][REF_PIC_LIST_0][REF_PIC_LIST_1][refIdx].end(), -1);
+
+      m_implicitRefIdx2nd[col][REF_PIC_LIST_1][REF_PIC_LIST_0][refIdx].resize(numSlices);
+      std::fill(m_implicitRefIdx2nd[col][REF_PIC_LIST_1][REF_PIC_LIST_0][refIdx].begin(),
+                m_implicitRefIdx2nd[col][REF_PIC_LIST_1][REF_PIC_LIST_0][refIdx].end(), -1);
+
+      m_implicitRefIdx2nd[col][REF_PIC_LIST_1][REF_PIC_LIST_1][refIdx].resize(numSlices);
+      std::fill(m_implicitRefIdx2nd[col][REF_PIC_LIST_1][REF_PIC_LIST_1][refIdx].begin(),
+                m_implicitRefIdx2nd[col][REF_PIC_LIST_1][REF_PIC_LIST_1][refIdx].end(), -1);
+      m_implicitRefIdx3rd[col][REF_PIC_LIST_0][REF_PIC_LIST_0][refIdx].resize(numSlices);
+      std::fill(m_implicitRefIdx3rd[col][REF_PIC_LIST_0][REF_PIC_LIST_0][refIdx].begin(),
+                m_implicitRefIdx3rd[col][REF_PIC_LIST_0][REF_PIC_LIST_0][refIdx].end(), -1);
+
+      m_implicitRefIdx3rd[col][REF_PIC_LIST_0][REF_PIC_LIST_1][refIdx].resize(numSlices);
+      std::fill(m_implicitRefIdx3rd[col][REF_PIC_LIST_0][REF_PIC_LIST_1][refIdx].begin(),
+                m_implicitRefIdx3rd[col][REF_PIC_LIST_0][REF_PIC_LIST_1][refIdx].end(), -1);
+
+      m_implicitRefIdx3rd[col][REF_PIC_LIST_1][REF_PIC_LIST_0][refIdx].resize(numSlices);
+      std::fill(m_implicitRefIdx3rd[col][REF_PIC_LIST_1][REF_PIC_LIST_0][refIdx].begin(),
+                m_implicitRefIdx3rd[col][REF_PIC_LIST_1][REF_PIC_LIST_0][refIdx].end(), -1);
+
+      m_implicitRefIdx3rd[col][REF_PIC_LIST_1][REF_PIC_LIST_1][refIdx].resize(numSlices);
+      std::fill(m_implicitRefIdx3rd[col][REF_PIC_LIST_1][REF_PIC_LIST_1][refIdx].begin(),
+                m_implicitRefIdx3rd[col][REF_PIC_LIST_1][REF_PIC_LIST_1][refIdx].end(), -1);
+#endif
     }
   }
   void                        setImRefIdx(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int colRefIdx, int curRefIdx, int col) { m_implicitRefIdx[col][colRefPicList][curRefPicList][colRefIdx][sliceIdx] = curRefIdx; }
   int                         getImRefIdx(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int colRefIdx, int col = 0) { return m_implicitRefIdx[col][colRefPicList][curRefPicList][colRefIdx][sliceIdx]; }
   int                         getImRefIdx(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int colRefIdx, int col = 0) const { return m_implicitRefIdx[col][colRefPicList][curRefPicList][colRefIdx][sliceIdx]; }
+#if JVET_AI0183_MVP_EXTENSION
+  void                        setImRefIdx2nd(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int colRefIdx, int curRefIdx, int col) { m_implicitRefIdx2nd[col][colRefPicList][curRefPicList][colRefIdx][sliceIdx] = curRefIdx; }
+  int                         getImRefIdx2nd(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int colRefIdx, int col = 0) { return m_implicitRefIdx2nd[col][colRefPicList][curRefPicList][colRefIdx][sliceIdx]; }
+  int                         getImRefIdx2nd(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int colRefIdx, int col = 0) const { return m_implicitRefIdx2nd[col][colRefPicList][curRefPicList][colRefIdx][sliceIdx]; }
+  void                        setImRefIdx3rd(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int colRefIdx, int curRefIdx, int col) { m_implicitRefIdx3rd[col][colRefPicList][curRefPicList][colRefIdx][sliceIdx] = curRefIdx; }
+  int                         getImRefIdx3rd(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int colRefIdx, int col = 0) { return m_implicitRefIdx3rd[col][colRefPicList][curRefPicList][colRefIdx][sliceIdx]; }
+  int                         getImRefIdx3rd(int sliceIdx, RefPicList colRefPicList, RefPicList curRefPicList, int colRefIdx, int col = 0) const { return m_implicitRefIdx3rd[col][colRefPicList][curRefPicList][colRefIdx][sliceIdx]; }
+#endif
+
 #else
   void resizeImBuf(int numSlices)
   {
@@ -3961,6 +4182,13 @@ public:
 #if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
   void                        generateEqualPocDist();
   bool                        getPairEqualPocDist(int refIdx0, int refIdx1) const { return m_pairEqualPocDist[refIdx0][refIdx1]; };
+#endif
+#if JVET_AI0183_MVP_EXTENSION
+  void                        generateIntersectingMv();
+  void                        getPuIntersectingMv(Position topLeftPuPos, Size puSize, IntersectingMvData* resultIntersectingMvDataPtr);
+  bool                        getIntersectingPositionMv(Position& intersectingScaledPosTL, Mv& srcIntersectingMv, Mv& dstIntersectingMv, Position srcScaledPosTL,
+                                                        Mv srcRefMv, Picture* srcRefPic, Picture* dstRefPic, const Position boundaryPosMin, const Position boundaryPosMax, const int scaleFactorToCurrent);
+  bool                        checkValidIntersectingMv(IntersectingMvData* curIntersectingMvDataBufPtr, RefPicList srcRefListIdx, int8_t srcRefIdx, Mv srcMv, RefPicList dstRefListIdx, int8_t dstRefIdx, Mv dstMv);
 #endif
 #if MULTI_HYP_PRED
   void                        setMultiHypRefPicList();
@@ -4230,12 +4458,32 @@ public:
   bool                        getAdaptiveClipQuant()                        const { return m_adaptiveClipQuant; };
 #endif
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  void                        setSeparateTreeEnabled( const bool& b )                 { m_separateTreeEnabled = b;        }
+  bool                        getSeparateTreeEnabled()                          const { return m_separateTreeEnabled;     }
+  void                        setProcessingIntraRegion( const bool& b )               { m_processingIntraRegion = b;      }
+  bool                        getProcessingIntraRegion()                        const { return m_processingIntraRegion;   }
+  void                        setProcessingSeparateTrees( const bool& b )             { m_processingSeparateTrees = b;    }
+  bool                        getProcessingSeparateTrees()                      const { return m_processingSeparateTrees; }
+  void                        setProcessingChannelType( const ChannelType& ch )       { m_processingChannelType = ch;     }
+  ChannelType                 getProcessingChannelType()                        const { return m_processingChannelType;   }
+  void                        setIntraRegionRoot( Partitioner* p );
+  void                        setCUIntraRegionRoot ( CodingUnit*cu );
+  bool                        isIntraRegionRoot( Partitioner* p )               const ;
+  void                        exitIntraRegionTesting();
+  bool                        shouldCopyLumaCUs()                               const { return ( m_separateTreeEnabled && m_processingIntraRegion && m_processingSeparateTrees && m_processingChannelType == CH_C ); }
+  bool                        processingIntraRegionChroma()                     const { return ( m_separateTreeEnabled && m_processingIntraRegion && m_processingSeparateTrees && m_processingChannelType == CH_C ); }
+  void                        setIntraRegionNoSplitTest( const bool& b )              { m_intraRegionNoSplitTest = b;     }
+  bool                        getIntraRegionNoSplitTest()                       const { return m_intraRegionNoSplitTest;  }
+#endif
+
 protected:
   Picture*              xGetRefPic( PicList& rcListPic, int poc, const int layerId );
   Picture*              xGetLongTermRefPic( PicList& rcListPic, int poc, bool pocHasMsb, const int layerId );
 public:
   std::unordered_map< Position, std::unordered_map< Size, double> > m_mapPltCost[2];
 private:
+
 };// END CLASS DEFINITION Slice
 
 

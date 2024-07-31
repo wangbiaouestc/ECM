@@ -44,7 +44,7 @@
 #if JVET_AG0196_CABAC_RETRAIN
 namespace CabacRetrain
 {
-  bool report=false;
+  bool tempCABAC = false;
 #if JVET_AG0196_WINDOWS_OFFSETS_SLICETYPE
   std::vector<int> vdrate0;
   std::vector<int> vdrate1;
@@ -52,7 +52,7 @@ namespace CabacRetrain
   std::vector<int> vweight;
   std::vector<int> vrate;
   std::vector<std::pair<uint16_t,uint16_t>> vprobaInit;
-  bool activate=false;
+  bool activate = false;
 }
 #endif
 const uint8_t ProbModelTables::m_RenormTable_32[32] =
@@ -728,7 +728,9 @@ std::vector<std::vector<uint8_t>> ContextSetCfg::sm_InitTables(NUMBER_OF_SLICE_T
 std::vector<std::vector<uint8_t>> ContextSetCfg::sm_InitTables(NUMBER_OF_SLICE_TYPES + 1);
 #endif
 
-#if JVET_AH0176_LOW_DELAY_B_CTX
+#if JVET_AI0281_CABAC_RETRAIN
+#include "Contexts_ecm14.0.inl"
+#elif JVET_AH0176_LOW_DELAY_B_CTX
 #include "Contexts_ecm13.inl"
 #elif JVET_ECM12_CABAC_RETRAIN
 #include "Contexts_ecm12.inl"
@@ -924,7 +926,7 @@ void CtxStore<BinProbModel>::loadPStates( const std::vector<std::pair<uint16_t, 
     if (CabacRetrain::activate)
     {
       CabacRetrain::vprobaInit[k] = probStates[k];
-      CabacRetrain::report        = true;
+      CabacRetrain::tempCABAC        = true;
     }
 #endif
   }

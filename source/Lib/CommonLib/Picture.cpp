@@ -188,6 +188,9 @@ Picture::Picture()
 #if JVET_S0124_UNAVAILABLE_REFERENCE
   nonReferencePictureFlag = false;
 #endif
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  maxTemporalBtDepth   = 0;
+#endif
 
   for( int i = 0; i < MAX_NUM_CHANNEL_TYPE; i++ )
   {
@@ -505,6 +508,7 @@ void Picture::finalInit( const VPS* vps, const SPS& sps, const PPS& pps, PicHead
 #endif
 
   memcpy(cs->alfApss, alfApss, sizeof(cs->alfApss));
+
   cs->lmcsAps = lmcsAps;
   cs->scalinglistAps = scalingListAps;
   cs->pcv     = pps.pcv;

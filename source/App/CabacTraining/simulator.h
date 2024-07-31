@@ -37,7 +37,7 @@ inline std::pair<uint16_t, uint16_t> coding2ProbaInit( int initId, int qp )
 
 inline void initNewParameters( const ModelParameters &prms, const DataFrame &slice, BinProbModel_Std &cabac )
 {
-  if( !slice.report )
+  if( !slice.tempCABAC )
   {
     // use the proba model
     cabac.setState( coding2ProbaInit( prms.initId, slice.qp ) );

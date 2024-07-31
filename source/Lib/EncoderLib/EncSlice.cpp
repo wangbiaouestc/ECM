@@ -44,7 +44,6 @@
 #include "CommonLib/dtrace_blockstatistics.h"
 #endif
 
-
 #include <math.h>
 
 //! \ingroup EncoderLib
@@ -1896,7 +1895,12 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
 #if JVET_AG0145_ADAPTIVE_CLIPPING
   int pelMax = pcPic->getLumaClpRng().max;
   int pelMin = pcPic->getLumaClpRng().min;
+#if JVET_AI0096_ADAPTIVE_CLIPPING_BIT_DEPTH_FIX
+  int targetMin = 16 * (1 << (pcPic->cs->sps->getBitDepth(toChannelType(COMPONENT_Y)) - 8));
+  int targetMax = 235 * (1 << (pcPic->cs->sps->getBitDepth(toChannelType(COMPONENT_Y)) - 8));
+#else
   int targetMin = 64, targetMax = 940;
+#endif
   if (cs.slice->getSliceType() != I_SLICE)
   {
     const Picture* const pColPic = pcPic->cs->slice->getRefPic(RefPicList(1 - pcPic->cs->slice->getColFromL0Flag()), pcPic->cs->slice->getColRefIdx())->unscaledPic;
@@ -2026,7 +2030,11 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
 #endif
   {
 #if JVET_AA0070_RRIBC
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    m_pcCuEncoder->getIbcHashMap().rebuildPicHashMap(cs.picture->getTrueOrigBuf(), CS::isDualITree(cs) || cs.slice->isIntra());
+#else
     m_pcCuEncoder->getIbcHashMap().rebuildPicHashMap(cs.picture->getTrueOrigBuf(), CS::isDualITree(cs));
+#endif
 #else
     m_pcCuEncoder->getIbcHashMap().rebuildPicHashMap(cs.picture->getTrueOrigBuf());
 #endif
@@ -2094,6 +2102,30 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
   }
 #endif
 
+#if JVET_AH0209_PDP
+  if( m_pcCuEncoder->getEncCfg()->getUsePDP() )
+  {
+    if( cs.slice->getPOC() == 0 || cs.slice->getSliceType() == I_SLICE ) // ensure sequential and parallel simulation generate same output
+    {
+      SPS* spsTmp = const_cast<SPS*>( cs.sps );
+      hashBlkHitPerc = ( hashBlkHitPerc == -1 ) ? m_pcCuEncoder->getIbcHashMap().calHashBlkMatchPerc( cs.area.Y() ) : hashBlkHitPerc;
+      bool isSCC = hashBlkHitPerc >= 20;
+      spsTmp->setUsePDP( !isSCC );
+    }
+  }
+#endif
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+  if (m_pcCuEncoder->getEncCfg()->getUseGeoInterIbc())
+  {
+    SPS* spsTmp = const_cast<SPS*>(cs.sps);
+    hashBlkHitPerc = (hashBlkHitPerc == -1) ? m_pcCuEncoder->getIbcHashMap().calHashBlkMatchPerc(cs.area.Y()) : hashBlkHitPerc;
+    bool isSCC = hashBlkHitPerc >= 20;
+    if (cs.slice->getPOC() == 0 || cs.slice->getSliceType() == I_SLICE)
+    {
+      spsTmp->setUseGeoInterIbc(isSCC);
+    }
+  }
+#endif
 #if JVET_AD0188_CCP_MERGE
   if ((pCfg->getSwitchPOC() != pcPic->poc || -1 == pCfg->getDebugCTU()))
   {
@@ -2412,11 +2444,23 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
       int numberOfSkipPixel = 0;
       for (auto &cu : cs.traverseCUs(ctuArea, CH_L))
       {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        if ( cu.separateTree && cu.chType != CH_L )
+        {
+          continue;
+        }
+#endif
         numberOfSkipPixel += cu.skip*cu.lumaSize().area();
       }
 
       for( auto &cu : cs.traverseCUs( ctuArea, CH_L ) )
       {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        if ( cu.separateTree && cu.chType != CH_L )
+        {
+          continue;
+        }
+#endif
         if( !cu.skip || cu.rootCbf )
         {
           numberOfEffectivePixels += cu.lumaSize().area();
@@ -2563,10 +2607,16 @@ void EncSlice::encodeSlice   ( Picture* pcPic, OutputBitstream* pcSubstreams, ui
 #if JVET_V0094_BILATERAL_FILTER
     if (ctuRsAddr == 0)
     {
-      m_CABACWriter->bif( COMPONENT_Y, *pcSlice, cs.picture->getBifParam( COMPONENT_Y ) );
+      if (cs.pps->getUseBIF())
+      {
+        m_CABACWriter->bif(COMPONENT_Y, *pcSlice, cs.picture->getBifParam(COMPONENT_Y));
+      }
 #if JVET_X0071_CHROMA_BILATERAL_FILTER
-      m_CABACWriter->bif( COMPONENT_Cb, *pcSlice, cs.picture->getBifParam( COMPONENT_Cb ) );
-      m_CABACWriter->bif( COMPONENT_Cr, *pcSlice, cs.picture->getBifParam( COMPONENT_Cr ) );
+      if (cs.pps->getUseChromaBIF())
+      {
+        m_CABACWriter->bif(COMPONENT_Cb, *pcSlice, cs.picture->getBifParam(COMPONENT_Cb));
+        m_CABACWriter->bif(COMPONENT_Cr, *pcSlice, cs.picture->getBifParam(COMPONENT_Cr));
+      }
 #endif
     }
 #endif

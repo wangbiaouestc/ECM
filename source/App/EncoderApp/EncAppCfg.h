@@ -392,15 +392,39 @@ protected:
   double    m_ttFastSkipThr;
 #endif
   bool      m_dualTree;
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  bool      m_interSliceSeparateTreeEnabled;
+#endif
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  bool      m_intraLFNSTISlice;
+  bool      m_intraLFNSTPBSlice;
+  bool      m_interLFNST;
+#else
   bool      m_LFNST;
+#endif
   bool      m_useFastLFNST;
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  bool      m_useFastInterLFNST;
+#endif
+#if JVET_AI0050_INTER_MTSS
+  bool      m_useInterMTSS;
+#endif
+#if JVET_AI0050_SBT_LFNST
+  bool      m_useSbtLFNST;
+#endif
   bool      m_sbTmvpEnableFlag;
   bool      m_Affine;
   bool      m_AffineType;
+#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+  bool      m_useAltCost;
+#endif
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
   bool      m_useAffineTM;
 #if JVET_AG0276_NLIC
   bool      m_useAffAltLMTM;
+#endif
+#if JVET_AH0119_SUBBLOCK_TM
+  bool      m_useSbTmvpTM;
 #endif
 #endif
 #if JVET_AG0135_AFFINE_CIIP
@@ -502,6 +526,9 @@ protected:
 #if JVET_AD0085_MPM_SORTING
   bool      m_mpmSorting;
 #endif
+#if JVET_AH0136_CHROMA_REORDERING
+  bool      m_chromaReordering;
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   int       m_cccm;
 #endif
@@ -519,6 +546,9 @@ protected:
   bool      m_ciipTimd;
 #endif
   bool      m_Geo;
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+  bool      m_geoInterIbc;
+#endif
   bool      m_HashME;
   bool      m_allowDisFracMMVD;
   bool      m_AffineAmvr;
@@ -599,6 +629,9 @@ protected:
 
   bool      m_wrapAround;
   unsigned  m_wrapAroundOffset;
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  bool      m_enableMaxMttIncrease;
+#endif
 #if MULTI_HYP_PRED
   int       m_numMHPCandsToTest;
   int       m_maxNumAddHyps;                                  ///< max. number of additional inter hypotheseis
@@ -643,6 +676,13 @@ protected:
 #endif
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   unsigned  m_tempCabacInitMode;
+#endif
+#if JVET_AH0209_PDP
+  bool      m_pdp;
+#endif
+#if JVET_AI0183_MVP_EXTENSION
+  bool      m_scaledMvExtTmvp;
+  bool      m_scaledMvExtBiTmvp;
 #endif
   
   // ADD_NEW_TOOL : (encoder app) add tool enabling flags and associated parameters here
@@ -713,6 +753,9 @@ protected:
 #endif
 #if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
   bool      m_alfPrecision;
+#endif
+#if JVET_AH0057_CCALF_COEFF_PRECISION
+  bool      m_ccalfPrecision;
 #endif
   bool      m_bTestSAODisableAtPictureLevel;
   double    m_saoEncodingRate;                                ///< When >0 SAO early picture termination is enabled for luma and chroma

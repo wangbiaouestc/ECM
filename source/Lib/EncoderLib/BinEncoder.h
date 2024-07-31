@@ -117,6 +117,7 @@ public:
   virtual unsigned  getNumBins        ( unsigned    ctxId )           const = 0;
 public:
   virtual void      encodeBin         ( unsigned bin,   unsigned ctxId    ) = 0;
+
   virtual void      encodeBinEP       ( unsigned bin                      ) = 0;
   virtual void      encodeBinsEP      ( unsigned bins,  unsigned numBins  ) = 0;
   virtual void      encodeRemAbsEP    ( unsigned bins,
@@ -289,6 +290,7 @@ public:
   void            setBinStorage     ( bool b )        {}
   const BinStore* getBinStore       ()          const { return 0; }
   BinEncIf*       getTestBinEncoder ()          const { return 0; }
+
 private:
   CtxStore<BinProbModel>& m_ctx;
 };

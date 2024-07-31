@@ -56,26 +56,27 @@ int main( int argc, char **argv )
   }
 
 #if JVET_AH0176_LOW_DELAY_B_CTX
-  SliceType to_train = NUMBER_OF_SLICE_TYPES;
+  SliceType toTrain = NUMBER_OF_SLICE_TYPES;
+
   if (sliceToTrain == "B") 
   {
-    to_train = B_SLICE;
+    toTrain = B_SLICE;
   }
   else if (sliceToTrain == "P")
   {
-    to_train = P_SLICE;
+    toTrain = P_SLICE;
   }
   else if (sliceToTrain == "I") 
   {
-    to_train = I_SLICE;
+    toTrain = I_SLICE;
   }
   else if (sliceToTrain == "all") 
   {
-    to_train = NUMBER_OF_SLICE_TYPES;
+    toTrain = NUMBER_OF_SLICE_TYPES;
   }
   else if (sliceToTrain == "L") 
   {
-    to_train = L_SLICE;
+    toTrain = L_SLICE;
   }
   else 
   {
@@ -132,7 +133,7 @@ int main( int argc, char **argv )
       if( sliceActivation[k] )
       {
 #if JVET_AH0176_LOW_DELAY_B_CTX
-        if (to_train == NUMBER_OF_SLICE_TYPES || k == to_train)
+        if (toTrain == NUMBER_OF_SLICE_TYPES || k == toTrain)
         {
 #endif
         std::cout << "Optimized parameter slice type " << k << std::endl;

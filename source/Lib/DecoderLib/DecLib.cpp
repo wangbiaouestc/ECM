@@ -208,7 +208,9 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
                 pcEncPic->lumaClpRngforQuant.min = pic->cs->slice->getLumaPelMin();
                 pcEncPic->lumaClpRngforQuant.max = pic->cs->slice->getLumaPelMax();
 #endif
-
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+                pcEncPic->cs->slice->copyAlfScale( *pic->cs->slice );
+#endif
                 if( debugCTU >= 0 && poc == debugPOC )
                 {
                   pcEncPic->cs->initStructData();
@@ -325,6 +327,12 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
                 {
                   pcEncPic->copySAO( *pic, 1 );
                 }
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+                if ( pic->cs->sps->getALFEnabledFlag() )
+                {
+                  pcDecLib->backupAlfScalePrev( pcEncPic->m_alfScalePrev );
+                }
+#endif
                 pcEncPic->cs->initStructData();
                 pcEncPic->cs->copyStructure( *pic->cs, CH_L, true, true );
 
@@ -840,6 +848,7 @@ void DecLib::executeLoopFilters()
 
 
   m_cLoopFilter.loopFilterPic( cs );
+
 #if !MULTI_PASS_DMVR
   CS::setRefinedMotionField(cs);
 #endif
@@ -950,12 +959,14 @@ void DecLib::adaptiveClipToRealRange()
   int height = m_pcPic->cs->pps->getPicHeightInLumaSamples();
   Pel* reconPel = m_pcPic->getRecoBuf().get(compID).buf;
   int stride = m_pcPic->getRecoBuf().get(compID).stride;
+
   for (uint32_t yPos = 0; yPos < height; yPos++)
   {
     for (uint32_t xPos = 0; xPos < width; xPos++)
     {
-      reconPel[yPos * stride + xPos] = ClipPel(reconPel[yPos * stride + xPos], clpRng);
+      reconPel[xPos] = ClipPel(reconPel[xPos], clpRng);
     }
+    reconPel += stride;
   }
 }
 #endif
@@ -1094,6 +1105,13 @@ void DecLib::finishPicture(int& poc, PicList*& rpcListPic, MsgLevel msgl )
   m_maxDecSliceAddrInSubPic = -1;
 
   m_pcPic->destroyTempBuffers();
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  m_pcPic->cs->destroyCoeffs();
+  if (!(!pcSlice->isIntra() && !((m_pcPic->temporalId == 0) || (pcSlice->getSPS()->getNumReorderPics(m_pcPic->temporalId) != m_pcPic->temporalId))))
+  {
+    m_pcPic->cs->SetSplitPred();
+  }
+#endif
   m_pcPic->cs->destroyTemporaryCsData();
 #if JVET_AA0096_MC_BOUNDARY_PADDING
   m_cFrameMcPadPrediction.init(&m_cRdCost, pcSlice->getSPS()->getChromaFormatIdc(), pcSlice->getSPS()->getMaxCUHeight(),
@@ -1714,7 +1732,9 @@ void activateAPS(PicHeader* picHeader, Slice* pSlice, ParameterSetManager& param
 
       CHECK( aps->getTemporalId() > pSlice->getTLayer(), "TemporalId shall be less than or equal to the TemporalId of the coded slice NAL unit" );
       //ToDO: APS NAL unit containing the APS RBSP shall have nuh_layer_id either equal to the nuh_layer_id of a coded slice NAL unit that referrs it, or equal to the nuh_layer_id of a direct dependent layer of the layer containing a coded slice NAL unit that referrs it.
-
+#if JVET_AH0057_CCALF_COEFF_PRECISION
+      filterParam.ccAlfCoeffPrec[COMPONENT_Cb - 1] = aps->getCcAlfAPSParam().ccAlfCoeffPrec[COMPONENT_Cb - 1];
+#endif
       filterParam.ccAlfFilterCount[COMPONENT_Cb - 1] = aps->getCcAlfAPSParam().ccAlfFilterCount[COMPONENT_Cb - 1];
       for (int filterIdx=0; filterIdx < filterParam.ccAlfFilterCount[COMPONENT_Cb - 1]; filterIdx++ )
       {
@@ -1742,7 +1762,9 @@ void activateAPS(PicHeader* picHeader, Slice* pSlice, ParameterSetManager& param
 
       CHECK( aps->getTemporalId() > pSlice->getTLayer(), "TemporalId shall be less than or equal to the TemporalId of the coded slice NAL unit" );
       //ToDO: APS NAL unit containing the APS RBSP shall have nuh_layer_id either equal to the nuh_layer_id of a coded slice NAL unit that referrs it, or equal to the nuh_layer_id of a direct dependent layer of the layer containing a coded slice NAL unit that referrs it.
-
+#if JVET_AH0057_CCALF_COEFF_PRECISION
+      filterParam.ccAlfCoeffPrec[COMPONENT_Cr - 1] = aps->getCcAlfAPSParam().ccAlfCoeffPrec[COMPONENT_Cr - 1];
+#endif
       filterParam.ccAlfFilterCount[COMPONENT_Cr - 1] = aps->getCcAlfAPSParam().ccAlfFilterCount[COMPONENT_Cr - 1];
       for (int filterIdx=0; filterIdx < filterParam.ccAlfFilterCount[COMPONENT_Cr - 1]; filterIdx++ )
       {
@@ -3189,6 +3211,9 @@ bool DecLib::xDecodeSlice(InputNALUnit &nalu, int &iSkipFrame, int iPOCLastDispl
 #endif
 #if JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT
     pcSlice->generateEqualPocDist();
+#endif
+#if JVET_AI0183_MVP_EXTENSION
+    pcSlice->generateIntersectingMv();
 #endif
 
     NalUnitInfo naluInfo;

@@ -430,6 +430,9 @@ private:
   bool                   m_isLowDelayConfig;
   double                 m_chromaFactor;
 #endif
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+  ScaleAlfEnc            m_scaleAlfEncParam[ALF_CTB_MAX_NUM_APS][MAX_NUM_ALF_ALTERNATIVES_LUMA];
+#endif
 
 public:
   EncAdaptiveLoopFilter( int& apsIdStart );
@@ -448,6 +451,13 @@ public:
 #endif
   );
   void   alfReconstructor(CodingStructure& cs, const PelUnitBuf& recExtBuf);
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+  ScaleAlfEnc* getAlfScaleEncPtr( const int apsId, const int altNum ) { return &m_scaleAlfEncParam[apsId][altNum]; }
+  ScaleAlfEnc& getAlfScaleEnc( const int apsId, const int altNum ) { return m_scaleAlfEncParam[apsId][altNum]; }
+  void         alfCorrection( CodingStructure& cs, const PelUnitBuf& origBuf, const PelUnitBuf& recExtBuf, bool mode=false );
+  void         alfCorrectionChroma( CodingStructure& cs, PelUnitBuf& recYuvSao );
+#endif
+
   void ALFProcess(CodingStructure& cs, const double *lambdas
 #if ENABLE_QPA
     , const double lambdaChromaWeight
@@ -573,16 +583,32 @@ private:
   void   deriveStatsForCcAlfFiltering(const PelUnitBuf &orgYuv, const PelUnitBuf &recYuv, const int compIdx, CodingStructure &cs);
   template<bool m_alfWSSD>
 #if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
-  void   getBlkStatsCcAlf(AlfCovariance &alfCovariance, const AlfFilterShape &shape, const PelUnitBuf &orgYuv, const PelUnitBuf &recYuv, const UnitArea &areaDst, const UnitArea &area, const ComponentID compID, const int yPos, PelUnitBuf &resiYuv );
+  void   getBlkStatsCcAlf(AlfCovariance &alfCovariance, const AlfFilterShape &shape, const PelUnitBuf &orgYuv, const PelUnitBuf &recYuv, const UnitArea &areaDst, const UnitArea &area, const ComponentID compID, const int yPos, PelUnitBuf &resiYuv 
+#if JVET_AI0166_CCALF_CHROMA_SAO_INPUT
+    , PelUnitBuf& recYuvSAO
+#endif
+  );
 #else
-  void   getBlkStatsCcAlf(AlfCovariance &alfCovariance, const AlfFilterShape &shape, const PelUnitBuf &orgYuv, const PelUnitBuf &recYuv, const UnitArea &areaDst, const UnitArea &area, const ComponentID compID, const int yPos);
+  void   getBlkStatsCcAlf(AlfCovariance &alfCovariance, const AlfFilterShape &shape, const PelUnitBuf &orgYuv, const PelUnitBuf &recYuv, const UnitArea &areaDst, const UnitArea &area, const ComponentID compID, const int yPos
+#if JVET_AI0166_CCALF_CHROMA_SAO_INPUT
+    , PelUnitBuf& recYuvSAO
+#endif
+  );
 #endif
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
 #if ALF_IMPROVEMENT
 #if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
-  void   calcCovarianceCcAlf( Pel ELocal[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const Pel* rec, const int stride, const AlfFilterShape& shape, Pel* resiPtr, int resiStride  );
+  void   calcCovarianceCcAlf( Pel ELocal[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const Pel* rec, const int stride, const AlfFilterShape& shape, Pel* resiPtr, int resiStride  
+#if JVET_AI0166_CCALF_CHROMA_SAO_INPUT
+    , Pel* recSAO, int saoStride
+#endif
+  );
 #else
-  void   calcCovarianceCcAlf( Pel ELocal[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const Pel* rec, const int stride, const AlfFilterShape& shape );
+  void   calcCovarianceCcAlf( Pel ELocal[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const Pel* rec, const int stride, const AlfFilterShape& shape 
+#if JVET_AI0166_CCALF_CHROMA_SAO_INPUT
+    , Pel* recSAO, int saoStride
+#endif
+  );
 #endif
 #else
   void   calcCovarianceCcAlf(Pel ELocal[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const Pel* rec, const int stride, const AlfFilterShape& shape, int vbDistance);
@@ -590,9 +616,17 @@ private:
 #else
 #if ALF_IMPROVEMENT
 #if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
-  void   calcCovarianceCcAlf( int ELocal[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const Pel* rec, const int stride, const AlfFilterShape& shape. Pel* resiPtr, int resiStride );
+  void   calcCovarianceCcAlf( int ELocal[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const Pel* rec, const int stride, const AlfFilterShape& shape. Pel* resiPtr, int resiStride 
+#if JVET_AI0166_CCALF_CHROMA_SAO_INPUT
+    , Pel* recSAO, int saoStride
+#endif
+  );
 #else
-  void   calcCovarianceCcAlf( int ELocal[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const Pel* rec, const int stride, const AlfFilterShape& shape );
+  void   calcCovarianceCcAlf( int ELocal[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const Pel* rec, const int stride, const AlfFilterShape& shape 
+#if JVET_AI0166_CCALF_CHROMA_SAO_INPUT
+    , Pel* recSAO, int saoStride
+#endif
+  );
 #endif
 #else
   void   calcCovarianceCcAlf(int ELocal[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const Pel* rec, const int stride, const AlfFilterShape& shape, int vbDistance);
@@ -699,7 +733,11 @@ private:
   void copyCtuAlternativeChroma( uint8_t* ctuAltsDst[MAX_NUM_COMPONENT], uint8_t* ctuAltsSrc[MAX_NUM_COMPONENT] );
   int getMaxNumAlternativesChroma( );
   int  getCoeffRateCcAlf(short chromaCoeff[MAX_NUM_CC_ALF_FILTERS][MAX_NUM_CC_ALF_CHROMA_COEFF], bool filterEnabled[MAX_NUM_CC_ALF_FILTERS], uint8_t filterCount, ComponentID compID);
+#if JVET_AH0057_CCALF_COEFF_PRECISION
+  void deriveCcAlfFilterCoeff( ComponentID compID, const PelUnitBuf& recYuv, const PelUnitBuf& recYuvExt, short filterCoeff[MAX_NUM_CC_ALF_FILTERS][MAX_NUM_CC_ALF_CHROMA_COEFF], const uint8_t filterIdx, int coeffPrec );
+#else
   void deriveCcAlfFilterCoeff( ComponentID compID, const PelUnitBuf& recYuv, const PelUnitBuf& recYuvExt, short filterCoeff[MAX_NUM_CC_ALF_FILTERS][MAX_NUM_CC_ALF_CHROMA_COEFF], const uint8_t filterIdx );
+#endif
   void determineControlIdcValues(CodingStructure &cs, const ComponentID compID, const PelBuf *buf, const int ctuWidthC,
                                  const int ctuHeightC, const int picWidthC, const int picHeightC,
                                  double **unfilteredDistortion, uint64_t *trainingDistortion[MAX_NUM_CC_ALF_FILTERS],

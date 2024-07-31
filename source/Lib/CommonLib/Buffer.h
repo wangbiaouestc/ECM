@@ -109,6 +109,10 @@ struct PelBufferOps
   void(*calcBIOParameter)   (const Pel* srcY0Tmp, const Pel* srcY1Tmp, Pel* gradX0, Pel* gradX1, Pel* gradY0, Pel* gradY1, int width, int height, const int src0Stride, const int src1Stride, const int widthG, const int bitDepth, Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGyGx, Pel* dI);
   void(*calAbsSum)          (const Pel* diff, int stride, int width, int height, int* absDiff);
   void(*calcBIOParamSum5)   (Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGyGx, const int widthG, const int width, const int height, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGyGx);
+#if JVET_AI0046_HIGH_PRECISION_BDOF_SAMPLE
+  void(*calcBIOParamSum5NOSIM4)   (int32_t* absGX, int32_t* absGY, int32_t* dIX, int32_t* dIY, int32_t* signGyGx, const int widthG, const int width, const int height, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGyGx ,Pel* dI, Pel* gX, Pel* gY);
+  void(*calcBIOParamSum5NOSIM8)   (int32_t* absGX, int32_t* absGY, int32_t* dIX, int32_t* dIY, int32_t* signGyGx, const int widthG, const int width, const int height, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGyGx, Pel* dI, Pel* gX, Pel* gY);
+#endif
   void(*calcBIOParamSum4)   (Pel* absGX, Pel* absGY, Pel* dIX, Pel* dIY, Pel* signGyGx, int width, int height, const int widthG, int* sumAbsGX, int* sumAbsGY, int* sumDIX, int* sumDIY, int* sumSignGyGx);
 #if JVET_Z0136_OOB
   void(*addBIOAvgN)         (const Pel* src0, int src0Stride, const Pel* src1, int src1Stride, Pel *dst, int dstStride, const Pel *gradX0, const Pel *gradX1, const Pel *gradY0, const Pel *gradY1, int gradStride, int width, int height, int* tmpx, int* tmpy, int shift, int offset, const ClpRng& clpRng, bool *mcMask[2], int mcStride, bool *isOOB);
@@ -202,6 +206,13 @@ struct AreaBuf : public Size
   void memset               ( const int val );
 
   void copyFrom             ( const AreaBuf<const T> &other );
+#if JVET_AH0209_PDP
+  void padCopyFrom(const AreaBuf<const T> &other, int w, int h, int pw, int ph);
+#if JVET_AI0208_PDP_MIP
+  void copyTranspose           ( const AreaBuf<const T> &other );
+  void copyFromFill             ( const AreaBuf<const T> &other, int w, int h, T fill);
+#endif
+#endif
   void roundToOutputBitdepth(const AreaBuf<const T> &src, const ClpRng& clpRng);
 
   void reconstruct          ( const AreaBuf<const T> &pred, const AreaBuf<const T> &resi, const ClpRng& clpRng);
@@ -316,6 +327,11 @@ typedef AreaBuf<const TCoeff> CPLTescapeBuf;
 
 typedef AreaBuf<      bool>  PLTtypeBuf;
 typedef AreaBuf<const bool> CPLTtypeBuf;
+
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+typedef AreaBuf<      SplitPred>  QTDepthBuf;
+typedef AreaBuf<const SplitPred> CQTDepthBuf;
+#endif
 
 #define SIZE_AWARE_PER_EL_OP( OP, INC )                     \
 if( ( width & 7 ) == 0 )                                    \
@@ -452,7 +468,84 @@ void AreaBuf<T>::copyFrom( const AreaBuf<const T> &other )
     }
   }
 }
+#if JVET_AH0209_PDP
+template<typename T>
+void AreaBuf<T>::padCopyFrom(const AreaBuf<const T> &other, int w, int h, int pw, int ph)
+{
+  subBuf(Position(0, 0), Size(w - pw, h - ph)).copyFrom(other.subBuf(Position(0, 0), Size(w - pw, h - ph)));
 
+  if (pw)
+  {
+    for (auto i = 0; i < h - ph; ++i)
+    {
+      subBuf(Position(w - pw, i), Size(pw, 1)).fill(other.at(w - pw - 1, i));
+    }
+  }
+  if (ph)
+  {
+    for (auto i = 0; i < w - pw; ++i)
+    {
+      subBuf(Position(i, h - ph), Size(1, ph)).fill(other.at(i, h - ph - 1));
+    }
+  }
+  if (pw && ph)
+  {
+    subBuf(Position(w - pw, h - ph), Size(pw, ph)).fill(other.at(w - pw - 1, h - ph - 1));
+  }
+}
+#if JVET_AI0208_PDP_MIP
+template<typename T>
+void AreaBuf<T>::copyTranspose           ( const AreaBuf<const T> &other )
+{
+  int tw = width;
+  int th = height;
+  int sw = other.width;
+  int sh = other.height;
+
+  if( tw != sh || th != sw )
+  {
+    CHECK(1, "Size not compatible");
+  }
+
+  for( auto i = 0; i < th; ++i)
+  {
+    for( auto j = 0; j < tw; ++j)
+    {
+      at(j,i) = other.at(i,j);
+    }
+  }
+}
+template<typename T>
+void AreaBuf<T>::copyFromFill             ( const AreaBuf<const T> &other, int w, int h, T fill)
+{
+  int pw = w - (int)other.width;
+  int ph = h - (int)other.height;
+
+  CHECK(pw < 0 || ph < 0, "Bad source/target buffer specified!" );
+
+  subBuf( Position(0,0), Size(w -pw, h -ph)).copyFrom(other.subBuf( Position(0,0), Size(w -pw, h -ph)));
+
+  if(pw)
+  {
+    for( auto i = 0; i < h - ph; ++i)
+    {
+      subBuf( Position(w-pw,i), Size(pw, 1)).fill(fill);
+    }
+  }
+  if(ph)
+  {
+    for( auto i = 0; i < w - pw; ++i)
+    {
+      subBuf( Position(i,h-ph), Size(1, ph)).fill(fill);
+    }
+  }
+  if(pw && ph)
+  {
+    subBuf( Position(w-pw,h-ph), Size(pw, ph)).fill(fill);
+  }
+}
+#endif
+#endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
 template<typename T>
 void AreaBuf<T>::flip(int flipType) // flipType = [0] no flip, [1] hor, [2] ver
@@ -1007,6 +1100,9 @@ struct UnitBuf
 
         UnitBuf<      T> subBuf (const UnitArea& subArea);
   const UnitBuf<const T> subBuf (const UnitArea& subArea) const;
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  void copyFromComponent    ( const UnitBuf<const T> &other, ComponentID startCompId, ComponentID lastCompId );
+#endif
   void colorSpaceConvert(const UnitBuf<T> &other, const bool forward, const ClpRng& clpRng);
 };
 
@@ -1052,6 +1148,18 @@ void UnitBuf<T>::addHypothesisAndClip(const UnitBuf<const T> &other, const int w
 }
 #endif
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+template<typename T>
+void UnitBuf<T>::copyFromComponent( const UnitBuf<const T> &other, ComponentID startCompId, ComponentID lastCompId )
+{
+  CHECK( chromaFormat != other.chromaFormat, "Incompatible formats" );
+
+  for( unsigned i = startCompId; i <= lastCompId; i++ )
+  {
+    bufs[i].copyFrom( other.bufs[i] );
+  }
+}
+#endif
 
 template<typename T>
 void UnitBuf<T>::subtract( const UnitBuf<const T> &other )

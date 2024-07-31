@@ -371,7 +371,11 @@ void Quant::dequant(const TransformUnit &tu,
 
   const bool            disableSMForLFNST = tu.cs->slice->getExplicitScalingListUsed() ? tu.cs->slice->getSPS()->getDisableScalingMatrixForLfnstBlks() : false;
 #if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  const bool            isLfnstApplied = tu.cu->lfnstIdx > 0 && (tu.cu->separateTree ? true : isLuma(compID));
+#else
   const bool            isLfnstApplied = tu.cu->lfnstIdx > 0 && (CS::isDualITree(*tu.cs) ? true : isLuma(compID));
+#endif
 #else
   const bool            isLfnstApplied = tu.cu->lfnstIdx > 0 && (tu.cu->isSepTree() ? true : isLuma(compID));
 #endif
@@ -1010,7 +1014,13 @@ void Quant::quant(TransformUnit &tu, const ComponentID &compID, const CCoeffBuf 
     const uint32_t lfnstIdx = tu.cu->lfnstIdx;
 #if JVET_W0119_LFNST_EXTENSION
 #if JVET_AC0130_NSPT
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+    bool spsIntraLfnstEnabled = ( ( tu.cu->slice->getSliceType() == I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTISlice() ) ||
+                                  ( tu.cu->slice->getSliceType() != I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTPBSlice() ) );
+    bool allowNSPT = CU::isNSPTAllowed( tu, compID, uiWidth, uiHeight, spsIntraLfnstEnabled && CU::isIntra( *( tu.cu ) ) );
+#else
     bool allowNSPT = CU::isNSPTAllowed( tu, compID, uiWidth, uiHeight, CU::isIntra( *( tu.cu ) ) );
+#endif
 
     const int maxNumberOfCoeffs = lfnstIdx > 0 ? ( allowNSPT ? PU::getNSPTMatrixDim( uiWidth, uiHeight ) : PU::getLFNSTMatrixDim( uiWidth, uiHeight ) ) : piQCoef.area();
 #else
@@ -1018,7 +1028,13 @@ void Quant::quant(TransformUnit &tu, const ComponentID &compID, const CCoeffBuf 
 #endif
 #else
 #if JVET_AC0130_NSPT
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+    bool spsIntraLfnstEnabled = ( ( tu.cu->slice->getSliceType() == I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTISlice() ) ||
+                                  ( tu.cu->slice->getSliceType() != I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTPBSlice() ) );
+    bool allowNSPT = CU::isNSPTAllowed( tu, compID, uiWidth, uiHeight, spsIntraLfnstEnabled && CU::isIntra( *( tu.cu ) ) );
+#else
     bool allowNSPT = CU::isNSPTAllowed( tu, compID, uiWidth, uiHeight, CU::isIntra( *( tu.cu ) ) );
+#endif
 
     const int maxNumberOfCoeffs = lfnstIdx > 0 ? ( allowNSPT ? PU::getNSPTMatrixDim( uiWidth, uiHeight ) : ( ( ( uiWidth == 4 && uiHeight == 4 ) || ( uiWidth == 8 && uiHeight == 8 ) ) ? 8 : 16 ) ) : piQCoef.area();
 #else
@@ -1205,7 +1221,11 @@ void Quant::invTrSkipDeQuantOneSample(TransformUnit &tu, const ComponentID &comp
   
   const bool           disableSMForLFNST = tu.cs->slice->getExplicitScalingListUsed() ? tu.cs->slice->getSPS()->getDisableScalingMatrixForLfnstBlks() : false;
 #if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  const bool           isLfnstApplied = tu.cu->lfnstIdx > 0 && (tu.cu->separateTree ? true : isLuma(compID));
+#else
   const bool           isLfnstApplied = tu.cu->lfnstIdx > 0 && (CS::isDualITree(*tu.cs) ? true : isLuma(compID));
+#endif
 #else
   const bool           isLfnstApplied = tu.cu->lfnstIdx > 0 && (tu.cu->isSepTree() ? true : isLuma(compID));
 #endif

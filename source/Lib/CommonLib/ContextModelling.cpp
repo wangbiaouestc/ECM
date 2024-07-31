@@ -253,7 +253,12 @@ void DeriveCtx::CtxSplit( const CodingStructure& cs, Partitioner& partitioner, u
 
   if( _canSplit == nullptr )
   {
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+    unsigned maxMtt;
+    partitioner.canSplit(cs, canSplit[0], canSplit[1], canSplit[2], canSplit[3], canSplit[4], canSplit[5], maxMtt);
+#else
     partitioner.canSplit( cs, canSplit[0], canSplit[1], canSplit[2], canSplit[3], canSplit[4], canSplit[5] );
+#endif
   }
   else
   {
@@ -660,6 +665,9 @@ void MergeCtx::copyRegularMergeCand(int dstCandIdx, MergeCtx& srcCtx, int srcCan
   useAltHpelIf      [dstCandIdx] = srcCtx.useAltHpelIf      [srcCandIdx];
 #if MULTI_HYP_PRED
   addHypNeighbours  [dstCandIdx] = srcCtx.addHypNeighbours  [srcCandIdx];
+#endif
+#if JVET_AI0187_TMVP_FOR_CMVP
+  candtype[dstCandIdx] = srcCtx.candtype[srcCandIdx];
 #endif
 }
 
@@ -1163,6 +1171,321 @@ void MergeCtx::setIbcL1Info( PredictionUnit& pu, int candIdx )
 #endif
 
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION                                
+#if JVET_AH0119_SUBBLOCK_TM
+bool AffineMergeCtx::xCheckSimilarSbTMVP(PredictionUnit pu, int mergeCandIndex, uint32_t mvdSimilarityThresh) const
+{
+  if (mvFieldNeighbours[(mergeCandIndex << 1)][0].refIdx < 0 && mvFieldNeighbours[(mergeCandIndex << 1) + 1][0].refIdx < 0)
+  {
+    return true;
+  }
+#if JVET_AI0183_MVP_EXTENSION
+  Size      puSize = pu.lumaSize();
+  int       numPartLine = std::max(puSize.width >> ATMVP_SUB_BLOCK_SIZE, 1u);
+  int       numPartCol = std::max(puSize.height >> ATMVP_SUB_BLOCK_SIZE, 1u);
+  int       puHeight = numPartCol == 1 ? puSize.height : 1 << ATMVP_SUB_BLOCK_SIZE;
+  int       puWidth = numPartLine == 1 ? puSize.width : 1 << ATMVP_SUB_BLOCK_SIZE;
+  const int incrRow = (puWidth >> ATMVP_SUB_BLOCK_SIZE);
+  const int incrColumn = mrgCtx->subPuMvpMiBuf[0].stride - (puSize.width >> ATMVP_SUB_BLOCK_SIZE);
+#endif
+  if (mvdSimilarityThresh > 1)
+  {
+    int mvdTh = mvdSimilarityThresh;
+    for (uint32_t ui = 0; ui < mergeCandIndex; ui++)
+    {
+      if (interDirNeighbours[ui] == interDirNeighbours[mergeCandIndex])
+      {
+        bool similarCheck = false;
+        if (interDirNeighbours[ui] == 3)
+        {
+          if (mvFieldNeighbours[(ui << 1)][0].refIdx == mvFieldNeighbours[(mergeCandIndex << 1)][0].refIdx
+            && mvFieldNeighbours[(ui << 1) + 1][0].refIdx == mvFieldNeighbours[(mergeCandIndex << 1) + 1][0].refIdx)
+          {
+            Mv mvDiffL0 = mvFieldNeighbours[(ui << 1)][0].mv - mvFieldNeighbours[(mergeCandIndex << 1)][0].mv;
+            Mv mvDiffL1 = mvFieldNeighbours[(ui << 1) + 1][0].mv - mvFieldNeighbours[(mergeCandIndex << 1) + 1][0].mv;
+
+            if (mvDiffL0.getAbsHor() < mvdTh && mvDiffL0.getAbsVer() < mvdTh && mvDiffL1.getAbsHor() < mvdTh
+              && mvDiffL1.getAbsVer() < mvdTh)
+            {
+              similarCheck = true;
+            }
+          }
+        }
+        else if (interDirNeighbours[ui] == 1)
+        {
+          if (mvFieldNeighbours[(ui << 1)][0].refIdx == mvFieldNeighbours[(mergeCandIndex << 1)][0].refIdx)
+          {
+            Mv mvDiff = mvFieldNeighbours[(ui << 1)][0].mv - mvFieldNeighbours[(mergeCandIndex << 1)][0].mv;
+            if (mvDiff.getAbsHor() < mvdTh && mvDiff.getAbsVer() < mvdTh)
+            {
+              similarCheck = true;
+            }
+          }
+        }
+        else if (interDirNeighbours[ui] == 2)
+        {
+          if (mvFieldNeighbours[(ui << 1) + 1][0].refIdx == mvFieldNeighbours[(mergeCandIndex << 1) + 1][0].refIdx)
+          {
+            Mv mvDiff = mvFieldNeighbours[(ui << 1) + 1][0].mv - mvFieldNeighbours[(mergeCandIndex << 1) + 1][0].mv;
+            if (mvDiff.getAbsHor() < mvdTh && mvDiff.getAbsVer() < mvdTh)
+            {
+              similarCheck = true;
+            }
+          }
+        }
+        if (similarCheck)
+        {
+#if JVET_AI0183_MVP_EXTENSION
+          MotionInfo* mi0 = mrgCtx->subPuMvpMiBuf[colIdx[ui]].buf;
+          MotionInfo* mi1 = mrgCtx->subPuMvpMiBuf[colIdx[mergeCandIndex]].buf;
+          for (int h = 0; h < puSize.height && similarCheck; h += puHeight)
+          {
+            for (int w = 0; w < puSize.width && similarCheck; w += puWidth)
+            {
+              if (mi0->interDir != mi1->interDir)
+#else
+          Size      puSize = pu.lumaSize();
+          int       numPartLine = std::max(puSize.width >> ATMVP_SUB_BLOCK_SIZE, 1u);
+          int       numPartCol = std::max(puSize.height >> ATMVP_SUB_BLOCK_SIZE, 1u);
+          int       puHeight = numPartCol == 1 ? puSize.height : 1 << ATMVP_SUB_BLOCK_SIZE;
+          int       puWidth = numPartLine == 1 ? puSize.width : 1 << ATMVP_SUB_BLOCK_SIZE;
+          MotionBuf mb0 = mrgCtx->subPuMvpMiBuf[colIdx[ui]];
+          MotionBuf mb1 = mrgCtx->subPuMvpMiBuf[colIdx[mergeCandIndex]];
+          for (int h = 0; h < puSize.height && similarCheck; h += puHeight)
+          {
+            for (int w = 0; w < puSize.width && similarCheck; w += puWidth)
+            {
+              MotionInfo mi0 = mb0.buf[(w >> ATMVP_SUB_BLOCK_SIZE) + (h >> ATMVP_SUB_BLOCK_SIZE) * (mrgCtx->subPuMvpMiBuf[0].stride)];
+              MotionInfo mi1 = mb1.buf[(w >> ATMVP_SUB_BLOCK_SIZE) + (h >> ATMVP_SUB_BLOCK_SIZE) * (mrgCtx->subPuMvpMiBuf[0].stride)];
+              char interDir0 = mi0.interDir;
+              char interDir1 = mi1.interDir;
+              if (interDir1 != interDir0)
+#endif
+              {
+                similarCheck = false;
+              }
+              else
+              {
+#if JVET_AI0183_MVP_EXTENSION
+                if (mi0->interDir == 1)
+                {
+                  if (mi1->refIdx[0] == mi0->refIdx[0])
+                  {
+                    Mv mvDiff = mi0->mv[0] - mi1->mv[0];
+#else
+                if (interDir1 == 1)
+                {
+                  if (mi1.refIdx[0] == mi0.refIdx[0])
+                  {
+                    Mv mvDiff = mi0.mv[0] - mi1.mv[0];
+#endif
+                    if (mvDiff.getAbsHor() >= mvdTh || mvDiff.getAbsVer() >= mvdTh)
+                    {
+                      similarCheck = false;
+                    }
+                  }
+                  else
+                  {
+                    similarCheck = false;
+                  }
+                }
+#if JVET_AI0183_MVP_EXTENSION
+                else if (mi0->interDir == 2)
+                {
+                  if (mi1->refIdx[1] == mi0->refIdx[1])
+                  {
+                    Mv mvDiff = mi0->mv[1] - mi1->mv[1];
+#else
+                else if (interDir1 == 2)
+                {
+                  if (mi1.refIdx[1] == mi0.refIdx[1])
+                  {
+                    Mv mvDiff = mi0.mv[1] - mi1.mv[1];
+#endif
+                    if (mvDiff.getAbsHor() >= mvdTh || mvDiff.getAbsVer() >= mvdTh)
+                    {
+                      similarCheck = false;
+                    }
+                  }
+                  else
+                  {
+                    similarCheck = false;
+                  }
+                }
+#if JVET_AI0183_MVP_EXTENSION
+                else
+                {
+                  if (mi1->refIdx[1] == mi0->refIdx[1] && mi1->refIdx[0] == mi0->refIdx[0])
+                  {
+                    Mv mvDiffL0 = mi0->mv[1] - mi1->mv[1];
+                    Mv mvDiffL1 = mi0->mv[0] - mi1->mv[0];
+                    if (mvDiffL0.getAbsHor() >= mvdTh || mvDiffL0.getAbsVer() >= mvdTh || mvDiffL1.getAbsHor() >= mvdTh || mvDiffL1.getAbsVer() >= mvdTh)
+#else
+                else if (interDir1 == 3)
+                {
+                  if (mi1.refIdx[1] == mi0.refIdx[1] && mi1.refIdx[0] == mi0.refIdx[0])
+                  {
+                    Mv mvDiffL0 = mi0.mv[1] - mi1.mv[1];
+                    Mv mvDiffL1 = mi0.mv[0] - mi1.mv[0];
+                    if (mvDiffL0.getAbsHor() >= mvdTh || mvDiffL0.getAbsVer() >= mvdTh || mvDiffL1.getAbsHor() >= mvdTh
+                      || mvDiffL1.getAbsVer() >= mvdTh)
+#endif
+                    {
+                      similarCheck = false;
+                    }
+                  }
+                  else
+                  {
+                    similarCheck = false;
+                  }
+                }
+              }
+#if JVET_AI0183_MVP_EXTENSION
+              mi0 += incrRow;
+              mi1 += incrRow;
+            }
+            mi0 += incrColumn;
+            mi1 += incrColumn;
+#else
+            }
+#endif
+          }
+          if (similarCheck)
+          {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+  else
+  {
+    for (uint32_t ui = 0; ui < mergeCandIndex; ui++)
+    {
+      if (interDirNeighbours[ui] == interDirNeighbours[mergeCandIndex])
+      {
+        bool similarCheck = false;
+        if (interDirNeighbours[ui] == 3)
+        {
+          if (mvFieldNeighbours[(ui << 1)][0].refIdx == mvFieldNeighbours[(mergeCandIndex << 1)][0].refIdx
+            && mvFieldNeighbours[(ui << 1) + 1][0].refIdx == mvFieldNeighbours[(mergeCandIndex << 1) + 1][0].refIdx
+            && mvFieldNeighbours[(ui << 1)][0].mv == mvFieldNeighbours[(mergeCandIndex << 1)][0].mv
+            && mvFieldNeighbours[(ui << 1) + 1][0].mv == mvFieldNeighbours[(mergeCandIndex << 1) + 1][0].mv)
+          {
+            similarCheck = true;
+          }
+        }
+        else if (interDirNeighbours[ui] == 1)
+        {
+          if (mvFieldNeighbours[(ui << 1)][0].refIdx == mvFieldNeighbours[(mergeCandIndex << 1)][0].refIdx
+            && mvFieldNeighbours[(ui << 1)][0].mv == mvFieldNeighbours[(mergeCandIndex << 1)][0].mv)
+          {
+            similarCheck = true;
+          }
+        }
+        else if (interDirNeighbours[ui] == 2)
+        {
+          if (mvFieldNeighbours[(ui << 1) + 1][0].refIdx == mvFieldNeighbours[(mergeCandIndex << 1) + 1][0].refIdx
+            && mvFieldNeighbours[(ui << 1) + 1][0].mv == mvFieldNeighbours[(mergeCandIndex << 1) + 1][0].mv)
+          {
+            similarCheck = true;
+          }
+        }
+        if (similarCheck)
+        {
+#if JVET_AI0183_MVP_EXTENSION
+          MotionInfo* mi0 = mrgCtx->subPuMvpMiBuf[colIdx[ui]].buf;
+          MotionInfo* mi1 = mrgCtx->subPuMvpMiBuf[colIdx[mergeCandIndex]].buf;
+          for (int h = 0; h < puSize.height && similarCheck; h += puHeight)
+          {
+            for (int w = 0; w < puSize.width && similarCheck; w += puWidth)
+            {
+              if (mi0->interDir != mi1->interDir)
+#else
+          Size      puSize = pu.lumaSize();
+          int       numPartLine = std::max(puSize.width >> ATMVP_SUB_BLOCK_SIZE, 1u);
+          int       numPartCol = std::max(puSize.height >> ATMVP_SUB_BLOCK_SIZE, 1u);
+          int       puHeight = numPartCol == 1 ? puSize.height : 1 << ATMVP_SUB_BLOCK_SIZE;
+          int       puWidth = numPartLine == 1 ? puSize.width : 1 << ATMVP_SUB_BLOCK_SIZE;
+          MotionBuf mb0 = mrgCtx->subPuMvpMiBuf[colIdx[ui]];
+          MotionBuf mb1 = mrgCtx->subPuMvpMiBuf[colIdx[mergeCandIndex]];
+          for (int h = 0; h < puSize.height && similarCheck; h += puHeight)
+          {
+            for (int w = 0; w < puSize.width && similarCheck; w += puWidth)
+            {
+              MotionInfo mi0 = mb0.buf[(w >> ATMVP_SUB_BLOCK_SIZE) + (h >> ATMVP_SUB_BLOCK_SIZE) * (mrgCtx->subPuMvpMiBuf[0].stride)];
+              MotionInfo mi1 = mb1.buf[(w >> ATMVP_SUB_BLOCK_SIZE) + (h >> ATMVP_SUB_BLOCK_SIZE) * (mrgCtx->subPuMvpMiBuf[0].stride)];
+              char interDir0 = mi0.interDir;
+              char interDir1 = mi1.interDir;
+              if (interDir1 != interDir0)
+#endif
+              {
+                similarCheck = false;
+              }
+              else
+              {
+#if JVET_AI0183_MVP_EXTENSION
+                if (mi0->interDir == 1)
+                {
+                  if (mi1->refIdx[0] != mi0->refIdx[0] || mi1->mv[0] != mi0->mv[0])
+#else
+                if (interDir1 == 1)
+                {
+                  if (mi1.refIdx[0] != mi0.refIdx[0] || mi1.mv[0] != mi0.mv[0])
+#endif
+                  {
+                    similarCheck = false;
+                  }
+                }
+#if JVET_AI0183_MVP_EXTENSION
+                else if (mi0->interDir == 2)
+                {
+                  if (mi1->refIdx[1] != mi0->refIdx[1] || mi1->mv[1] != mi0->mv[1])
+#else
+                else if (interDir1 == 2)
+                {
+                  if (mi1.refIdx[1] != mi0.refIdx[1] || mi1.mv[1] != mi0.mv[1])
+#endif
+                  {
+                    similarCheck = false;
+                  }
+                }
+#if JVET_AI0183_MVP_EXTENSION
+                else
+                {
+                  if (mi1->refIdx[1] != mi0->refIdx[1] || mi1->mv[1] != mi0->mv[1] || mi1->refIdx[0] != mi0->refIdx[0] || mi1->mv[0] != mi0->mv[0])
+#else
+                else if (interDir1 == 3)
+                {
+                  if (mi1.refIdx[1] != mi0.refIdx[1] || mi1.mv[1] != mi0.mv[1] || mi1.refIdx[0] != mi0.refIdx[0]
+                    || mi1.mv[0] != mi0.mv[0])
+#endif
+                  {
+                    similarCheck = false;
+                  }
+                }
+              }
+#if JVET_AI0183_MVP_EXTENSION
+              mi0 += incrRow;
+              mi1 += incrRow;
+            }
+            mi0 += incrColumn;
+            mi1 += incrColumn;
+#else
+            }
+#endif
+          }
+          if (similarCheck)
+          {
+            return true;
+          }
+        }
+      }
+    }
+  }
+  return false;
+}
+#endif
 bool MergeCtx::xCheckSimilarMotionSubTMVP(int mergeCandIndex, uint32_t mvdSimilarityThresh) const
 {
   if (interDirNeighbours[mergeCandIndex] == 0)
@@ -1405,6 +1728,9 @@ void MergeCtx::initMrgCand(int cnt)
 #endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
   candCost[cnt] = MAX_UINT64;
+#endif
+#if JVET_AI0187_TMVP_FOR_CMVP
+  candtype[cnt] = -1;
 #endif
 }
 #endif
@@ -1778,7 +2104,7 @@ void MergeCtx::copyMergeCtx(MergeCtx & orgMergeCtx)
   memcpy(interDirNeighbours, orgMergeCtx.interDirNeighbours, MRG_MAX_NUM_CANDS * sizeof(unsigned char));
   memcpy(mvFieldNeighbours, orgMergeCtx.mvFieldNeighbours, (MRG_MAX_NUM_CANDS << 1) * sizeof(MvField));
 #if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
-  for (int i = 0; i < MRG_MAX_NUM_CANDS; ++i)
+  for (int i = 0; i < orgMergeCtx.numValidMergeCand; ++i)
   {
     copyLICParamFromCtx(i, orgMergeCtx, i);
 #if JVET_AG0276_NLIC
@@ -3140,5 +3466,30 @@ void AffineMergeCtx::setAffMergeInfo(PredictionUnit &pu, int candIdx, int8_t mmv
       }
     }
   }
+}
+#endif
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+unsigned DeriveCtx::CtxCUSeparateTree( const CodingStructure& cs, Partitioner& partitioner )
+{
+  const Position pos         = partitioner.currArea().blocks[partitioner.chType];
+  const unsigned curSliceIdx = cs.slice->getIndependentSliceIdx();
+  const unsigned curTileIdx  = cs.pps->getTileIdx( partitioner.currArea().lumaPos() );
+#if HEVC_TILES_WPP
+  const unsigned curTileIdx  = cs.picture->tileMap->getTileIdxMap( pos );
+#endif
+
+#if HEVC_TILES_WPP
+  const CodingUnit *cuLeft = cs.getCURestricted( pos.offset(-1, 0), curSliceIdx, curTileIdx, partitioner.chType );
+  const CodingUnit *cuAbove = cs.getCURestricted( pos.offset(0, -1), curSliceIdx, curTileIdx, partitioner.chType );
+#else
+  const CodingUnit *cuLeft = cs.getCURestricted( pos.offset(-1, 0), pos, curSliceIdx, curTileIdx, partitioner.chType );
+  const CodingUnit *cuAbove = cs.getCURestricted( pos.offset(0, -1), pos, curSliceIdx, curTileIdx, partitioner.chType );
+#endif
+
+  unsigned ctxId = ( cuLeft && cuLeft->separateTree ) ? 1 : 0;
+  ctxId += ( cuAbove && cuAbove->separateTree ) ? 1 : 0;
+
+  return ctxId;
 }
 #endif

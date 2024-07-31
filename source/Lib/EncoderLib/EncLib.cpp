@@ -761,6 +761,9 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
 #if JVET_AE0159_FIBC || JVET_AE0059_INTER_CCCM || JVET_AE0078_IBC_LIC_EXTENSION || JVET_AF0073_INTER_CCP_MERGE
   m_cInterSearch.setIntraPrediction(&m_cIntraSearch);
 #endif
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+  m_cIntraSearch.setInterPrediction(&m_cInterSearch);
+#endif
   m_iMaxRefPicNum = 0;
 
 #if ER_CHROMA_QP_WCG_PPS
@@ -1749,6 +1752,19 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setMaxPicWidthInLumaSamples( m_iSourceWidth );
   sps.setMaxPicHeightInLumaSamples( m_iSourceHeight );
 #endif
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  sps.setUseInterSliceSeparateTree ( m_interSliceSeparateTreeEnabled );
+  if (getFrameRate() < 50 && (m_sourceWidth * m_sourceHeight) <= (832 * 480))
+  {
+    sps.setUseInterSliceSeparateTree ( false );
+  }
+  if(m_iQP < 27 || m_iQP>32)
+  {
+    sps.setUseInterSliceSeparateTree ( false );
+  }
+#endif
+
   if (m_resChangeInClvsEnabled)
   {
 #if JVET_AA0146_WRAP_AROUND_FIX
@@ -1771,6 +1787,7 @@ void EncLib::xInitSPS( SPS& sps )
       maxPicHeight = std::max(maxPicHeight, (int)((double)m_sourceHeight / m_scalingRatioVer3 + 0.5));
     }
 #endif
+
     const int minCuSize = std::max(8, 1 << m_log2MinCUSize);
     if (maxPicWidth % minCuSize)
     {
@@ -1806,7 +1823,13 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setLog2SignPredArea                    (m_log2SignPredArea);
 #endif
 #endif
+#if JVET_AH0103_LOW_DELAY_LFNST_NSPT
+  sps.setUseIntraLFNSTISlice                 ( m_intraLFNSTISlice );
+  sps.setUseIntraLFNSTPBSlice                ( m_intraLFNSTPBSlice );
+  sps.setUseInterLFNST                       ( m_interLFNST );
+#else
   sps.setUseLFNST                            ( m_LFNST );
+#endif
   sps.setSbTMVPEnabledFlag(m_sbTmvpEnableFlag);
   sps.setAMVREnabledFlag                ( m_ImvMode != IMV_OFF );
   sps.setBDOFEnabledFlag                    ( m_BIO );
@@ -1824,6 +1847,14 @@ void EncLib::xInitSPS( SPS& sps )
 #endif
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
   sps.setUseFastSubTmvp                     ((m_sourceWidth * m_sourceHeight) > (m_intraPeriod == -1 ? 0 : 832 * 480));
+#endif
+#if JVET_AI0183_MVP_EXTENSION
+  sps.setConfigScaledMvExtTmvp( m_scaledMvExtTmvp );
+  if (m_intraPeriod == -1)
+  {
+    sps.setConfigScaledMvExtTmvp( false );
+    setMaxNumAffineMergeCand(getMaxNumAffineMergeCand() - 2);
+  }
 #endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   sps.setUseArmcRefinedMotion               ( m_armcRefinedMotion );
@@ -1855,6 +1886,16 @@ void EncLib::xInitSPS( SPS& sps )
 #endif
   sps.setUseAffine             ( m_Affine );
   sps.setUseAffineType         ( m_AffineType );
+#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+  sps.setUseAltCost            ( m_useAltCost );
+  if ((getSourceWidth() * getSourceHeight()) > (832 * 480) && ((getSourceWidth() * getSourceHeight()) < (1920 * 1080)))
+  {
+    if (getBaseQP() > 27)
+    {
+      sps.setUseAltCost(false);
+    }
+  }
+#endif
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
   sps.setUseAffineTM           ( m_useAffineTM );
 #if JVET_AG0276_NLIC
@@ -1886,6 +1927,14 @@ void EncLib::xInitSPS( SPS& sps )
     {
       sps.setUseAltLM(false);
     }
+  }
+#endif
+#if JVET_AH0119_SUBBLOCK_TM
+  sps.setUseSbTmvpTM(m_useSbTmvpTM);
+  if (getBaseQP() < 27)
+  {
+    sps.setUseSbTmvpTM(false);
+    sps.setUseAffineTM(false);
   }
 #endif
 #endif
@@ -1930,6 +1979,12 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setUseIntraMTS           ( m_IntraMTS );
   sps.setUseInterMTS           ( m_InterMTS );
   sps.setUseSBT                             ( m_SBT );
+#if JVET_AI0050_INTER_MTSS
+  sps.setUseInterMTSS          ( m_useInterMTSS );
+#endif
+#if JVET_AI0050_SBT_LFNST
+  sps.setUseSbtLFNST           ( m_useSbtLFNST );
+#endif
   sps.setUseSMVD                ( m_SMVD );
   sps.setUseBcw                ( m_bcw );
 #if INTER_LIC
@@ -1978,6 +2033,9 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_AD0085_MPM_SORTING
   sps.setUseMpmSorting      ( m_mpmSorting );
 #endif
+#if JVET_AH0136_CHROMA_REORDERING
+  sps.setUseChromaReordering (m_chromaReordering);
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   sps.setUseCccm            ( m_cccm );
 #endif
@@ -2018,6 +2076,9 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setUseGeo                ( m_Geo );
 #if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
   sps.setUseGeoBlend           ( true );
+#endif
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+  sps.setUseGeoInterIbc        ( m_Geo ? m_geoInterIbc : false );
 #endif
   sps.setUseMMVD               ( m_MMVD );
   sps.setFpelMmvdEnabledFlag   (( m_MMVD ) ? m_allowDisFracMMVD : false);
@@ -2079,6 +2140,9 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setItmpLicMode                        ( m_itmpLicMode );
 #endif
   sps.setWrapAroundEnabledFlag                      ( m_wrapAround );
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  sps.setEnableMaxMttIncrease               ( m_enableMaxMttIncrease );
+#endif
 #if MULTI_HYP_PRED
   sps.setMaxNumAddHyps(m_maxNumAddHyps);
   sps.setNumAddHypWeights(m_numAddHypWeights);
@@ -2102,6 +2166,16 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
   sps.setUseInterCcpMergeZeroLumaCbf(m_interCcpMergeZeroLumaCbf);
 #endif
+#endif
+#if JVET_AH0209_PDP
+  sps.setUsePDP( m_pdp );
+#endif
+#if JVET_AI0183_MVP_EXTENSION
+  sps.setConfigScaledMvExtBiTmvp( m_scaledMvExtBiTmvp );
+  if (getBaseQP() < 27 && ((getSourceWidth() * getSourceHeight()) < (3840 * 2160)))
+  {
+    sps.setConfigScaledMvExtBiTmvp( false );
+  }
 #endif
   // ADD_NEW_TOOL : (encoder lib) set tool enabling flags and associated parameters here
   sps.setUseISP                             ( m_ISP );
@@ -2141,6 +2215,9 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_AG0158_ALF_LUMA_COEFF_PRECISION
   sps.setAlfPrecisionFlag( m_alfPrecision );
 #endif
+#if JVET_AH0057_CCALF_COEFF_PRECISION
+  sps.setCCALFPrecisionFlag( m_ccalfPrecision );
+#endif
   sps.setJointCbCrEnabledFlag( m_JointCbCrMode );
   sps.setMaxTLayers( m_maxTempLayer );
   sps.setTemporalIdNestingFlag( ( m_maxTempLayer == 1 ) ? true : false );
@@ -2175,6 +2252,30 @@ void EncLib::xInitSPS( SPS& sps )
 
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT
   sps.setTempCabacInitMode( m_tempCabacInitMode );
+#endif
+
+#if JVET_AI0084_ALF_RESIDUALS_SCALING
+  sps.setAlfScalePrevEnabled( true );
+  if ( getIntraPeriod() == 1 )
+  {
+    sps.setAlfScaleMode( 0 );
+  }
+  else if ( getIntraPeriod() < 0 )
+  {
+    if ( m_sourceWidth * m_sourceHeight < 1920 * 1080 )
+    {
+      sps.setAlfScaleMode( 2 );
+      sps.setAlfScalePrevEnabled( false );
+    }
+    else
+    {
+      sps.setAlfScaleMode( 3 );
+    }
+  }
+  else
+  {
+    sps.setAlfScaleMode( 1 );
+  }
 #endif
 
   if (sps.getVuiParametersPresentFlag())

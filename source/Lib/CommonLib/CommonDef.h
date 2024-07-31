@@ -121,12 +121,25 @@
 #define NGTXCTX                                           7
 #endif
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+#if JVET_AH0119_SUBBLOCK_TM
+static const double REFINE_THRESHOLD_AFFINE_MERGE = 0.80;
+static const double REFINE_THRESHOLD_SBTMVP_MERGE = 0.80;
+#else
 static const double REFINE_THRESHOLD_AFFINE_MERGE = 0.75;
+#endif
 #endif
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
 static const int SUB_TMVP_CANDIDATE_NUM = 10;
 static const int SUB_TMVP_INDEX = 3;  // 1: 2 subtmvp; 2: 4 subtmvp
+#if JVET_AI0183_MVP_EXTENSION
+static const int SUB_TMVP_NUM = 11;
+static const int COLIDX_MAP[2 * SUB_TMVP_INDEX * 3] = { 0,1,7,2,3,8,4,5,9,-1,-1,-1,-1,6,10,-1,-1,-1 };
+#elif JVET_AH0119_SUBBLOCK_TM
+static const int SUB_TMVP_NUM = 2 * SUB_TMVP_INDEX * 2 - 5;
+static const int COLIDX_MAP[2 * SUB_TMVP_INDEX * 2] = { 0,1,2,3,7,5,4,9,8,6,10,11 };
+#else
 static const int SUB_TMVP_NUM = 2 * SUB_TMVP_INDEX;
+#endif
 static const int SUB_TMVP_MV_THRESHOLD = 2;
 static const int AMVP_TMVP_INDEX = 1;  // 1: 2 AMVP tmvp; 2: 4 AMVP tmvp
 #endif
@@ -180,7 +193,12 @@ static const int AMVP_DECIMATION_FACTOR =                           2;
 #endif
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
+#if JVET_AI0103_ADDITIONAL_CMVP
+static const int NUM_CMVP_CANDS =                                  4; ///< CMVP
+static const int NUM_MERGE_CANDS =                                 28 + NUM_CMVP_CANDS; ///< for new maximum buffer of merging candidates
+#else
 static const int NUM_MERGE_CANDS =                                 28; ///< for maximum buffer of merging candidates
+#endif
 static const int NUM_TMVP_CANDS =                                  8; ///< TMVP
 static const int MAX_PAIR_CANDS =                                  4; ///< MAX Pairiwse candidates for Regular TM and BM merge modes
 #else
@@ -208,8 +226,17 @@ static const int MRG_MAX_NUM_CANDS =                                6; ///< MERG
 static const int AFF_NON_ADJACENT_DIST    =                          4;
 #endif
 
+#if JVET_AI0187_TMVP_FOR_CMVP
+static const int REGULAR_ARMC_NUM       =                             4;
+static const int REGULAR_ARMC_NUM_LD    =                             8;
+static const int TM_ARMC_NUM            =                             2;
+static const int TM_ARMC_NUM_LD         =                             5;
+#endif
+
 #if JVET_Z0139_HIST_AFF || JVET_Z0139_NA_AFF
-#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+#if JVET_AI0183_MVP_EXTENSION
+static const int AFFINE_MRG_MAX_NUM_CANDS =                         18; ///< AFFINE MERGE
+#elif JVET_AF0163_TM_SUBBLOCK_REFINEMENT
 static const int AFFINE_MRG_MAX_NUM_CANDS =                         16; ///< AFFINE MERGE
 #else
 static const int AFFINE_MRG_MAX_NUM_CANDS =                         15; ///< AFFINE MERGE
@@ -219,12 +246,25 @@ static const int AFFINE_MRG_MAX_NUM_CANDS =                         5; ///< AFFI
 #endif
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
 static const int AFF_MAX_NON_ADJACENT_INHERITED_CANDS = 6;
-#if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
+#if JVET_AI0183_MVP_EXTENSION
+static const int ADAPT_SBTMVP_CAND_NUM = 2;
+static const int RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE = 33 + ADAPT_SBTMVP_CAND_NUM;
+static const int RMVF_AFFINE_MRG_MAX_CAND_LIST_EFFECT_SIZE = 33;
+#elif JVET_AF0163_TM_SUBBLOCK_REFINEMENT
 static const int RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE = 31;
 #else
 static const int RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE = 30;
 #endif
+#if JVET_AI0197_AFFINE_TMVP
+static const int ADDITIONAL_AFFINE_CAND_NUM   = 24;
+#if JVET_AI0183_MVP_EXTENSION
+static const int AFFINE_MRG_MAX_NUM_CANDS_ALL = AFFINE_MRG_MAX_NUM_CANDS + ADDITIONAL_AFFINE_CAND_NUM + ADAPT_SBTMVP_CAND_NUM;
+#else
+static const int AFFINE_MRG_MAX_NUM_CANDS_ALL = AFFINE_MRG_MAX_NUM_CANDS + ADDITIONAL_AFFINE_CAND_NUM;
+#endif
+#else
 static const int ADDITIONAL_AFFINE_CAND_NUM = 15;
+#endif
 #if JVET_AB0189_RMVF_BITLENGTH_CONTROL
 static const int RMVF_MV_RANGE = (1 << 12);
 static const int RMVF_CUSIZE_THRED = 128;
@@ -271,6 +311,11 @@ static const double LAMBDA_DEC_SIDE[MAX_QP+1] = {
 };
 #endif
 
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+static const int QTBTTT_TEMPO_PRED_BUFFER_SIZE      =              16;
+static const int QTBTTT_TEMPO_PRED_BLOCK_RESOLUTION =              16;
+static const int LOG2__BLOCK_RESOLUTION             =               4;
+#endif
 #if JVET_AG0145_ADAPTIVE_CLIPPING
 static const int ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_1 =                5;
 static const int ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_0 =                1;
@@ -312,6 +357,20 @@ static const int MIP_MAX_WIDTH =                                   MAX_TB_SIZEY;
 static const int MIP_MAX_HEIGHT =                                  MAX_TB_SIZEY;
 #endif
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+static const int ID_SEP_TREE_BLK_SIZE_LIMIT1 =                     10; // W*H>=2^BLK_SIZE_LIMIT1 implies separate tree
+static const int ID_SEP_TREE_BLK_SIZE_LIMIT2 =                     7;  // W*H<=2^BLK_SIZE_LIMIT2 implies shared tree
+static const int ID_SEP_TREE_TID_OFF         =                     3;  
+
+static const int MAX_TREE_TYPE              =                      3; ///< LumaChromaSharedTree(0), LumaSeparateTree(1), ChromaSeparateTree(2)
+#endif
+
+#if JVET_AH0209_PDP
+static const int PDP_NUM_MODES =                                  67;
+static const int PDP_NUM_SIZES =                                  18;
+static const int PDP_NUM_GROUPS =                                 67;
+static const int PDP_SHORT_TH[3] =                     { 0, 19, 49 };
+#endif
 #if JVET_W0066_CCSAO
 #define          MAX_CCSAO_SET_NUM                                  4
 static const int MAX_CCSAO_CAND_POS_Y        =                      9;
@@ -395,7 +454,7 @@ static const int NUM_DB_PAD                  =                      1;
 #if JVET_AD0222_ALF_LONG_FIXFILTER && JVET_AD0222_ADDITONAL_ALF_FIXFILTER
 static const int MAX_NUM_ALF_LUMA_COEFF      =                     11 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF_NEW + NUM_RESI + 1 + NUM_GAUSS_FILTERED_COEFF;
 #elif JVET_AD0222_ALF_LONG_FIXFILTER
-static const int MAX_NUM_ALF_LUMA_COEFF      =                     11 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF_NEW + NUM_RESI + 1
+static const int MAX_NUM_ALF_LUMA_COEFF = 11 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF_NEW + NUM_RESI + 1;
 #elif JVET_AD0222_ADDITONAL_ALF_FIXFILTER
 static const int MAX_NUM_ALF_LUMA_COEFF      =                     21 + EXT_LENGTH + NUM_DB + NUM_FIXED_BASED_COEFF + NUM_RESI + 1 + NUM_GAUSS_FILTERED_COEFF;
 #else
@@ -434,6 +493,10 @@ static const int MAX_NUM_ALF_CHROMA_COEFF    =                     21 + 5;
 #else
 static const int MAX_NUM_ALF_CHROMA_COEFF    =                     21;
 #endif
+#if JVET_AH0057_CCALF_COEFF_PRECISION
+static const int MAX_NUM_CCALF_PREC          =                     4;
+static const int MIN_CCALF_PREC              =                     7;
+#endif
 #else
 static const int MAX_NUM_ALF_LUMA_COEFF      =                     13;
 static const int MAX_NUM_ALF_CHROMA_COEFF    =                      7;
@@ -447,10 +510,21 @@ static const int       MAX_ALF_PADDING_SIZE           =             4;
 #endif
 #if JVET_X0071_LONGER_CCALF
 #define MAX_NUM_CC_ALF_FILTERS                                      16
+#if JVET_AI0166_CCALF_CHROMA_SAO_INPUT
+static const     int CCALF_SAO_TAPS_NUM               =             4;
+#endif
 #if JVET_AF0197_LUMA_RESIDUAL_TAP_IN_CCALF
-static constexpr int MAX_NUM_CC_ALF_CHROMA_COEFF    =               23 + 5;
+#if JVET_AI0166_CCALF_CHROMA_SAO_INPUT
+static constexpr int MAX_NUM_CC_ALF_CHROMA_COEFF      =             23 + 5 + CCALF_SAO_TAPS_NUM;
 #else
-static constexpr int MAX_NUM_CC_ALF_CHROMA_COEFF    =               25;
+static constexpr int MAX_NUM_CC_ALF_CHROMA_COEFF      =             23 + 5;
+#endif
+#else
+#if JVET_AI0166_CCALF_CHROMA_SAO_INPUT
+static constexpr int MAX_NUM_CC_ALF_CHROMA_COEFF      =             25 + CCALF_SAO_TAPS_NUM;
+#else
+static constexpr int MAX_NUM_CC_ALF_CHROMA_COEFF      =             25;
+#endif
 #endif
 #else
 #define MAX_NUM_CC_ALF_FILTERS                                      4
@@ -659,8 +733,24 @@ static const int MDLM_T_IDX =                          LM_CHROMA_IDX + 2; ///< M
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
 static const int DIMD_CHROMA_IDX =                     NUM_INTRA_MODE; ///< chroma mode index for derived by DIMD method
 #if JVET_AC0071_DBV
+#if JVET_AH0136_CHROMA_REORDERING
+static const int DBV_CHROMA_IDX = NUM_INTRA_MODE + 1;
+static const int DBV_CHROMA_IDX1 = NUM_INTRA_MODE + 2;
+static const int DBV_CHROMA_IDX2 = NUM_INTRA_MODE + 3;
+static const int DBV_CHROMA_IDX3 = NUM_INTRA_MODE + 4;
+static const int DBV_CHROMA_IDX4 = NUM_INTRA_MODE + 5;
+static const int DBV_CHROMA_IDX5 = NUM_INTRA_MODE + 6;
+static const int DBV_CHROMA_IDX6 = NUM_INTRA_MODE + 7;
+static const int DBV_CHROMA_IDX7 = NUM_INTRA_MODE + 8;
+static const int DBV_CHROMA_IDX8 = NUM_INTRA_MODE + 9;
+static const int DBV_CHROMA_IDX9 = NUM_INTRA_MODE + 10;
+static const int DM_CHROMA_IDX = NUM_INTRA_MODE + 11; ///< chroma mode index for derived from luma intra mode
+static const int NUM_CHROMA_TM_LINES_IN_REORDERING = 1;
+static const int NUM_CHROMA_LIST_MODE = 7 + 4 + 5 + 10; /// 7 orginal modes + 4 collocated modes + 5 neighboring modes + 10 DBV modes
+#else
 static const int DBV_CHROMA_IDX = NUM_INTRA_MODE + 1;
 static const int DM_CHROMA_IDX = NUM_INTRA_MODE + 2; ///< chroma mode index for derived from luma intra mode
+#endif
 #else
 static const int DM_CHROMA_IDX =                       NUM_INTRA_MODE + 1; ///< chroma mode index for derived from luma intra mode
 #endif
@@ -1140,7 +1230,11 @@ static const double AMAXBT_TH128 =                                 60.0;
 static const int ADAPTIVE_SUB_GROUP_SIZE =                         5;
 #if JVET_Z0139_HIST_AFF || JVET_Z0139_NA_AFF
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
+#if JVET_AI0197_AFFINE_TMVP
+static const int ADAPTIVE_AFFINE_SUB_GROUP_SIZE = AFFINE_MRG_MAX_NUM_CANDS_ALL;
+#else
 static const int ADAPTIVE_AFFINE_SUB_GROUP_SIZE = RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE;
+#endif
 #else
 static const int ADAPTIVE_AFFINE_SUB_GROUP_SIZE = AFFINE_MRG_MAX_NUM_CANDS;
 #endif
@@ -1172,7 +1266,11 @@ static const int ADAPTIVE_SUB_GROUP_SIZE_MMVD_AFF = AF_MMVD_MAX_REFINE_NUM;
 #if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
 static const int CFG_ALT_MRG_MAX_NUM_CANDS = 16;
 #if (JVET_Y0134_TMVP_NAMVP_CAND_REORDERING && JVET_W0090_ARMC_TM) || JVET_Z0075_IBC_HMVP_ENLARGE
-static const int ALT_MRG_MAX_NUM_CANDS = std::min(CFG_ALT_MRG_MAX_NUM_CANDS, NUM_MERGE_CANDS);
+#if CFG_ALT_MRG_MAX_NUM_CANDS <= NUM_MERGE_CANDS
+static const int ALT_MRG_MAX_NUM_CANDS = CFG_ALT_MRG_MAX_NUM_CANDS;
+#else
+static const int ALT_MRG_MAX_NUM_CANDS = NUM_MERGE_CANDS;
+#endif
 #else
 static const int ALT_MRG_MAX_NUM_CANDS = std::min(CFG_ALT_MRG_MAX_NUM_CANDS, MRG_MAX_NUM_CANDS);
 #endif
@@ -1282,6 +1380,13 @@ static const int CFLM_MAX_REF_SAMPLES = CCCM_MAX_REF_SAMPLES;
 static const int INTER_CCCM_NUM_PARAMS = 8;
 static const int INTER_CCCM_MAX_REF_SAMPLES = 256;
 #endif
+#if JVET_AG0058_EIP
+#if JVET_AI0066_REGULARIZED_EIP
+static const int REGULARIZED_EIP_L2_SAMPLE_THRESHOLD = 2024;
+static const int REGULARIZED_EIP_L2_SMALL = 192;
+static const int REGULARIZED_EIP_L2_LARGE = 128;
+#endif
+#endif
 #if JVET_AC0071_DBV
 static const int NUM_DBV_POSITION = 5;
 static const int DBV_TEMPLATE_SIZE = 1;
@@ -1359,7 +1464,12 @@ static const int GEO_MAX_NUM_UNI_AFF_CANDS_ARMC                     = 22;
 
 #if JVET_Y0065_GPM_INTRA
 static const int GEO_MAX_NUM_INTRA_CANDS =                          3;
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+static const int GEO_MAX_NUM_IBC_CANDS =                            4;
+static const int GEO_NUM_INTRA_RDO_BUFFER =                         23 + GEO_MAX_NUM_IBC_CANDS;
+#else
 static const int GEO_NUM_INTRA_RDO_BUFFER =                         23;
+#endif
 #if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
 static const int GEO_BLEND_MAX_NUM_CANDS =                        ((GEO_MAX_NUM_UNI_CANDS + 1) >> 1) * ((GEO_MAX_NUM_UNI_CANDS + 1) >> 1) / 2;
 static const int GEO_NUM_RDO_BUFFER =                               GEO_MAX_NUM_UNI_CANDS + 67 + 1 + 1;
@@ -1370,7 +1480,11 @@ static const int GEO_NUM_RDO_BUFFER =                               GEO_MAX_NUM_
 static const int GEO_NUM_RDO_BUFFER =                               GEO_MAX_NUM_UNI_CANDS + GEO_NUM_INTRA_RDO_BUFFER;
 #endif
 #endif
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+static const int GEO_MAX_NUM_CANDS = (GEO_MAX_NUM_UNI_CANDS+GEO_MAX_NUM_INTRA_CANDS+GEO_MAX_NUM_IBC_CANDS) * ((GEO_MAX_NUM_UNI_CANDS+GEO_MAX_NUM_INTRA_CANDS+GEO_MAX_NUM_IBC_CANDS) - 1);
+#else
 static const int GEO_MAX_NUM_CANDS = (GEO_MAX_NUM_UNI_CANDS+GEO_MAX_NUM_INTRA_CANDS) * ((GEO_MAX_NUM_UNI_CANDS+GEO_MAX_NUM_INTRA_CANDS) - 1);
+#endif
 #else
 static const int GEO_MAX_NUM_CANDS = GEO_MAX_NUM_UNI_CANDS * (GEO_MAX_NUM_UNI_CANDS - 1);
 #endif
@@ -1412,6 +1526,9 @@ static const int GEO_ENC_MMVD_MAX_REFINE_NUM_ADJ = 1 // regular merge(1)
 #endif
 #if JVET_Y0065_GPM_INTRA
                                                  + 1 // intra(1)
+#endif
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+                                                 + 1 // IBC(1)
 #endif
 ;
 #else
@@ -1457,6 +1574,9 @@ static const int SBT_MAX_SIZE =                                    64; ///< maxi
 #endif
 static const int SBT_NUM_SL =                                      10; ///< maximum number of historical PU decision saved for a CU
 static const int SBT_NUM_RDO =                                      2; ///< maximum number of SBT mode tried for a PU
+#if JVET_AI0050_SBT_LFNST
+static const int NUM_SBT_LFNST_RDO =                                2;
+#endif
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
 static const int NUM_INTER_CU_INFO_SAVE =                           8; ///< maximum number of inter cu information saved for fast algorithm
 static const int LDT_MODE_TYPE_INHERIT =                            0; ///< No need to signal mode_constraint_flag, and the modeType of the region is inherited from its parent node
@@ -1575,8 +1695,12 @@ static const int SIGN_PRED_FREQ_RANGE   = 32;///< not configurable
 #else
 static const int SIGN_PRED_FREQ_RANGE   = 4; ///< not configurable
 #endif
+#if JVET_AI0096_SIGN_PRED_BIT_DEPTH_FIX
+static const int SIGN_PRED_RESIDUAL_BITS  = 8; ///< not configurable
+#else
 static const int SIGN_PRED_SHIFT        = 8; ///< not configurable
 static const int SIGN_PRED_OFFSET       = 1 << ( SIGN_PRED_SHIFT - 1 ); ///< not configurable
+#endif
 #endif
 #if MULTI_HYP_PRED
 static const auto MULTI_HYP_PRED_MAX_CANDS =                     4;
@@ -1661,6 +1785,14 @@ static const int CCCM_REF_SAMPLES_MAX =       CCCM_MAX_REF_SAMPLES;
 #if JVET_AG0117_CABAC_SPATIAL_TUNING
 static constexpr int CABAC_SPATIAL_MAX_BINS                  = 128;
 static constexpr int CABAC_SPATIAL_MAX_BINS_PER_CTX          =   4;
+#endif
+
+#if JVET_AI0183_MVP_EXTENSION
+static const int SCALE_FRAC_INTERNAL_PLUS_CU_LOG2 = MIN_CU_LOG2 + MV_FRACTIONAL_BITS_INTERNAL;
+static const int SCALE_FRAC_INTERNAL_PLUS_CU_LOG2_OFFSET = 1 << (SCALE_FRAC_INTERNAL_PLUS_CU_LOG2 - 1);
+static const int INTERSECTING_MV_MAX_NR = 4;
+static const int INTERSECTING_MV_MAX_REF_IDX_NR = 4;
+static const int INTERSECTING_MV_PU_GET_ICT_MAX_DIM_NR = 8;
 #endif
 
 // ====================================================================================================================
@@ -2059,9 +2191,16 @@ static const int FIX_FILTER_NUM_COEFF    = 42;
 static const int TMP_TEMPLATE_SIZE =            4; // must be multiple of 4 for SIMD
 static const int TMP_MAXSIZE_DEPTH =            6; // should be log2(TMP_TEMPLATE_SIZE): keep as 6 to avoid any error
 static const int USE_MORE_BLOCKSIZE_DEPTH_MAX = TMP_MAXSIZE_DEPTH - 1;
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+static const int INIT_THRESHOULD_SHIFTBITS =    0;
+#if JVET_AG0136_INTRA_TMP_LIC
+static const int INIT_THRESHOLD_SHIFTBITS_SUPP = 0;
+#endif
+#else
 static const int INIT_THRESHOULD_SHIFTBITS =    2;  ///< (default 2) Early skip threshold for checking distance.
 #if JVET_AG0136_INTRA_TMP_LIC
 static const int INIT_THRESHOLD_SHIFTBITS_SUPP = 4;
+#endif
 #endif
 static const int TMP_SEARCH_RANGE_MULT_FACTOR = 5;
 #if JVET_AD0086_ENHANCED_INTRA_TMP
@@ -2070,6 +2209,15 @@ static const int TMP_GROUP_IDX       = 3;
 static const int FUSION_IDX_NUM      = TMP_FUSION_NUM * TMP_GROUP_IDX;
 static const int MTMP_NUM            = 19;
 static const int MTMP_NUM_SPARSE     = 30;
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+static const int TMP_BV_REORDER_MAX   = 2;
+static const int TMP_REFINE_NONLIC_BV_NUM  = 0;
+static const int TMP_REFINE_LIC_BV_NUM     = 0;
+static const int TMP_SKIP_REFINE_THRESHOLD = 128;
+static const int TMP_TEMPLATE_COST_SHIFT   = 3;
+static const double TMP_INT_BV_COST_SCALE = 0.85;
+static const double TMP_ENC_REFINE_THRESHOLD = 1.1;
+#endif
 #if JVET_AG0136_INTRA_TMP_LIC 
 static const int MTMP_NUM_SPARSE_FOR_LIC = 15;
 #endif
@@ -2114,6 +2262,17 @@ static const int TMP_SAMPLING = 1 << LOG2_TMP_SAMPLING;
 #if JVET_AG0151_INTRA_TMP_MERGE_MODE
 static const int TMP_NUM_MERGE_CANDS = 10;
 #endif
+#if JVET_AH0055_INTRA_TMP_ARBVP
+static const int NUM_TMP_ARBVP = 20;
+static const int EBVP_RANGE = 1;
+#endif
+
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+static const int NUM_TMP_ARBVP_S  = 5;
+static const int TMP_MRG_REG_ID   = 6;
+static const int INIT_TL_POS      = (MTMP_NUM - TL_NUM_SPARSE);
+#endif
+
 #if JVET_AG0152_SGPM_ITMP_IBC
 static const int SGPM_NUM_BVS = 6; // maximum BVs to be considered into the list for Itmp-Sgpm
 static const int SGPM_BV_START_IDX = NUM_LUMA_MODE;

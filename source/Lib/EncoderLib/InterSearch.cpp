@@ -8280,11 +8280,19 @@ void InterSearch::setGeoSplitModeToSyntaxTable(PredictionUnit& pu, MergeCtx& mer
 #if JVET_Y0065_GPM_INTRA
                                              , IntraPrediction* pcIntraPred
 #endif
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+                                             , Mv* geoBvList
+#endif
                                              , int mmvdCand0, int mmvdCand1)
 {
 #if JVET_Y0065_GPM_INTRA
   bool isIntra[2];
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+  bool isIbc[2];
+  xRemapMrgIndexAndMmvdIdx(mergeCand0, mergeCand1, mmvdCand0, mmvdCand1, isIntra[0], isIntra[1], isIbc[0], isIbc[1]);
+#else
   xRemapMrgIndexAndMmvdIdx(mergeCand0, mergeCand1, mmvdCand0, mmvdCand1, isIntra[0], isIntra[1]);
+#endif
 #endif
   const int idx0 = mmvdCand0 + 1;
   const int idx1 = mmvdCand1 + 1;
@@ -8300,6 +8308,9 @@ void InterSearch::setGeoSplitModeToSyntaxTable(PredictionUnit& pu, MergeCtx& mer
 #if JVET_Y0065_GPM_INTRA
                       , pcIntraPred
 #endif
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+                      , geoBvList
+#endif
                       , m_gpmPartTplCost[idx0][mergeCand0]
                       , m_gpmPartTplCost[idx1][mergeCand1]
                       , mergeCtx0
@@ -8310,6 +8321,9 @@ void InterSearch::setGeoSplitModeToSyntaxTable(PredictionUnit& pu, MergeCtx& mer
 #else
                       + (isIntra[0] ? GEO_MAX_NUM_UNI_CANDS : 0)
 #endif
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+                      + (isIbc[0] ? GEO_MAX_NUM_INTRA_CANDS : 0)
+#endif
 #endif
                       , mergeCtx1
                       , mergeCand1
@@ -8318,6 +8332,9 @@ void InterSearch::setGeoSplitModeToSyntaxTable(PredictionUnit& pu, MergeCtx& mer
                       + (isIntra[1] ? GEO_MAX_ALL_INTER_UNI_CANDS : 0)
 #else
                       + (isIntra[1] ? GEO_MAX_NUM_UNI_CANDS : 0)
+#endif
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+                      + (isIbc[1] ? GEO_MAX_NUM_INTRA_CANDS : 0)
 #endif
 #endif
                       , numValidInList
@@ -8363,7 +8380,12 @@ int InterSearch::convertGeoSplitModeToSyntax(int splitDir, int mergeCand0, int m
 {
 #if JVET_Y0065_GPM_INTRA
   bool isIntra[2];
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+  bool isIbc[2];
+  xRemapMrgIndexAndMmvdIdx(mergeCand0, mergeCand1, mmvdCand0, mmvdCand1, isIntra[0], isIntra[1], isIbc[0], isIbc[1]);
+#else
   xRemapMrgIndexAndMmvdIdx(mergeCand0, mergeCand1, mmvdCand0, mmvdCand1, isIntra[0], isIntra[1]);
+#endif
 #endif
   return m_gpmacsSplitModeTmSel[mmvdCand0 + 1][mmvdCand1 + 1][mergeCand0][mergeCand1][splitDir];
 }
@@ -8374,6 +8396,9 @@ bool InterSearch::selectGeoSplitModes(PredictionUnit &pu,
 #endif
 #if JVET_Y0065_GPM_INTRA
                                       IntraPrediction* pcIntraPred,
+#endif
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+                                      Mv* geoBvList,
 #endif
                                       uint32_t (&gpmTplCostPart0)[2][GEO_NUM_PARTITION_MODE],
                                       uint32_t (&gpmTplCostPart1)[2][GEO_NUM_PARTITION_MODE],
@@ -8405,6 +8430,9 @@ bool InterSearch::selectGeoSplitModes(PredictionUnit &pu,
   Pel* pRefLeftPart0   = m_acYuvRefAMLTemplatePart0[1];
   Pel* pRefTopPart1    = m_acYuvRefAMLTemplatePart1[0];
   Pel* pRefLeftPart1   = m_acYuvRefAMLTemplatePart1[1];
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+  std::vector<Pel>* lut = m_pcReshape->getSliceReshaperInfo().getUseSliceReshaper() && m_pcReshape->getCTUFlag() ? &m_pcReshape->getInvLUT() : nullptr;
+#endif
 
   // First partition
   if (fillRefTplPart0)
@@ -8413,6 +8441,9 @@ bool InterSearch::selectGeoSplitModes(PredictionUnit &pu,
     fillPartGPMRefTemplate<0, false>(pu, mergeCtx0, mergeCand0, mmvdCand0, pRefTopPart0, pRefLeftPart0, &affMergeCtx);
 #else
     fillPartGPMRefTemplate<0, false>(pu, mergeCtx0, mergeCand0, mmvdCand0, pRefTopPart0, pRefLeftPart0);
+#endif
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+    fillPartGpmInterIbcRefTemplate<0, false>(pu, lut, geoBvList, mergeCand0, mmvdCand0, pRefTopPart0, pRefLeftPart0);
 #endif
 #if JVET_Y0065_GPM_INTRA
     xCollectIntraGeoPartCost<0>(pu, pcIntraPred, mergeCand0, gpmTplCostPart0[0]);
@@ -8426,6 +8457,9 @@ bool InterSearch::selectGeoSplitModes(PredictionUnit &pu,
     fillPartGPMRefTemplate<1, false>(pu, mergeCtx1, mergeCand1, mmvdCand1, pRefTopPart1, pRefLeftPart1, &affMergeCtx);
 #else
     fillPartGPMRefTemplate<1, false>(pu, mergeCtx1, mergeCand1, mmvdCand1, pRefTopPart1, pRefLeftPart1);
+#endif
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+    fillPartGpmInterIbcRefTemplate<1, false>(pu, lut, geoBvList, mergeCand1, mmvdCand1, pRefTopPart1, pRefLeftPart1);
 #endif
 #if JVET_Y0065_GPM_INTRA
     xCollectIntraGeoPartCost<1>(pu, pcIntraPred, mergeCand1, gpmTplCostPart1[1]);
@@ -8773,6 +8807,16 @@ void InterSearch::xCollectIntraGeoPartCost(PredictionUnit &pu, IntraPrediction* 
   {
     return;
   }
+#if JVET_AI0082_GPM_WITH_INTER_IBC
+#if JVET_AG0164_AFFINE_GPM
+  if (mergeCand >= GEO_MAX_ALL_INTER_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS)
+#else
+  if (mergeCand >= GEO_MAX_NUM_UNI_CANDS + GEO_MAX_NUM_INTRA_CANDS)
+#endif
+  {
+    return;
+  }
+#endif
 
   std::vector<Pel>* LUT = m_pcReshape->getSliceReshaperInfo().getUseSliceReshaper() && m_pcReshape->getCTUFlag() ? &m_pcReshape->getInvLUT() : nullptr;
   pcIntraPred->fillIntraGPMRefTemplateAll(pu, m_bAMLTemplateAvailabe[0], m_bAMLTemplateAvailabe[1], true, false, false, LUT, (partIdx == 0 ? mergeCand : 0), (partIdx == 1 ? mergeCand : 0));
@@ -13153,7 +13197,11 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
       const bool mtsAllowed = CU::isMTSAllowed( *tu.cu, compID );
 #endif
 #if JVET_AG0061_INTER_LFNST_NSPT
+#if JVET_AI0050_SBT_LFNST
+      const bool lfnstAllowed = CU::isLfnstAllowed(*tu.cu, compID) && cu.lfnstFlag && !tu.noResidual;
+#else
       const bool lfnstAllowed = CU::isLfnstAllowed(*tu.cu, compID) && cu.lfnstFlag;
+#endif
 #endif
 
 #if JVET_AG0061_INTER_LFNST_NSPT
@@ -13169,7 +13217,11 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
 #endif
       std::vector<TrMode> trModes;
 #if TU_256
-      if(tu.idx != cu.firstTU->idx)
+#if JVET_AI0050_SBT_LFNST
+      if (tu.idx != cu.firstTU->idx && ((cu.sbtInfo && tu.noResidual) || !cu.sbtInfo))
+#else
+      if (tu.idx != cu.firstTU->idx)
+#endif
       {
         trModes.push_back( TrMode( cu.firstTU->mtsIdx[compID], true ) );
         nNumTransformCands = 1;
@@ -13182,7 +13234,11 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
           nNumTransformCands = 0;
         }
 #if JVET_AG0061_INTER_LFNST_NSPT
+#if JVET_AI0050_SBT_LFNST
+        else if (!((cu.mtsFlag || (cu.lfnstFlag && !tu.noResidual)) && compID == COMPONENT_Y))
+#else
         else if (!((cu.mtsFlag || cu.lfnstFlag) && compID == COMPONENT_Y))
+#endif
 #elif JVET_AA0133_INTER_MTS_OPT
         else if (!(cu.mtsFlag && compID == COMPONENT_Y))
 #else
@@ -13229,7 +13285,12 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
 #if JVET_AG0061_INTER_LFNST_NSPT
         if (lfnstAllowed)
         {
+#if JVET_AI0050_INTER_MTSS
+          int numMode = cu.cs->sps->getUseInterMTSS() && tu.cu->geoFlag ? 6 : 3;
+          for (int i = NUM_TRAFO_MODES_MTS; i < NUM_TRAFO_MODES_MTS + numMode; i++)   // 3 or 6 lfnst
+#else
           for (int i = NUM_TRAFO_MODES_MTS; i < NUM_TRAFO_MODES_MTS + 3; i++)   // 3 lfnst
+#endif
           {
             {
               trModes.push_back(TrMode(i, true));
@@ -13443,12 +13504,25 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
             }
 #if JVET_AG0061_INTER_LFNST_NSPT
             tu.mtsIdx[compID]   = trModes[transformMode].first < NUM_TRAFO_MODES_MTS ? trModes[transformMode].first : 0;
+#if JVET_AI0050_INTER_MTSS
+            int factor = (trModes[transformMode].first - NUM_TRAFO_MODES_MTS) / 3;
+            tu.lfnstIdx[compID] = trModes[transformMode].first < NUM_TRAFO_MODES_MTS ? 0 : trModes[transformMode].first - NUM_TRAFO_MODES_MTS - 3 * factor + 1;
+            tu.lfnstIntra[compID] = trModes[transformMode].first < (NUM_TRAFO_MODES_MTS + 3) ? 0 : (trModes[transformMode].first < (NUM_TRAFO_MODES_MTS + 6) ? 1 : 2);
+#else
             tu.lfnstIdx[compID] = trModes[transformMode].first < NUM_TRAFO_MODES_MTS
                                     ? 0
                                     : trModes[transformMode].first - NUM_TRAFO_MODES_MTS + 1;
+#endif
+#if JVET_AI0050_SBT_LFNST
+            if ((compID == COMPONENT_Y && !cu.sbtInfo) || (!tu.noResidual && compID == COMPONENT_Y && cu.sbtInfo))
+#else
             if (compID == COMPONENT_Y)
+#endif
             {
               tu.cu->lfnstIdx = tu.lfnstIdx[compID];
+#if JVET_AI0050_INTER_MTSS
+              tu.cu->lfnstIntra = tu.lfnstIntra[compID];
+#endif
             }
 #else
             tu.mtsIdx[compID] = trModes[transformMode].first;
@@ -13502,13 +13576,30 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
             if( transformMode == 0 )
             {
 #if JVET_AG0061_INTER_LFNST_NSPT
+#if JVET_AI0050_INTER_MTSS
+              m_pcTrQuant->transformNxN(tu, compID, cQP, &trModes, m_pcEncCfg->getMTSInterMaxCand() + 6);
+#else
               m_pcTrQuant->transformNxN(tu, compID, cQP, &trModes, m_pcEncCfg->getMTSInterMaxCand() + 3);
+#endif
               tu.mtsIdx[compID] = trModes[0].first < NUM_TRAFO_MODES_MTS ? trModes[0].first : 0;
+#if JVET_AI0050_INTER_MTSS
+              int factor = (trModes[0].first - NUM_TRAFO_MODES_MTS) / 3;
+              tu.lfnstIdx[compID] = trModes[0].first < NUM_TRAFO_MODES_MTS ? 0 : trModes[0].first - NUM_TRAFO_MODES_MTS - 3 * factor + 1;
+              tu.lfnstIntra[compID] = trModes[0].first < (NUM_TRAFO_MODES_MTS + 3) ? 0 : (trModes[0].first < (NUM_TRAFO_MODES_MTS + 6) ? 1 : 2);
+#else
               tu.lfnstIdx[compID] =
                 trModes[0].first < NUM_TRAFO_MODES_MTS ? 0 : trModes[0].first - NUM_TRAFO_MODES_MTS + 1;
+#endif
+#if JVET_AI0050_SBT_LFNST
+              if ((compID == COMPONENT_Y && !tu.cu->sbtInfo) || (!tu.noResidual && compID == COMPONENT_Y && tu.cu->sbtInfo))
+#else
               if (compID == COMPONENT_Y)
+#endif
               {
                 tu.cu->lfnstIdx = tu.lfnstIdx[compID];
+#if JVET_AI0050_INTER_MTSS
+                tu.cu->lfnstIntra = tu.lfnstIntra[compID];
+#endif
               }
 #else
               m_pcTrQuant->transformNxN(tu, compID, cQP, &trModes, m_pcEncCfg->getMTSInterMaxCand());
@@ -13880,7 +13971,11 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
 #endif
           }
 #if JVET_AG0061_INTER_LFNST_NSPT
+#if JVET_AI0050_SBT_LFNST
+          else if ((cu.mtsFlag && compID == COMPONENT_Y) || (transformMode > 0) || (cu.lfnstFlag && !tu.noResidual && compID == COMPONENT_Y))
+#else
           else if ((cu.mtsFlag && compID == COMPONENT_Y) || (transformMode > 0) || (cu.lfnstFlag && compID == COMPONENT_Y))
+#endif
 #elif JVET_AA0133_INTER_MTS_OPT
           else if ((cu.mtsFlag && compID == COMPONENT_Y) || (transformMode > 0))
 #else
@@ -13963,7 +14058,11 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
       if (compID == 0)
       {
 #if JVET_AG0061_INTER_LFNST_NSPT
+#if JVET_AI0050_SBT_LFNST
+        if (cu.mtsFlag || (cu.lfnstFlag && !bestTU.noResidual))
+#else
         if (cu.mtsFlag || cu.lfnstFlag)
+#endif
 #else
         if (cu.mtsFlag)
 #endif
@@ -13989,9 +14088,16 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
       // copy component
       tu.copyComponentFrom(bestTU, compID);
 #if JVET_AG0061_INTER_LFNST_NSPT
+#if JVET_AI0050_SBT_LFNST
+      if ((compID == COMPONENT_Y && !tu.cu->sbtInfo) || (!tu.noResidual && compID == COMPONENT_Y && tu.cu->sbtInfo))
+#else
       if (compID == COMPONENT_Y)
+#endif
       {
         tu.cu->lfnstIdx = tu.lfnstIdx[compID];
+#if JVET_AI0050_INTER_MTSS
+        tu.cu->lfnstIntra = tu.lfnstIntra[compID];
+#endif
       }
 #endif
       csFull->getResiBuf( compArea ).copyFrom( saveCS.getResiBuf( compArea ) );
@@ -14647,12 +14753,34 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
     else
       THROW( "Implicit TU split not available!" );
 
+#if JVET_AI0050_SBT_LFNST
+    bool isValid = false;
+#endif
     do
     {
+#if JVET_AI0050_SBT_LFNST
+      if (cu.sbtInfo)
+      {
+        bool isSubValid = false;
+        isSubValid = xEstimateInterResidualQT(*csSplit, partitioner, bCheckFull ? nullptr : puiZeroDist, luma, chroma, orgResi);
+        if (!csSplit->tus.back()->noResidual)
+        {
+          isValid = isSubValid;
+        }
+      }
+      else
+      {
+        xEstimateInterResidualQT(*csSplit, partitioner, bCheckFull ? nullptr : puiZeroDist
+          , luma, chroma
+          , orgResi
+        );
+      }
+#else
       xEstimateInterResidualQT(*csSplit, partitioner, bCheckFull ? nullptr : puiZeroDist
         , luma, chroma
         , orgResi
       );
+#endif
 
       csSplit->cost = m_pcRdCost->calcRdCost( csSplit->fracBits, csSplit->dist );
     } while( partitioner.nextPart( *csSplit ) );
@@ -14666,6 +14794,12 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
     {
       for( auto &currTU : csSplit->traverseTUs( currArea, partitioner.chType ) )
       {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        if ( currTU.chType != partitioner.chType )
+        {
+          continue;
+        }
+#endif
         for( unsigned ch = 0; ch < numTBlocks; ch++ )
         {
           compCbf[ ch ] |= ( TU::getCbfAtDepth( currTU, ComponentID(ch), currDepth + 1 ) ? 1 : 0 );
@@ -14723,6 +14857,12 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
       csSplit->releaseIntermediateData();
       csFull ->releaseIntermediateData();
     }
+#if JVET_AI0050_SBT_LFNST
+    if (cu.sbtInfo)
+    {
+      return isValid;
+    }
+#endif
   }
 #if JVET_AA0133_INTER_MTS_OPT
   return true;
@@ -14809,7 +14949,7 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
       clpRngs.comp[COMPONENT_Y].min = cu.cs->slice->getLumaPelMin();
       clpRngs.comp[COMPONENT_Y].max = cu.cs->slice->getLumaPelMax();
     }
-    cs.getRecoBuf().copyClip(cs.getRecoBuf(), clpRngs);
+    cs.getRecoBuf().copyClip(cs.getRecoBuf(), clpRngs, luma && !chroma, !luma && chroma);
 #endif
 
     // add empty TU(s)
@@ -14929,7 +15069,11 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
 
     PredictionUnit &pu = *cs.getPU( partitioner.chType );
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    m_CABACEstimator->cu_skip_flag  ( cu, partitioner );
+#else
     m_CABACEstimator->cu_skip_flag  ( cu );
+#endif
     m_CABACEstimator->merge_data(pu);
 #if INTER_LIC
     m_CABACEstimator->cu_lic_flag(cu);
@@ -15823,7 +15967,11 @@ uint64_t InterSearch::xGetSymbolFracBitsInter(CodingStructure &cs, Partitioner &
   {
     cu.skip = true;
     CHECK(cu.colorTransform, "ACT should not be enabled for skip mode");
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    m_CABACEstimator->cu_skip_flag  ( cu, partitioner );
+#else
     m_CABACEstimator->cu_skip_flag  ( cu );
+#endif
     if (cu.firstPU->ciipFlag)
     {
       // CIIP shouldn't be skip, the upper level function will deal with it, i.e. setting the overall cost to MAX_DOUBLE
@@ -15839,8 +15987,13 @@ uint64_t InterSearch::xGetSymbolFracBitsInter(CodingStructure &cs, Partitioner &
     CHECK( cu.skip, "Skip flag has to be off at this point!" );
 
     if (cu.Y().valid())
-    m_CABACEstimator->cu_skip_flag( cu );
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    m_CABACEstimator->cu_skip_flag( cu, partitioner );
+    m_CABACEstimator->pred_mode   ( cu, partitioner );
+#else
+      m_CABACEstimator->cu_skip_flag( cu );
     m_CABACEstimator->pred_mode   ( cu );
+#endif
     m_CABACEstimator->cu_pred_data( cu );
     CUCtx cuCtx;
     cuCtx.isDQPCoded = true;

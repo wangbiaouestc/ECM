@@ -78,6 +78,12 @@ class TempLibFast
 public:
   int   m_pX;           //offset X
   int   m_pY;           //offset Y
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  Mv    m_windTL;       // TL offset of refine window
+  Mv    m_windBR;       // BR offset of refine window
+  bool m_isTransferredLeft;
+  bool m_isTransferredTop;
+#endif
 #if JVET_AD0086_ENHANCED_INTRA_TMP
   int   m_rId;
 #else
@@ -88,10 +94,20 @@ public:
   TempLibFast();
   ~TempLibFast();
 #if JVET_AD0086_ENHANCED_INTRA_TMP
-  TempLibFast(const int pX, const int pY, const int rId)
+  TempLibFast(const int pX, const int pY
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+    , const Mv windTL, const Mv windBR, const bool isTransferredLeft, const bool isTransferredTop
+#endif
+    , const int rId)
   {
     m_pX = pX;
     m_pY = pY;
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+    m_windTL = windTL;
+    m_windBR = windBR;
+    m_isTransferredLeft = isTransferredLeft;
+    m_isTransferredTop = isTransferredTop;
+#endif
     m_rId = rId;
   };
 #endif
@@ -105,6 +121,24 @@ public:
   int   getDiffMax                    ()       { return m_diffMax; }
 #endif
 };
+
+#if JVET_AD0086_ENHANCED_INTRA_TMP
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+class TempLibFracFast
+{
+public:
+  int   m_subpel;
+  int   m_fracDir;
+
+  TempLibFracFast();
+  ~TempLibFracFast();
+  TempLibFracFast(const int pPrec, const int pDirt)
+  {
+    m_subpel = pPrec, m_fracDir = pDirt;
+  }; 
+};
+#endif
+#endif
 
 typedef short TrainDataType;
 #endif
@@ -251,6 +285,14 @@ public:
   uint8_t m_intraNonMPM[NUM_NON_MPM_MODES];
 #endif
 
+#if JVET_AH0209_PDP
+  Pel* m_pdpIntraPredBufIP[NUM_LUMA_MODE];
+  bool m_pdpIntraPredReady[NUM_LUMA_MODE];
+  Pel m_ref[256] = {0};
+  Pel m_refShort[256] = {0};
+  bool m_refAvailable;
+#endif
+
 protected:
 #if JVET_AC0094_REF_SAMPLES_OPT
   Pel m_refBuffer[MAX_NUM_COMPONENT][NUM_PRED_BUF][((MAX_CU_SIZE << 3) + 1 + MAX_REF_LINE_IDX) * 2];
@@ -314,6 +356,9 @@ private:
 #if JVET_W0123_TIMD_FUSION
   static const uint8_t m_aucIntraFilterExt[MAX_INTRA_FILTER_DEPTHS];
   RdCost* m_timdSatdCost;
+#endif
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  RdCost* m_itmpSatdCost;
 #endif
 #if JVET_AC0071_DBV
   RdCost *m_dbvSadCost;
@@ -419,12 +464,24 @@ protected:
   std::vector<PelStorage>   m_intraPredBuffer;
   Pel tempRefAbove[(MAX_CU_SIZE << 3) + 5 + 33 * MAX_REF_LINE_IDX];
   Pel tempRefLeft[(MAX_CU_SIZE << 3) + 5 + 33 * MAX_REF_LINE_IDX];
-
+#if JVET_AH0209_PDP
+  bool (*m_xPredIntraOpt)(PelBuf &pDst, const PredictionUnit &pu, const uint32_t modeIdx, const ClpRng& clpRng, Pel* refF, Pel* refS);
+  static bool xPredIntraOpt(PelBuf &pDst, const PredictionUnit &pu, const uint32_t modeIdx, const ClpRng& clpRng, Pel* refF, Pel* refS);
+#endif
 #if JVET_V0130_INTRA_TMP
   int          m_uiPartLibSize;
 #if JVET_AD0086_ENHANCED_INTRA_TMP
   static_vector<TempLibFast, MTMP_NUM> m_mtmpCandList;
   static_vector<uint64_t, MTMP_NUM>    m_mtmpCostList;
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+  static_vector<TempLibFracFast, TMP_BV_REORDER_MAX> m_mtmpFracCandList[MTMP_NUM];
+  static_vector<uint64_t, TMP_BV_REORDER_MAX>    m_mtmpFracCostList[MTMP_NUM];
+  int m_log2SizeTop;
+  int m_log2SizeLeft;
+  int m_sizeTopLeft;
+  int m_topMeanTar;
+  int m_leftMeanTar;
+#endif
 #if JVET_AG0136_INTRA_TMP_LIC
   static_vector<TempLibFast, MTMP_NUM> m_mtmpCandListUseMR;
   static_vector<uint64_t, MTMP_NUM>    m_mtmpCostListUseMR;
@@ -436,7 +493,11 @@ protected:
   Picture*     m_refPicBuf;
   unsigned int m_uiPicStride;
   unsigned int m_uiVaildCandiNum;
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  Pel* m_pppTarPatch;
+#else
   Pel***       m_pppTarPatch;
+#endif
 #endif
 
 #if TMP_FAST_ENC
@@ -500,6 +561,13 @@ protected:
 #endif
 
   void xFillReferenceSamples      ( const CPelBuf &recoBuf,      Pel* refBufUnfiltered, const CompArea &area, const CodingUnit &cu );
+
+#if JVET_AH0136_CHROMA_REORDERING
+  void xFillReferenceSamplesForCoLuma(const CPelBuf &recoBuf, Pel* refBufUnfiltered, const CompArea &area, const CodingUnit &cu);
+#endif
+#if JVET_AH0209_PDP
+  void xFillReferenceSamples2(const CPelBuf &recoBuf, const CompArea &area, const CodingUnit &cu);
+#endif
   void xFilterReferenceSamples(const Pel *refBufUnfiltered, Pel *refBufFiltered, const CompArea &area, const SPS &sps,
                                int multiRefIdx
   );
@@ -534,6 +602,9 @@ public:
 #endif
 #if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
   std::vector<Mv> m_bvBasedMergeCandidates;
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+  std::vector<Mv> m_sgpmMvBasedMergeCandidates;
+#endif
 #endif
 #if LMS_LINEAR_MODEL && MMLM
   struct MMLMParameters
@@ -664,7 +735,11 @@ public:
   void   xCflmCalcModels(const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, CccmModel& cflmModel, int modelId, int modelThr);
   void   xCflmApplyModel(const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, CccmModel& cflmModel, int modelId, int modelThr, PelBuf& piPred);
   void   xCflmCreateLumaRef       (const PredictionUnit& pu, const CompArea& chromaArea);
-  bool   xCflmCreateChromaPred    (const PredictionUnit& pu, const ComponentID compId, PelBuf& piPred);
+  bool   xCflmCreateChromaPred    (const PredictionUnit& pu, const ComponentID compId, PelBuf& piPred
+#if JVET_AH0136_CHROMA_REORDERING
+    , InterPrediction *pcInterPred
+#endif
+  );
   PelBuf xCflmGetRefBuf           (const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea, int& areaWidth, int& areaHeight, int& refSizeX, int& refSizeY, int& refPosPicX, int& refPosPicY) const;
   PelBuf xCflmGetPuBuf            (const PredictionUnit& pu, const ComponentID compId, const CompArea& chromaArea) const;
   int    xCflmCalcRefAver         (const PredictionUnit& pu, const CompArea& chromaArea);
@@ -738,15 +813,22 @@ public:
 #endif
 
 #if ENABLE_DIMD
-#if JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
-  static int deriveDimdIntraTmpModePred(const CodingUnit cu, CPelBuf predBuf); // using prediction samples
-#endif
   static void deriveDimdMode      (const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu);
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
   static void deriveDimdChromaMode(const CPelBuf &recoBufY, const CPelBuf &recoBufCb, const CPelBuf &recoBufCr, const CompArea &areaY, const CompArea &areaCb, const CompArea &areaCr, CodingUnit &cu);
+#if JVET_AH0136_CHROMA_REORDERING
+   void deriveNonCcpChromaModes(const CPelBuf &recoBufY, const CPelBuf &recoBufCb, const CPelBuf &recoBufCr, const CompArea &areaY, const CompArea &areaCb, const CompArea &areaCr, CodingUnit &cu, PredictionUnit &pu, InterPrediction *pcInterPred);
+   void buildChromaModeList(const CompArea &area, CodingUnit &cu, PredictionUnit &pu, uint8_t chromaList[NUM_CHROMA_LIST_MODE], int &existNum, bool &hasDBV);
+   void predCoLuma(const CompArea &area, const CPelBuf &recoBuf, PredictionUnit &pu, uint8_t predMode, PelBuf predBuf, InterPrediction *pcInterPred, CodingUnit &chromaCu);
+   void predChromaTM(const CompArea &areaCb, const CompArea &areaCr, PredictionUnit &pu, uint8_t predMode, PelBuf predCb, PelBuf predCr, TemplateType eTplType, InterPrediction *pcInterPred);
 #endif
-#if JVET_AB0067_MIP_DIMD_LFNST && ENABLE_DIMD
-  static int deriveDimdMipMode(PelBuf& reducedPred, int width, int height, CodingUnit& cu);
+#endif
+#if ENABLE_DIMD && (JVET_AB0067_MIP_DIMD_LFNST || JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST || JVET_AG0058_EIP || JVET_AG0061_INTER_LFNST_NSPT)
+  static int deriveIpmForTransform(CPelBuf predBuf, CodingUnit& cu
+#if JVET_AI0050_INTER_MTSS
+    , int &secondMode
+#endif
+  );
 #endif
 #if !JVET_AG0061_INTER_LFNST_NSPT
   static int  buildHistogram      ( const Pel *pReco, int iStride, uint32_t uiHeight, uint32_t uiWidth, int* piHistogram, int direction, int bw, int bh );
@@ -763,7 +845,11 @@ public:
   );
 #if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
   void predTimdIbcItmp(const ComponentID compId, const PredictionUnit& pu, Mv Bv, Pel* pPred, uint32_t uiStride, uint32_t iWidth, uint32_t iHeight, TemplateType eTempType, int32_t iTemplateWidth, int32_t iTemplateHeight, Pel* piOrg, int orgStride);
-  void predUsingBv(Pel* piPred, unsigned int uiStride, Mv Bv, CodingUnit cu);
+  void predUsingBv(Pel* piPred, unsigned int uiStride, Mv Bv, CodingUnit cu
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+  , bool isIntBv = true
+#endif  
+  );
 #endif
   void xIntraPredTimdAngLuma(Pel* pDstBuf, const ptrdiff_t dstStride, Pel* refMain, int width, int height, int deltaPos, int intraPredAngle, const ClpRng& clpRng, int xOffset, int yOffset);
 #if JVET_AC0119_LM_CHROMA_FUSION
@@ -888,7 +974,9 @@ public:
   void       clearPrefilledIntraGPMRefTemplate () {memset(&m_abFilledIntraGPMRefTpl[0], 0, sizeof(m_abFilledIntraGPMRefTpl));}
 #endif
   // Angular Intra
-#if JVET_AB0157_INTRA_FUSION
+#if JVET_AH0209_PDP
+  void predIntraAng(const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu, const bool applyFusion = true, const bool applyPDPFilter = true);
+#elif JVET_AB0157_INTRA_FUSION
   void predIntraAng               ( const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu, const bool applyFusion = true);
 #else
   void predIntraAng               ( const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu);
@@ -980,7 +1068,11 @@ public:
   void geneIntrainterPred         (const CodingUnit &cu, PelStorage& pred);
 #if JVET_Z0050_DIMD_CHROMA_FUSION
 #if JVET_AD0188_CCP_MERGE
-  void geneChromaFusionPred       (const ComponentID compId, PelBuf &piPred, PredictionUnit &pu);
+  void geneChromaFusionPred       (const ComponentID compId, PelBuf &piPred, PredictionUnit &pu
+#if JVET_AH0136_CHROMA_REORDERING
+    , InterPrediction *pcInterPred = NULL
+#endif
+  );
 #else
   void geneChromaFusionPred       (const ComponentID compId, PelBuf &piPred, const PredictionUnit &pu);
 #endif
@@ -1008,16 +1100,34 @@ public:
 #if JVET_W0069_TMP_BOUNDARY
 #if JVET_AD0086_ENHANCED_INTRA_TMP
 #if JVET_AG0136_INTRA_TMP_LIC
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  void (*m_calcTemplateDiffJointSadMrsad) (const Pel* const ref, const unsigned int uiStride, Pel* tarPatch, int tarStride, const unsigned int uiPatchWidth, const unsigned int uiPatchHeight, int* diffSad, int* diffMrsad, int* iMaxSad, int* iMaxMrsad, const RefTemplateType tempType, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, const int topTargetMean, const int leftTargetMean, const int licShift);
+  void(*m_calcTargetMean)           (Pel* tarPatch, int tarStride, const unsigned int uiPatchWidth, const unsigned int uiPatchHeight, const RefTemplateType tempType, const int requiredTemplate, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, int& topTargetMean, int& leftTargetMean);
+  static void calcTemplateDiffJointSadMrsad(const Pel* const ref, const unsigned int uiStride, Pel* tarPatch, int tarStride, const unsigned int uiPatchWidth, const unsigned int uiPatchHeight, int* diffSad, int* diffMrsad, int* iMaxSad, int* iMaxMrsad, const RefTemplateType tempType, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, const int topTargetMean, const int leftTargetMean, const int licShift);
+  static void calcTargetMean(Pel* tarPatch, int tarStride, const unsigned int uiPatchWidth, const unsigned int uiPatchHeight, const RefTemplateType tempType, const int requiredTemplate, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, int& topTargetMean, int& leftTargetMean);
+#else
   void (*m_calcTemplateDiffJointSadMrsad) (const Pel* const ref, const unsigned int uiStride, Pel** tarPatch, const unsigned int uiPatchWidth, const unsigned int uiPatchHeight, int* diffSad, int* diffMrsad, int* iMaxSad, int* iMaxMrsad, const RefTemplateType tempType, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, const int topTargetMean, const int leftTargetMean);
   void(*m_calcTargetMean)           (Pel** tarPatch, const unsigned int uiPatchWidth, const unsigned int uiPatchHeight, const RefTemplateType tempType, const int requiredTemplate, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, int& topTargetMean, int& leftTargetMean);
   static void calcTemplateDiffJointSadMrsad(const Pel* const ref, const unsigned int uiStride, Pel** tarPatch, const unsigned int uiPatchWidth, const unsigned int uiPatchHeight, int* diffSad, int* diffMrsad, int* iMaxSad, int* iMaxMrsad, const RefTemplateType tempType, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, const int topTargetMean, const int leftTargetMean);
   static void calcTargetMean(Pel** tarPatch, const unsigned int uiPatchWidth, const unsigned int uiPatchHeight, const RefTemplateType tempType, const int requiredTemplate, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, int& topTargetMean, int& leftTargetMean);
+#endif //
 #endif
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  void(*m_calcTemplateDiff)      (Pel* ref, unsigned int uiStride, Pel* tarPatch, int tarStride, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int* diff, int* iMax, RefTemplateType TempType, int requiredTemplate
+#else
   void(*m_calcTemplateDiff)      (Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int *diff, int *iMax, RefTemplateType TempType, int requiredTemplate
+#endif
 #if JVET_AG0136_INTRA_TMP_LIC
                                   , const bool isMrSad, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, const int topTargetMean, const int leftTargetMean
 #endif
                                   );
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  static void calcTemplateDiff(Pel* ref, unsigned int uiStride, Pel* tarPatch, int tarStride, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int* diff, int* iMax, RefTemplateType TempType, int requiredTemplate
+#if JVET_AG0136_INTRA_TMP_LIC
+                               , const bool isMrSad, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, const int topTargetMean, const int leftTargetMean
+#endif
+                               );
+#else
   static void calcTemplateDiff(Pel *ref, unsigned int uiStride, Pel **tarPatch, unsigned int uiPatchWidth,
                                unsigned int uiPatchHeight, int *diff, int *iMax, RefTemplateType TempType,
                                int requiredTemplate
@@ -1025,6 +1135,7 @@ public:
                                , const bool isMrSad, const int log2SizeTop, const int log2SizeLeft, const int sizeTopLeft, const int topTargetMean, const int leftTargetMean
 #endif
                                );
+#endif
 #else
   int( *m_calcTemplateDiff )      ( Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int iMax, RefTemplateType TempType );
   static int calcTemplateDiff     ( Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int iMax, RefTemplateType TempType );
@@ -1033,7 +1144,11 @@ public:
   int( *m_calcTemplateDiff )      (Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int iMax);
   static int calcTemplateDiff     ( Pel* ref, unsigned int uiStride, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, int iMax );
 #endif
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  Pel* getTargetPatch() { return m_pppTarPatch; }
+#else
   Pel** getTargetPatch            ( unsigned int uiDepth )      { return m_pppTarPatch[uiDepth]; }
+#endif
   Pel* getRefPicUsed              ()                            { return m_refPicUsed;           }
   void setRefPicUsed              ( Pel* ref )                  { m_refPicUsed = ref;            }
   unsigned int getStride          ()                            { return m_uiPicStride;          }
@@ -1041,7 +1156,11 @@ public:
 
 #if JVET_W0069_TMP_BOUNDARY
   RefTemplateType getRefTemplateType ( CodingUnit& cu, CompArea& area );
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  void searchCandidateFromOnePicIntra(CodingUnit* pcCU, Pel* tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, RefTemplateType tempType
+#else
   void searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, RefTemplateType tempType
+#endif
 #if JVET_AG0136_INTRA_TMP_LIC
                                       , const bool useMR
 #endif
@@ -1054,6 +1173,17 @@ public:
                                       , const bool bJointCalc
 #endif
                                       );
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+  void xPadForFracSearchInterpolation (CodingUnit* pcCU, RefTemplateType tempType);
+  void xTmpFracSearchIF(PredictionUnit& pu, Pel* padbf0, unsigned int padStride, Pel* preTmpbf0, unsigned int predTempStride, Pel* tmp0, unsigned int tmpStride, int extUiWidth, int extUiHeight, int fracPrec, int fracDir);
+#if JVET_AI0129_INTRA_TMP_OVERLAPPING_REFINEMENT
+  void searchFracCandidate(CodingUnit* pcCU, Pel* tarPatch, RefTemplateType tempType);
+#else
+  void searchFracCandidate( CodingUnit* pcCU, Pel** tarPatch, RefTemplateType tempType);
+#endif
+  InterPrediction *m_pcInterPred;
+  void setInterPrediction( InterPrediction *inter);
+#endif
 #else
   void searchCandidateFromOnePicIntra( CodingUnit* pcCU, Pel** tarPatch, unsigned int uiPatchWidth, unsigned int uiPatchHeight, );
   void candidateSearchIntra          ( CodingUnit* pcCU, unsigned int uiBlkWidth, unsigned int uiBlkHeight );
@@ -1140,6 +1270,9 @@ public:
     }
 #if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
     m_bvBasedMergeCandidates.clear();
+#endif
+#if JVET_AH0200_INTRA_TMP_BV_REORDER
+    m_sgpmMvBasedMergeCandidates.clear();
 #endif
   }
   void initTmpFlmParams()

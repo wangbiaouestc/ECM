@@ -146,6 +146,9 @@ void Partitioner::setCUData( CodingUnit& cu )
   cu.depth       = currDepth;
   cu.btDepth     = currBtDepth;
   cu.mtDepth     = currMtDepth;
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  cu.mtImplicitDepth = currImplicitBtDepth;
+#endif
   cu.qtDepth     = currQtDepth;
   cu.splitSeries = getSplitSeries();
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
@@ -191,6 +194,13 @@ void AdaptiveDepthPartitioner::setMaxMinDepth( unsigned& minDepth, unsigned& max
 
   minDepth = stdMaxDepth;
   maxDepth = stdMinDepth;
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  if ( !cs.slice->isIntra() && cuLeft       != nullptr && cuLeft->predMode       == MODE_INTRA && cuLeft->isSST       && cuLeft->separateTree       ) { cuLeft       = nullptr; }
+  if ( !cs.slice->isIntra() && cuBelowLeft  != nullptr && cuBelowLeft->predMode  == MODE_INTRA && cuBelowLeft->isSST  && cuBelowLeft->separateTree  ) { cuBelowLeft  = nullptr; }
+  if ( !cs.slice->isIntra() && cuAbove      != nullptr && cuAbove->predMode      == MODE_INTRA && cuAbove->isSST      && cuAbove->separateTree      ) { cuAbove      = nullptr; }
+  if ( !cs.slice->isIntra() && cuAboveRight != nullptr && cuAboveRight->predMode == MODE_INTRA && cuAboveRight->isSST && cuAboveRight->separateTree ) { cuAboveRight = nullptr; }
+#endif
 
   if( cuLeft )
   {
@@ -379,9 +389,157 @@ void QTBTPartitioner::splitCurrArea( const PartSplit split, const CodingStructur
     currQgChromaPos = currArea().chromaPos();
 }
 
-void QTBTPartitioner::canSplit( const CodingStructure &cs, bool& canNo, bool& canQt, bool& canBh, bool& canBv, bool& canTh, bool& canTv )
+void QTBTPartitioner::canSplit( const CodingStructure &cs, bool& canNo, bool& canQt, bool& canBh, bool& canBv, bool& canTh, bool& canTv
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  , unsigned& maxMtt
+#endif
+)
 {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  PartSplit implicitSplit = m_partStack.back().checkdIfImplicit ? m_partStack.back().implicitSplit : getImplicitSplit( cs );
+  if ( cs.slice->isIntra() && cs.slice->getSeparateTreeEnabled() && !cs.slice->getProcessingIntraRegion() && ( currArea().lwidth() <= 256 && currArea().lheight() <= 256 ) )
+  {
+    implicitSplit = CU_DONT_SPLIT;
+  }
+#else
   const PartSplit implicitSplit = m_partStack.back().checkdIfImplicit ? m_partStack.back().implicitSplit : getImplicitSplit( cs );
+#endif
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  Picture* pColPic = cs.slice->getRefPic(RefPicList(cs.slice->isInterB() ? 1 - cs.slice->getColFromL0Flag() : 0), cs.slice->getColRefIdx());
+
+  unsigned maxBTD = cs.pcv->getMaxBtDepth(*cs.slice, chType) + currImplicitBtDepth;
+  unsigned maxBtSize = cs.pcv->getMaxBtSize(*cs.slice, chType);
+  unsigned minBtSize = cs.pcv->getMinBtSize(*cs.slice, chType);
+  unsigned maxTtSize = cs.pcv->getMaxTtSize(*cs.slice, chType);
+  unsigned minTtSize = cs.pcv->getMinTtSize(*cs.slice, chType);
+  unsigned minQtSize = cs.pcv->getMinQtSize(*cs.slice, chType);
+
+  canNo = canQt = canBh = canTh = canBv = canTv = true;
+  bool canBtt = currMtDepth < maxBTD;
+
+  maxMtt = maxBTD;
+
+  if ((!cs.slice->isIntra() && pColPic != NULL && pColPic->cs->slice != NULL)
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    && (cs.area.blocks[chType].contains(currArea().blocks[chType].pos().offset((currArea().blocks[chType].size().width) >> 1,
+      ((currArea().blocks[chType].size().height) >> 1)))
+      && pColPic->cs->area.blocks[chType].contains(currArea().blocks[chType].pos().offset((currArea().blocks[chType].size().width) >> 1,
+        ((currArea().blocks[chType].size().height) >> 1)))
+      )
+#else
+    && (pColPic->cs->area.Y().contains(currArea().blocks[chType].pos().offset((currArea().blocks[chType].lumaSize().width) >> 1,
+      ((currArea().blocks[chType].lumaSize().height) >> 1))))
+#endif
+    )
+  {
+    SplitPred currentSplitPred = pColPic->cs->getQtDepthInfo(currArea().blocks[chType].pos().offset((currArea().blocks[chType].lumaSize().width) >> 1,
+                                                             ((currArea().blocks[chType].lumaSize().height) >> 1)));
+
+    if (!cs.sps->getPLTMode() || (!pColPic->cs->slice->isIntra()))
+    {
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      if ((int)(currQtDepth + 1) < (int)(currentSplitPred.minqtDetphCol) && ((currMtDepth==0 && canQt) || !cs.slice->getSeparateTreeEnabled()) )
+#else
+      if ((int)(currQtDepth + 1) < (int)(currentSplitPred.minqtDetphCol))
+#endif
+      {
+        canBh = canTh = canBv = canTv = false;
+        canNo = false;
+      }
+    }
+    if (!cs.sps->getPLTMode())
+    {
+      if ((int)(currQtDepth + 1) < (int)(currentSplitPred.qtDetphCol))
+      {
+        if (currMtDepth == 0)
+        {
+          canBh = canBv = false;
+        }
+      }
+    }
+
+    if (pColPic->cs->slice->isIntra())
+    {
+      if ((cs.pcv->getMaxBtDepth(*cs.slice, chType) < currentSplitPred.maxBtDetphCol)
+        && (currQtDepth == currentSplitPred.qtDetphCol - 1)
+        )
+      {
+        if ((currentSplitPred.mttDetphCol >= (pColPic->maxTemporalBtDepth)))
+          maxBTD--;
+      }
+    }
+    if(cs.slice->getSPS()->getEnableMaxMttIncrease())
+    {
+      if (!pColPic->cs->slice->isIntra())
+      {
+        if ((cs.pcv->getMaxBtDepth(*cs.slice, chType) < currentSplitPred.maxBtDetphCol)
+          && (currQtDepth == currentSplitPred.qtDetphCol - 1)
+          )
+        {
+          if ((currentSplitPred.mttDetphCol == (pColPic->maxTemporalBtDepth >> 1))
+            && (((!pColPic->cs->slice->isIntra()) && (std::abs(cs.slice->getPic()->getPOC() - pColPic->getPOC()) <= 2) && cs.slice->getPic()->temporalId != pColPic->temporalId)
+              || ((pColPic->cs->slice->isIntra()) && (cs.slice->getPic()->temporalId == pColPic->temporalId))))
+          {
+            maxBTD++;
+          }
+        }
+      }
+
+      if ((cs.pcv->getMaxBtDepth(*cs.slice, chType) < currentSplitPred.maxBtDetphCol)
+        && (currQtDepth == currentSplitPred.qtDetphCol))
+      {
+        if ((currentSplitPred.mttDetphCol >= (pColPic->maxTemporalBtDepth >> 1)))
+          if (((!pColPic->cs->slice->isIntra()) && (std::abs(cs.slice->getPic()->getPOC() - pColPic->getPOC()) <= 2) && cs.slice->getPic()->temporalId != pColPic->temporalId)
+            || ((pColPic->cs->slice->isIntra()) && (cs.slice->getPic()->temporalId == pColPic->temporalId)))
+          {
+            maxBTD++;
+          }
+      }
+    }
+    if (!cs.sps->getPLTMode())
+    {
+      if ((uint8_t)log2(cs.sps->getCTUSize() / (minQtSize << 1)) >= cs.pcv->getMaxBtDepth(*cs.slice, chType))
+      {
+        if ((uint8_t)cs.pcv->getMaxBtDepth(*cs.slice, chType) == currentSplitPred.maxBtDetphCol)
+        {
+          if (((int)currQtDepth) > ((int)currentSplitPred.qtDetphCol))
+          {
+            if (maxBTD > 0)
+            {
+              maxBTD--;
+            }
+          }
+        }
+      }
+      if (cs.slice->getSliceQp() >= pColPic->cs->slice->getSliceQp())
+      {
+        if (cs.pcv->getMaxBtDepth(*cs.slice, chType) > currentSplitPred.maxBtDetphCol)
+        {
+          if (maxBTD > 0)
+          {
+            maxBTD--;
+          }
+        }
+        if (maxBTD > currentSplitPred.maxBtDetphCol)
+        {
+          if (maxBTD > 0)
+          {
+            maxBTD--;
+          }
+          if (maxBTD > currentSplitPred.maxBtDetphCol)
+          {
+            if (maxBTD > 0)
+            {
+              maxBTD--;
+            }
+          }
+        }
+      }
+    }
+    maxMtt = maxBTD;
+    canBtt = currMtDepth < maxBTD;
+  }
+#else
 
   const unsigned maxBTD         = cs.pcv->getMaxBtDepth( *cs.slice, chType ) + currImplicitBtDepth;
   const unsigned maxBtSize      = cs.pcv->getMaxBtSize ( *cs.slice, chType );
@@ -392,6 +550,7 @@ void QTBTPartitioner::canSplit( const CodingStructure &cs, bool& canNo, bool& ca
 
   canNo = canQt = canBh = canTh = canBv = canTv = true;
   bool canBtt = currMtDepth < maxBTD;
+#endif
 
   // the minimal and maximal sizes are given in luma samples
   const CompArea&  area  = currArea().Y();
@@ -498,6 +657,13 @@ void QTBTPartitioner::canSplit( const CodingStructure &cs, bool& canNo, bool& ca
 #if !INTER_RM_SIZE_CONSTRAINTS
   if( modeType == MODE_TYPE_INTER && area.width * area.height == 64 )  canTv = canTh = false;
 #endif
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  if (!cs.slice->isIntra() && cs.slice->getSeparateTreeEnabled() && cs.slice->getProcessingIntraRegion() && chType==CHANNEL_TYPE_CHROMA)
+  {
+    canTv=false;
+    canTh=false;
+  }
+#endif
 }
 
 bool QTBTPartitioner::canSplit( const PartSplit split, const CodingStructure &cs )
@@ -507,7 +673,12 @@ bool QTBTPartitioner::canSplit( const PartSplit split, const CodingStructure &cs
 
   bool canNo, canQt, canBh, canTh, canBv, canTv;
 
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  unsigned maxMtt;
+  canSplit( cs, canNo, canQt, canBh, canBv, canTh, canTv, maxMtt );
+#else
   canSplit( cs, canNo, canQt, canBh, canBv, canTh, canTv );
+#endif
   switch( split )
   {
   case CTU_LEVEL:
@@ -608,6 +779,12 @@ PartSplit QTBTPartitioner::getImplicitSplit( const CodingStructure &cs )
     }
   }
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  if ( cs.slice->isIntra() && cs.slice->getSeparateTreeEnabled() && !cs.slice->getProcessingIntraRegion() && ( currArea().Y().width > 256 || currArea().Y().height > 256 ) )
+  {
+    split = CU_QUAD_SPLIT;
+  }
+#endif
   m_partStack.back().checkdIfImplicit = true;
   m_partStack.back().isImplicit = split != CU_DONT_SPLIT;
   m_partStack.back().implicitSplit = split;

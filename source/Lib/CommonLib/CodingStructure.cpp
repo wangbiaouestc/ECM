@@ -76,6 +76,23 @@ CodingStructure::CodingStructure(CUCache& cuCache, PUCache& puCache, TUCache& tu
 #else
   , resetIBCBuffer (false)
 #endif
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  , m_lumaCUs       ( nullptr )      
+  , m_lumaPUs       ( nullptr )      
+  , m_lumaTUs       ( nullptr )      
+  , m_lumaUnitScale ( nullptr )
+  , m_lumaArea      ( nullptr )     
+  , m_lumaCuIdx     ( nullptr )    
+  , m_lumaPuIdx     ( nullptr )    
+  , m_lumaTuIdx     ( nullptr )    
+  , m_lumaParent    ( nullptr )    
+  , m_bestCU        ( nullptr )
+  , m_lastCodedCU   ( nullptr )
+  , m_savedCost     ( MAX_DOUBLE )
+  , m_lumaFracBits  ( MAX_UINT )
+  , m_lumaDist      ( MAX_UINT )
+  , m_lumaCost      ( MAX_DOUBLE )
+#endif
 {
   for( uint32_t i = 0; i < MAX_NUM_COMPONENT; i++ )
   {
@@ -115,6 +132,9 @@ CodingStructure::CodingStructure(CUCache& cuCache, PUCache& puCache, TUCache& tu
 #else
   m_motionBuf     = nullptr;
 #endif
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  currQtDepthBuf  = nullptr;
+#endif
 
 #if JVET_AE0043_CCP_MERGE_TEMPORAL
   m_ccpmIdxBuf = nullptr;
@@ -152,6 +172,9 @@ CodingStructure::CodingStructure(CUCache& cuCache, PUCache& puCache, TUCache& tu
 #if JVET_Z0118_GDR
   picHeader = nullptr;
   m_gdrEnabled = false;
+#endif
+#if JVET_AI0183_MVP_EXTENSION
+  m_intersectingMvBuf = nullptr;
 #endif
 }
 
@@ -195,6 +218,10 @@ void CodingStructure::destroy()
   delete[] m_motionBuf;
   m_motionBuf = nullptr;
 #endif
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  delete[] currQtDepthBuf;
+  currQtDepthBuf = nullptr;
+#endif 
 
 #if JVET_AE0043_CCP_MERGE_TEMPORAL
   if (m_ccpmIdxBuf)
@@ -279,6 +306,13 @@ void CodingStructure::destroyTemporaryCsData()
   }
   m_cuCache.cache(cus);
   m_numCUs = 0;
+#if JVET_AI0183_MVP_EXTENSION
+  if (m_intersectingMvBuf != nullptr)
+  {
+    delete[] m_intersectingMvBuf;
+    m_intersectingMvBuf = nullptr;
+  }
+#endif
 }
 
 void CodingStructure::createTemporaryCsData(const bool isPLTused)
@@ -307,6 +341,9 @@ void CodingStructure::createTemporaryCsData(const bool isPLTused)
     mcMask[i] = (bool*)xMalloc(bool, extendLumaArea);
     mcMaskChroma[i] = (bool*)xMalloc(bool, extendLumaArea);
   }
+#endif
+#if JVET_AI0183_MVP_EXTENSION
+  m_intersectingMvBuf = new IntersectingMvData[unitScale[0].scale(area.blocks[0].size()).area()];
 #endif
 }
 
@@ -1111,6 +1148,47 @@ CodingUnit* CodingStructure::getCU( const Position &pos, const ChannelType effCh
   }
 }
 
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+CodingUnit* CodingStructure::getCUTempo(const Position& pos, const ChannelType effChType)
+{
+  const CompArea& _blk = area.blocks[effChType];
+#if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+  if (!_blk.contains(pos))
+#else
+  if (!_blk.contains(pos) || (treeType == TREE_C && effChType == CHANNEL_TYPE_LUMA))
+#endif
+  {
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+    //keep this check, which is helpful to identify bugs
+    if (treeType == TREE_C && effChType == CHANNEL_TYPE_LUMA)
+    {
+      CHECK(parent == nullptr, "parent shall be valid; consider using function getLumaCU()");
+      CHECK(parent->treeType != TREE_D, "wrong parent treeType ");
+    }
+#endif
+    if (parent)
+    {
+      return parent->getCU(pos, effChType);
+    }
+    else
+    {
+      return nullptr;
+    }
+  }
+  else
+  {
+    const unsigned idx = m_cuIdx[effChType][rsAddr(pos, _blk.pos(), _blk.width, unitScale[effChType])];
+    if (idx != 0)
+    {
+      return cus[idx - 1];
+    }
+    else
+    {
+      return nullptr;
+    }
+  }
+}
+#endif
 const CodingUnit* CodingStructure::getCU( const Position &pos, const ChannelType effChType ) const
 {
 #if JVET_Z0118_GDR
@@ -1394,7 +1472,11 @@ const TransformUnit * CodingStructure::getTU( const Position &pos, const Channel
   }
 }
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+CodingUnit& CodingStructure::addCU( const UnitArea &unit, const ChannelType chType, const PartSplit& implicitSplit )
+#else
 CodingUnit& CodingStructure::addCU( const UnitArea &unit, const ChannelType chType )
+#endif
 {
   CodingUnit *cu = m_cuCache.get();
 
@@ -1430,7 +1512,11 @@ CodingUnit& CodingStructure::addCU( const UnitArea &unit, const ChannelType chTy
 
   uint32_t numCh = ::getNumberValidChannels( area.chromaFormat );
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  for( uint32_t i = 0; i < numCh && implicitSplit == CU_DONT_SPLIT; i++ )
+#else
   for( uint32_t i = 0; i < numCh; i++ )
+#endif
   {
     if( !cu->blocks[i].valid() )
     {
@@ -1902,6 +1988,9 @@ void CodingStructure::createInternals(const UnitArea& _unit, const bool isTopLay
   m_motionBuf       = new MotionInfo[_lumaAreaScaled];
 #endif
 
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  currQtDepthBuf = new SplitPred[_lumaAreaScaled];
+#endif 
 #if JVET_AE0043_CCP_MERGE_TEMPORAL
   m_ccpmIdxBuf = new int[_lumaAreaScaled];
   m_ccpModelLUT.resize(0);
@@ -2407,6 +2496,12 @@ void CodingStructure::initSubStructure( CodingStructure& subStruct, const Channe
   subStruct.modeType  = modeType;
 #endif
   subStruct.initStructData( currQP[_chType] );
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  if ( slice->shouldCopyLumaCUs() )
+  {
+    copyLumaPointers( subStruct );
+  }
+#endif
 
   if( isTuEnc )
   {
@@ -2517,7 +2612,12 @@ void CodingStructure::useSubStructure( const CodingStructure& subStruct, const C
 
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
 #if JVET_AB0061_ITMP_BV_FOR_IBC
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  bool processingIntraRegion = ( slice->getSeparateTreeEnabled() && slice->getProcessingIntraRegion() ) ? true : false;
+  if( !subStruct.m_isTuEnc && (((!slice->isIntra()&& !processingIntraRegion ) || slice->getUseIBC() || slice->getSPS()->getUseIntraTMP()) && chType != CHANNEL_TYPE_CHROMA) )
+#else
   if (!subStruct.m_isTuEnc && ((!slice->isIntra() || slice->getUseIBC() || slice->getSPS()->getUseIntraTMP()) && chType != CHANNEL_TYPE_CHROMA))
+#endif
 #else
   if (!subStruct.m_isTuEnc && ((!slice->isIntra() || slice->getUseIBC()) && chType != CHANNEL_TYPE_CHROMA))
 #endif
@@ -2584,7 +2684,11 @@ void CodingStructure::useSubStructure( const CodingStructure& subStruct, const C
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
       CodingUnit &cu = addCU( cuPatch, pcu->chType );
 #else
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      CodingUnit &cu = addCU( cuPatch, pcu->chType );
+#else
       CodingUnit &cu = addCU(cuPatch, chType);
+#endif
 #endif
 
       // copy the CU info from subPatch
@@ -2606,7 +2710,11 @@ void CodingStructure::useSubStructure( const CodingStructure& subStruct, const C
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
       PredictionUnit &pu = addPU( puPatch, ppu->chType );
 #else
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      PredictionUnit &pu = addPU( puPatch, ppu->chType );
+#else
       PredictionUnit &pu = addPU(puPatch, chType);
+#endif
 #endif
       // copy the PU info from subPatch
       pu = *ppu;
@@ -2620,7 +2728,11 @@ void CodingStructure::useSubStructure( const CodingStructure& subStruct, const C
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
     TransformUnit &tu = addTU( tuPatch, ptu->chType );
 #else
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    TransformUnit &tu = addTU( tuPatch, ptu->chType );
+#else
     TransformUnit &tu = addTU(tuPatch, chType);
+#endif
 #endif
     // copy the TU info from subPatch
     tu = *ptu;
@@ -2819,6 +2931,9 @@ void CodingStructure::initStructData( const int &QP, const bool &skipMotBuf )
 #endif
   }
 
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+  getQTDepthBuf().memset(0);
+#endif
 #if JVET_W0123_TIMD_FUSION
 #if JVET_Z0118_GDR
   getIpmBuf(PIC_RECONSTRUCTION_0).memset(0);
@@ -2936,6 +3051,168 @@ const CMotionBuf CodingStructure::getMotionBuf( const Area& _area ) const
 #endif
 }
 
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+void CodingStructure::SetSplitPred()
+{
+  const Picture* pic = picture->unscaledPic;
+  const int width = pic->getPicWidthInLumaSamples();
+  const int height = pic->getPicHeightInLumaSamples();
+  Position pos;
+  CodingUnit* cuColAll = NULL;
+  QTDepthBuf mb; 
+  SplitPred sp;
+
+  int offset = slice->getPPS()->getCtuSize() >> 1;
+  picture->maxTemporalBtDepth = slice->getPicHeader()->getMaxMTTHierarchyDepth(slice->getSliceType(), CHANNEL_TYPE_LUMA);
+  const uint32_t roundVal = ((slice->getPPS()->getCtuSize() >> 2) * (slice->getPPS()->getCtuSize() >> 2))
+   * (slice->getPPS()->getCtuSize()  >> LOG2__BLOCK_RESOLUTION) * (slice->getPPS()->getCtuSize() >> LOG2__BLOCK_RESOLUTION);
+
+  uint32_t sumQtdetphColArea = 0;
+  uint32_t nbSamples = 0;
+  uint32_t nbSamplesMTT = 0;
+
+  const uint8_t nbPos = (offset << 1) >> LOG2__BLOCK_RESOLUTION;
+  bool parsedPositions[256 >> LOG2__BLOCK_RESOLUTION][256 >> LOG2__BLOCK_RESOLUTION];
+  for (int h = 0; h < height; h = h + QTBTTT_TEMPO_PRED_BUFFER_SIZE)
+  {
+    for (int w = 0; w < width; w = w + QTBTTT_TEMPO_PRED_BUFFER_SIZE)
+    {
+      sumQtdetphColArea = 0;
+      nbSamples = 0;
+
+      uint8_t maxBtdetphColArea = 0;
+      uint32_t sumMttdetphColArea = 0;
+      nbSamplesMTT = 0;
+      uint8_t minQtdetphColArea = UINT8_MAX;
+
+      pos = Position{ PosType(w), PosType(h) };
+
+      int topLeftWindowx = pos.x - offset;
+      int topLeftWindowy = pos.y - offset;
+      int BottomRightWindowx = pos.x + offset;
+      int BottomRightWindowy = pos.y + offset;
+      for (int i = 0; i < nbPos; i++)
+      {
+        for (int j = 0; j < nbPos; j++)
+        {
+          parsedPositions[i][j] = false;
+        }
+      }
+
+      if ((topLeftWindowx < 0)
+        || (topLeftWindowy < 0)
+        || (BottomRightWindowx >= width)
+        || (BottomRightWindowy >= height)
+        )
+      {
+        for (int i = 0; i < nbPos; i++)
+        {
+          for (int j = 0; j < nbPos; j++)
+          {
+            if (topLeftWindowx + i * QTBTTT_TEMPO_PRED_BLOCK_RESOLUTION < 0)
+            {
+              parsedPositions[i][j] = true;
+            }
+            if (topLeftWindowy + j * QTBTTT_TEMPO_PRED_BLOCK_RESOLUTION < 0)
+            {
+              parsedPositions[i][j] = true;
+            }
+            if (topLeftWindowx + i * QTBTTT_TEMPO_PRED_BLOCK_RESOLUTION >= width)
+            {
+              parsedPositions[i][j] = true;
+            }
+            if (topLeftWindowy + j * QTBTTT_TEMPO_PRED_BLOCK_RESOLUTION >= height)
+            {
+              parsedPositions[i][j] = true;
+            }
+          }
+        }
+      }
+
+      for (int x = 0; x < 0 + (offset << 1); x = x + QTBTTT_TEMPO_PRED_BLOCK_RESOLUTION)
+      {
+        for (int y = 0; y < 0 + (offset << 1); y = y + QTBTTT_TEMPO_PRED_BLOCK_RESOLUTION)
+        {
+          if (!parsedPositions[x >> LOG2__BLOCK_RESOLUTION][y >> LOG2__BLOCK_RESOLUTION])
+          {
+            cuColAll = getCUTempo(pos.offset(x - offset, y - offset), CHANNEL_TYPE_LUMA);
+                   
+            int widthBlockRes  = (cuColAll->lumaPos().x - (pos.x + x - offset) + cuColAll->lwidth() + QTBTTT_TEMPO_PRED_BLOCK_RESOLUTION - 1 ) >> LOG2__BLOCK_RESOLUTION;
+            int heightBlockRes = (cuColAll->lumaPos().y - (pos.y + y - offset) + cuColAll->lheight() + QTBTTT_TEMPO_PRED_BLOCK_RESOLUTION - 1) >> LOG2__BLOCK_RESOLUTION;
+
+            if (((x >> LOG2__BLOCK_RESOLUTION) + widthBlockRes > ((offset << 1) >> LOG2__BLOCK_RESOLUTION)))
+            {
+              widthBlockRes = ((offset << 1) >> LOG2__BLOCK_RESOLUTION) - (x >> LOG2__BLOCK_RESOLUTION);
+            }
+            if(((y >> LOG2__BLOCK_RESOLUTION) + heightBlockRes > ((offset << 1) >> LOG2__BLOCK_RESOLUTION)))
+            {
+              heightBlockRes = ((offset << 1) >> LOG2__BLOCK_RESOLUTION) - (y >> LOG2__BLOCK_RESOLUTION);
+            }
+                
+            for (int i = x >> LOG2__BLOCK_RESOLUTION; i < (x >> LOG2__BLOCK_RESOLUTION)  + widthBlockRes; i++)
+            {
+              for (int j = y >> LOG2__BLOCK_RESOLUTION; j < (y >> LOG2__BLOCK_RESOLUTION) + heightBlockRes; j++)
+              {
+                parsedPositions[i][j] = true;
+              }
+            }
+
+            int sizeBlock = (cuColAll->lheight() ) * (cuColAll->lwidth() );
+            sumQtdetphColArea += cuColAll->qtDepth * ((roundVal * (heightBlockRes * widthBlockRes) )/ sizeBlock);
+            nbSamples += ((roundVal * (heightBlockRes * widthBlockRes)) / sizeBlock);
+
+            if (cuColAll->mtDepth - cuColAll->mtImplicitDepth > maxBtdetphColArea)
+            {
+              maxBtdetphColArea = cuColAll->mtDepth - cuColAll->mtImplicitDepth;
+            }
+
+            if (cuColAll->mtImplicitDepth == 0)
+            {
+              sumMttdetphColArea += (cuColAll->mtDepth - cuColAll->mtImplicitDepth) * ((roundVal * (heightBlockRes * widthBlockRes)) / sizeBlock);
+              nbSamplesMTT += ((roundVal * (heightBlockRes * widthBlockRes)) / sizeBlock);
+            }
+
+            if (cuColAll->qtDepth < minQtdetphColArea)
+            {
+              minQtdetphColArea = cuColAll->qtDepth;
+            }
+          }
+        }
+      }
+      if (nbSamples > 0)
+      {
+        sumQtdetphColArea = (sumQtdetphColArea + (nbSamples >> 1)) / nbSamples;
+      }
+      sp.qtDetphCol = (uint8_t)sumQtdetphColArea;
+      sp.maxBtDetphCol = maxBtdetphColArea;
+
+      if (nbSamplesMTT > 0)
+      {
+        sumMttdetphColArea = (sumMttdetphColArea + (nbSamplesMTT >> 1)) / nbSamplesMTT;
+      }
+      sp.mttDetphCol = (uint8_t)sumMttdetphColArea;
+
+      sp.minqtDetphCol = minQtdetphColArea;
+
+      mb = getQtDepthBuf(Area(pos.getX(), pos.getY(), std::min(width - w, QTBTTT_TEMPO_PRED_BUFFER_SIZE), std::min(height - h, QTBTTT_TEMPO_PRED_BUFFER_SIZE)));
+      mb.fill(sp);
+    }
+  }
+}
+
+QTDepthBuf CodingStructure::getQtDepthBuf(const Area& _area)
+{
+  const CompArea& _luma = area.Y();
+  CHECKD(!_luma.contains(_area), "Trying to access motion information outside of this coding structure");
+
+  const Area miArea = g_miScaling.scale(_area);
+  const Area selfArea = g_miScaling.scale(_luma);
+
+  return QTDepthBuf(currQtDepthBuf + rsAddr(miArea.pos(), selfArea.pos(), selfArea.width), selfArea.width, miArea.size());
+}
+
+#endif 
+
 #if JVET_W0123_TIMD_FUSION && RPR_ENABLE
 bool  CodingStructure::picContain(const Position _pos)
 {
@@ -2988,6 +3265,16 @@ const MotionInfo& CodingStructure::getMotionInfo( const Position& pos ) const
   return *( m_motionBuf + miPos.y * stride + miPos.x );
 #endif
 }
+#if JVET_AH0135_TEMPORAL_PARTITIONING
+SplitPred& CodingStructure::getQtDepthInfo(const Position& pos)
+{
+  CHECKD(!area.Y().contains(pos), "Trying to access TEMPORAL partitionning information outside of this coding structure");
+  const unsigned stride = g_miScaling.scaleHor(area.lumaSize().width);
+  const Position miPos = g_miScaling.scale(pos - area.lumaPos());
+
+  return *(currQtDepthBuf + miPos.y * stride + miPos.x);
+}
+#endif 
 #if JVET_Z0118_GDR
 MotionBuf CodingStructure::getMotionBuf(const Area& _area, PictureType pt)
 {
@@ -3424,6 +3711,8 @@ const CPelUnitBuf CodingStructure::getBuf( const UnitArea &unit, const PictureTy
   }
 }
 
+
+
 const CodingUnit* CodingStructure::getCURestricted( const Position &pos, const CodingUnit& curCu, const ChannelType _chType ) const
 {
   const CodingUnit* cu = getCU( pos, _chType );
@@ -3434,6 +3723,7 @@ const CodingUnit* CodingStructure::getCURestricted( const Position &pos, const C
   int xNbY  = pos.x << getChannelTypeScaleX( _chType, curCu.chromaFormat );
   int xCurr = curCu.blocks[_chType].x << getChannelTypeScaleX( _chType, curCu.chromaFormat );
   bool addCheck = (wavefrontsEnabled && (xNbY >> ctuSizeBit) >= (xCurr >> ctuSizeBit) + 1 ) ? false : true;
+
   if( cu && CU::isSameSliceAndTile( *cu, curCu ) && ( cu->cs != curCu.cs || cu->idx <= curCu.idx ) && addCheck)
   {
 #if JVET_Z0118_GDR
@@ -3557,3 +3847,233 @@ const TransformUnit* CodingStructure::getTURestricted( const Position &pos, cons
   }
 }
 
+
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+void CodingStructure::copyLumaPointers( CodingStructure& cs )
+{
+  cs.m_lumaCUs       = m_lumaCUs;      
+  cs.m_lumaPUs       = m_lumaPUs;      
+  cs.m_lumaTUs       = m_lumaTUs;      
+  cs.m_lumaUnitScale = m_lumaUnitScale;
+  cs.m_lumaArea      = m_lumaArea;     
+  cs.m_lumaCuIdx     = m_lumaCuIdx;    
+  cs.m_lumaPuIdx     = m_lumaPuIdx;    
+  cs.m_lumaTuIdx     = m_lumaTuIdx;    
+  cs.m_lumaParent    = m_lumaParent; 
+  cs.m_lumaFracBits  = m_lumaFracBits;
+  cs.m_lumaDist      = m_lumaDist;
+  cs.m_lumaCost      = m_lumaCost;
+};
+
+void CodingStructure::setLumaPointers( CodingStructure& cs )
+{
+  cs.m_lumaCUs       = &(cus);
+  cs.m_lumaPUs       = &(pus);
+  cs.m_lumaTUs       = &(tus);
+  cs.m_lumaUnitScale = &(unitScale[COMPONENT_Y]);
+  cs.m_lumaArea      = &(area);
+  cs.m_lumaCuIdx     = m_cuIdx[CH_L];
+  cs.m_lumaPuIdx     = m_puIdx[CH_L];
+  cs.m_lumaTuIdx     = m_tuIdx[CH_L];
+  cs.m_lumaParent    = parent;
+  cs.m_lumaFracBits  = fracBits;
+  cs.m_lumaDist      = dist;
+  cs.m_lumaCost      = cost;
+};
+
+/*const*/ CodingUnit *CodingStructure::getLumaCU(const Position &pos, const ChannelType effChType) const
+{
+  const CompArea &_blk = m_lumaArea->blocks[effChType];
+
+  if (!_blk.contains(pos))
+  {
+    if (m_lumaParent)
+    {
+      return m_lumaParent->getCU(pos, effChType);   // retrieve using getCU()
+    }
+    else
+    {
+      return nullptr;
+    }
+  }
+  else
+  {
+    const unsigned idx = m_lumaCuIdx[rsAddr(pos, _blk.pos(), _blk.width, (*m_lumaUnitScale))];
+    if (idx != 0)
+    {
+      return (*m_lumaCUs)[idx - 1];
+    }
+    else
+    {
+      return nullptr;
+    }
+  }
+}
+
+const PredictionUnit *CodingStructure::getLumaPU(const Position &pos, const ChannelType effChType) const
+{
+  const CompArea &_blk = m_lumaArea->blocks[effChType];
+
+  if (!_blk.contains(pos))
+  {
+    if (m_lumaParent)
+    {
+      return m_lumaParent->getPU(pos, effChType);   // retrieve using getPU()
+    }
+    else
+    {
+      return nullptr;
+    }
+  }
+  else
+  {
+    const unsigned idx = m_lumaPuIdx[rsAddr(pos, _blk.pos(), _blk.width, (*m_lumaUnitScale))];
+    if (idx != 0)
+    {
+      return (*m_lumaPUs)[idx - 1];
+    }
+    else
+    {
+      return nullptr;
+    }
+  }
+}
+
+const TransformUnit *CodingStructure::getLumaTU(const Position &pos, const ChannelType effChType) const
+{
+  const CompArea &_blk = m_lumaArea->blocks[effChType];
+
+  if (!_blk.contains(pos))
+  {
+    if (m_lumaParent)
+    {
+      return m_lumaParent->getTU(pos, effChType);   // retrieve using getTU()
+    }
+    else
+    {
+      return nullptr;
+    }
+  }
+  else
+  {
+    const unsigned idx = m_lumaTuIdx[rsAddr(pos, _blk.pos(), _blk.width, (*m_lumaUnitScale))];
+    if (idx != 0)
+    {
+      return (*m_lumaTUs)[idx - 1];
+    }
+    else if (m_isTuEnc)
+    {
+      return m_lumaParent->getTU(pos, effChType);
+    }
+    else
+    {
+      return nullptr;
+    }
+  }
+}
+
+void CodingStructure::popLastCU( const PartSplit& implicitSplit )
+{
+  CodingUnit* cu = cus.back();
+  cu->idx        = 0;
+  m_cuCache.cache( cu );
+
+  cus.pop_back();
+  m_numCUs--;
+  CodingUnit *prevCU = m_numCUs > 0 ? cus.back() : nullptr;
+
+  if( prevCU )
+  {
+    prevCU->next = nullptr;
+  }
+
+  uint32_t idx = 0;
+
+  uint32_t numCh = ::getNumberValidChannels( area.chromaFormat );
+
+  for( uint32_t i = 0; i < numCh && implicitSplit == CU_DONT_SPLIT; i++ )
+  {
+    if( !cu->blocks[i].valid() )
+    {
+      continue;
+    }
+
+    const CompArea &_selfBlk = area.blocks[i];
+    const CompArea     &_blk = cu-> blocks[i];
+
+    const UnitScale& scale = unitScale[_blk.compID];
+    const Area scaledSelf  = scale.scale( _selfBlk );
+    const Area scaledBlk   = scale.scale(     _blk );
+    unsigned *idxPtr       = m_cuIdx[i] + rsAddr( scaledBlk.pos(), scaledSelf.pos(), scaledSelf.width );
+    AreaBuf<uint32_t>( idxPtr, scaledSelf.width, scaledBlk.size() ).fill( idx );
+  }
+}
+
+void CodingStructure::deriveSeparateTreeFlagInference( int& separateTreeFlag, bool& inferredSeparateTreeFlag, int width, int height, bool canSplit )
+{
+  if (!slice->isIntra())
+  {
+    if (!canSplit)   // at maximal leaf of partition tree always use shared tree
+    {
+      inferredSeparateTreeFlag = true;
+      separateTreeFlag         = 0;
+    }
+    else if (g_aucLog2[width] > 6 || g_aucLog2[height] > 6)   // JVET-K0230
+    {
+      inferredSeparateTreeFlag = true;
+      separateTreeFlag         = 0;
+    }
+    else if ((g_aucLog2[width] + g_aucLog2[height]) >= ID_SEP_TREE_BLK_SIZE_LIMIT1)
+    {
+      inferredSeparateTreeFlag = true;
+      separateTreeFlag         = 1;
+    }
+    else if ((g_aucLog2[width] + g_aucLog2[height]) <= ID_SEP_TREE_BLK_SIZE_LIMIT2)
+    {
+      inferredSeparateTreeFlag = true;
+      separateTreeFlag         = 0;
+    }
+    else
+    {
+      inferredSeparateTreeFlag = false;
+    }
+  }
+  else
+  {
+    inferredSeparateTreeFlag = true;
+    separateTreeFlag         = 1;
+  }
+}
+
+void CodingStructure::determineIfSeparateTreeFlagInferred(bool &inferredSeparateTreeFlag, int width, int height,
+                                                          bool canSplit)
+{
+  if (!slice->isIntra())
+  {
+    if (!canSplit)
+    {
+      inferredSeparateTreeFlag = true;
+    }
+    else if (g_aucLog2[width] > 6 || g_aucLog2[height] > 6)   // JVET-K0230
+    {
+      inferredSeparateTreeFlag = true;
+    }
+    else if ((g_aucLog2[width] + g_aucLog2[height]) >= ID_SEP_TREE_BLK_SIZE_LIMIT1)
+    {
+      inferredSeparateTreeFlag = true;
+    }
+    else if ((g_aucLog2[width] + g_aucLog2[height]) <= ID_SEP_TREE_BLK_SIZE_LIMIT2)
+    {
+      inferredSeparateTreeFlag = true;
+    }
+    else
+    {
+      inferredSeparateTreeFlag = false;
+    }
+  }
+  else
+  {
+    inferredSeparateTreeFlag = true;
+  }
+}
+#endif
