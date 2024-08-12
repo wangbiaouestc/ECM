@@ -39398,7 +39398,7 @@ std::vector<Mv> InterPrediction::deriveMVDFromMVSDIdxAffineSI(PredictionUnit& pu
   }
 #endif
 
-#if JVET_AD0123_REF_PICTURE_PADDING_FOR_GDR
+#if JVET_Z0118_GDR && JVET_AD0123_REF_PICTURE_PADDING_FOR_GDR
   void InterPrediction::padDirtyArea(Picture* pcCurPic, Slice& slice, PictureType pt)
   {
     if (slice.getPicHeader()->getNumVerVirtualBoundaries() == 1)

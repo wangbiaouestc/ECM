@@ -324,10 +324,8 @@ private:
 
   PelStorage m_pred;
   PelStorage m_resi;
-#if JVET_Z0118_GDR
-public:
-  PictureType m_pt; 
 #if JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+public:
 #if !JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   Pel   *m_pCurrTmTop;
   Pel   *m_pCurrTmLeft;
@@ -340,13 +338,18 @@ public:
   PelBuf m_pcBufPredRefLeft;
 #endif
 #if JVET_AE0043_CCP_MERGE_TEMPORAL
+public:
   int    *m_ccpmIdxBuf;
   std::vector<CCPModelCandidate> m_ccpModelLUT;
 #endif
 #if JVET_AG0058_EIP
+public:
   int    *m_eipIdxBuf;
   std::vector<EipModelCandidate> m_eipModelLUT;
 #endif
+#if JVET_Z0118_GDR
+public:
+  PictureType m_pt; 
 private:
   PelStorage m_reco0; // for GDR dirty
   PelStorage m_reco1; // for GDR clean

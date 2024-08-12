@@ -1347,7 +1347,7 @@ public:
 
   void updateBufferState( const Slice* slice )
   {
-#if JVET_AD0206_CABAC_INIT_AT_GDR
+#if JVET_Z0118_GDR && JVET_AD0206_CABAC_INIT_AT_GDR
     if( slice->getPendingRasInit() || slice->isInterGDR() )
 #else
     if( slice->getPendingRasInit() )
