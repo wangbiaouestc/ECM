@@ -25582,9 +25582,9 @@ void PU::getBMAffineMergeCand(const PredictionUnit &pu, AffineMergeCtx& affineBM
             {
               continue;
             }
-            if (addOneAffineMergeHMVPCand(pu, affineBMMergeCtx, pu.cs->motionLut.lutAff, 0, mvInfo, posGroup2[nei], puNei->interDir == 3 ? puNei->cu->BcwIdx : BCW_DEFAULT
+            if (addOneAffineMergeHMVPCand(pu, affineBMMergeCtx, pu.cs->motionLut.lutAff, 0, mvInfo, posGroup2[nei], puNei->interDir == 3 ? puNei->cu->bcwIdx : BCW_DEFAULT
 #if INTER_LIC
-              , puNei->cu->LICFlag
+              , puNei->cu->licFlag
 #endif
             ))
             {
@@ -25757,9 +25757,9 @@ void PU::getBMAffineMergeCand(const PredictionUnit &pu, AffineMergeCtx& affineBM
         {
           continue;
         }
-        if (addOneAffineMergeHMVPCand(pu, affineBMMergeCtx, pu.cs->motionLut.lutAff, iAffListIdx, mvInfo, posGroup2[nei], puNei->interDir == 3 ? puNei->cu->BcwIdx : BCW_DEFAULT
+        if (addOneAffineMergeHMVPCand(pu, affineBMMergeCtx, pu.cs->motionLut.lutAff, iAffListIdx, mvInfo, posGroup2[nei], puNei->interDir == 3 ? puNei->cu->bcwIdx : BCW_DEFAULT
 #if INTER_LIC
-          , puNei->cu->LICFlag
+          , puNei->cu->licFlag
 #endif
         ))
         {
