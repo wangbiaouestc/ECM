@@ -138,6 +138,42 @@ bool CABACReader::terminating_bit()
   return false;
 }
 
+#if JVET_AI0087_BTCUS_RESTRICTION 
+bool CABACReader::isLumaNonBoundaryCu(const Partitioner& partitioner, SizeType picWidth, SizeType picHeight )
+{
+  bool validCU = false;
+  if (isLuma(partitioner.chType))
+  {
+    int maxWidthHeight = std::max(partitioner.currArea().lwidth(), partitioner.currArea().lheight()) - 1;
+    if ((partitioner.currArea().Y().x + maxWidthHeight < picWidth)
+      && (partitioner.currArea().Y().y + maxWidthHeight < picHeight))
+    {
+      validCU = true;
+    }
+  }
+  return validCU;
+}
+void CABACReader::setBtFirstPart(const Partitioner& partitioner, SizeType blockSize, CodingStructure& cs, PartSplit setValue)
+{
+  if (blockSize == 128)
+  {
+    cs.btFirstPartDecs[0] = setValue;
+  }
+  else if (blockSize == 64)
+  {
+    cs.btFirstPartDecs[1] = setValue;
+  }
+  else if (blockSize == 32)
+  {
+    cs.btFirstPartDecs[2] = setValue;
+  }
+  else if (blockSize == 16)
+  {
+    cs.btFirstPartDecs[3] = setValue;
+  }  
+}
+#endif
+
 void CABACReader::remaining_bytes( bool noTrailingBytesExpected )
 {
   if( noTrailingBytesExpected )
@@ -175,7 +211,10 @@ void CABACReader::coding_tree_unit( CodingStructure& cs, const UnitArea& area, i
 #endif
 
   partitioner.initCtu(area, CH_L, *cs.slice);
-#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+  #if JVET_AI0087_BTCUS_RESTRICTION 
+  std::memset(cs.btFirstPartDecs,0, sizeof(cs.btFirstPartDecs));
+#endif
+  #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   cs.treeType = partitioner.treeType = TREE_D;
   cs.modeType = partitioner.modeType = MODE_TYPE_ALL;
 #endif
@@ -763,7 +802,11 @@ void CABACReader::coding_tree( CodingStructure& cs, Partitioner& partitioner, CU
 
   const PartSplit splitMode = split_cu_mode( cs, partitioner );
 
-  CHECK( !partitioner.canSplit( splitMode, cs ), "Got an invalid split!" );
+#if JVET_AI0087_BTCUS_RESTRICTION
+  CHECK(!partitioner.canSplit(splitMode, cs, false, false), "Got an invalid split!");
+#else
+  CHECK(!partitioner.canSplit(splitMode, cs), "Got an invalid split!");
+#endif
 
   if( splitMode != CU_DONT_SPLIT )
   {
@@ -1122,21 +1165,86 @@ ModeType CABACReader::mode_constraint( CodingStructure& cs, Partitioner &partiti
 PartSplit CABACReader::split_cu_mode( CodingStructure& cs, Partitioner &partitioner )
 {
   RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE2( STATS__CABAC_BITS__SPLIT_FLAG, partitioner.currArea().blocks[partitioner.chType].size(), partitioner.chType );
+#if JVET_AI0087_BTCUS_RESTRICTION
+  bool disableBTV = false;
+  bool disableBTH = false;
 
+  if (CABACReader::isLumaNonBoundaryCu(partitioner, cs.picture->lwidth(), cs.picture->lheight()) && (!(cs.slice->getProcessingIntraRegion() && cs.slice->getProcessingSeparateTrees()) || cs.slice->isIntra()) )
+  {
+    if ((partitioner.currBtDepth == 0) && (partitioner.currArea().lwidth() == partitioner.currArea().lheight()))
+    {
+      CABACReader::setBtFirstPart(partitioner, partitioner.currArea().lwidth(), cs, CTU_LEVEL);
+    }
+
+    if ((partitioner.currBtDepth == 1) && (partitioner.currPartIdx() == 1))
+    {
+      if (partitioner.currPartLevel().split == CU_HORZ_SPLIT)
+      {
+        if (partitioner.currArea().lwidth() == 128 && cs.btFirstPartDecs[0] == CU_VERT_SPLIT)
+        {
+          disableBTV = true;
+        }
+        else if (partitioner.currArea().lwidth() == 64 && cs.btFirstPartDecs[1] == CU_VERT_SPLIT)
+        {
+          disableBTV = true;
+        }
+        else if (partitioner.currArea().lwidth() == 32 && cs.btFirstPartDecs[2] == CU_VERT_SPLIT)
+        {
+          disableBTV = true;
+        }
+        else if (partitioner.currArea().lwidth() == 16 && cs.btFirstPartDecs[3] == CU_VERT_SPLIT)
+        {
+          disableBTV = true;
+        }
+      }
+      else if (partitioner.currPartLevel().split == CU_VERT_SPLIT)   // BTV Case
+      {
+        if (partitioner.currArea().lheight() == 128 && cs.btFirstPartDecs[0] == CU_HORZ_SPLIT)
+        {
+          disableBTH = true;
+        }
+        else if (partitioner.currArea().lheight() == 64 && cs.btFirstPartDecs[1] == CU_HORZ_SPLIT)
+        {
+          disableBTH = true;
+        }
+        else if (partitioner.currArea().lheight() == 32 && cs.btFirstPartDecs[2] == CU_HORZ_SPLIT)
+        {
+          disableBTH = true;
+        }
+        else if (partitioner.currArea().lheight() == 16 && cs.btFirstPartDecs[3] == CU_HORZ_SPLIT)
+        {
+          disableBTH = true;
+        }
+      }
+    }
+  }
+#endif
   PartSplit mode = CU_DONT_SPLIT;
 
   bool canNo, canQt, canBh, canBv, canTh, canTv;
 #if JVET_AH0135_TEMPORAL_PARTITIONING
   unsigned maxMtt;
-  partitioner.canSplit( cs, canNo, canQt, canBh, canBv, canTh, canTv, maxMtt );
+  partitioner.canSplit( cs, canNo, canQt, canBh, canBv, canTh, canTv, maxMtt 
+#if JVET_AI0087_BTCUS_RESTRICTION
+    , disableBTV, disableBTH
+#endif
+  );
 #else
-  partitioner.canSplit( cs, canNo, canQt, canBh, canBv, canTh, canTv );
+  partitioner.canSplit( cs, canNo, canQt, canBh, canBv, canTh, canTv
+#if JVET_AI0087_BTCUS_RESTRICTION
+    , disableBTV, disableBTH
+#endif
+  );
 #endif
 
   bool canSpl[6] = { canNo, canQt, canBh, canBv, canTh, canTv };
 
   unsigned ctxSplit = 0, ctxQtSplit = 0, ctxBttHV = 0, ctxBttH12 = 0, ctxBttV12;
-  DeriveCtx::CtxSplit( cs, partitioner, ctxSplit, ctxQtSplit, ctxBttHV, ctxBttH12, ctxBttV12, canSpl );
+  DeriveCtx::CtxSplit( cs, partitioner, ctxSplit, ctxQtSplit, ctxBttHV, ctxBttH12, ctxBttV12, canSpl
+#if JVET_AI0087_BTCUS_RESTRICTION
+    , disableBTV, disableBTH
+#endif
+  );
 
   bool isSplit = canBh || canBv || canTh || canTv || canQt;
 #if JVET_AH0135_TEMPORAL_PARTITIONING
@@ -1307,6 +1415,38 @@ PartSplit CABACReader::split_cu_mode( CodingStructure& cs, Partitioner &partitio
   {
     mode = CU_TRIH_SPLIT;
   }
+
+#if JVET_AI0087_BTCUS_RESTRICTION
+  if (CABACReader::isLumaNonBoundaryCu(partitioner, cs.picture->lwidth(), cs.picture->lheight())
+      && (!(cs.slice->getProcessingIntraRegion() && cs.slice->getProcessingSeparateTrees()) || cs.slice->isIntra()))
+  {
+    if ((partitioner.currBtDepth == 1) && (partitioner.currPartIdx() == 0))
+    {
+      if (partitioner.currPartLevel().split == CU_HORZ_SPLIT)   // BTH Case
+      {
+        if (mode == CU_VERT_SPLIT)
+        {
+          CABACReader::setBtFirstPart(partitioner, partitioner.currArea().lwidth(), cs, CU_VERT_SPLIT);
+        }
+        else
+        {
+          CABACReader::setBtFirstPart(partitioner, partitioner.currArea().lwidth(), cs, CTU_LEVEL);
+        }
+      }
+      else if (partitioner.currPartLevel().split == CU_VERT_SPLIT)   // BTV Case
+      {
+        if (mode == CU_HORZ_SPLIT)
+        {
+          CABACReader::setBtFirstPart(partitioner, partitioner.currArea().lheight(), cs, CU_HORZ_SPLIT);
+        }
+        else
+        {
+          CABACReader::setBtFirstPart(partitioner, partitioner.currArea().lheight(), cs, CTU_LEVEL);
+        }
+      }
+    }
+  }
+#endif
 
   DTRACE( g_trace_ctx, D_SYNTAX, "split_cu_mode() pos=(%d,%d) size=%dx%d chType=%d ctxHv=%d ctx12=%d mode=%d\n", block.x, block.y, block.width, block.height, partitioner.chType, ctxBttHV, isVer ? ctxBttV12 : ctxBttH12, mode );
 
@@ -1781,8 +1921,16 @@ void CABACReader::separate_tree_cu_flag( CodingUnit& cu, Partitioner& partitione
   bool inferredSeparateTreeFlag = false;
   if ( cu.slice->getSeparateTreeEnabled() && CU::isIntra( cu ) && !cu.cs->slice->getProcessingIntraRegion() )
   {
-    bool canSplit = partitioner.canSplit(CU_QUAD_SPLIT, *cu.cs);
-    canSplit = canSplit || partitioner.canSplit( CU_MT_SPLIT, *cu.cs );
+    bool canSplit = partitioner.canSplit(CU_QUAD_SPLIT, *cu.cs
+#if JVET_AI0087_BTCUS_RESTRICTION
+      , false, false
+#endif
+    );
+    canSplit = canSplit || partitioner.canSplit( CU_MT_SPLIT, *cu.cs 
+#if JVET_AI0087_BTCUS_RESTRICTION
+      , false, false
+#endif
+    );
 
     int separateTreeFlag = -1;
     cu.cs->deriveSeparateTreeFlagInference( separateTreeFlag, inferredSeparateTreeFlag, partitioner.currArea().lumaSize().width, partitioner.currArea().lumaSize().height, canSplit );
@@ -7316,22 +7464,38 @@ void CABACReader::transform_tree( CodingStructure &cs, Partitioner &partitioner,
   int       subTuCounter = subTuIdx;
 
   // split_transform_flag
-  bool split = partitioner.canSplit(TU_MAX_TR_SPLIT, cs);
+  bool split = partitioner.canSplit(TU_MAX_TR_SPLIT, cs
+#if JVET_AI0087_BTCUS_RESTRICTION
+    , false, false
+#endif
+  );
   const unsigned  trDepth = partitioner.currTrDepth;
 
-  if( cu.sbtInfo && partitioner.canSplit( PartSplit( cu.getSbtTuSplit() ), cs ) )
+  if( cu.sbtInfo && partitioner.canSplit( PartSplit( cu.getSbtTuSplit() ), cs 
+#if JVET_AI0087_BTCUS_RESTRICTION
+    , false, false
+#endif
+  ) )
   {
     split = true;
   }
 
   if( !split && cu.ispMode )
   {
-    split = partitioner.canSplit( ispType, cs );
+    split = partitioner.canSplit( ispType, cs
+#if JVET_AI0087_BTCUS_RESTRICTION
+      , false, false
+#endif
+    );
   }
 
   if( split )
   {
-    if (partitioner.canSplit(TU_MAX_TR_SPLIT, cs))
+    if (partitioner.canSplit(TU_MAX_TR_SPLIT, cs
+#if JVET_AI0087_BTCUS_RESTRICTION
+      , false, false
+#endif
+    ))
     {
 #if ENABLE_TRACING
       const CompArea &tuArea = partitioner.currArea().blocks[partitioner.chType];
@@ -7345,7 +7509,11 @@ void CABACReader::transform_tree( CodingStructure &cs, Partitioner &partitioner,
     {
       partitioner.splitCurrArea(ispType, cs);
     }
-    else if (cu.sbtInfo && partitioner.canSplit(PartSplit(cu.getSbtTuSplit()), cs))
+    else if (cu.sbtInfo && partitioner.canSplit(PartSplit(cu.getSbtTuSplit()), cs
+#if JVET_AI0087_BTCUS_RESTRICTION
+      , false, false
+#endif
+    ))
     {
       partitioner.splitCurrArea(PartSplit(cu.getSbtTuSplit()), cs);
     }

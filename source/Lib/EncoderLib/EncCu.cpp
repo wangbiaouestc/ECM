@@ -878,6 +878,119 @@ int  EncCu::updateCtuDataISlice(const CPelBuf buf)
   return( iSumHad );
 }
 
+#if JVET_AI0087_BTCUS_RESTRICTION
+bool EncCu::isLumaNonBoundaryCu(const Partitioner &partitioner, SizeType picWidth, SizeType picHeight)
+{
+  bool validCU = false;
+  if (isLuma(partitioner.chType))
+  {
+    int maxWidthHeight = std::max(partitioner.currArea().lwidth(), partitioner.currArea().lheight()) - 1;
+    if ((partitioner.currArea().Y().x + maxWidthHeight < picWidth)
+        && (partitioner.currArea().Y().y + maxWidthHeight < picHeight))
+    {
+      validCU = true;
+    }
+  }
+  return validCU;
+}
+bool EncCu::xStoreRDcostandPredMode(CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &partitioner, const EncTestMode &encTestMode, double lastModeBestCost)
+{
+  if (EncCu::isLumaNonBoundaryCu(partitioner, bestCS->picture->lwidth(), bestCS->picture->lheight())
+      && (!(bestCS->slice->getProcessingIntraRegion() && bestCS->slice->getProcessingSeparateTrees())
+          || bestCS->slice->isIntra()))
+  {
+    bool PrevbestCostisChangedtoNewBestCost = (lastModeBestCost != bestCS->cost);
+    if ((partitioner.currBtDepth == 1) && (partitioner.currPartIdx() == 0) && PrevbestCostisChangedtoNewBestCost)
+    {
+      if (partitioner.currPartLevel().split == CU_HORZ_SPLIT
+          || partitioner.currPartLevel().split == CU_VERT_SPLIT)   // BTH or BTV Case
+      {
+        if (partitioner.currPartLevel().split == CU_HORZ_SPLIT)
+        {
+          if (partitioner.currArea().lwidth() == 128)
+          {
+            bestCS->btFirstPartDecs[0] = encTestMode.type == ETM_SPLIT_BT_H
+                                           ? CU_HORZ_SPLIT
+                                           : (encTestMode.type == ETM_SPLIT_BT_V ? CU_VERT_SPLIT : 0);
+            tempCS->btFirstPartDecs[0] = encTestMode.type == ETM_SPLIT_BT_H
+                                           ? CU_HORZ_SPLIT
+                                           : (encTestMode.type == ETM_SPLIT_BT_V ? CU_VERT_SPLIT : 0);
+          }
+          else if (partitioner.currArea().lwidth() == 64)
+          {
+            bestCS->btFirstPartDecs[1] = encTestMode.type == ETM_SPLIT_BT_H
+                                           ? CU_HORZ_SPLIT
+                                           : (encTestMode.type == ETM_SPLIT_BT_V ? CU_VERT_SPLIT : 0);
+            tempCS->btFirstPartDecs[1] = encTestMode.type == ETM_SPLIT_BT_H
+                                           ? CU_HORZ_SPLIT
+                                           : (encTestMode.type == ETM_SPLIT_BT_V ? CU_VERT_SPLIT : 0);
+          }
+          else if (partitioner.currArea().lwidth() == 32)
+          {
+            bestCS->btFirstPartDecs[2] = encTestMode.type == ETM_SPLIT_BT_H
+                                           ? CU_HORZ_SPLIT
+                                           : (encTestMode.type == ETM_SPLIT_BT_V ? CU_VERT_SPLIT : 0);
+            tempCS->btFirstPartDecs[2] = encTestMode.type == ETM_SPLIT_BT_H
+                                           ? CU_HORZ_SPLIT
+                                           : (encTestMode.type == ETM_SPLIT_BT_V ? CU_VERT_SPLIT : 0);
+          }
+          else if (partitioner.currArea().lwidth() == 16)
+          {
+            bestCS->btFirstPartDecs[3] = encTestMode.type == ETM_SPLIT_BT_H
+                                           ? CU_HORZ_SPLIT
+                                           : (encTestMode.type == ETM_SPLIT_BT_V ? CU_VERT_SPLIT : 0);
+            tempCS->btFirstPartDecs[3] = encTestMode.type == ETM_SPLIT_BT_H
+                                           ? CU_HORZ_SPLIT
+                                           : (encTestMode.type == ETM_SPLIT_BT_V ? CU_VERT_SPLIT : 0);
+          }
+        }
+        else
+        {
+          if (partitioner.currArea().lheight() == 128)
+          {
+            bestCS->btFirstPartDecs[0] = encTestMode.type == ETM_SPLIT_BT_H
+                                           ? CU_HORZ_SPLIT
+                                           : (encTestMode.type == ETM_SPLIT_BT_V ? CU_VERT_SPLIT : 0);
+            tempCS->btFirstPartDecs[0] = encTestMode.type == ETM_SPLIT_BT_H
+                                           ? CU_HORZ_SPLIT
+                                           : (encTestMode.type == ETM_SPLIT_BT_V ? CU_VERT_SPLIT : 0);
+          }
+          else if (partitioner.currArea().lheight() == 64)
+          {
+            bestCS->btFirstPartDecs[1] = encTestMode.type == ETM_SPLIT_BT_H
+                                           ? CU_HORZ_SPLIT
+                                           : (encTestMode.type == ETM_SPLIT_BT_V ? CU_VERT_SPLIT : 0);
+            tempCS->btFirstPartDecs[1] = encTestMode.type == ETM_SPLIT_BT_H
+                                           ? CU_HORZ_SPLIT
+                                           : (encTestMode.type == ETM_SPLIT_BT_V ? CU_VERT_SPLIT : 0);
+          }
+          else if (partitioner.currArea().lheight() == 32)
+          {
+            bestCS->btFirstPartDecs[2] = encTestMode.type == ETM_SPLIT_BT_H
+                                           ? CU_HORZ_SPLIT
+                                           : (encTestMode.type == ETM_SPLIT_BT_V ? CU_VERT_SPLIT : 0);
+            tempCS->btFirstPartDecs[2] = encTestMode.type == ETM_SPLIT_BT_H
+                                           ? CU_HORZ_SPLIT
+                                           : (encTestMode.type == ETM_SPLIT_BT_V ? CU_VERT_SPLIT : 0);
+          }
+          else if (partitioner.currArea().lheight() == 16)
+          {
+            bestCS->btFirstPartDecs[3] = encTestMode.type == ETM_SPLIT_BT_H
+                                           ? CU_HORZ_SPLIT
+                                           : (encTestMode.type == ETM_SPLIT_BT_V ? CU_VERT_SPLIT : 0);
+            tempCS->btFirstPartDecs[3] = encTestMode.type == ETM_SPLIT_BT_H
+                                           ? CU_HORZ_SPLIT
+                                           : (encTestMode.type == ETM_SPLIT_BT_V ? CU_VERT_SPLIT : 0);
+          }
+        }
+      }
+    }
+  }
+
+  return true;
+}
+#endif
+
 bool EncCu::xCheckBestMode( CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &partitioner, const EncTestMode& encTestMode )
 {
   bool bestCSUpdated = false;
@@ -1345,6 +1458,9 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
 
     if( currTestMode.type == ETM_INTER_ME )
     {
+#if JVET_AI0087_BTCUS_RESTRICTION 
+      double lastModeBestCost = bestCS->cost == MAX_DOUBLE ? MAX_DOUBLE : bestCS->cost;
+#endif
 #if ENABLE_OBMC
       bool tryObmc = true;
 #if JVET_AA0129_INTERHASH_OBMCOFF_RD
@@ -1366,6 +1482,9 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
 #else
           xCheckRDCostInterIMV(tempCS, bestCS, partitioner, currTestMode, bestIntPelCost);
 #endif
+#if JVET_AI0087_BTCUS_RESTRICTION 
+          xStoreRDcostandPredMode(tempCS, bestCS, partitioner, currTestMode, lastModeBestCost);
+#endif
           tempCS->bestCS = nullptr;
 #if JVET_Y0152_TT_ENC_SPEEDUP
           splitRdCostBest[CTU_LEVEL] = bestCS->cost;
@@ -1380,6 +1499,9 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
         tryObmc = xCheckRDCostInter(tempCS, bestCS, partitioner, currTestMode);
 #else
         xCheckRDCostInter( tempCS, bestCS, partitioner, currTestMode );
+#endif
+#if JVET_AI0087_BTCUS_RESTRICTION 
+        xStoreRDcostandPredMode(tempCS, bestCS, partitioner, currTestMode, lastModeBestCost);
 #endif
         tempCS->bestCS = nullptr;
 #if JVET_Y0152_TT_ENC_SPEEDUP
@@ -1400,6 +1522,9 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     }
     else if (currTestMode.type == ETM_HASH_INTER)
     {
+#if JVET_AI0087_BTCUS_RESTRICTION
+      double lastModeBestCost = bestCS->cost == MAX_DOUBLE ? MAX_DOUBLE : bestCS->cost;
+#endif
 #if ENABLE_OBMC && JVET_AA0129_INTERHASH_OBMCOFF_RD
       bool tryObmc = xCheckRDCostHashInter( tempCS, bestCS, partitioner, currTestMode );
 #else
@@ -1414,6 +1539,9 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
       {
         xCheckRDCostInterWoOBMC(  tempCS, bestCS, partitioner, currTestMode );
       }
+#endif
+#if JVET_AI0087_BTCUS_RESTRICTION 
+      xStoreRDcostandPredMode(tempCS, bestCS, partitioner, currTestMode, lastModeBestCost);
 #endif
     }
 #if !MERGE_ENC_OPT
@@ -1449,7 +1577,13 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
 #if REUSE_CU_RESULTS
     else if( currTestMode.type == ETM_RECO_CACHED )
     {
+#if JVET_AI0087_BTCUS_RESTRICTION 
+    double lastModeBestCost = bestCS->cost == MAX_DOUBLE ? MAX_DOUBLE : bestCS->cost;
+#endif
       xReuseCachedResult( tempCS, bestCS, partitioner );
+#if JVET_AI0087_BTCUS_RESTRICTION 
+      xStoreRDcostandPredMode(tempCS, bestCS, partitioner, currTestMode, lastModeBestCost);
+#endif
 #if JVET_Y0152_TT_ENC_SPEEDUP
       splitRdCostBest[CTU_LEVEL] = bestCS->cost;
       tempCS->splitRdCostBest = splitRdCostBest;
@@ -1458,7 +1592,13 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
 #endif
     else if( currTestMode.type == ETM_MERGE_SKIP )
     {
+#if JVET_AI0087_BTCUS_RESTRICTION 
+    double lastModeBestCost = bestCS->cost == MAX_DOUBLE ? MAX_DOUBLE : bestCS->cost;
+#endif
       xCheckRDCostMerge2Nx2N( tempCS, bestCS, partitioner, currTestMode );
+#if JVET_AI0087_BTCUS_RESTRICTION 
+      xStoreRDcostandPredMode(tempCS, bestCS, partitioner, currTestMode, lastModeBestCost);
+#endif
 
       CodingUnit* cu = bestCS->getCU(partitioner.chType);
 
@@ -1471,6 +1611,9 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     }
     else if( currTestMode.type == ETM_MERGE_GEO )
     {
+#if JVET_AI0087_BTCUS_RESTRICTION 
+    double lastModeBestCost = bestCS->cost == MAX_DOUBLE ? MAX_DOUBLE : bestCS->cost;
+#endif
 #if JVET_W0097_GPM_MMVD_TM
       CodedCUInfo    &relatedCU = ((EncModeCtrlMTnoRQT *)m_modeCtrl)->getBlkInfo(partitioner.currArea());
       if (!relatedCU.isGPMTested)
@@ -1485,6 +1628,9 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
 #else
       xCheckRDCostMergeGeo2Nx2N( tempCS, bestCS, partitioner, currTestMode );
 #endif
+#if JVET_AI0087_BTCUS_RESTRICTION 
+      xStoreRDcostandPredMode(tempCS, bestCS, partitioner, currTestMode, lastModeBestCost);
+#endif
 #if JVET_Y0152_TT_ENC_SPEEDUP
       splitRdCostBest[CTU_LEVEL] = bestCS->cost;
       tempCS->splitRdCostBest = splitRdCostBest;
@@ -1493,7 +1639,13 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
 #if MULTI_HYP_PRED
     else if (currTestMode.type == ETM_INTER_MULTIHYP)
     {
+#if JVET_AI0087_BTCUS_RESTRICTION
+    double lastModeBestCost = bestCS->cost == MAX_DOUBLE ? MAX_DOUBLE : bestCS->cost;
+#endif
       xCheckRDCostInterMultiHyp2Nx2N(tempCS, bestCS, partitioner, currTestMode);
+#if JVET_AI0087_BTCUS_RESTRICTION 
+      xStoreRDcostandPredMode(tempCS, bestCS, partitioner, currTestMode, lastModeBestCost);
+#endif
 #if JVET_Y0152_TT_ENC_SPEEDUP
       splitRdCostBest[CTU_LEVEL] = bestCS->cost;
       tempCS->splitRdCostBest = splitRdCostBest;
@@ -1502,6 +1654,9 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
 #endif
     else if( currTestMode.type == ETM_INTRA )
     {
+#if JVET_AI0087_BTCUS_RESTRICTION
+    double lastModeBestCost = bestCS->cost == MAX_DOUBLE ? MAX_DOUBLE : bestCS->cost;
+#endif
       if (slice.getSPS()->getUseColorTrans() && !CS::isDualITree(*tempCS))
       {
         bool skipSecColorSpace = false;
@@ -1548,7 +1703,9 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
         }
       }
 #endif
-
+#if JVET_AI0087_BTCUS_RESTRICTION 
+      xStoreRDcostandPredMode(tempCS, bestCS, partitioner, currTestMode, lastModeBestCost);
+#endif
 #if JVET_Y0152_TT_ENC_SPEEDUP
       splitRdCostBest[CTU_LEVEL] = bestCS->cost;
       tempCS->splitRdCostBest = splitRdCostBest;
@@ -1557,7 +1714,15 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
 #if JVET_AI0136_ADAPTIVE_DUAL_TREE
     else if( currTestMode.type == ETM_SEPARATE_TREE_INTRA )
     {
+#if JVET_AI0087_BTCUS_RESTRICTION
+    double lastModeBestCost = bestCS->cost == MAX_DOUBLE ? MAX_DOUBLE : bestCS->cost;
+#endif
       xCheckRDCostSeparateTreeIntra( tempCS, bestCS, partitioner, currTestMode );
+
+#if JVET_AI0087_BTCUS_RESTRICTION 
+      xStoreRDcostandPredMode(tempCS, bestCS, partitioner, currTestMode, lastModeBestCost);
+#endif
+
 
 #if JVET_AI0136_ADAPTIVE_DUAL_TREE
 #if JVET_Z0118_GDR
@@ -1582,7 +1747,13 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
 #endif
     else if (currTestMode.type == ETM_PALETTE)
     {
+#if JVET_AI0087_BTCUS_RESTRICTION 
+    double lastModeBestCost = bestCS->cost == MAX_DOUBLE ? MAX_DOUBLE : bestCS->cost;
+#endif
       xCheckPLT( tempCS, bestCS, partitioner, currTestMode );
+#if JVET_AI0087_BTCUS_RESTRICTION 
+      xStoreRDcostandPredMode(tempCS, bestCS, partitioner, currTestMode, lastModeBestCost);
+#endif
 #if JVET_Y0152_TT_ENC_SPEEDUP
       splitRdCostBest[CTU_LEVEL] = bestCS->cost;
       tempCS->splitRdCostBest = splitRdCostBest;
@@ -1590,6 +1761,9 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     }
     else if (currTestMode.type == ETM_IBC)
     {
+#if JVET_AI0087_BTCUS_RESTRICTION 
+    double lastModeBestCost = bestCS->cost == MAX_DOUBLE ? MAX_DOUBLE : bestCS->cost;
+#endif
 #if JVET_AA0070_RRIBC
       if (m_pcEncCfg->getIntraPeriod() <= 1)
       {
@@ -1607,6 +1781,9 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
       else
 #endif
       xCheckRDCostIBCMode(tempCS, bestCS, partitioner, currTestMode);
+#if JVET_AI0087_BTCUS_RESTRICTION 
+      xStoreRDcostandPredMode(tempCS, bestCS, partitioner, currTestMode, lastModeBestCost);
+#endif
 #if JVET_Y0152_TT_ENC_SPEEDUP
       splitRdCostBest[CTU_LEVEL] = bestCS->cost;
       tempCS->splitRdCostBest = splitRdCostBest;
@@ -1614,10 +1791,16 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     }
     else if (currTestMode.type == ETM_IBC_MERGE)
     {
+#if JVET_AI0087_BTCUS_RESTRICTION 
+    double lastModeBestCost = bestCS->cost == MAX_DOUBLE ? MAX_DOUBLE : bestCS->cost;
+#endif
 #if JVET_AE0169_BIPREDICTIVE_IBC
       if (!m_skipIbcMerge)
 #endif
       xCheckRDCostIBCModeMerge2Nx2N(tempCS, bestCS, partitioner, currTestMode);
+#if JVET_AI0087_BTCUS_RESTRICTION 
+      xStoreRDcostandPredMode(tempCS, bestCS, partitioner, currTestMode, lastModeBestCost);
+#endif
 #if JVET_Y0152_TT_ENC_SPEEDUP
       splitRdCostBest[CTU_LEVEL] = bestCS->cost;
       tempCS->splitRdCostBest = splitRdCostBest;
@@ -1629,6 +1812,9 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
       {
         splitmode = bestCS->cus[0]->splitSeries;
       }
+#if JVET_AI0087_BTCUS_RESTRICTION 
+      double lastModeBestCost = bestCS->cost == MAX_DOUBLE ? MAX_DOUBLE : bestCS->cost;
+#endif
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
       assert( partitioner.modeType == tempCS->modeType );
       int signalModeConsVal = tempCS->signalModeCons( getPartSplit( currTestMode ), partitioner, modeTypeParent );
@@ -1681,6 +1867,9 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
 #else
       xCheckModeSplit(tempCS, bestCS, partitioner, currTestMode);
 #endif
+#endif
+#if JVET_AI0087_BTCUS_RESTRICTION 
+      xStoreRDcostandPredMode(tempCS, bestCS, partitioner, currTestMode, lastModeBestCost);
 #endif
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
         //recover cons modes
@@ -2305,9 +2494,17 @@ void EncCu::xCheckModeSplit(CodingStructure *&tempCS, CodingStructure *&bestCS, 
 
   m_CABACEstimator->resetBits();
 #if JVET_AI0136_ADAPTIVE_DUAL_TREE
-  m_CABACEstimator->split_cu_mode( split, *tempCS, partitioner, nullptr );
+  m_CABACEstimator->split_cu_mode( split, *tempCS, partitioner, nullptr
+#if JVET_AI0087_BTCUS_RESTRICTION
+    , false
+#endif
+  );
 #else
-  m_CABACEstimator->split_cu_mode( split, *tempCS, partitioner );
+  m_CABACEstimator->split_cu_mode(split, *tempCS, partitioner
+#if JVET_AI0087_BTCUS_RESTRICTION
+    , false
+#endif
+  );
 #endif
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   m_CABACEstimator->mode_constraint( split, *tempCS, partitioner, modeTypeChild );
@@ -2401,6 +2598,66 @@ void EncCu::xCheckModeSplit(CodingStructure *&tempCS, CodingStructure *&bestCS, 
         }
       }
 #endif 
+#if JVET_AI0087_BTCUS_RESTRICTION
+      if (EncCu::isLumaNonBoundaryCu(partitioner, bestCS->picture->lwidth(), bestCS->picture->lheight())
+          && (!(bestCS->slice->getProcessingIntraRegion() && bestCS->slice->getProcessingSeparateTrees())
+              || bestCS->slice->isIntra()))
+      {
+        if (partitioner.currPartLevel().split == CU_HORZ_SPLIT
+            || partitioner.currPartLevel().split == CU_VERT_SPLIT)   // BTH or BTV Case
+        {
+          if ((partitioner.currBtDepth == 1) && (partitioner.currPartIdx() == 0))
+          {
+            if (partitioner.currPartLevel().split == CU_HORZ_SPLIT)
+            {
+              if (partitioner.currArea().lwidth() == 128)
+              {
+                tempCS->btFirstPartDecs[0] = 0;
+                bestCS->btFirstPartDecs[0] = 0;
+              }
+              else if (partitioner.currArea().lwidth() == 64)
+              {
+                tempCS->btFirstPartDecs[1] = 0;
+                bestCS->btFirstPartDecs[1] = 0;
+              }
+              else if (partitioner.currArea().lwidth() == 32)
+              {
+                tempCS->btFirstPartDecs[2] = 0;
+                bestCS->btFirstPartDecs[2] = 0;
+              }
+              else if (partitioner.currArea().lwidth() == 16)
+              {
+                tempCS->btFirstPartDecs[3] = 0;
+                bestCS->btFirstPartDecs[3] = 0;
+              }
+            }
+            else
+            {
+              if (partitioner.currArea().lheight() == 128)
+              {
+                tempCS->btFirstPartDecs[0] = 0;
+                bestCS->btFirstPartDecs[0] = 0;
+              }
+              else if (partitioner.currArea().lheight() == 64)
+              {
+                tempCS->btFirstPartDecs[1] = 0;
+                bestCS->btFirstPartDecs[1] = 0;
+              }
+              else if (partitioner.currArea().lheight() == 32)
+              {
+                tempCS->btFirstPartDecs[2] = 0;
+                bestCS->btFirstPartDecs[2] = 0;
+              }
+              if (partitioner.currArea().lheight() == 16)
+              {
+                tempCS->btFirstPartDecs[3] = 0;
+                bestCS->btFirstPartDecs[3] = 0;
+              }
+            }
+          }
+        }
+      }
+#endif
       tempCS->initSubStructure( *tempSubCS, partitioner.chType, subCUArea, false );
       tempCS->initSubStructure( *bestSubCS, partitioner.chType, subCUArea, false );
       tempSubCS->bestParent = bestSubCS->bestParent = bestCS;
@@ -2628,9 +2885,17 @@ void EncCu::xCheckModeSplit(CodingStructure *&tempCS, CodingStructure *&bestCS, 
       m_CABACEstimator->resetBits();
 
 #if JVET_AI0136_ADAPTIVE_DUAL_TREE
-      m_CABACEstimator->split_cu_mode( split, *tempCS, partitioner, nullptr );
+      m_CABACEstimator->split_cu_mode(split, *tempCS, partitioner, nullptr
+#if JVET_AI0087_BTCUS_RESTRICTION
+        , false
+#endif
+      );
 #else
-      m_CABACEstimator->split_cu_mode( split, *tempCS, partitioner );
+      m_CABACEstimator->split_cu_mode(split, *tempCS, partitioner
+#if JVET_AI0087_BTCUS_RESTRICTION
+        , false
+#endif
+      );
 #endif
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
       partitioner.modeType = modeTypeParent;
@@ -2723,8 +2988,16 @@ void EncCu::xCheckRDCostSeparateTreeIntra( CodingStructure *&tempCS, CodingStruc
   int startFlagVal     = 0;
   int endFlagVal       = 1;
   int inferredFlagVal  = -1;
-  bool canSplit        = partitioner.canSplit( CU_QUAD_SPLIT, *tempCS );
-  canSplit             = canSplit || partitioner.canSplit( CU_MT_SPLIT, *tempCS );
+  bool canSplit        = partitioner.canSplit( CU_QUAD_SPLIT, *tempCS 
+#if JVET_AI0087_BTCUS_RESTRICTION
+    , false, false
+#endif
+  );
+  canSplit             = canSplit || partitioner.canSplit( CU_MT_SPLIT, *tempCS 
+#if JVET_AI0087_BTCUS_RESTRICTION
+    , false, false
+#endif
+  );
 
   tempCS->deriveSeparateTreeFlagInference( inferredFlagVal, inferredSeparateTreeFlag, partitioner.currArea().lwidth(), partitioner.currArea().lheight(), canSplit );
   if ( inferredSeparateTreeFlag )
@@ -23634,11 +23907,14 @@ void EncCu::xEncodeInterResidual(   CodingStructure *&tempCS
 void EncCu::xEncodeDontSplit( CodingStructure &cs, Partitioner &partitioner )
 {
   m_CABACEstimator->resetBits();
+  m_CABACEstimator->split_cu_mode(CU_DONT_SPLIT, cs, partitioner
 #if JVET_AI0136_ADAPTIVE_DUAL_TREE
-  m_CABACEstimator->split_cu_mode( CU_DONT_SPLIT, cs, partitioner, nullptr );
-#else
-  m_CABACEstimator->split_cu_mode( CU_DONT_SPLIT, cs, partitioner );
+    , nullptr
 #endif
+#if JVET_AI0087_BTCUS_RESTRICTION
+    , false
+#endif
+  );
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   if( partitioner.treeType == TREE_C )
     CHECK( m_CABACEstimator->getEstFracBits() != 0, "must be 0 bit" );

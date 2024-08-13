@@ -94,6 +94,7 @@
 #if TU_256
 #define LMCS_CHROMA_CALC_CU                               1 // Derive chroma LMCS parameter based on neighbor CUs. Needed by VPDU removal and 128x128 transform.
 #endif
+#define JVET_AI0087_BTCUS_RESTRICTION                     1 // JVET-AI0087: Restriction on BT CUs from applying QT like partitioning structure
 
 //-- intra
 #define INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS             1 // Enable 2xN and Nx2 block by removing SCIPU constraints

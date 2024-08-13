@@ -12573,11 +12573,19 @@ void InterSearch::xEncodeInterResidualQT(CodingStructure &cs, Partitioner &parti
 
   if (compID == MAX_NUM_TBLOCKS)  // we are not processing a channel, instead we always recurse and code the CBFs
   {
-    if( partitioner.canSplit( TU_MAX_TR_SPLIT, cs ) )
+    if( partitioner.canSplit( TU_MAX_TR_SPLIT, cs 
+#if JVET_AI0087_BTCUS_RESTRICTION
+      , false, false
+#endif
+    ) )
     {
       CHECK( !bSubdiv, "Not performing the implicit TU split" );
     }
-    else if( cu.sbtInfo && partitioner.canSplit( PartSplit( cu.getSbtTuSplit() ), cs ) )
+    else if( cu.sbtInfo && partitioner.canSplit( PartSplit( cu.getSbtTuSplit() ), cs
+#if JVET_AI0087_BTCUS_RESTRICTION
+      , false, false
+#endif
+    ) )
     {
       CHECK( !bSubdiv, "Not performing the implicit TU split - sbt" );
     }
@@ -12652,11 +12660,19 @@ void InterSearch::xEncodeInterResidualQT(CodingStructure &cs, Partitioner &parti
   {
     if( compID == MAX_NUM_TBLOCKS || TU::getCbfAtDepth( currTU, compID, currDepth ) )
     {
-      if( partitioner.canSplit( TU_MAX_TR_SPLIT, cs ) )
+      if( partitioner.canSplit( TU_MAX_TR_SPLIT, cs 
+#if JVET_AI0087_BTCUS_RESTRICTION
+        , false, false
+#endif
+      ) )
       {
         partitioner.splitCurrArea( TU_MAX_TR_SPLIT, cs );
       }
-      else if( cu.sbtInfo && partitioner.canSplit( PartSplit( cu.getSbtTuSplit() ), cs ) )
+      else if( cu.sbtInfo && partitioner.canSplit( PartSplit( cu.getSbtTuSplit() ), cs 
+#if JVET_AI0087_BTCUS_RESTRICTION
+        , false, false
+#endif
+      ) )
       {
         partitioner.splitCurrArea( PartSplit( cu.getSbtTuSplit() ), cs );
       }
@@ -12939,8 +12955,16 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
   const unsigned currDepth = partitioner.currTrDepth;
   const bool colorTransFlag = cs.cus[0]->colorTransform;
 
-  bool bCheckFull  = !partitioner.canSplit( TU_MAX_TR_SPLIT, cs );
-  if( cu.sbtInfo && partitioner.canSplit( PartSplit( cu.getSbtTuSplit() ), cs ) )
+  bool bCheckFull  = !partitioner.canSplit( TU_MAX_TR_SPLIT, cs 
+#if JVET_AI0087_BTCUS_RESTRICTION
+    , false, false
+#endif
+  );
+  if( cu.sbtInfo && partitioner.canSplit( PartSplit( cu.getSbtTuSplit() ), cs 
+#if JVET_AI0087_BTCUS_RESTRICTION
+    , false, false
+#endif
+  ) )
   {
     bCheckFull = false;
   }
@@ -14742,11 +14766,19 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
       m_CABACEstimator->getCtx() = ctxStart;
     }
 
-    if( partitioner.canSplit( TU_MAX_TR_SPLIT, cs ) )
+    if( partitioner.canSplit( TU_MAX_TR_SPLIT, cs 
+#if JVET_AI0087_BTCUS_RESTRICTION
+      , false, false
+#endif
+    ) )
     {
       partitioner.splitCurrArea( TU_MAX_TR_SPLIT, cs );
     }
-    else if( cu.sbtInfo && partitioner.canSplit( PartSplit( cu.getSbtTuSplit() ), cs ) )
+    else if( cu.sbtInfo && partitioner.canSplit( PartSplit( cu.getSbtTuSplit() ), cs
+#if JVET_AI0087_BTCUS_RESTRICTION
+      , false, false
+#endif
+    ) )
     {
       partitioner.splitCurrArea( PartSplit( cu.getSbtTuSplit() ), cs );
     }

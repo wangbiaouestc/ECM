@@ -407,6 +407,9 @@ public:
 #endif
   virtual void setBest              ( CodingStructure& cs );
   bool         anyMode              () const;
+#if JVET_AI0087_BTCUS_RESTRICTION
+  bool         isLumaNonBoundaryCu(const Partitioner& partitioner, SizeType picWidth, SizeType picHeight);
+#endif
 #if JVET_AE0057_MTT_ET
   void         setNoSplitIntraCost  (double cost) { m_noSplitIntraRdCost = cost; }
 #endif

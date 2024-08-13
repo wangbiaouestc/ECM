@@ -1194,7 +1194,11 @@ public:
 
 namespace DeriveCtx
 {
-void     CtxSplit     ( const CodingStructure& cs, Partitioner& partitioner, unsigned& ctxSpl, unsigned& ctxQt, unsigned& ctxHv, unsigned& ctxHorBt, unsigned& ctxVerBt, bool* canSplit = nullptr );
+void     CtxSplit     ( const CodingStructure& cs, Partitioner& partitioner, unsigned& ctxSpl, unsigned& ctxQt, unsigned& ctxHv, unsigned& ctxHorBt, unsigned& ctxVerBt, bool* canSplit = nullptr 
+#if JVET_AI0087_BTCUS_RESTRICTION
+  ,bool disableBTV = false, bool disableBTH = false
+#endif
+);
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
 unsigned CtxModeConsFlag( const CodingStructure& cs, Partitioner& partitioner );
 #endif

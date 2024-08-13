@@ -290,10 +290,19 @@ void QTBTPartitioner::initCtu( const UnitArea& ctuArea, const ChannelType _chTyp
 
 void QTBTPartitioner::splitCurrArea( const PartSplit split, const CodingStructure& cs )
 {
-  CHECKD( !canSplit( split, cs ), "Trying to apply a prohibited split!" );
+
+#if JVET_AI0087_BTCUS_RESTRICTION
+  CHECKD(!canSplit(split, cs, false, false), "Trying to apply a prohibited split!");
+#else
+  CHECKD(!canSplit(split, cs), "Trying to apply a prohibited split!");
+#endif
 
   bool isImplicit = isSplitImplicit( split, cs );
-  bool canQtSplit = canSplit( CU_QUAD_SPLIT, cs );
+  bool canQtSplit = canSplit( CU_QUAD_SPLIT, cs 
+#if JVET_AI0087_BTCUS_RESTRICTION
+    , false, false
+#endif
+  );
   bool qgEnable = currQgEnable();
   bool qgChromaEnable = currQgChromaEnable();
 
@@ -392,6 +401,9 @@ void QTBTPartitioner::splitCurrArea( const PartSplit split, const CodingStructur
 void QTBTPartitioner::canSplit( const CodingStructure &cs, bool& canNo, bool& canQt, bool& canBh, bool& canBv, bool& canTh, bool& canTv
 #if JVET_AH0135_TEMPORAL_PARTITIONING
   , unsigned& maxMtt
+#endif
+#if JVET_AI0087_BTCUS_RESTRICTION
+  , bool disableBTV, bool disableBTH
 #endif
 )
 {
@@ -614,6 +626,18 @@ void QTBTPartitioner::canSplit( const CodingStructure &cs, bool& canNo, bool& ca
     canBh = canBv = false;
   }
 
+#if JVET_AI0087_BTCUS_RESTRICTION
+  if (disableBTV && (chType == CHANNEL_TYPE_LUMA))
+  {
+    canBv = false;
+  }
+
+  if (disableBTH && (chType == CHANNEL_TYPE_LUMA))
+  {
+    canBh = false;
+  }
+#endif
+
   // specific check for BT splits
   if( area.height <= minBtSize )                            canBh = false;
 #if !REMOVE_VPDU || CTU_256
@@ -666,7 +690,11 @@ void QTBTPartitioner::canSplit( const CodingStructure &cs, bool& canNo, bool& ca
 #endif
 }
 
-bool QTBTPartitioner::canSplit( const PartSplit split, const CodingStructure &cs )
+bool QTBTPartitioner::canSplit( const PartSplit split, const CodingStructure &cs
+#if JVET_AI0087_BTCUS_RESTRICTION
+  ,bool disableBTV, bool disableBTH
+#endif
+)
 {
   const CompArea area       = currArea().Y();
   const unsigned maxTrSize  = cs.sps->getMaxTbSize();
@@ -675,9 +703,17 @@ bool QTBTPartitioner::canSplit( const PartSplit split, const CodingStructure &cs
 
 #if JVET_AH0135_TEMPORAL_PARTITIONING
   unsigned maxMtt;
-  canSplit( cs, canNo, canQt, canBh, canBv, canTh, canTv, maxMtt );
+  canSplit( cs, canNo, canQt, canBh, canBv, canTh, canTv, maxMtt 
+#if JVET_AI0087_BTCUS_RESTRICTION
+   , disableBTV, disableBTH
+#endif
+  );
 #else
-  canSplit( cs, canNo, canQt, canBh, canBv, canTh, canTv );
+  canSplit( cs, canNo, canQt, canBh, canBv, canTh, canTv
+#if JVET_AI0087_BTCUS_RESTRICTION
+    , disableBTV, disableBTH
+#endif
+  );
 #endif
   switch( split )
   {
@@ -964,7 +1000,11 @@ bool TUIntraSubPartitioner::hasNextPart()
   return ( ( m_partStack.back().idx + 1 ) < m_partStack.back().parts.size() );
 }
 
-bool TUIntraSubPartitioner::canSplit( const PartSplit split, const CodingStructure &cs )
+bool TUIntraSubPartitioner::canSplit( const PartSplit split, const CodingStructure &cs 
+#if JVET_AI0087_BTCUS_RESTRICTION
+  , bool disableBTV, bool disableBTH
+#endif
+)
 {
   //const PartSplit implicitSplit = getImplicitSplit(cs);
   const UnitArea &area = currArea();
