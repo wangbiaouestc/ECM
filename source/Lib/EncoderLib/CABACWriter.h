@@ -64,9 +64,13 @@ public:
 
 public:
 #if JVET_AG0196_CABAC_RETRAIN
-  void        initCtxModels             ( Slice&                  slice );
+  void initCtxModels(Slice &slice);
 #else
-  void        initCtxModels             ( const Slice&                  slice );
+  void        initCtxModels(const Slice &slice);
+#endif
+#if JVET_AI0087_BTCUS_RESTRICTION
+  bool         isLumaNonBoundaryCu(const Partitioner& partitioner, SizeType picWidth, SizeType picHeight);
+  void         setBtFirstPart(Partitioner& partitioner, SizeType blockSize, PartSplit setValue);
 #endif
   void        setEncCu(EncCu* pcEncCu) { m_EncCu = pcEncCu; }
   SliceType   getCtxInitId              ( const Slice&                  slice );
@@ -109,10 +113,18 @@ public:
   // coding (quad)tree (clause 7.3.8.4)
 #if JVET_AI0136_ADAPTIVE_DUAL_TREE
   void        coding_tree               ( const CodingStructure&        cs,       Partitioner&      pm,         CUCtx& cuCtx, int (&qps)[2], Partitioner* pPartitionerChroma = nullptr, CUCtx* pCuCtxChroma = nullptr);
-  void        split_cu_mode             ( const PartSplit               split,    const CodingStructure& cs,    Partitioner& pm,    const CodingUnit* cu );
+  void        split_cu_mode             ( const PartSplit               split,    const CodingStructure& cs,     Partitioner& pm, const CodingUnit* cu
+#if JVET_AI0087_BTCUS_RESTRICTION
+    , bool btUpdateInfo
+#endif
+  );
 #else
   void        coding_tree               ( const CodingStructure&        cs,       Partitioner&      pm,         CUCtx& cuCtx, Partitioner* pPartitionerChroma = nullptr, CUCtx* pCuCtxChroma = nullptr);
-  void        split_cu_mode             ( const PartSplit               split,    const CodingStructure& cs,    Partitioner& pm );
+  void        split_cu_mode             ( const PartSplit               split,    const CodingStructure& cs,    Partitioner& pm
+#if JVET_AI0087_BTCUS_RESTRICTION
+    , bool btUpdateInfo
+#endif
+  );
 #endif
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
   void        mode_constraint           ( const PartSplit               split,    const CodingStructure& cs,    Partitioner& pm,    const ModeType modeType );

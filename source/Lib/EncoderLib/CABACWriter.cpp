@@ -139,6 +139,42 @@ SliceType xGetCtxInitId( const Slice& slice, const BinEncIf& binEncoder, Ctx& ct
   }
 }
 
+#if JVET_AI0087_BTCUS_RESTRICTION 
+bool CABACWriter::isLumaNonBoundaryCu(const Partitioner& partitioner, SizeType picWidth, SizeType picHeight)
+{
+  bool validCU = false;
+  if (isLuma(partitioner.chType))
+  {
+    int maxWidthHeight = std::max(partitioner.currArea().lwidth(), partitioner.currArea().lheight()) - 1;
+    if ((partitioner.currArea().Y().x + maxWidthHeight < picWidth)
+      && (partitioner.currArea().Y().y + maxWidthHeight < picHeight))
+    {
+      validCU = true;
+    }
+  }
+  return validCU;
+}
+
+void CABACWriter::setBtFirstPart(Partitioner& partitioner, SizeType blockSize, PartSplit setValue)
+{
+  if (blockSize == 128)
+  {
+    partitioner.btFirstPartDecs[0] = setValue;
+  }
+  else if (blockSize == 64)
+  {
+    partitioner.btFirstPartDecs[1] = setValue;
+  }
+  else if (blockSize == 32)
+  {
+    partitioner.btFirstPartDecs[2] = setValue;
+  }
+  else if (blockSize == 16)
+  {
+    partitioner.btFirstPartDecs[3] = setValue;
+  }
+}
+#endif
 
 SliceType CABACWriter::getCtxInitId( const Slice& slice )
 {
@@ -598,14 +634,21 @@ void CABACWriter::coding_tree(const CodingStructure& cs, Partitioner& partitione
 #endif
 
   const PartSplit splitMode = CU::getSplitAtDepth( cu, partitioner.currDepth );
-
+  split_cu_mode(splitMode, cs, partitioner
 #if JVET_AI0136_ADAPTIVE_DUAL_TREE
-  split_cu_mode( splitMode, cs, partitioner, &cu);
+    , & cu
+#endif
+#if JVET_AI0087_BTCUS_RESTRICTION
+    , true
+#endif
+  );
+
+#if JVET_AI0087_BTCUS_RESTRICTION
+  CHECK(!partitioner.canSplit(splitMode, cs, false, false), "The chosen split mode is invalid!");
 #else
-  split_cu_mode( splitMode, cs, partitioner);
+  CHECK(!partitioner.canSplit(splitMode, cs), "The chosen split mode is invalid!");
 #endif
 
-  CHECK( !partitioner.canSplit( splitMode, cs ), "The chosen split mode is invalid!" );
 
 #if JVET_AI0136_ADAPTIVE_DUAL_TREE
   if( splitMode != CU_DONT_SPLIT && ( cs.slice->getProcessingIntraRegion() || !CU::isIntraRegionRoot( cu, partitioner ) ) )
@@ -829,25 +872,140 @@ void CABACWriter::mode_constraint( const PartSplit split, const CodingStructure&
   }
 }
 #endif
-
+void CABACWriter::split_cu_mode( const PartSplit split, const CodingStructure& cs, Partitioner& partitioner 
 #if JVET_AI0136_ADAPTIVE_DUAL_TREE
-void CABACWriter::split_cu_mode( const PartSplit split, const CodingStructure& cs, Partitioner& partitioner, const CodingUnit* cu )
-#else
-void CABACWriter::split_cu_mode( const PartSplit split, const CodingStructure& cs, Partitioner& partitioner )
+  , const CodingUnit* cu
 #endif
+#if JVET_AI0087_BTCUS_RESTRICTION
+  , bool updatePartInfo
+#endif
+)
 {
+#if JVET_AI0087_BTCUS_RESTRICTION
+  bool disableBTV = false;
+  bool disableBTH = false;
+
+  if (CABACWriter::isLumaNonBoundaryCu(partitioner, cs.picture->lwidth(), cs.picture->lheight()) && (!(cs.slice->getProcessingIntraRegion() && cs.slice->getProcessingSeparateTrees()) || cs.slice->isIntra()) )
+  {
+    if ((partitioner.currBtDepth == 0) && (partitioner.currArea().lwidth() == partitioner.currArea().lheight()))
+    {
+      if (updatePartInfo)
+      {
+        CABACWriter::setBtFirstPart(partitioner, partitioner.currArea().lwidth(), CTU_LEVEL);
+      }
+    }
+
+    if ((partitioner.currBtDepth == 1) && (partitioner.currPartIdx() == 1))
+    {
+      if (partitioner.currPartLevel().split == CU_HORZ_SPLIT)   // BTH Case
+      {
+        if (updatePartInfo)
+        {
+          if (partitioner.currArea().lwidth() == 128 && partitioner.btFirstPartDecs[0] == CU_VERT_SPLIT)
+          {
+            disableBTV = true;
+          }
+          else if (partitioner.currArea().lwidth() == 64 && partitioner.btFirstPartDecs[1] == CU_VERT_SPLIT)
+          {
+            disableBTV = true;
+          }
+          else if (partitioner.currArea().lwidth() == 32 && partitioner.btFirstPartDecs[2] == CU_VERT_SPLIT)
+          {
+            disableBTV = true;
+          }
+          else if (partitioner.currArea().lwidth() == 16 && partitioner.btFirstPartDecs[3] == CU_VERT_SPLIT)
+          {
+            disableBTV = true;
+          }
+        }
+        else
+        {
+          if (partitioner.currArea().lwidth() == 128 && cs.btFirstPartDecs[0] == CU_VERT_SPLIT)
+          {
+            disableBTV = true;
+          }
+          else if (partitioner.currArea().lwidth() == 64 && cs.btFirstPartDecs[1] == CU_VERT_SPLIT)
+          {
+            disableBTV = true;
+          }
+          else if (partitioner.currArea().lwidth() == 32 && cs.btFirstPartDecs[2] == CU_VERT_SPLIT)
+          {
+            disableBTV = true;
+          }
+          else if (partitioner.currArea().lwidth() == 16 && cs.btFirstPartDecs[3] == CU_VERT_SPLIT)
+          {
+            disableBTV = true;
+          }
+        }
+      }
+      else if (partitioner.currPartLevel().split == CU_VERT_SPLIT)   // BTV Case
+      {
+        if (updatePartInfo)
+        {
+          if (partitioner.currArea().lheight() == 128 && partitioner.btFirstPartDecs[0] == CU_HORZ_SPLIT)
+          {
+            disableBTH = true;
+          }
+          else if (partitioner.currArea().lheight() == 64 && partitioner.btFirstPartDecs[1] == CU_HORZ_SPLIT)
+          {
+            disableBTH = true;
+          }
+          else if (partitioner.currArea().lheight() == 32 && partitioner.btFirstPartDecs[2] == CU_HORZ_SPLIT)
+          {
+            disableBTH = true;
+          }
+          else if (partitioner.currArea().lheight() == 16 && partitioner.btFirstPartDecs[3] == CU_HORZ_SPLIT)
+          {
+            disableBTH = true;
+          }
+        }
+        else
+        {
+          if (partitioner.currArea().lheight() == 128 && cs.btFirstPartDecs[0] == CU_HORZ_SPLIT)
+          {
+            disableBTH = true;
+          }
+          else if (partitioner.currArea().lheight() == 64 && cs.btFirstPartDecs[1] == CU_HORZ_SPLIT)
+          {
+            disableBTH = true;
+          }
+          else if (partitioner.currArea().lheight() == 32 && cs.btFirstPartDecs[2] == CU_HORZ_SPLIT)
+          {
+            disableBTH = true;
+          }
+          else if (partitioner.currArea().lheight() == 16 && cs.btFirstPartDecs[3] == CU_HORZ_SPLIT)
+          {
+            disableBTH = true;
+          }
+        }
+      }
+    }
+  }
+#endif
   bool canNo, canQt, canBh, canBv, canTh, canTv;
 #if JVET_AH0135_TEMPORAL_PARTITIONING
   unsigned maxMtt;
-  partitioner.canSplit( cs, canNo, canQt, canBh, canBv, canTh, canTv, maxMtt );
+  partitioner.canSplit( cs, canNo, canQt, canBh, canBv, canTh, canTv, maxMtt 
+#if JVET_AI0087_BTCUS_RESTRICTION
+    , disableBTV, disableBTH
+#endif
+  );
 #else
-  partitioner.canSplit( cs, canNo, canQt, canBh, canBv, canTh, canTv );
+  partitioner.canSplit( cs, canNo, canQt, canBh, canBv, canTh, canTv
+#if JVET_AI0087_BTCUS_RESTRICTION
+    , disableBTV, disableBTH
+#endif
+  );
 #endif
 
   bool canSpl[6] = { canNo, canQt, canBh, canBv, canTh, canTv };
 
   unsigned ctxSplit = 0, ctxQtSplit = 0, ctxBttHV = 0, ctxBttH12 = 0, ctxBttV12;
-  DeriveCtx::CtxSplit( cs, partitioner, ctxSplit, ctxQtSplit, ctxBttHV, ctxBttH12, ctxBttV12, canSpl );
+  DeriveCtx::CtxSplit( cs, partitioner, ctxSplit, ctxQtSplit, ctxBttHV, ctxBttH12, ctxBttV12, canSpl 
+#if JVET_AI0087_BTCUS_RESTRICTION
+    , disableBTV, disableBTH
+#endif
+  );
 
   const bool canSplit = canBh || canBv || canTh || canTv || canQt;
 #if JVET_AI0136_ADAPTIVE_DUAL_TREE
@@ -985,6 +1143,37 @@ void CABACWriter::split_cu_mode( const PartSplit split, const CodingStructure& c
     m_BinEncoder.encodeBin( is12, Ctx::Split12Flag( isVer ? ctxBttV12 : ctxBttH12 ) );
   }
 
+#if JVET_AI0087_BTCUS_RESTRICTION
+  if (CABACWriter::isLumaNonBoundaryCu(partitioner, cs.picture->lwidth(), cs.picture->lheight())
+      && (!(cs.slice->getProcessingIntraRegion() && cs.slice->getProcessingSeparateTrees()) || cs.slice->isIntra()))
+  {
+    if (updatePartInfo && (partitioner.currBtDepth == 1) && (partitioner.currPartIdx() == 0))
+    {
+      if (partitioner.currPartLevel().split == CU_HORZ_SPLIT)   // BTH Case
+      {
+        if (split == CU_VERT_SPLIT)
+        {
+          CABACWriter::setBtFirstPart(partitioner, partitioner.currArea().lwidth(), CU_VERT_SPLIT);
+        }
+        else
+        {
+          CABACWriter::setBtFirstPart(partitioner, partitioner.currArea().lwidth(), CTU_LEVEL);
+        }
+      }
+      else if (partitioner.currPartLevel().split == CU_VERT_SPLIT)   // BTV Case
+      {
+        if (split == CU_HORZ_SPLIT)
+        {
+          CABACWriter::setBtFirstPart(partitioner, partitioner.currArea().lheight(), CU_HORZ_SPLIT);
+        }
+        else
+        {
+          CABACWriter::setBtFirstPart(partitioner, partitioner.currArea().lheight(), CTU_LEVEL);
+        }
+      }
+    }
+  }
+#endif
   DTRACE( g_trace_ctx, D_SYNTAX, "split_cu_mode() pos=(%d,%d) size=%dx%d chType=%d ctxHv=%d ctx12=%d mode=%d\n", block.x, block.y, block.width, block.height, partitioner.chType, ctxBttHV, isVer ? ctxBttV12 : ctxBttH12, split);
 }
 
@@ -1291,8 +1480,16 @@ void CABACWriter::separate_tree_cu_flag( const CodingUnit& cu, Partitioner& part
   if ( cu.slice->getSeparateTreeEnabled() && !cu.slice->getProcessingIntraRegion() && CU::isIntra( cu ) && CU::isIntraRegionRoot( cu, partitioner ) )
 #endif
   {
-    bool canSplit = partitioner.canSplit( CU_QUAD_SPLIT, *cu.cs );
-    canSplit = canSplit || partitioner.canSplit( CU_MT_SPLIT, *cu.cs );
+    bool canSplit = partitioner.canSplit( CU_QUAD_SPLIT, *cu.cs 
+#if JVET_AI0087_BTCUS_RESTRICTION
+      , false, false
+#endif
+    );
+    canSplit = canSplit || partitioner.canSplit( CU_MT_SPLIT, *cu.cs 
+#if JVET_AI0087_BTCUS_RESTRICTION
+      , false, false
+#endif
+    );
     cu.cs->determineIfSeparateTreeFlagInferred( inferredSeparateTreeFlag, partitioner.currArea().lumaSize().width, partitioner.currArea().lumaSize().height, canSplit );
 
     if ( !inferredSeparateTreeFlag )
@@ -7124,11 +7321,19 @@ void CABACWriter::transform_tree(const CodingStructure& cs, Partitioner& partiti
   const bool            split = (tu.depth > trDepth);
 
   // split_transform_flag
-  if( partitioner.canSplit( TU_MAX_TR_SPLIT, cs ) )
+  if( partitioner.canSplit( TU_MAX_TR_SPLIT, cs 
+#if JVET_AI0087_BTCUS_RESTRICTION
+    , false, false
+#endif
+  ) )
   {
     CHECK( !split, "transform split implied" );
   }
-  else if( cu.sbtInfo && partitioner.canSplit( PartSplit( cu.getSbtTuSplit() ), cs ) )
+  else if( cu.sbtInfo && partitioner.canSplit( PartSplit( cu.getSbtTuSplit() ), cs 
+#if JVET_AI0087_BTCUS_RESTRICTION
+    , false, false
+#endif
+  ) )
   {
     CHECK( !split, "transform split implied - sbt" );
   }
@@ -7139,7 +7344,11 @@ void CABACWriter::transform_tree(const CodingStructure& cs, Partitioner& partiti
   if( split )
   {
 
-    if( partitioner.canSplit( TU_MAX_TR_SPLIT, cs ) )
+    if( partitioner.canSplit( TU_MAX_TR_SPLIT, cs 
+#if JVET_AI0087_BTCUS_RESTRICTION
+      , false, false
+#endif
+    ) )
     {
 #if ENABLE_TRACING
       const CompArea &tuArea = partitioner.currArea().blocks[partitioner.chType];
@@ -7152,7 +7361,11 @@ void CABACWriter::transform_tree(const CodingStructure& cs, Partitioner& partiti
     {
       partitioner.splitCurrArea( ispType, cs );
     }
-    else if( cu.sbtInfo && partitioner.canSplit( PartSplit( cu.getSbtTuSplit() ), cs ) )
+    else if( cu.sbtInfo && partitioner.canSplit( PartSplit( cu.getSbtTuSplit() ), cs
+#if JVET_AI0087_BTCUS_RESTRICTION
+      , false, false
+#endif
+    ) )
     {
       partitioner.splitCurrArea( PartSplit( cu.getSbtTuSplit() ), cs );
     }

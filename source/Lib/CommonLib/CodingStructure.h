@@ -87,7 +87,9 @@ public:
   Slice           *slice;
 
   UnitScale        unitScale[MAX_NUM_COMPONENT];
-
+#if JVET_AI0087_BTCUS_RESTRICTION 
+  int         btFirstPartDecs[4];
+#endif
   int         baseQP;
   int         prevQP[MAX_NUM_CHANNEL_TYPE];
   int         currQP[MAX_NUM_CHANNEL_TYPE];

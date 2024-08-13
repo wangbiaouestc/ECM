@@ -4271,7 +4271,11 @@ void IntraSearch::estIntraPredChromaQT( CodingUnit &cu, Partitioner &partitioner
       if (CS::isDualITree(cs))
 #endif
       {
-        if( partitioner.canSplit( TU_MAX_TR_SPLIT, cs ) )
+        if( partitioner.canSplit( TU_MAX_TR_SPLIT, cs
+#if JVET_AI0087_BTCUS_RESTRICTION
+          , false, false
+#endif
+        ) )
         {
           partitioner.splitCurrArea( TU_MAX_TR_SPLIT, cs );
 
@@ -8957,7 +8961,11 @@ void IntraSearch::xEncSubdivCbfQT( CodingStructure &cs, Partitioner &partitioner
   const bool subdiv        = currTU.depth > currDepth;
   ComponentID compID = partitioner.chType == CHANNEL_TYPE_LUMA ? COMPONENT_Y : COMPONENT_Cb;
 
-  if( partitioner.canSplit( TU_MAX_TR_SPLIT, cs ) )
+  if( partitioner.canSplit( TU_MAX_TR_SPLIT, cs 
+#if JVET_AI0087_BTCUS_RESTRICTION
+    , false, false
+#endif
+  ) )
   {
     CHECK( !subdiv, "TU split implied" );
   }
@@ -8990,7 +8998,11 @@ void IntraSearch::xEncSubdivCbfQT( CodingStructure &cs, Partitioner &partitioner
 
   if (subdiv)
   {
-    if( partitioner.canSplit( TU_MAX_TR_SPLIT, cs ) )
+    if( partitioner.canSplit( TU_MAX_TR_SPLIT, cs
+#if JVET_AI0087_BTCUS_RESTRICTION
+      , false, false
+#endif
+    ) )
     {
       partitioner.splitCurrArea( TU_MAX_TR_SPLIT, cs );
     }
@@ -9059,7 +9071,11 @@ void IntraSearch::xEncCoeffQT( CodingStructure &cs, Partitioner &partitioner, co
 
   if (subdiv)
   {
-    if (partitioner.canSplit(TU_MAX_TR_SPLIT, cs))
+    if (partitioner.canSplit(TU_MAX_TR_SPLIT, cs
+#if JVET_AI0087_BTCUS_RESTRICTION
+      , false, false
+#endif
+    ))
     {
       partitioner.splitCurrArea(TU_MAX_TR_SPLIT, cs);
     }
@@ -10744,13 +10760,25 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
   const SPS &sps           = *cs.sps;
   bool bCheckFull          = true;
   bool bCheckSplit         = false;
-  bCheckFull               = !partitioner.canSplit( TU_MAX_TR_SPLIT, cs );
-  bCheckSplit              = partitioner.canSplit( TU_MAX_TR_SPLIT, cs );
+  bCheckFull               = !partitioner.canSplit( TU_MAX_TR_SPLIT, cs
+#if JVET_AI0087_BTCUS_RESTRICTION
+    , false, false
+#endif
+  );
+  bCheckSplit              = partitioner.canSplit( TU_MAX_TR_SPLIT, cs
+#if JVET_AI0087_BTCUS_RESTRICTION
+    , false, false
+#endif
+  );
   const Slice           &slice = *cs.slice;
 
   if( cu.ispMode )
   {
-    bCheckSplit = partitioner.canSplit( ispType, cs );
+    bCheckSplit = partitioner.canSplit( ispType, cs 
+#if JVET_AI0087_BTCUS_RESTRICTION
+      , false, false
+#endif
+    );
     bCheckFull = !bCheckSplit;
   }
   uint32_t    numSig           = 0;
@@ -11333,7 +11361,11 @@ bool IntraSearch::xRecurIntraCodingLumaQT( CodingStructure &cs, Partitioner &par
 
     bool uiSplitCbfLuma  = false;
     bool splitIsSelected = true;
-    if( partitioner.canSplit( TU_MAX_TR_SPLIT, cs ) )
+    if( partitioner.canSplit( TU_MAX_TR_SPLIT, cs
+#if JVET_AI0087_BTCUS_RESTRICTION
+      , false, false
+#endif
+    ) )
     {
       partitioner.splitCurrArea( TU_MAX_TR_SPLIT, cs );
     }
@@ -11470,7 +11502,11 @@ bool IntraSearch::xRecurIntraCodingACTQT(CodingStructure &cs, Partitioner &parti
   const Slice    &slice = *cs.slice;
   const SPS      &sps = *cs.sps;
 
-  bool bCheckFull = !partitioner.canSplit(TU_MAX_TR_SPLIT, cs);
+  bool bCheckFull = !partitioner.canSplit(TU_MAX_TR_SPLIT, cs
+#if JVET_AI0087_BTCUS_RESTRICTION
+    , false, false
+#endif
+  );
   bool bCheckSplit = !bCheckFull;
 
   TempCtx ctxStart(m_ctxCache, m_CABACEstimator->getCtx());
@@ -12279,7 +12315,11 @@ bool IntraSearch::xRecurIntraCodingACTQT(CodingStructure &cs, Partitioner &parti
   bool validReturnSplit = false;
   if (bCheckSplit)
   {
-    if (partitioner.canSplit(TU_MAX_TR_SPLIT, *csSplit))
+    if (partitioner.canSplit(TU_MAX_TR_SPLIT, *csSplit
+#if JVET_AI0087_BTCUS_RESTRICTION
+      , false, false
+#endif
+    ))
     {
       partitioner.splitCurrArea(TU_MAX_TR_SPLIT, *csSplit);
     }
@@ -13051,7 +13091,11 @@ ChromaCbfs IntraSearch::xRecurIntraChromaCodingQT( CodingStructure &cs, Partitio
     unsigned    numValidTBlocks   = ::getNumberValidTBlocks( *cs.pcv );
     ChromaCbfs  SplitCbfs         ( false );
 
-    if( partitioner.canSplit( TU_MAX_TR_SPLIT, cs ) )
+    if( partitioner.canSplit( TU_MAX_TR_SPLIT, cs 
+#if JVET_AI0087_BTCUS_RESTRICTION
+      , false, false
+#endif
+    ) )
     {
       partitioner.splitCurrArea( TU_MAX_TR_SPLIT, cs );
     }

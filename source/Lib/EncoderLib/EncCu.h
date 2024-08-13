@@ -494,7 +494,11 @@ public:
   void  compressCtu         ( CodingStructure& cs, const UnitArea& area, const unsigned ctuRsAddr, const int prevQP[], const int currQP[] );
   /// CTU encoding function
   int   updateCtuDataISlice ( const CPelBuf buf );
-
+  /// function to check whether the current CU is luma and non-boundary CU
+#if JVET_AI0087_BTCUS_RESTRICTION
+  bool isLumaNonBoundaryCu(const Partitioner &partitioner, SizeType picWidth, SizeType picHeight);
+  bool xStoreRDcostandPredMode(CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &pm, const EncTestMode &encTestmode, double tempcost);
+#endif
   EncModeCtrl* getModeCtrl  () { return m_modeCtrl; }
 
 #if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
@@ -521,7 +525,6 @@ protected:
   void xCompressCUParallel    ( CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &pm );
   void copyState              ( EncCu* other, Partitioner& pm, const UnitArea& currArea, const bool isDist );
 #endif
-
   bool
     xCheckBestMode         ( CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &pm, const EncTestMode& encTestmode );
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS

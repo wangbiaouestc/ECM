@@ -237,7 +237,12 @@ unsigned DeriveCtx::CtxModeConsFlag( const CodingStructure& cs, Partitioner& par
 }
 #endif
 
-void DeriveCtx::CtxSplit( const CodingStructure& cs, Partitioner& partitioner, unsigned& ctxSpl, unsigned& ctxQt, unsigned& ctxHv, unsigned& ctxHorBt, unsigned& ctxVerBt, bool* _canSplit /*= nullptr */ )
+void DeriveCtx::CtxSplit( const CodingStructure& cs, Partitioner& partitioner, unsigned& ctxSpl, unsigned& ctxQt, unsigned& ctxHv, unsigned& ctxHorBt, unsigned& ctxVerBt, bool* _canSplit 
+#if JVET_AI0087_BTCUS_RESTRICTION
+  , bool disableBTV, bool disableBTH
+#endif
+
+/*= nullptr */ )
 {
   const Position pos         = partitioner.currArea().blocks[partitioner.chType];
   const unsigned curSliceIdx = cs.slice->getIndependentSliceIdx();
@@ -255,9 +260,17 @@ void DeriveCtx::CtxSplit( const CodingStructure& cs, Partitioner& partitioner, u
   {
 #if JVET_AH0135_TEMPORAL_PARTITIONING
     unsigned maxMtt;
-    partitioner.canSplit(cs, canSplit[0], canSplit[1], canSplit[2], canSplit[3], canSplit[4], canSplit[5], maxMtt);
+    partitioner.canSplit(cs, canSplit[0], canSplit[1], canSplit[2], canSplit[3], canSplit[4], canSplit[5], maxMtt
+#if JVET_AI0087_BTCUS_RESTRICTION
+      , false, false
+#endif
+    );
 #else
-    partitioner.canSplit( cs, canSplit[0], canSplit[1], canSplit[2], canSplit[3], canSplit[4], canSplit[5] );
+    partitioner.canSplit( cs, canSplit[0], canSplit[1], canSplit[2], canSplit[3], canSplit[4], canSplit[5]
+#if JVET_AI0087_BTCUS_RESTRICTION
+      , false, false
+#endif
+    );
 #endif
   }
   else
@@ -312,6 +325,13 @@ void DeriveCtx::CtxSplit( const CodingStructure& cs, Partitioner& partitioner, u
   }
 
   ctxSpl += 3 * ( numSplit >> 1 );
+
+#if JVET_AI0087_BTCUS_RESTRICTION
+  if ((disableBTV || disableBTH) && partitioner.chType == CHANNEL_TYPE_LUMA)
+  {
+    ctxSpl = 9;
+  }
+#endif
 
   //////////////////////////
   // CTX is qt split (0-5)
