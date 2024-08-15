@@ -2277,7 +2277,7 @@ Distortion RdCost::xGetSSE64( const DistParam &rcDtParam )
 // HADAMARD with step (used in fractional search)
 // --------------------------------------------------------------------------------------------------------------------
 
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
 Distortion RdCost::xCalcHADs1xN(const Pel* piOrg, const Pel* piCur, int iStrideOrg, int iStrideCur, int iRows, int iCols)
 {
   Distortion satd = 0;
@@ -3134,7 +3134,7 @@ Distortion RdCost::xGetHADs( const DistParam &rcDtParam )
       piCur += iOffsetCur;
     }
   }
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
   else if (iRows == 1 || iCols == 1)
   {
     uiSum = xCalcHADs1xN(piOrg, piCur, iStrideOrg, iStrideCur, iRows, iCols);

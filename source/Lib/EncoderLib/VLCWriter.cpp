@@ -1664,7 +1664,7 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
   }
 #endif
 
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
   WRITE_FLAG(pcSPS->getUseAltCost() ? 1 : 0, "sps_alt_cost_enabled_flag");
 #endif
   WRITE_FLAG(pcSPS->getUseBcw() ? 1 : 0, "sps_bcw_enabled_flag");

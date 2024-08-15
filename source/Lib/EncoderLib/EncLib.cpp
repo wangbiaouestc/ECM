@@ -1886,7 +1886,7 @@ void EncLib::xInitSPS( SPS& sps )
 #endif
   sps.setUseAffine             ( m_Affine );
   sps.setUseAffineType         ( m_AffineType );
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
   sps.setUseAltCost            ( m_useAltCost );
   if ((getSourceWidth() * getSourceHeight()) > (832 * 480) && ((getSourceWidth() * getSourceHeight()) < (1920 * 1080)))
   {

@@ -427,7 +427,7 @@ protected:
   bool      m_sbTmvpEnableFlag;
   bool      m_Affine;
   bool      m_AffineType;
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
   bool      m_useAltCost;
 #endif
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
@@ -1611,7 +1611,7 @@ public:
   bool      getAffine                       ()         const { return m_Affine; }
   void      setAffineType( bool b )                          { m_AffineType = b; }
   bool      getAffineType()                            const { return m_AffineType; }
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
   void      setUseAltCost(bool b)                            { m_useAltCost = b; }
   bool      getUseAltCost()                            const { return m_useAltCost; }
 #endif

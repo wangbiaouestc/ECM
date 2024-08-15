@@ -3068,7 +3068,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
               }
               m_geoTmMrgCtx[tmType].setMergeInfo(pu, pu.geoMergeIdx0);
               pu.geoTmType = tmType;
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
               m_pcInterPred->deriveTMMv(pu, NULL, pu.geoMergeIdx0);
 #else
               m_pcInterPred->deriveTMMv(pu);
@@ -3138,7 +3138,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
               }
               m_geoTmMrgCtx[tmType].setMergeInfo(pu, pu.geoMergeIdx1);
               pu.geoTmType = tmType;
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
               m_pcInterPred->deriveTMMv(pu, NULL, pu.geoMergeIdx1);
 #else
               m_pcInterPred->deriveTMMv(pu);
@@ -3408,7 +3408,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
 #if JVET_AH0119_SUBBLOCK_TM
                   , affineMergeCtx, false
 #endif
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
                   , pu.mergeIdx
 #endif
                 );
@@ -3682,7 +3682,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
               EAffineModel affTypeL1;
               if (pu.affBMMergeFlag && PU::checkBDMVR4Affine(pu))
               {
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
                 m_pcInterPred->processBDMVR4AdaptiveAffine(pu, refinedMvL0, refinedMvL1, affTypeL0, affTypeL1, pu.mergeIdx);
 #else
                 m_pcInterPred->processBDMVR4AdaptiveAffine(pu, refinedMvL0, refinedMvL1, affTypeL0, affTypeL1);
@@ -3708,7 +3708,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                   , affineMergeCtx
                   , !pu.affineOppositeLic
 #endif
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
                   , pu.mergeIdx
 #endif
                 );
@@ -3751,7 +3751,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
             }
             m_pcInterPred->setBdmvrSubPuMvBuf(m_mvBufBDMVR[0], m_mvBufBDMVR[1]);
             pu.bdmvrRefine = false;
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
             m_pcInterPred->processTM4Affine(pu, affineMergeCtx, -1, false, true, pu.mergeIdx);//bi
 #else
             m_pcInterPred->processTM4Affine(pu, affineMergeCtx, -1, false);//bi
@@ -3794,7 +3794,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
 #if JVET_AH0119_SUBBLOCK_TM              
                 , !pu.affineOppositeLic
 #endif
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
                 , pu.mergeIdx
 #endif
               );//uni
@@ -3824,7 +3824,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
             &&  PU::checkAffineTMCondition(pu)
             &&  pu.mergeType== MRG_TYPE_SUBPU_ATMVP)
           {
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
             m_pcInterPred->processTM4SbTmvp(pu, affineMergeCtx, -1, false, pu.mergeIdx);
 #else
             m_pcInterPred->processTM4SbTmvp(pu, affineMergeCtx, -1, false);
@@ -3884,7 +3884,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
           for (uint32_t uiMergeCand = 0; uiMergeCand < CIIP_TM_MRG_MAX_NUM_CANDS; uiMergeCand++)
           {
             mrgCtx.setMergeInfo(pu, uiMergeCand);
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
             m_pcInterPred->deriveTMMv(pu, NULL, uiMergeCand);
 #else
             m_pcInterPred->deriveTMMv(pu);
@@ -4276,7 +4276,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                       pu.refIdx[1] = mrgCtx.mvFieldNeighbours[(candIdx << 1) + 1].refIdx;
 
                       Mv   finalMvDir[2];
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
                       applyBDMVR4BM[candIdx] = m_pcInterPred->processBDMVRPU2Dir(pu, subPuRefineList[candIdx], finalMvDir, candIdx);
 #else
                       applyBDMVR4BM[candIdx] = m_pcInterPred->processBDMVRPU2Dir(pu, subPuRefineList[candIdx], finalMvDir);
@@ -4294,7 +4294,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                     pu.mergeIdx = orgMergeIdx;
                     mrgCtx.setMergeInfo( pu, pu.mergeIdx);
                     m_pcInterPred->setBdmvrSubPuMvBuf(m_mvBufBDMVR[0], m_mvBufBDMVR[1]);
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
                     m_pcInterPred->processBDMVRSubPU(pu, subPuRefineList[mergeIdx][pu.bmDir - 1], pu.mergeIdx);
 #else
                     m_pcInterPred->processBDMVRSubPU(pu, subPuRefineList[mergeIdx][pu.bmDir - 1]);
@@ -4370,7 +4370,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                       pu.refIdx[1] = mrgCtx.mvFieldNeighbours[(candIdx << 1) + 1].refIdx;
 
                       Mv   finalMvDir[2];
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
                       applyBDMVR4BM[candIdx] = m_pcInterPred->processBDMVRPU2Dir(pu, subPuRefineList[candIdx], finalMvDir, candIdx);
 #else
                       applyBDMVR4BM[candIdx] = m_pcInterPred->processBDMVRPU2Dir(pu, subPuRefineList[candIdx], finalMvDir);
@@ -4388,7 +4388,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                     pu.mergeIdx = orgMergeIdx;
                     mrgCtx.setMergeInfo( pu, pu.mergeIdx);
                     m_pcInterPred->setBdmvrSubPuMvBuf(m_mvBufBDMVR[0], m_mvBufBDMVR[1]);
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
                     m_pcInterPred->processBDMVRSubPU(pu, subPuRefineList[mergeIdx][pu.bmDir - 1], pu.mergeIdx);
 #else
                     m_pcInterPred->processBDMVRSubPU(pu, subPuRefineList[mergeIdx][pu.bmDir - 1]);
@@ -4605,7 +4605,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                     {
                       m_pcInterPred->setBdmvrSubPuMvBuf(m_mvBufBDMVR[uiMergeCand << 1], m_mvBufBDMVR[(uiMergeCand << 1) + 1]);
                       pu.bdmvrRefine = true;
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
                       applyBDMVR4TM[uiMergeCand] = m_pcInterPred->processBDMVR( pu, 1, tempCost, uiMergeCand);
 #else
                       applyBDMVR4TM[uiMergeCand] = m_pcInterPred->processBDMVR( pu, 1, tempCost );
@@ -4613,7 +4613,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                     }
                     else
                     {
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
                       m_pcInterPred->deriveTMMv(pu, tempCost, uiMergeCand);
 #else
                       m_pcInterPred->deriveTMMv(pu, tempCost);
@@ -4858,7 +4858,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                   {
                     m_pcInterPred->setBdmvrSubPuMvBuf(m_mvBufBDMVR[uiMergeCand << 1], m_mvBufBDMVR[(uiMergeCand << 1) + 1]);
                     pu.bdmvrRefine = true;
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
                     applyBDMVR4TM[uiMergeCand] = m_pcInterPred->processBDMVR( pu, 1, tempCost, uiMergeCand);
 #else
                     applyBDMVR4TM[uiMergeCand] = m_pcInterPred->processBDMVR( pu, 1, tempCost );
@@ -4866,7 +4866,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
                   }
                   else
                   {
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
                     m_pcInterPred->deriveTMMv(pu, tempCost, uiMergeCand);
 #else
                     m_pcInterPred->deriveTMMv(pu, tempCost);
@@ -4962,7 +4962,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
             if (pu.bdmvrRefine)
             {
               m_pcInterPred->setBdmvrSubPuMvBuf(m_mvBufBDMVR[0], m_mvBufBDMVR[1]);
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
               pu.bdmvrRefine = m_pcInterPred->processBDMVR( pu, 0, NULL, pu.mergeIdx);
 #else
               pu.bdmvrRefine = m_pcInterPred->processBDMVR( pu );
@@ -4970,7 +4970,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
             }
             else
             {
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
               m_pcInterPred->deriveTMMv(pu, NULL, pu.mergeIdx);
 #else
               m_pcInterPred->deriveTMMv(pu);
@@ -5036,7 +5036,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
             }
             else
             {
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
               pu.bdmvrRefine = m_pcInterPred->processBDMVR( pu, 0, NULL, pu.mergeIdx);
 #else
               pu.bdmvrRefine = m_pcInterPred->processBDMVR( pu );
@@ -5052,7 +5052,7 @@ void DecCu::xDeriveCUMV(CodingUnit &cu)
             if (pu.tmMergeFlag)
 #endif
             {
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
               m_pcInterPred->deriveTMMv(pu, NULL, CU::isIBC(*pu.cu)? -1 : pu.mergeIdx);
 #else
               m_pcInterPred->deriveTMMv(pu);

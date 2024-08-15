@@ -830,7 +830,7 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setSbTmvpEnabledFlag                                 ( m_sbTmvpEnableFlag );
   m_cEncLib.setAffine                                            ( m_Affine );
   m_cEncLib.setAffineType                                        ( m_AffineType );
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
   m_cEncLib.setUseAltCost                                        ( m_useAltCost );
 #endif
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT

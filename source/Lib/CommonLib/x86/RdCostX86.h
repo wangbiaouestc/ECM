@@ -2570,7 +2570,7 @@ Distortion RdCost::xGetHADs_SIMD( const DistParam &rcDtParam )
       piCur += iOffsetCur;
     }
   }
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
   else if (iRows == 1 || iCols == 1)
   {
     uiSum = xCalcHADs1xN(piOrg, piCur, iStrideOrg, iStrideCur, iRows, iCols);
