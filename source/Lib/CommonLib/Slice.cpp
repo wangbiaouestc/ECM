@@ -4292,7 +4292,7 @@ SPS::SPS()
 #endif
 , m_Affine                    ( false )
 , m_AffineType                ( false )
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
 , m_useAltCost                ( true )
 #endif
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT

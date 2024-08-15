@@ -1802,7 +1802,7 @@ private:
   bool              m_SMVD;
   bool              m_Affine;
   bool              m_AffineType;
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
   bool              m_useAltCost;
 #endif
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
@@ -2693,7 +2693,7 @@ void                    setCCALFEnabledFlag( bool b )                           
   void      setUseFastSubTmvp     ( bool b )                                        { m_fastSubTmvp = b; }
   bool      getUseFastSubTmvp     ()                                      const     { return m_fastSubTmvp; }
 #endif
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
   void      setUseAltCost         ( bool b )                                        { m_useAltCost = b; }
   bool      getUseAltCost         ()                                      const     { return m_useAltCost; }
 #endif
