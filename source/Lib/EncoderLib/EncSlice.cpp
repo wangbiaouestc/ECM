@@ -2076,7 +2076,7 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
     bool isSCC = hashBlkHitPerc >= 20;
     spsTmp->setUseIbcFilter(isSCC);   
 #if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
-    if (cs.slice->getPOC() == 0 || cs.slice->getSliceType() == I_SLICE) // ensure sequential and parallel simulation generate same output
+    if ( cs.sps->getUseGeoBlend() && (cs.slice->getPOC() == 0 || cs.slice->getSliceType() == I_SLICE) ) // ensure sequential and parallel simulation generate same output
     {
       spsTmp->setUseGeoBlend(!isSCC);
     }
