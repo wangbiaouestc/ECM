@@ -6978,7 +6978,6 @@ void EncAdaptiveLoopFilter::alfCorrection( CodingStructure& cs, const PelUnitBuf
   const int offsetN = adjustOffCorr;
   const int offsetP = offsetN - 1;
 
-  bool  alfLumaEnabled = false;
   int numAlfLumaEnabled[ALF_CTB_MAX_NUM_APS];
   memset( numAlfLumaEnabled, 0, sizeof(int) * ALF_CTB_MAX_NUM_APS );
 
@@ -6996,7 +6995,6 @@ void EncAdaptiveLoopFilter::alfCorrection( CodingStructure& cs, const PelUnitBuf
       {
         ctuEnableFlag |= m_ctuEnableFlag[compIdx][ctuIdx] > 0;
       }
-      alfLumaEnabled |= m_ctuEnableFlag[COMPONENT_Y][ctuIdx] > 0;
 
       int rasterSliceAlfPad = 0;
       bool  nok = ctuEnableFlag && isCrossedByVirtualBoundaries(cs, xPos, yPos, width, height, clipTop, clipBottom, clipLeft, clipRight, numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos, rasterSliceAlfPad);
@@ -7097,7 +7095,6 @@ void EncAdaptiveLoopFilter::alfCorrection( CodingStructure& cs, const PelUnitBuf
     return;
   }
 
-  int       sumBestSadDiff = 0;
   int64_t   sumBestMseDiff = 0;
 
   cs.slice->setUseAlfScale(false);
@@ -7118,8 +7115,6 @@ void EncAdaptiveLoopFilter::alfCorrection( CodingStructure& cs, const PelUnitBuf
     gScaleAlf[i] = nullptr;
   }
   int cptAps = 0;
-
-  double estCostBest = 0;
 
   for (int f = 0; f < cs.slice->getTileGroupNumAps(); f++)
   {
@@ -7148,7 +7143,6 @@ void EncAdaptiveLoopFilter::alfCorrection( CodingStructure& cs, const PelUnitBuf
         // init best idxCorr as s=0 :
         std::vector<int>  bestGroupIdxCorr;
         bestGroupIdxCorr.resize(MAX_NUM_ALF_CLASSES, 0);
-        int bestGroupSad = 0;
         int64_t   bestGroupMse = 0;
 
         uint64_t  sumBestMse0 = 0;
@@ -7290,15 +7284,12 @@ void EncAdaptiveLoopFilter::alfCorrection( CodingStructure& cs, const PelUnitBuf
           }
         }
 
-        sumBestSadDiff += bestGroupSad;
         sumBestMseDiff += bestGroupMse;
 
         if ( !curScaleAlfParam.usePrev )
         {
           curScaleAlfParam.fillIdxCorr();
         }
-
-        estCostBest += estCostBestApsAlt;
 
         cptAps++;
 
