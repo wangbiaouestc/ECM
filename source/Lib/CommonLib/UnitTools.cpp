@@ -9796,7 +9796,15 @@ void PU::getInterMergeCandidates( const PredictionUnit &pu, MergeCtx& mrgCtx,
   }
 #if JVET_AI0103_ADDITIONAL_CMVP
   int blkSizeThres = 128;
-  const uint32_t numCmvpCands = (pu.lumaSize().width + pu.lumaSize().height < blkSizeThres) ? NUM_CMVP_CANDS : 0;
+  uint32_t numCmvpCands = (pu.lumaSize().width + pu.lumaSize().height < blkSizeThres) ? NUM_CMVP_CANDS : 0;
+#if JVET_AE0174_NONINTER_TM_TOOLS_CONTROL
+  if (!(pu.cs->sps->getUseAML() && pu.cs->sps->getTMToolsEnableFlag())|| !pu.cs->sps->getUseTmvpNmvpReordering())
+#else
+  if (!pu.cs->sps->getUseAML() || !pu.cs->sps->getUseTmvpNmvpReordering())
+#endif
+  {
+    numCmvpCands = 0;
+  }
   additionalMRGCand += numCmvpCands;
 #endif
 #if JVET_AI0183_MVP_EXTENSION
