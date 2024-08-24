@@ -1198,7 +1198,7 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #endif
   ("Geo",                                             m_Geo,                                            false, "Enable geometric partitioning mode (0:off, 1:on)")
 #if JVET_AI0082_GPM_WITH_INTER_IBC
-  ("GeoInterIbc",                                     m_geoInterIbc,                                    true, "GPM with inter and IBC (0:off, 1:on)  [default: off]" )
+  ("GeoInterIbc",                                     m_geoInterIbc,                                    false, "GPM with inter and IBC (0:off, 1:on)  [default: off]" )
 #endif
   ("HashME",                                          m_HashME,                                         false, "Enable hash motion estimation (0:off, 1:on)")
 
