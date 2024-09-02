@@ -1169,7 +1169,11 @@ PartSplit CABACReader::split_cu_mode( CodingStructure& cs, Partitioner &partitio
   bool disableBTV = false;
   bool disableBTH = false;
 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
   if (CABACReader::isLumaNonBoundaryCu(partitioner, cs.picture->lwidth(), cs.picture->lheight()) && (!(cs.slice->getProcessingIntraRegion() && cs.slice->getProcessingSeparateTrees()) || cs.slice->isIntra()) )
+#else
+  if (CABACReader::isLumaNonBoundaryCu(partitioner, cs.picture->lwidth(), cs.picture->lheight()) )
+#endif
   {
     if ((partitioner.currBtDepth == 0) && (partitioner.currArea().lwidth() == partitioner.currArea().lheight()))
     {
@@ -1418,7 +1422,10 @@ PartSplit CABACReader::split_cu_mode( CodingStructure& cs, Partitioner &partitio
 
 #if JVET_AI0087_BTCUS_RESTRICTION
   if (CABACReader::isLumaNonBoundaryCu(partitioner, cs.picture->lwidth(), cs.picture->lheight())
-      && (!(cs.slice->getProcessingIntraRegion() && cs.slice->getProcessingSeparateTrees()) || cs.slice->isIntra()))
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      && (!(cs.slice->getProcessingIntraRegion() && cs.slice->getProcessingSeparateTrees()) || cs.slice->isIntra())
+#endif
+      )
   {
     if ((partitioner.currBtDepth == 1) && (partitioner.currPartIdx() == 0))
     {

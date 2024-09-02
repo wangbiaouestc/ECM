@@ -896,8 +896,11 @@ bool EncCu::isLumaNonBoundaryCu(const Partitioner &partitioner, SizeType picWidt
 bool EncCu::xStoreRDcostandPredMode(CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &partitioner, const EncTestMode &encTestMode, double lastModeBestCost)
 {
   if (EncCu::isLumaNonBoundaryCu(partitioner, bestCS->picture->lwidth(), bestCS->picture->lheight())
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
       && (!(bestCS->slice->getProcessingIntraRegion() && bestCS->slice->getProcessingSeparateTrees())
-          || bestCS->slice->isIntra()))
+          || bestCS->slice->isIntra())
+#endif
+          )
   {
     bool PrevbestCostisChangedtoNewBestCost = (lastModeBestCost != bestCS->cost);
     if ((partitioner.currBtDepth == 1) && (partitioner.currPartIdx() == 0) && PrevbestCostisChangedtoNewBestCost)
@@ -2600,8 +2603,11 @@ void EncCu::xCheckModeSplit(CodingStructure *&tempCS, CodingStructure *&bestCS, 
 #endif 
 #if JVET_AI0087_BTCUS_RESTRICTION
       if (EncCu::isLumaNonBoundaryCu(partitioner, bestCS->picture->lwidth(), bestCS->picture->lheight())
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
           && (!(bestCS->slice->getProcessingIntraRegion() && bestCS->slice->getProcessingSeparateTrees())
-              || bestCS->slice->isIntra()))
+              || bestCS->slice->isIntra())
+#endif
+              )
       {
         if (partitioner.currPartLevel().split == CU_HORZ_SPLIT
             || partitioner.currPartLevel().split == CU_VERT_SPLIT)   // BTH or BTV Case
