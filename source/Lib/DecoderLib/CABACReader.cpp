@@ -975,6 +975,7 @@ void CABACReader::coding_tree( CodingStructure& cs, Partitioner& partitioner, CU
   if ( cu.isSST )
   {
     cu.chType = cu.slice->getProcessingChannelType();
+    cu.slice->setCUIntraRegionRoot( &cu );
   }
 
   if (!cu.slice->getSeparateTreeEnabled() || !cu.slice->getProcessingIntraRegion() || (cu.slice->isIntra() && cu.slice->getUseIBC()))
@@ -996,6 +997,12 @@ void CABACReader::coding_tree( CodingStructure& cs, Partitioner& partitioner, CU
     cs.slice->setProcessingSeparateTrees ( separateTree );
     cs.slice->setProcessingChannelType   ( CH_L );
     cs.slice->setIntraRegionRoot         ( &partitioner );
+
+    if ( cu.isSST )
+    {
+      cu.slice->setProcessingIntraRegion   ( true );
+      cu.slice->setCUIntraRegionRoot( &cu );
+    }
 
     CHECK( separateTree && ( partitioner.currArea().lwidth() > 256 || partitioner.currArea().lheight() > 256 ), "Separate tree cannot have width or height greater than 256" );
 

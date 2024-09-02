@@ -211,6 +211,8 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
 #if JVET_AI0084_ALF_RESIDUALS_SCALING
                 pcEncPic->cs->slice->copyAlfScale( *pic->cs->slice );
 #endif
+                pic->cs->setLumaPointers(*pcEncPic->cs);
+
                 if( debugCTU >= 0 && poc == debugPOC )
                 {
                   pcEncPic->cs->initStructData();
