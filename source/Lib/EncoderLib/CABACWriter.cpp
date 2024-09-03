@@ -355,6 +355,8 @@ void CABACWriter::coding_tree_unit( CodingStructure& cs, const UnitArea& area, i
   }
 
 #if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  cs.setLumaPointers( cs );
+
   coding_tree( cs, partitioner, cuCtx, qps );
   qps[CH_L] = cuCtx.qp;
 #else
@@ -809,6 +811,9 @@ void CABACWriter::coding_tree(const CodingStructure& cs, Partitioner& partitione
     partitionerSST->chType = CH_L;
 
     cs.slice->setProcessingIntraRegion   ( true );
+    
+    cu.slice->setProcessingIntraRegion   ( true );
+
     cs.slice->setProcessingSeparateTrees ( cu.separateTree );
     cs.slice->setIntraRegionRoot         ( &partitioner );
     cs.slice->setProcessingChannelType   ( CH_L );
@@ -827,6 +832,7 @@ void CABACWriter::coding_tree(const CodingStructure& cs, Partitioner& partitione
       qps[CH_C] = cuCtxChroma.qp;
     }
     cs.slice->setProcessingIntraRegion( false );
+    cu.slice->setProcessingIntraRegion( false );
   }
 #endif
 
