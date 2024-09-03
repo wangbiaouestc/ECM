@@ -1727,7 +1727,12 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
 #if JVET_AI0087_BTCUS_RESTRICTION
   bool disableBTV = false;
   bool disableBTH = false;
+  
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
   if (EncModeCtrl::isLumaNonBoundaryCu(partitioner, cs.picture->lwidth(), cs.picture->lheight()) && (!(cs.slice->getProcessingIntraRegion() && cs.slice->getProcessingSeparateTrees()) || cs.slice->isIntra()) )
+#else
+  if (EncModeCtrl::isLumaNonBoundaryCu(partitioner, cs.picture->lwidth(), cs.picture->lheight()) )
+#endif
   {
     if ((partitioner.currBtDepth == 1) && (partitioner.currPartIdx() == 1))
     {

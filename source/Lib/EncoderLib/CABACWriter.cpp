@@ -885,7 +885,11 @@ void CABACWriter::split_cu_mode( const PartSplit split, const CodingStructure& c
   bool disableBTV = false;
   bool disableBTH = false;
 
-  if (CABACWriter::isLumaNonBoundaryCu(partitioner, cs.picture->lwidth(), cs.picture->lheight()) && (!(cs.slice->getProcessingIntraRegion() && cs.slice->getProcessingSeparateTrees()) || cs.slice->isIntra()) )
+  if (CABACWriter::isLumaNonBoundaryCu(partitioner, cs.picture->lwidth(), cs.picture->lheight()) 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  && (!(cs.slice->getProcessingIntraRegion() && cs.slice->getProcessingSeparateTrees()) || cs.slice->isIntra()) 
+#endif
+  )
   {
     if ((partitioner.currBtDepth == 0) && (partitioner.currArea().lwidth() == partitioner.currArea().lheight()))
     {
@@ -1145,7 +1149,10 @@ void CABACWriter::split_cu_mode( const PartSplit split, const CodingStructure& c
 
 #if JVET_AI0087_BTCUS_RESTRICTION
   if (CABACWriter::isLumaNonBoundaryCu(partitioner, cs.picture->lwidth(), cs.picture->lheight())
-      && (!(cs.slice->getProcessingIntraRegion() && cs.slice->getProcessingSeparateTrees()) || cs.slice->isIntra()))
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      && (!(cs.slice->getProcessingIntraRegion() && cs.slice->getProcessingSeparateTrees()) || cs.slice->isIntra())
+#endif
+      )
   {
     if (updatePartInfo && (partitioner.currBtDepth == 1) && (partitioner.currPartIdx() == 0))
     {
