@@ -6518,7 +6518,7 @@ void CABACWriter::geo_merge_idx1(const PredictionUnit& pu)
 #if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
 uint64_t CABACWriter::geo_blend_est( const TempCtx& ctxStart, const int flag )
 {
-  getCtx() = ctxStart;
+  getCtx() = SubCtx(Ctx::GeoBlendFlag,ctxStart);
   resetBits();
 
   m_BinEncoder.encodeBin( flag, Ctx::GeoBlendFlag() );
@@ -6677,7 +6677,7 @@ uint64_t CABACWriter::geo_mmvdIdx_est(const TempCtx& ctxStart, const int geoMMVD
 #if JVET_AG0164_AFFINE_GPM
 uint64_t CABACWriter::geo_affFlag_est(const TempCtx& ctxStart, const int flag, int ctxOffset)
 {
-  getCtx() = ctxStart;
+  getCtx() = SubCtx(Ctx::AffineFlag,ctxStart);
   resetBits();
 
   m_BinEncoder.encodeBin(flag, Ctx::AffineFlag(ctxOffset));
@@ -6694,7 +6694,7 @@ uint64_t CABACWriter::geoBldFlagEst(const PredictionUnit& pu, const TempCtx& ctx
 uint64_t CABACWriter::geoBldFlagEst(const TempCtx& ctxStart, const int flag)
 #endif
 {
-  getCtx() = ctxStart;
+  getCtx() = SubCtx(Ctx::GeoBldFlag,ctxStart);
   resetBits();
 #if JVET_AH0314_ADAPTIVE_GPM_BLENDING_IMPROV
   int blkSizeSmall = pu.lwidth() < pu.lheight() ? pu.lwidth() : pu.lheight();
