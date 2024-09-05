@@ -200,13 +200,7 @@ bool tryDecodePicture( Picture* pcEncPic, const int expectedPoc, const std::stri
                 pcEncPic->cs->sps   = pcEncPic->slices.back()->getSPS();
                 pcEncPic->cs->slice = pcEncPic->slices.back();
 #if JVET_AG0145_ADAPTIVE_CLIPPING
-                pcEncPic->cs->slice->setLumaPelMin(pic->cs->slice->getLumaPelMin());
-                pcEncPic->cs->slice->setLumaPelMax(pic->cs->slice->getLumaPelMax());
-                pcEncPic->cs->slice->setAdaptiveClipQuant(pic->cs->slice->getAdaptiveClipQuant());
-                pcEncPic->lumaClpRng.min = pic->cs->slice->getLumaPelMin();
-                pcEncPic->lumaClpRng.max = pic->cs->slice->getLumaPelMax();
-                pcEncPic->lumaClpRngforQuant.min = pic->cs->slice->getLumaPelMin();
-                pcEncPic->lumaClpRngforQuant.max = pic->cs->slice->getLumaPelMax();
+                pcEncPic->calcLumaClpParams();
 #endif
 #if JVET_AI0084_ALF_RESIDUALS_SCALING
                 pcEncPic->cs->slice->copyAlfScale( *pic->cs->slice );
