@@ -1780,3 +1780,104 @@ void Picture::copyCleanCurPicture()
   }
 }
 #endif
+
+#if JVET_AG0145_ADAPTIVE_CLIPPING
+void Picture::calcLumaClpParams()
+{
+  int pelMax = getLumaClpRng().max;
+  int pelMin = getLumaClpRng().min;
+#if JVET_AI0096_ADAPTIVE_CLIPPING_BIT_DEPTH_FIX
+  int targetMin = 16 * (1 << (cs->sps->getBitDepth(toChannelType(COMPONENT_Y)) - 8));
+  int targetMax = 235 * (1 << (cs->sps->getBitDepth(toChannelType(COMPONENT_Y)) - 8));
+#else
+  int targetMin = 64, targetMax = 940;
+#endif
+  if (cs->slice->getSliceType() != I_SLICE)
+  {
+    const Picture *const pColPic = cs->slice->getRefPic(RefPicList(1 - cs->slice->getColFromL0Flag()), cs->slice->getColRefIdx())->unscaledPic;
+    ClpRng colLumaClpRng = pColPic->getLumaClpRng();
+    targetMin            = colLumaClpRng.min;
+    targetMax            = colLumaClpRng.max;
+  }
+  int clipDeltaShift = 0;
+  if (cs->slice->getSliceType() != I_SLICE && cs->slice->getCheckLDC())
+  {
+    clipDeltaShift = ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_1;
+    cs->slice->setAdaptiveClipQuant(true);
+  }
+  else
+  {
+    clipDeltaShift = ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_0;
+    cs->slice->setAdaptiveClipQuant(false);
+  }
+  int       pelMaxOF  = 0;
+  int       pelMinOF  = (1 << cs->sps->getBitDepth(toChannelType(COMPONENT_Y))) - 1;
+  const int orgPelMin = pelMin;
+  {
+    int deltaMinToSignal = (pelMin - targetMin);
+    if (deltaMinToSignal < 0)
+    {
+      int absDelta = ((targetMin - pelMin) >> clipDeltaShift) << clipDeltaShift;
+      pelMin       = targetMin - absDelta;
+      while (pelMin > orgPelMin)
+      {
+        pelMin -= (1 << clipDeltaShift);
+      }
+      while (pelMin < 0)
+      {
+        pelMinOF = pelMin;
+        pelMin   = 0;
+      }
+      CHECK(pelMin < 0, "this is not possible");
+    }
+    else if (deltaMinToSignal > 0)
+    {
+      int absDelta = (deltaMinToSignal >> clipDeltaShift) << clipDeltaShift;
+      pelMin       = targetMin + absDelta;
+      CHECK(pelMin > orgPelMin, "this is not possible");
+      CHECK(pelMin < 0, "this is not possible");
+    }
+    else
+    {
+      CHECK(pelMin != targetMin, "this is not possible");
+    }
+  }
+
+  const int orgPelMax = pelMax;
+  {
+    int deltaMaxToSignal = (pelMax - targetMax);
+    if (deltaMaxToSignal < 0)
+    {
+      int absDelta = ((targetMax - pelMax) >> clipDeltaShift) << clipDeltaShift;
+      pelMax       = targetMax - absDelta;
+      CHECK(pelMax < orgPelMax, "this is not possible");
+      CHECK(pelMax > (1 << cs->sps->getBitDepth(toChannelType(COMPONENT_Y))) - 1, "this is not possible");
+    }
+    else if (deltaMaxToSignal > 0)
+    {
+      int absDelta = (deltaMaxToSignal >> clipDeltaShift) << clipDeltaShift;
+      pelMax       = targetMax + absDelta;
+      while (pelMax < orgPelMax)
+      {
+        pelMax += (1 << clipDeltaShift);
+      }
+      while (pelMax >= (1 << cs->sps->getBitDepth(toChannelType(COMPONENT_Y))))
+      {
+        pelMaxOF = pelMax;
+        pelMax   = (1 << cs->sps->getBitDepth(toChannelType(COMPONENT_Y))) - 1;
+      }
+      CHECK(pelMax > (1 << cs->sps->getBitDepth(toChannelType(COMPONENT_Y))) - 1, "this is not possible");
+    }
+    else
+    {
+      CHECK(pelMax != targetMax, "this is not possible");
+    }
+  }
+  cs->slice->setLumaPelMax(pelMax);
+  cs->slice->setLumaPelMin(pelMin);
+  lumaClpRng.min         = pelMin;
+  lumaClpRng.max         = pelMax;
+  lumaClpRngforQuant.min = std::min(pelMin, pelMinOF);
+  lumaClpRngforQuant.max = std::max(pelMax, pelMaxOF);
+}
+#endif
