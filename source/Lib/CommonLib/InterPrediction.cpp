@@ -14937,7 +14937,7 @@ void InterPrediction::adjustMergeCandidates(PredictionUnit& pu, MergeCtx& mvpMer
       }
       if (bRefIsRescaled)
       {
-        uiCost = std::numeric_limits<Distortion>::max();
+        uiCost = MAX_UINT64 - 1;
       }
       else
       {
