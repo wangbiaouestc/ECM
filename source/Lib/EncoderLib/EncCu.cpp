@@ -1725,7 +1725,9 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
 #if JVET_AI0087_BTCUS_RESTRICTION 
       xStoreRDcostandPredMode(tempCS, bestCS, partitioner, currTestMode, lastModeBestCost);
 #endif
-
+#if JVET_Y0152_TT_ENC_SPEEDUP 
+      tempCS->splitRdCostBest = splitRdCostBest;
+#endif
 
 #if JVET_AI0136_ADAPTIVE_DUAL_TREE
 #if JVET_Z0118_GDR
@@ -3074,6 +3076,18 @@ void EncCu::xCheckRDCostSeparateTreeIntra( CodingStructure *&tempCS, CodingStruc
         tempSSTCS->baseQP        = bestSSTCS->baseQP       = tempCS->currQP[CH_L];
       tempSSTCS->prevQP[CH_L]  = bestSSTCS->prevQP[CH_L] = tempCS->prevQP[CH_L];
 
+#if JVET_AI0087_BTCUS_RESTRICTION
+      tempSSTCS->btFirstPartDecs[0] = 0;
+      tempSSTCS->btFirstPartDecs[1] = 0;
+      tempSSTCS->btFirstPartDecs[2] = 0;
+      tempSSTCS->btFirstPartDecs[3] = 0;
+
+      bestSSTCS->btFirstPartDecs[0] = 0;
+      bestSSTCS->btFirstPartDecs[1] = 0;
+      bestSSTCS->btFirstPartDecs[2] = 0;
+      bestSSTCS->btFirstPartDecs[3] = 0;
+#endif
+
       xCompressCU( tempSSTCS, bestSSTCS, *partitionerSST );
 
       if ( ( bestSSTCS->cost != MAX_DOUBLE || ( !separateTreeFlag && bestSSTCS->cost < bestCS->cost ) ) && !bestSSTCS->cus.empty() ) 
@@ -3114,6 +3128,18 @@ void EncCu::xCheckRDCostSeparateTreeIntra( CodingStructure *&tempCS, CodingStruc
         tempCS->setLumaPointers                ( *bestSSTCS );
         tempCS->slice->setProcessingChannelType( CH_C    );
         m_modeCtrl->setTreeIdx();
+
+#if JVET_AI0087_BTCUS_RESTRICTION
+      tempSSTCS->btFirstPartDecs[0] = 0;
+      tempSSTCS->btFirstPartDecs[1] = 0;
+      tempSSTCS->btFirstPartDecs[2] = 0;
+      tempSSTCS->btFirstPartDecs[3] = 0;
+
+      bestSSTCS->btFirstPartDecs[0] = 0;
+      bestSSTCS->btFirstPartDecs[1] = 0;
+      bestSSTCS->btFirstPartDecs[2] = 0;
+      bestSSTCS->btFirstPartDecs[3] = 0;
+#endif
 
         xCompressCU( tempSSTCS, bestSSTCS, *partitionerSST );
 
