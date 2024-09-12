@@ -1279,7 +1279,7 @@ PartSplit CABACReader::split_cu_mode( CodingStructure& cs, Partitioner &partitio
 
       Picture *pColPic = cs.slice->getRefPic(RefPicList(cs.slice->isInterB() ? 1 - cs.slice->getColFromL0Flag() : 0),
                                              cs.slice->getColRefIdx());
-      if (!cs.slice->isIntra() && pColPic != NULL && pColPic->cs->slice != NULL
+      if (!cs.slice->isIntra() && pColPic != NULL && !pColPic->isRefScaled(cs.pps) && pColPic->cs->slice != NULL
           && (pColPic->cs->area.Y().contains(partitioner.currArea().blocks[partitioner.chType].pos().offset(
             (partitioner.currArea().blocks[partitioner.chType].lumaSize().width) >> 1,
             ((partitioner.currArea().blocks[partitioner.chType].lumaSize().height) >> 1)))))
