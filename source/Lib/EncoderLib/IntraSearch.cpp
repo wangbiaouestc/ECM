@@ -3006,6 +3006,14 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
         uiRdModeList.push_back(m);
       }
 #endif
+
+#if JVET_AH0209_PDP
+      if( pdpSaveFlag )
+      {
+        std::memcpy(m_pdpIntraPredBufIP, m_pdpIntraPredBuf, sizeof(m_pdpIntraPredBufIP));
+      }
+#endif
+
       // after this point, don't use numModesForFullRD
       // PBINTRA fast
       if (m_pcEncCfg->getUsePbIntraFast() && !cs.slice->isIntra() && uiRdModeList.size() < numModesAvailable
@@ -3190,16 +3198,6 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
       m_modeCtrl->setMtsFirstPassNoIspCost( MAX_DOUBLE );
     }
     int bestLfnstIdx = cu.lfnstIdx;
-
-#if JVET_AH0209_PDP
-    if( pdpSaveFlag )
-    {
-      for( int i = 0; i < NUM_LUMA_MODE; i++ )
-      {
-        m_pdpIntraPredBufIP[i] = m_pdpIntraPredBuf[i];
-      }
-    }
-#endif
 
     for (int mode = isSecondColorSpace ? 0 : -2 * int(testBDPCM); mode < (int)uiRdModeList.size(); mode++)
     {
