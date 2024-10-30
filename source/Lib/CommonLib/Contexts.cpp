@@ -728,9 +728,7 @@ std::vector<std::vector<uint8_t>> ContextSetCfg::sm_InitTables(NUMBER_OF_SLICE_T
 std::vector<std::vector<uint8_t>> ContextSetCfg::sm_InitTables(NUMBER_OF_SLICE_TYPES + 1);
 #endif
 
-#if ECM_14_1_CABAC_RETRAIN
-#include "Contexts_ecm14.1.inl"
-#elif JVET_AI0281_CABAC_RETRAIN
+#if JVET_AI0281_CABAC_RETRAIN
 #include "Contexts_ecm14.0.inl"
 #elif JVET_AH0176_LOW_DELAY_B_CTX
 #include "Contexts_ecm13.inl"
