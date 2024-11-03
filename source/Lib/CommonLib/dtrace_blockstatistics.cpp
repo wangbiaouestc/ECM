@@ -816,9 +816,12 @@ void writeAllData(const CodingStructure& cs, const UnitArea& ctuArea)
               MergeCtx geoMrgCtx = geoMergeCtxtsOfCurrentCtu.front();
               geoMergeCtxtsOfCurrentCtu.pop();
 
+              PredictionUnit tmpPu = *cu.firstPU;
+              CodingUnit tmpCu = cu;
+              tmpPu.cu = &tmpCu;
+
               // first partition
               {
-                PredictionUnit tmpPu = *cu.firstPU;
 #if JVET_Y0065_GPM_INTRA
                 if (candIdx0 >= GEO_MAX_NUM_UNI_CANDS)
                 {
@@ -854,7 +857,6 @@ void writeAllData(const CodingStructure& cs, const UnitArea& ctuArea)
 
               // second partition
               {
-                PredictionUnit tmpPu = *cu.firstPU;
 #if JVET_Y0065_GPM_INTRA
                 if (candIdx1 >= GEO_MAX_NUM_UNI_CANDS)
                 {
