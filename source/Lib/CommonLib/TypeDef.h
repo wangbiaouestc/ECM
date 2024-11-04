@@ -362,6 +362,8 @@
 #define JVET_AI0094_SHARP_MC_FILTER_FOR_BIPRED            1 // JVET-AI0094: Sharp motion compensation filter for bi-prediction
 #define JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE           1 // JVET-AI0185 adaptive cost function selection in merge mode
 #define JVET_AI0183_MVP_EXTENSION                         1 // JVET-AI0183 MVP extension
+#define JVET_AJ0107_GPM_SHAPE_ADAPT                       1 // JVET-AJ0107: Test 3.4d, GPM with shape adaptation only applied to regular GPM.
+
 // Inter template matching tools
 #define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction
 #if ENABLE_INTER_TEMPLATE_MATCHING

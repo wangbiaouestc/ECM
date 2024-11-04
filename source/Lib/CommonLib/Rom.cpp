@@ -5410,7 +5410,11 @@ void destroyROM()
   delete gp_sizeIdxInfo;
   gp_sizeIdxInfo = nullptr;
 
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+  for( int modeIdx = 0; modeIdx < GEO_TOTAL_NUM_PARTITION_MODE; modeIdx++ )
+#else
   for( int modeIdx = 0; modeIdx < GEO_NUM_PARTITION_MODE; modeIdx++ )
+#endif
   {
     delete[] g_geoParams[modeIdx];
     g_geoParams[modeIdx] = nullptr;
@@ -5814,14 +5818,20 @@ uint8_t g_paletteRunLeftLut[5] = { 0, 1, 2, 3, 4 };
 
 void initGeoTemplate()
 {
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+  g_geoParams = new int16_t*[GEO_TOTAL_NUM_PARTITION_MODE];
+#else
   g_geoParams = new int16_t*[GEO_NUM_PARTITION_MODE];
+#endif
   int modeIdx = 0;
   for( int angleIdx = 0; angleIdx < GEO_NUM_ANGLES; angleIdx++ )
   {
     for( int distanceIdx = 0; distanceIdx < GEO_NUM_DISTANCES; distanceIdx++ )
     {
       if( (distanceIdx == 0 && angleIdx >= 16)
+#if !JVET_AJ0107_GPM_SHAPE_ADAPT
         || ((distanceIdx == 2 || distanceIdx == 0) && (g_angle2mask[angleIdx] == 0 || g_angle2mask[angleIdx] == 5))
+#endif
         || g_angle2mask[angleIdx] == -1 )
       {
         continue;
@@ -5991,7 +6001,11 @@ void initGeoTemplate()
     for( int wIdx = 0; wIdx < GEO_NUM_CU_SIZE; wIdx++ )
     {
       int16_t width = 1 << (wIdx + GEO_MIN_CU_LOG2);
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+      for( int splitDir = 0; splitDir < GEO_TOTAL_NUM_PARTITION_MODE; splitDir++ )
+#else
       for( int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++ )
+#endif
       {
         int16_t angle         = g_geoParams[splitDir][0];
         int16_t distance      = g_geoParams[splitDir][1];
@@ -6020,7 +6034,11 @@ void initGeoTemplate()
     for (int wIdx = 0; wIdx < GEO_NUM_CU_SIZE_EX; wIdx++)
     {
       int16_t width = 1 << (wIdx + GEO_MIN_CU_LOG2_EX);
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+      for (int splitDir = 0; splitDir < GEO_TOTAL_NUM_PARTITION_MODE; splitDir++)
+#else
       for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++)
+#endif
       {
         int16_t angle    = g_geoParams[splitDir][0];
         int16_t distance = g_geoParams[splitDir][1];
@@ -6065,7 +6083,12 @@ Pel*      g_geoEncSadMask[GEO_NUM_PRESTORED_MASK];
 int16_t*  g_geoEncSadMask[GEO_NUM_PRESTORED_MASK];
 #endif
 #if JVET_AB0155_SGPM
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+int16_t g_weightOffsetEx[GEO_TOTAL_NUM_PARTITION_MODE][GEO_NUM_CU_SIZE_EX][GEO_NUM_CU_SIZE_EX][2];
+#else
 int16_t g_weightOffsetEx[GEO_NUM_PARTITION_MODE][GEO_NUM_CU_SIZE_EX][GEO_NUM_CU_SIZE_EX][2];
+#endif
+#if !JVET_AJ0107_GPM_SHAPE_ADAPT
 int8_t g_sgpmSplitDir[GEO_NUM_PARTITION_MODE] = {
 1,1,0,0,0,0,1,0,
 1,0,1,0,1,0,1,0,
@@ -6077,19 +6100,66 @@ int8_t g_sgpmSplitDir[GEO_NUM_PARTITION_MODE] = {
 1,0,0,1,0,0,0,0
 };
 #endif
+#endif
 
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+// Shape-dependent indices for 'regular GPM'
+int8_t g_gpmSplitDir[GEO_NUM_CU_SHAPES][GEO_NUM_PARTITION_MODE] = {
+{1, 3, 64, 66, 33, 35, 88, 90, 4, 7, 69, 60, 63, 111, 8, 11, 72, 56, 59, 108, 12, 15, 75, 52, 55, 105, 5, 67, 61, 109, 9, 70, 57, 106, 13, 73, 53, 103, 16, 17, 19, 76, 78, 48, 49, 51, 100, 102, 6, 68, 62, 110, 10, 71, 58, 107, 14, 74, 54, 104, 18, 77, 50, 101},
+{1, 3, 64, 66, 33, 35, 88, 90, 8, 11, 72, 56, 59, 108, 12, 15, 75, 52, 55, 105, 4, 7, 69, 60, 63, 111, 9, 70, 57, 106, 13, 73, 53, 103, 5, 67, 61, 109, 20, 21, 23, 79, 81, 44, 45, 47, 97, 99, 10, 71, 58, 107, 14, 74, 54, 104, 6, 68, 62, 110, 22, 80, 46, 98},
+{1, 3, 64, 66, 33, 35, 88, 90, 12, 15, 75, 52, 55, 105, 16, 19, 78, 48, 51, 102, 8, 11, 72, 56, 59, 108, 13, 73, 53, 103, 17, 76, 49, 100, 9, 70, 57, 106, 4, 5, 7, 67, 69, 60, 61, 63, 109, 111, 14, 74, 54, 104, 18, 77, 50, 101, 10, 71, 58, 107, 6, 68, 62, 110},
+{1, 3, 64, 66, 33, 35, 88, 90, 16, 19, 78, 48, 51, 102, 20, 23, 81, 44, 47, 99, 12, 15, 75, 52, 55, 105, 17, 76, 49, 100, 21, 79, 45, 97, 13, 73, 53, 103, 8, 9, 11, 70, 72, 56, 57, 59, 106, 108, 18, 77, 50, 101, 22, 80, 46, 98, 14, 74, 54, 104, 10, 71, 58, 107},
+{1, 3, 64, 66, 33, 35, 88, 90, 20, 23, 81, 44, 47, 99, 24, 27, 84, 40, 43, 96, 16, 19, 78, 48, 51, 102, 21, 79, 45, 97, 25, 82, 41, 94, 17, 76, 49, 100, 12, 13, 15, 73, 75, 52, 53, 55, 103, 105, 22, 80, 46, 98, 26, 83, 42, 95, 18, 77, 50, 101, 14, 74, 54, 104},
+{1, 3, 64, 66, 33, 35, 88, 90, 24, 27, 84, 40, 43, 96, 28, 31, 87, 36, 39, 93, 20, 23, 81, 44, 47, 99, 25, 82, 41, 94, 29, 85, 37, 91, 21, 79, 45, 97, 16, 17, 19, 76, 78, 48, 49, 51, 100, 102, 26, 83, 42, 95, 30, 86, 38, 92, 22, 80, 46, 98, 18, 77, 50, 101},
+{1, 3, 64, 66, 33, 35, 88, 90, 28, 31, 87, 36, 39, 93, 20, 23, 81, 44, 47, 99, 24, 27, 84, 40, 43, 96, 29, 85, 37, 91, 21, 79, 45, 97, 25, 82, 41, 94, 16, 17, 19, 76, 78, 48, 49, 51, 100, 102, 30, 86, 38, 92, 14, 74, 54, 104, 26, 83, 42, 95, 18, 77, 50, 101}};
+// Fixed-shape indices for IBC-GPM and SGPM
+int8_t g_sgpmSplitDir[SGPM_TOTAL_NUM_PARTITIONS] = {1, 3, 12, 14, 16, 18, 20, 22, 33, 35, 44, 46, 48, 50, 52, 54, 64, 66, 74, 77, 80, 88, 90, 98, 101, 104};
+int8_t g_ibcGpmSplitDir[IBC_GPM_MAX_SPLIT_DIR_FIRST_SET_NUM + IBC_GPM_MAX_SPLIT_DIR_SECOND_SET_NUM] = {1, 3, 8, 9, 11, 12, 13, 15, 16, 17, 19, 20, 21, 23, 33, 35, 44, 45, 47, 48, 49, 51, 52, 53, 55, 56, 57, 59, 64, 66, 70, 72, 73, 75, 76, 78, 79, 81, 88, 90, 97, 99, 100, 102, 103, 105, 106, 108}; 
+int8_t g_ibcGpmSplitDirFirstSetRank[IBC_GPM_MAX_SPLIT_DIR_FIRST_SET_NUM + IBC_GPM_MAX_SPLIT_DIR_SECOND_SET_NUM] = {1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0}; 
+#endif
+
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+int16_t   g_weightOffset       [GEO_TOTAL_NUM_PARTITION_MODE][GEO_NUM_CU_SIZE][GEO_NUM_CU_SIZE][2];
+int8_t    g_angle2mask[GEO_NUM_ANGLES] = { 0,  1, 2, 3, 4, 5,  6, 7, 8, 7,  6, 5, 4, 3, 2,  1, 0,  1, 2, 3, 4, 5,  6, 7, 8, 7,  6, 5, 4, 3, 2,  1 };
+#else
 int16_t   g_weightOffset       [GEO_NUM_PARTITION_MODE][GEO_NUM_CU_SIZE][GEO_NUM_CU_SIZE][2];
 int8_t    g_angle2mask[GEO_NUM_ANGLES] = { 0, -1, 1, 2, 3, 4, -1, -1, 5, -1, -1, 4, 3, 2, 1, -1, 0, -1, 1, 2, 3, 4, -1, -1, 5, -1, -1, 4, 3, 2, 1, -1 };
+#endif
 int8_t    g_dis[GEO_NUM_ANGLES] = { 8, 8, 8, 8, 4, 4, 2, 1, 0, -1, -2, -4, -4, -8, -8, -8, -8, -8, -8, -8, -4, -4, -2, -1, 0, 1, 2, 4, 4, 8, 8, 8 };
 int8_t    g_angle2mirror[GEO_NUM_ANGLES] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2 };
 #if JVET_Y0065_GPM_INTRA
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+int8_t    g_geoAngle2IntraAng[GEO_NUM_ANGLES] = {50,46, 44, 41, 34, 27,23, 21, 18, 15,13, 9, 66, 59, 56,54, 50,46, 44, 41, 34, 27,23, 21, 18, 15,13, 9, 66, 59, 56,54};
+#else
 int8_t    g_geoAngle2IntraAng[GEO_NUM_ANGLES] = {50, 0, 44, 41, 34, 27, 0, 0, 18, 0, 0, 9, 66, 59, 56, 0, 50, 0, 44, 41, 34, 27, 0, 0, 18, 0, 0, 9, 66, 59, 56, 0};
 #endif
+#endif
+
+
 #if MULTI_HYP_PRED
 const int g_addHypWeight[MULTI_HYP_PRED_NUM_WEIGHTS] = { 2, -1 };
 static_assert(g_bcwLog2WeightBase == MULTI_HYP_PRED_WEIGHT_BITS, "number of bits for gbi and multi-hyp weights do not match");
 #endif
 #if (JVET_W0097_GPM_MMVD_TM && TM_MRG) || JVET_Y0065_GPM_INTRA
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+uint8_t g_geoTmShape[2][GEO_NUM_ANGLES] = {
+                                          { GEO_TM_SHAPE_A,  GEO_TM_SHAPE_A,  GEO_TM_SHAPE_A,  GEO_TM_SHAPE_A,
+                                            GEO_TM_SHAPE_A,  GEO_TM_SHAPE_AL, GEO_TM_SHAPE_AL, GEO_TM_SHAPE_AL,
+                                            GEO_TM_SHAPE_AL, GEO_TM_SHAPE_AL, GEO_TM_SHAPE_AL, GEO_TM_SHAPE_AL,
+                                            GEO_TM_SHAPE_AL, GEO_TM_SHAPE_A,  GEO_TM_SHAPE_A,  GEO_TM_SHAPE_A,
+                                            GEO_TM_SHAPE_A,  GEO_TM_SHAPE_A,  GEO_TM_SHAPE_A,  GEO_TM_SHAPE_A,
+                                            GEO_TM_SHAPE_A,  GEO_TM_SHAPE_AL, GEO_TM_SHAPE_AL, GEO_TM_SHAPE_AL,
+                                            GEO_TM_SHAPE_AL, GEO_TM_SHAPE_AL, GEO_TM_SHAPE_AL, GEO_TM_SHAPE_AL,
+                                            GEO_TM_SHAPE_AL, GEO_TM_SHAPE_A,  GEO_TM_SHAPE_A,  GEO_TM_SHAPE_A, },
+                                          { GEO_TM_SHAPE_AL, GEO_TM_SHAPE_AL, GEO_TM_SHAPE_AL, GEO_TM_SHAPE_AL,
+                                            GEO_TM_SHAPE_L,  GEO_TM_SHAPE_L,  GEO_TM_SHAPE_L,  GEO_TM_SHAPE_L,
+                                            GEO_TM_SHAPE_L,  GEO_TM_SHAPE_L,  GEO_TM_SHAPE_L,  GEO_TM_SHAPE_L,
+                                            GEO_TM_SHAPE_AL, GEO_TM_SHAPE_AL, GEO_TM_SHAPE_AL, GEO_TM_SHAPE_AL,
+                                            GEO_TM_SHAPE_AL, GEO_TM_SHAPE_AL, GEO_TM_SHAPE_AL, GEO_TM_SHAPE_AL,
+                                            GEO_TM_SHAPE_L,  GEO_TM_SHAPE_L,  GEO_TM_SHAPE_L,  GEO_TM_SHAPE_L,
+                                            GEO_TM_SHAPE_L,  GEO_TM_SHAPE_L,  GEO_TM_SHAPE_L,  GEO_TM_SHAPE_L,
+                                            GEO_TM_SHAPE_AL, GEO_TM_SHAPE_AL, GEO_TM_SHAPE_AL, GEO_TM_SHAPE_AL, } };
+#else
 uint8_t g_geoTmShape[2][GEO_NUM_ANGLES] = {
                                           { GEO_TM_SHAPE_A,  0,               GEO_TM_SHAPE_A,  GEO_TM_SHAPE_A,
                                             GEO_TM_SHAPE_A,  GEO_TM_SHAPE_AL, 0,               0,
@@ -6107,6 +6177,7 @@ uint8_t g_geoTmShape[2][GEO_NUM_ANGLES] = {
                                             GEO_TM_SHAPE_L,  GEO_TM_SHAPE_L,  0,               0,
                                             GEO_TM_SHAPE_L,  0,               0,               GEO_TM_SHAPE_L,
                                             GEO_TM_SHAPE_AL, GEO_TM_SHAPE_AL, GEO_TM_SHAPE_AL, 0, } };
+#endif
 #endif
 #if JVET_W0066_CCSAO
 const int8_t g_ccSaoCandPosX[MAX_NUM_LUMA_COMP][MAX_CCSAO_CAND_POS_Y] = { {-1,  0,  1, -1,  0,  1, -1,  0,  1} };
@@ -6155,6 +6226,7 @@ const int8_t g_glmPattern[NUM_GLM_PATTERN][6] =
 };
 #endif
 #if JVET_AC0112_IBC_GPM
+#if !JVET_AJ0107_GPM_SHAPE_ADAPT
 const int8_t g_ibcGpmFirstSetSplitDirToIdx[GEO_NUM_PARTITION_MODE] = {
 0,1,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,
@@ -6176,7 +6248,7 @@ const int8_t g_ibcGpmSecondSetSplitDir[GEO_NUM_PARTITION_MODE] = {
 0,1,0,0,1,0,1,1,
 0,1,1,0,1,1,0,1
 };
-
+#endif
 #endif
 
 #if JVET_AG0098_AMVP_WITH_SBTMVP

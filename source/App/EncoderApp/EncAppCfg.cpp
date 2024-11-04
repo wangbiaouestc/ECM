@@ -1197,6 +1197,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("CIIPTIMD",                                        m_ciipTimd,                                       true, "Enable CIIP-TIMD mode")
 #endif
   ("Geo",                                             m_Geo,                                            false, "Enable geometric partitioning mode (0:off, 1:on)")
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+  ("GeoShapeAdapt",                                   m_GeoShapeAdapt,                                  false, "Enable shape adaptive geometric partitioning mode (0:off, 1:on)")
+#endif
 #if JVET_AI0082_GPM_WITH_INTER_IBC
   ("GeoInterIbc",                                     m_geoInterIbc,                                    false, "GPM with inter and IBC (0:off, 1:on)  [default: off]" )
 #endif
@@ -5672,6 +5675,9 @@ void EncAppCfg::xPrintParameter()
     msg(VERBOSE, "CIIPAffine:%d ", m_useCiipAffine);
 #endif
     msg( VERBOSE, "Geo:%d ", m_Geo );
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+    msg( VERBOSE, "GeoShapeAdapt:%d ", m_GeoShapeAdapt );
+#endif
 #if JVET_AI0082_GPM_WITH_INTER_IBC
     msg( VERBOSE, "GeoInterIbc:%d ", m_geoInterIbc );
 #endif

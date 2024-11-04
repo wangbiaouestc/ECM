@@ -5289,7 +5289,19 @@ void CABACReader::ibcGpmMergeIdx(PredictionUnit& pu)
   if (splitDirFirstSet)
   {
     int splitDirIdx = m_BinDecoder.decodeBinsEP(3);
+#if JVET_AJ0107_GPM_SHAPE_ADAPT 
+    splitDir = splitDirIdx;
+    for(int i = 0; IBC_GPM_MAX_SPLIT_DIR_FIRST_SET_NUM+ IBC_GPM_MAX_SPLIT_DIR_SECOND_SET_NUM; i++)
+    {
+      if(g_ibcGpmSplitDirFirstSetRank[i] == splitDirIdx+1)
+      {
+        splitDir = i;
+        break;
+      }
+    }
+#else
     splitDir = g_ibcGpmFirstSetSplitDir[splitDirIdx];
+#endif
   }
   else
   {
@@ -5298,7 +5310,11 @@ void CABACReader::ibcGpmMergeIdx(PredictionUnit& pu)
     splitDir++;
     for (uint8_t i = 0; i < GEO_NUM_PARTITION_MODE && splitDir != 0; i++)
     {
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+      if (g_ibcGpmSplitDirFirstSetRank[i] != 0)
+#else
       if (!g_ibcGpmSecondSetSplitDir[i])
+#endif
       {
         prefix++;
       }

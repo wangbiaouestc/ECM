@@ -1719,6 +1719,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if JVET_AI0082_GPM_WITH_INTER_IBC
       WRITE_FLAG(pcSPS->getUseGeoInterIbc() ? 1 : 0, "sps_gpm_inter_ibc_enabled_flag");
 #endif
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+      WRITE_FLAG(pcSPS->getUseGeoShapeAdapt() ? 1 : 0, "sps_gpm_shape_adapt_flag");
+#endif
     }
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_W0097_GPM_MMVD_TM && TM_MRG
     else

@@ -4916,12 +4916,23 @@ void CABACWriter::ibcGpmMergeIdx(const PredictionUnit& pu)
   uint8_t candIdx0 = pu.ibcGpmMergeIdx0;
   uint8_t candIdx1 = pu.ibcGpmMergeIdx1;
 
+
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+  uint8_t splitDirIdx = pu.ibcGpmSplitDir;
+  if(g_ibcGpmSplitDirFirstSetRank[splitDirIdx] != 0)
+  {
+#else
   uint8_t splitDirIdx = 0;
   if (g_geoParams[splitDir][0] % 8 == 0)
   {
+#endif
     m_BinEncoder.encodeBin( 1, Ctx::IbcGpmSplitDirSetFlag() );
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+    m_BinEncoder.encodeBinsEP(g_ibcGpmSplitDirFirstSetRank[splitDirIdx] - 1, 3);
+#else
     splitDirIdx = g_ibcGpmFirstSetSplitDirToIdx[splitDir];
     m_BinEncoder.encodeBinsEP(splitDirIdx, 3);
+#endif
   }
   else
   {
@@ -4929,7 +4940,11 @@ void CABACWriter::ibcGpmMergeIdx(const PredictionUnit& pu)
     uint8_t prefix = 0;
     for (uint8_t i = 0; i < splitDir; i++)
     {
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+      if(g_ibcGpmSplitDirFirstSetRank[i] != 0)
+#else
       if (!g_ibcGpmSecondSetSplitDir[i])
+#endif
       {
         prefix++;
       }
@@ -6187,7 +6202,11 @@ void CABACWriter::geoModeIdx(const uint8_t geoMode, const uint8_t altCodeIdx)
 
   if (GEO_SPLIT_MODE_RICE_CODE_DIVISOR > 1)
   {
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+    uint8_t geoModeSuffix = geoMode % (uint8_t)(GEO_SPLIT_MODE_RICE_CODE_DIVISOR);
+#else
     uint8_t geoModeSuffix = geoMode & (uint8_t)(GEO_SPLIT_MODE_RICE_CODE_DIVISOR - 1);
+#endif
     xWriteTruncBinCode(geoModeSuffix, GEO_SPLIT_MODE_RICE_CODE_DIVISOR);
     DTRACE( g_trace_ctx, D_SYNTAX, "merge_idx() geo_split_dir=%d(prefix=%d suffix=%u)\n", geoMode, geoModePrefix, geoModeSuffix );
   }

@@ -995,8 +995,15 @@ bool IntraPrediction::xFillIntraGPMRefTemplateAll(PredictionUnit& pu, TemplateTy
   uint8_t startIdx = candIdx == std::numeric_limits<uint8_t>::max() ? 0                       : (candIdx - GEO_MAX_NUM_UNI_CANDS);
 #endif
   uint8_t endIdx   = candIdx == std::numeric_limits<uint8_t>::max() ? GEO_MAX_NUM_INTRA_CANDS : (startIdx + 1                   );
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+  for (int splitDirIdx = 0; splitDirIdx < GEO_NUM_PARTITION_MODE; splitDirIdx++)
+  {
+    int whIdx = !pu.cs->slice->getSPS()->getUseGeoShapeAdapt() ? GEO_SQUARE_IDX : Clip3(0, GEO_NUM_CU_SHAPES-1, floorLog2(pu.lwidth()) - floorLog2(pu.lheight()) + GEO_SQUARE_IDX);
+    int splitDir = g_gpmSplitDir[whIdx][splitDirIdx];
+#else
   for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++)
   {
+#endif
     uint8_t* geoIntraMPMList = m_aiGpmIntraMPMLists[splitDir][partIdx];
     if (!readBufferedMPMList)
     {
@@ -2534,7 +2541,11 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
     
     m_ipaParam           = m_ipaParam2;
     
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+    int     splitDir   = g_sgpmSplitDir[pu.cu->sgpmSplitDir];
+#else
     int     splitDir   = pu.cu->sgpmSplitDir;
+#endif
     m_if.m_weightedSgpm(pu, width, height, compID, splitDir, piPred, piPred, predFusion);
   }
 #endif
@@ -7644,9 +7655,17 @@ void IntraPrediction::deriveSgpmModeOrdered(const CPelBuf &recoBuf, const CompAr
 
 #if JVET_AG0152_SGPM_ITMP_IBC
   Distortion sadWholeTM[NUM_LUMA_MODE + SGPM_NUM_BVS];
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+  Distortion sadPartsTM[NUM_LUMA_MODE + SGPM_NUM_BVS][SGPM_TOTAL_NUM_PARTITIONS];
+#else
   Distortion sadPartsTM[NUM_LUMA_MODE + SGPM_NUM_BVS][GEO_NUM_PARTITION_MODE];
+#endif
   uint8_t    ipmList[GEO_NUM_PARTITION_MODE][2][SGPM_NUM_MPM + SGPM_NUM_BVS];
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+  bool       sadPartsNeeded[NUM_LUMA_MODE + SGPM_NUM_BVS][SGPM_TOTAL_NUM_PARTITIONS] = {};
+#else
   bool       sadPartsNeeded[NUM_LUMA_MODE + SGPM_NUM_BVS][GEO_NUM_PARTITION_MODE] = {};
+#endif
   bool       ipmNeeded[NUM_LUMA_MODE + SGPM_NUM_BVS] = {};
 
 #if JVET_AH0200_INTRA_TMP_BV_REORDER
@@ -7703,30 +7722,61 @@ void IntraPrediction::deriveSgpmModeOrdered(const CPelBuf &recoBuf, const CompAr
   bool       ipmNeeded[NUM_LUMA_MODE]                                 = {};
 #endif
 
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+  for (int splitDirIdx = 0; splitDirIdx < SGPM_TOTAL_NUM_PARTITIONS; splitDirIdx++)
+  {
+#else
   for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++)
   {
+#endif
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+#else
     if (!g_sgpmSplitDir[splitDir])
     {
       continue;
     }
+#endif
 
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+    int splitDir = g_sgpmSplitDir[splitDirIdx];
+#endif
     int16_t angle = g_geoParams[splitDir][0];
     for (int partIdx = 0; partIdx < 2; partIdx++)
     {
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+      PU::getSgpmIntraMPMs(pu, ipmList[splitDirIdx][partIdx], splitDir, g_geoTmShape[partIdx][angle]);
+#else
       PU::getSgpmIntraMPMs(pu, ipmList[splitDir][partIdx], splitDir, g_geoTmShape[partIdx][angle]);
+#endif
       for (int modeIdx = 0; modeIdx < SGPM_NUM_MPM; modeIdx++)
       {
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+        int ipmIdx                       = ipmList[splitDirIdx][partIdx][modeIdx];
+#else
         int ipmIdx                       = ipmList[splitDir][partIdx][modeIdx];
+#endif
         ipmNeeded[ipmIdx]                = true;
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+        sadPartsNeeded[ipmIdx][splitDirIdx] = true;
+#else
         sadPartsNeeded[ipmIdx][splitDir] = true;
+#endif
       }
 #if JVET_AG0152_SGPM_ITMP_IBC
       for (int modeIdx = 0; modeIdx < numItmpIbc; modeIdx++)
       {
         int ipmIdx = SGPM_BV_START_IDX + modeIdx;
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+        ipmList[splitDirIdx][partIdx][modeIdx + SGPM_NUM_MPM] = ipmIdx;
+#else
         ipmList[splitDir][partIdx][modeIdx + SGPM_NUM_MPM] = ipmIdx;
+#endif
         ipmNeeded[ipmIdx] = true;
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+        sadPartsNeeded[ipmIdx][splitDirIdx] = true;
+#else
         sadPartsNeeded[ipmIdx][splitDir] = true;
+#endif
       }
 #endif
     }
@@ -7749,11 +7799,23 @@ void IntraPrediction::deriveSgpmModeOrdered(const CPelBuf &recoBuf, const CompAr
       sadWholeTM[ipmIdx] =
         m_if.m_sadTM(pu, uiWidth, uiHeight, iTempWidth, iTempHeight, COMPONENT_Y, predBuf, recBuf, adBuf);
 
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+      for (int splitDirIdx = 0; splitDirIdx < SGPM_TOTAL_NUM_PARTITIONS; splitDirIdx++)
+      {
+        int splitDir = g_sgpmSplitDir[splitDirIdx];
+#else
       for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++)
       {
+#endif
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+        if (sadPartsNeeded[ipmIdx][splitDirIdx])
+        {
+          sadPartsTM[ipmIdx][splitDirIdx] =
+#else
         if (sadPartsNeeded[ipmIdx][splitDir])
         {
           sadPartsTM[ipmIdx][splitDir] =
+#endif
             m_if.m_sgpmSadTM(pu, uiWidth, uiHeight, iTempWidth, iTempHeight, COMPONENT_Y, splitDir, adBuf);
         }
       }
@@ -7790,11 +7852,23 @@ void IntraPrediction::deriveSgpmModeOrdered(const CPelBuf &recoBuf, const CompAr
       sadWholeTM[ipmIdx] =
         m_if.m_sadTM(pu, uiWidth, uiHeight, iTempWidth, iTempHeight, COMPONENT_Y, predBuf, recBuf, adBuf);
 
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+      for (int splitDirIdx = 0; splitDirIdx < SGPM_TOTAL_NUM_PARTITIONS; splitDirIdx++)
+      {
+        int splitDir = g_sgpmSplitDir[splitDirIdx];
+#else
       for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++)
       {
+#endif
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+        if (sadPartsNeeded[ipmIdx][splitDirIdx])
+        {
+          sadPartsTM[ipmIdx][splitDirIdx] =
+#else
         if (sadPartsNeeded[ipmIdx][splitDir])
         {
           sadPartsTM[ipmIdx][splitDir] =
+#endif
             m_if.m_sgpmSadTM(pu, uiWidth, uiHeight, iTempWidth, iTempHeight, COMPONENT_Y, splitDir, adBuf);
         }
       }
@@ -7803,12 +7877,19 @@ void IntraPrediction::deriveSgpmModeOrdered(const CPelBuf &recoBuf, const CompAr
 #endif
   // check every possible combination
   uint32_t cntComb = 0;
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+  for (int splitDir = 0; splitDir < SGPM_TOTAL_NUM_PARTITIONS; splitDir++)
+#else
   for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; splitDir++)
+#endif
   {
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+#else
     if (!g_sgpmSplitDir[splitDir])
     {
       continue;
     }
+#endif
 
 #if JVET_AG0152_SGPM_ITMP_IBC
     for (int mode0Idx = 0; mode0Idx < SGPM_NUM_MPM + numItmpIbc; mode0Idx++)

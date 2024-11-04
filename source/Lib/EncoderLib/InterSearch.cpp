@@ -8539,6 +8539,9 @@ void InterSearch::getBestGeoModeListEncoder(PredictionUnit &pu, uint8_t& numVali
   bool filledRefTplPart1 = gpmTplCostPart1[1][0] == std::numeric_limits<uint32_t>::max();
   int bitDepth = pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA);
 
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+    int whIdx = !pu.cs->slice->getSPS()->getUseGeoShapeAdapt() ? GEO_SQUARE_IDX : Clip3(0, GEO_NUM_CU_SHAPES-1, floorLog2(pu.lwidth()) - floorLog2(pu.lheight()) + GEO_SQUARE_IDX);
+#endif
   if (m_bAMLTemplateAvailabe[0])
   {
     SizeType   szPerLine            = pu.lwidth();
@@ -8556,13 +8559,24 @@ void InterSearch::getBestGeoModeListEncoder(PredictionUnit &pu, uint8_t& numVali
       GetAbsDiffPerSample(pcBufPredRefTopPart0.Y(), pcBufPredCurTop.Y(), pcBufPredRefTopPart0.Y());
       uint32_t fullCostPart0 = (uint32_t)GetSampleSum(pcBufPredRefTopPart0.Y(), bitDepth);
 
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+      for (int splitDirIdx = 0; splitDirIdx < GEO_NUM_PARTITION_MODE; ++splitDirIdx)
+      {
+        int splitDir = g_gpmSplitDir[whIdx][splitDirIdx];
+#else
       for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; ++splitDir)
       {
+#endif
         int16_t mirrorIdx = g_angle2mirror[g_geoParams[splitDir][0]];
         Pel* mask = getTplWeightTableCU<false, 0>(splitDir);
         uint32_t tempDist = (uint32_t)Get01MaskedSampleSum(pcBufPredRefTopPart0.Y(), bitDepth, mask, stepX[mirrorIdx], maskStride[mirrorIdx], maskStride2[mirrorIdx]);
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+        gpmTplCostPart0[0][splitDirIdx] = tempDist;
+        gpmTplCostPart0[1][splitDirIdx] = fullCostPart0 - tempDist; // pre-calculated
+#else
         gpmTplCostPart0[0][splitDir] = tempDist;
         gpmTplCostPart0[1][splitDir] = fullCostPart0 - tempDist; // pre-calculated
+#endif
       }
     }
 
@@ -8572,13 +8586,24 @@ void InterSearch::getBestGeoModeListEncoder(PredictionUnit &pu, uint8_t& numVali
       GetAbsDiffPerSample(pcBufPredRefTopPart1.Y(), pcBufPredCurTop.Y(), pcBufPredRefTopPart1.Y());
       uint32_t fullCostPart1 = (uint32_t)GetSampleSum(pcBufPredRefTopPart1.Y(), bitDepth);
 
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+      for (int splitDirIdx = 0; splitDirIdx < GEO_NUM_PARTITION_MODE; ++splitDirIdx)
+      {
+        int splitDir = g_gpmSplitDir[whIdx][splitDirIdx];
+#else
       for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; ++splitDir)
       {
+#endif
         int16_t mirrorIdx = g_angle2mirror[g_geoParams[splitDir][0]];
         Pel* mask = getTplWeightTableCU<false, 0>(splitDir);
         uint32_t tempDist = (uint32_t)Get01MaskedSampleSum(pcBufPredRefTopPart1.Y(), bitDepth, mask, stepX[mirrorIdx], maskStride[mirrorIdx], maskStride2[mirrorIdx]);
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+        gpmTplCostPart1[0][splitDirIdx] = tempDist;  // pre-calculated
+        gpmTplCostPart1[1][splitDirIdx] = fullCostPart1 - tempDist;
+#else
         gpmTplCostPart1[0][splitDir] = tempDist;  // pre-calculated
         gpmTplCostPart1[1][splitDir] = fullCostPart1 - tempDist;
+#endif
       }
     }
   }
@@ -8607,19 +8632,33 @@ void InterSearch::getBestGeoModeListEncoder(PredictionUnit &pu, uint8_t& numVali
     const int maskStride[3] = { (int)szPerLine, (int)szPerLine, (int)szPerLine }; // mask stride
     const int stepX[3] = { 1, 1, 1 };
 
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+    int whIdx = !pu.cs->slice->getSPS()->getUseGeoShapeAdapt() ? GEO_SQUARE_IDX : Clip3(0, GEO_NUM_CU_SHAPES-1, floorLog2(pu.lwidth()) - floorLog2(pu.lheight()) + GEO_SQUARE_IDX);
+#endif
     // Cost of partition 0
     if (filledRefTplPart0)
     {
       GetAbsDiffPerSample(pcBufPredRefLeftPart0.Y(), pcBufPredCurLeft.Y(), pcBufPredRefLeftPart0.Y());
       uint32_t fullCostPart0 = (uint32_t)GetSampleSum(pcBufPredRefLeftPart0.Y(), bitDepth);
 
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+      for (int splitDirIdx = 0; splitDirIdx < GEO_NUM_PARTITION_MODE; ++splitDirIdx)
+      {
+        int splitDir = g_gpmSplitDir[whIdx][splitDirIdx];
+#else
       for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; ++splitDir)
       {
+#endif
         int16_t mirrorIdx = g_angle2mirror[g_geoParams[splitDir][0]];
         Pel* mask = getTplWeightTableCU<false, 2>(splitDir);
         uint32_t tempDist = (uint32_t)Get01MaskedSampleSum(pcBufPredRefLeftPart0.Y(), bitDepth, mask, stepX[mirrorIdx], maskStride[mirrorIdx], maskStride2[mirrorIdx]);
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+        gpmTplCostPart0[0][splitDirIdx] += tempDist;
+        gpmTplCostPart0[1][splitDirIdx] += fullCostPart0 - tempDist; // pre-calculated
+#else
         gpmTplCostPart0[0][splitDir] += tempDist;
         gpmTplCostPart0[1][splitDir] += fullCostPart0 - tempDist; // pre-calculated
+#endif
       }
     }
 
@@ -8629,13 +8668,24 @@ void InterSearch::getBestGeoModeListEncoder(PredictionUnit &pu, uint8_t& numVali
       GetAbsDiffPerSample(pcBufPredRefLeftPart1.Y(), pcBufPredCurLeft.Y(), pcBufPredRefLeftPart1.Y());
       uint32_t fullCostPart1 = (uint32_t)GetSampleSum(pcBufPredRefLeftPart1.Y(), bitDepth);
 
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+      for (int splitDirIdx = 0; splitDirIdx < GEO_NUM_PARTITION_MODE; ++splitDirIdx)
+      {
+        int splitDir = g_gpmSplitDir[whIdx][splitDirIdx];
+#else
       for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; ++splitDir)
       {
+#endif
         int16_t mirrorIdx = g_angle2mirror[g_geoParams[splitDir][0]];
         Pel* mask = getTplWeightTableCU<false, 2>(splitDir);
         uint32_t tempDist = (uint32_t)Get01MaskedSampleSum(pcBufPredRefLeftPart1.Y(), bitDepth, mask, stepX[mirrorIdx], maskStride[mirrorIdx], maskStride2[mirrorIdx]);
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+        gpmTplCostPart1[0][splitDirIdx] += tempDist;  // pre-calculated
+        gpmTplCostPart1[1][splitDirIdx] += fullCostPart1 - tempDist;
+#else
         gpmTplCostPart1[0][splitDir] += tempDist;  // pre-calculated
         gpmTplCostPart1[1][splitDir] += fullCostPart1 - tempDist;
+#endif
       }
     }
   }
@@ -8671,6 +8721,9 @@ void InterSearch::getBestGeoTMModeListEncoder(PredictionUnit &pu, uint8_t& numVa
   bool filledRefTplPart1 = gpmTplCostPart1[1][0] == std::numeric_limits<uint32_t>::max();
   int bitDepth = pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA);
 
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+    int whIdx = !pu.cs->slice->getSPS()->getUseGeoShapeAdapt() ? GEO_SQUARE_IDX : Clip3(0, GEO_NUM_CU_SHAPES-1, floorLog2(pu.lwidth()) - floorLog2(pu.lheight()) + GEO_SQUARE_IDX);
+#endif
   if (m_bAMLTemplateAvailabe[0])
   {
     SizeType   szPerLine       = pu.lwidth();
@@ -8694,13 +8747,23 @@ void InterSearch::getBestGeoTMModeListEncoder(PredictionUnit &pu, uint8_t& numVa
       GetAbsDiffPerSample(pcBufPredRefTopPart0[GEO_TM_SHAPE_AL].Y(), pcBufPredCurTop.Y(), pcBufPredRefTopPart0[GEO_TM_SHAPE_AL].Y());
       GetAbsDiffPerSample(pcBufPredRefTopPart0[GEO_TM_SHAPE_A ].Y(), pcBufPredCurTop.Y(), pcBufPredRefTopPart0[GEO_TM_SHAPE_A ].Y());
 
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+      for (int splitDirIdx = 0; splitDirIdx < GEO_NUM_PARTITION_MODE; ++splitDirIdx)
+      {
+        int splitDir = g_gpmSplitDir[whIdx][splitDirIdx];
+#else
       for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; ++splitDir)
       {
+#endif
         int16_t mirrorIdx = g_angle2mirror[g_geoParams[splitDir][0]];
         uint8_t shapeIdx  = g_geoTmShape[0][g_geoParams[splitDir][0]];
         Pel* mask = getTplWeightTableCU<false, 0>(splitDir);
         uint32_t tempDist = (uint32_t)Get01MaskedSampleSum(pcBufPredRefTopPart0[shapeIdx].Y(), bitDepth, mask, stepX[mirrorIdx], maskStride[mirrorIdx], maskStride2[mirrorIdx]);
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+        gpmTplCostPart0[0][splitDirIdx] = tempDist;
+#else
         gpmTplCostPart0[0][splitDir] = tempDist;
+#endif
       }
     }
 
@@ -8710,13 +8773,23 @@ void InterSearch::getBestGeoTMModeListEncoder(PredictionUnit &pu, uint8_t& numVa
       GetAbsDiffPerSample(pcBufPredRefTopPart1[GEO_TM_SHAPE_AL].Y(), pcBufPredCurTop.Y(), pcBufPredRefTopPart1[GEO_TM_SHAPE_AL].Y());
       GetAbsDiffPerSample(pcBufPredRefTopPart1[GEO_TM_SHAPE_L ].Y(), pcBufPredCurTop.Y(), pcBufPredRefTopPart1[GEO_TM_SHAPE_L ].Y());
 
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+      for (int splitDirIdx = 0; splitDirIdx < GEO_NUM_PARTITION_MODE; ++splitDirIdx)
+      {
+        int splitDir = g_gpmSplitDir[whIdx][splitDirIdx];
+#else
       for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; ++splitDir)
       {
+#endif
         int16_t mirrorIdx = g_angle2mirror[g_geoParams[splitDir][0]];
         uint8_t shapeIdx  = g_geoTmShape[1][g_geoParams[splitDir][0]];
         Pel* mask = getTplWeightTableCU<false, 0>(splitDir);
         uint32_t tempDist = (uint32_t)Get01InvMaskedSampleSum(pcBufPredRefTopPart1[shapeIdx].Y(), bitDepth, mask, stepX[mirrorIdx], maskStride[mirrorIdx], maskStride2[mirrorIdx]);
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+        gpmTplCostPart1[1][splitDirIdx] = tempDist;
+#else
         gpmTplCostPart1[1][splitDir] = tempDist;
+#endif
       }
     }
   }
@@ -8755,13 +8828,23 @@ void InterSearch::getBestGeoTMModeListEncoder(PredictionUnit &pu, uint8_t& numVa
       GetAbsDiffPerSample(pcBufPredRefLeftPart0[GEO_TM_SHAPE_AL].Y(), pcBufPredCurLeft.Y(), pcBufPredRefLeftPart0[GEO_TM_SHAPE_AL].Y());
       GetAbsDiffPerSample(pcBufPredRefLeftPart0[GEO_TM_SHAPE_A ].Y(), pcBufPredCurLeft.Y(), pcBufPredRefLeftPart0[GEO_TM_SHAPE_A ].Y());
 
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+      for (int splitDirIdx = 0; splitDirIdx < GEO_NUM_PARTITION_MODE; ++splitDirIdx)
+      {
+        int splitDir = g_gpmSplitDir[whIdx][splitDirIdx];
+#else
       for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; ++splitDir)
       {
+#endif
         int16_t mirrorIdx = g_angle2mirror[g_geoParams[splitDir][0]];
         uint8_t shapeIdx  = g_geoTmShape[0][g_geoParams[splitDir][0]];
         Pel* mask = getTplWeightTableCU<false, 2>(splitDir);
         uint32_t tempDist = (uint32_t)Get01MaskedSampleSum(pcBufPredRefLeftPart0[shapeIdx].Y(), bitDepth, mask, stepX[mirrorIdx], maskStride[mirrorIdx], maskStride2[mirrorIdx]);
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+        gpmTplCostPart0[0][splitDirIdx] += tempDist;
+#else
         gpmTplCostPart0[0][splitDir] += tempDist;
+#endif
       }
     }
 
@@ -8771,13 +8854,23 @@ void InterSearch::getBestGeoTMModeListEncoder(PredictionUnit &pu, uint8_t& numVa
       GetAbsDiffPerSample(pcBufPredRefLeftPart1[GEO_TM_SHAPE_AL].Y(), pcBufPredCurLeft.Y(), pcBufPredRefLeftPart1[GEO_TM_SHAPE_AL].Y());
       GetAbsDiffPerSample(pcBufPredRefLeftPart1[GEO_TM_SHAPE_L ].Y(), pcBufPredCurLeft.Y(), pcBufPredRefLeftPart1[GEO_TM_SHAPE_L ].Y());
 
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+      for (int splitDirIdx = 0; splitDirIdx < GEO_NUM_PARTITION_MODE; ++splitDirIdx)
+      {
+        int splitDir = g_gpmSplitDir[whIdx][splitDirIdx];
+#else
       for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; ++splitDir)
       {
+#endif
         int16_t mirrorIdx = g_angle2mirror[g_geoParams[splitDir][0]];
         uint8_t shapeIdx  = g_geoTmShape[1][g_geoParams[splitDir][0]];
         Pel* mask = getTplWeightTableCU<false, 2>(splitDir);
         uint32_t tempDist = (uint32_t)Get01InvMaskedSampleSum(pcBufPredRefLeftPart1[shapeIdx].Y(), bitDepth, mask, stepX[mirrorIdx], maskStride[mirrorIdx], maskStride2[mirrorIdx]);
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+        gpmTplCostPart1[1][splitDirIdx] += tempDist;
+#else
         gpmTplCostPart1[1][splitDir] += tempDist;
+#endif
       }
     }
   }
@@ -8819,7 +8912,11 @@ void InterSearch::xCollectIntraGeoPartCost(PredictionUnit &pu, IntraPrediction* 
 #endif
 
   std::vector<Pel>* LUT = m_pcReshape->getSliceReshaperInfo().getUseSliceReshaper() && m_pcReshape->getCTUFlag() ? &m_pcReshape->getInvLUT() : nullptr;
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+  pcIntraPred->fillIntraGPMRefTemplateAll(pu, m_bAMLTemplateAvailabe[0], m_bAMLTemplateAvailabe[1], false, false, false, LUT, (partIdx == 0 ? mergeCand : 0), (partIdx == 1 ? mergeCand : 0));
+#else
   pcIntraPred->fillIntraGPMRefTemplateAll(pu, m_bAMLTemplateAvailabe[0], m_bAMLTemplateAvailabe[1], true, false, false, LUT, (partIdx == 0 ? mergeCand : 0), (partIdx == 1 ? mergeCand : 0));
+#endif
 #if JVET_AG0164_AFFINE_GPM
   int  realCandIdx = mergeCand - GEO_MAX_ALL_INTER_UNI_CANDS;
 #else
@@ -8830,9 +8927,16 @@ void InterSearch::xCollectIntraGeoPartCost(PredictionUnit &pu, IntraPrediction* 
   Pel* pDiffLeft   = partIdx == 0 ? m_acYuvRefAMLTemplatePart0[1] : m_acYuvRefAMLTemplatePart1[1];
 
   static_vector<int, GEO_NUM_PARTITION_MODE> intraModeToSplitDirAll[NUM_INTRA_MODE];
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+  int whIdx = !pu.cs->slice->getSPS()->getUseGeoShapeAdapt() ? GEO_SQUARE_IDX : Clip3(0, GEO_NUM_CU_SHAPES-1, floorLog2(pu.lwidth()) - floorLog2(pu.lheight()) + GEO_SQUARE_IDX);
+#endif
   for (int splitDir = 0; splitDir < GEO_NUM_PARTITION_MODE; ++splitDir)
   {
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+    uint8_t intraMode = pcIntraPred->getPrefilledIntraGPMMPMMode(partIdx, g_gpmSplitDir[whIdx][splitDir], realCandIdx);
+#else
     uint8_t intraMode = pcIntraPred->getPrefilledIntraGPMMPMMode(partIdx, splitDir, realCandIdx);
+#endif
     intraModeToSplitDirAll[intraMode].push_back(splitDir);
   }
 
@@ -8857,10 +8961,20 @@ void InterSearch::xCollectIntraGeoPartCost(PredictionUnit &pu, IntraPrediction* 
 
         for (int i = 0; i < toSplitDir.size(); ++i)
         {
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+          int splitDirIdx = toSplitDir[i];
+          CHECK(splitDirIdx >= GEO_NUM_PARTITION_MODE, "Invalid GPM partition");
+          int splitDir = g_gpmSplitDir[whIdx][splitDirIdx];
+#else
           int splitDir = toSplitDir[i];
+#endif
           int16_t mirrorIdx = g_angle2mirror[g_geoParams[splitDir][0]];
           Pel* mask = getTplWeightTableCU<false, 0>(splitDir);
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+          gpmTplCost[splitDirIdx] = (uint32_t)GetSampleSumFunc(partIdx + 2, pcBufDiffTop.Y(), bitDepth, mask, stepX[mirrorIdx], maskStride[mirrorIdx], maskStride2[mirrorIdx]);
+#else          
           gpmTplCost[splitDir] = (uint32_t)GetSampleSumFunc(partIdx + 2, pcBufDiffTop.Y(), bitDepth, mask, stepX[mirrorIdx], maskStride[mirrorIdx], maskStride2[mirrorIdx]);
+#endif
         }
       }
     }
@@ -8891,10 +9005,20 @@ void InterSearch::xCollectIntraGeoPartCost(PredictionUnit &pu, IntraPrediction* 
 
         for (int i = 0; i < toSplitDir.size(); ++i)
         {
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+          int splitDirIdx = toSplitDir[i];
+          CHECK(splitDirIdx >= GEO_NUM_PARTITION_MODE, "Invalid GPM partition");
+          int splitDir = g_gpmSplitDir[whIdx][splitDirIdx];
+#else
           int splitDir = toSplitDir[i];
+#endif
           int16_t mirrorIdx = g_angle2mirror[g_geoParams[splitDir][0]];
           Pel* mask = getTplWeightTableCU<false, 2>(splitDir);
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+          gpmTplCost[splitDirIdx] += (uint32_t)GetSampleSumFunc(partIdx + 2, pcBufDiffLeft.Y(), bitDepth, mask, stepX[mirrorIdx], maskStride[mirrorIdx], maskStride2[mirrorIdx]);
+#else
           gpmTplCost[splitDir] += (uint32_t)GetSampleSumFunc(partIdx + 2, pcBufDiffLeft.Y(), bitDepth, mask, stepX[mirrorIdx], maskStride[mirrorIdx], maskStride2[mirrorIdx]);
+#endif
         }
       }
     }
