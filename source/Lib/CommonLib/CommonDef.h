@@ -703,6 +703,12 @@ static const int MRL_IDX_RICE_CODE_DIVISOR =                        4;
 static const int TMRL_MPM_SIZE =                                   10;
 static const int TMRL_MODECOST =     NUM_LUMA_MODE * MAX_REF_LINE_IDX;
 static const int EXT_REF_LINE_IDX[] =              { 1, 3, 5, 7, 12 };
+#if JVET_AJ0081_CHROMA_TMRL
+static const int CHROMA_TMRL_LIST_SIZE = 6;
+static const int CHROMA_TMRL_MPM_SIZE = 8;
+static const int MAX_CHROMA_MRL_IDX = 3;
+static const int CHROMA_MULTI_REF_LINE_IDX[MAX_CHROMA_MRL_IDX] = { 1, 3, 5 };
+#endif
 #endif
 #if JVET_AG0058_EIP
 static const int EIP_IDX =                                        201;

@@ -3518,6 +3518,22 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
       dimdChromaMode = cu.dimdChromaMode;
       dimdChromaModeSecond = cu.dimdChromaModeSecond;
 
+#if JVET_AJ0081_CHROMA_TMRL
+      if (tempCS->slice->getSPS()->getUseTmrl())
+      {
+        PredictionUnit pu(tempCS->area);
+        pu.cu = &cu;
+        cu.firstPU = &pu;
+        pu.cs = bestCS;
+        cu.cs = bestCS;
+
+        if (PU::hasChromaTmrl(pu))
+        {
+          m_pcIntraSearch->getChromaTmrlList(bestCS->picture->getRecoBuf(lumaArea), bestCS->picture->getRecoBuf(areaCb), bestCS->picture->getRecoBuf(areaCr), lumaArea, areaCb, areaCr, cu, pu, m_pcInterSearch);
+        }
+      }
+#endif
+
 #if JVET_AH0136_CHROMA_REORDERING
       for (int i = 0; i < 5; i++)
       {

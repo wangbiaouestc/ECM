@@ -638,6 +638,11 @@ struct IntraPredictionData
   int       ccpMergeFusionFlag;
   int       ccpMergeFusionType;
 #endif
+#if JVET_AJ0081_CHROMA_TMRL
+  int       chromaMrlIdx;
+  bool      chromaTmrlFlag;
+  int       chromaTmrlIdx;
+#endif
 };
 
 struct InterPredictionData

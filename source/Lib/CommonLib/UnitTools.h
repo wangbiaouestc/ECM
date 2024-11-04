@@ -963,6 +963,9 @@ namespace PU
 #if JVET_AG0059_CCP_MERGE_ENHANCEMENT
   bool hasCCPMergeFusionFlag(const PredictionUnit& pu);
 #endif
+#if JVET_AJ0081_CHROMA_TMRL
+  bool hasChromaTmrl(const PredictionUnit& pu);
+#endif
 #if JVET_AC0071_DBV
   bool hasChromaBvFlag(const PredictionUnit &pu);
 #endif

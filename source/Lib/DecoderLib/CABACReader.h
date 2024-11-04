@@ -134,6 +134,9 @@ public:
 #endif
 #if JVET_AB0157_TMRL
   void        cuTmrlFlag                ( CodingUnit&                   cu );
+#if JVET_AJ0081_CHROMA_TMRL
+  void        intraChromaTmrl           ( PredictionUnit&               pu );
+#endif
 #endif
   void        intra_chroma_pred_modes   ( CodingUnit&                   cu );
   bool        intra_chroma_lmc_mode     ( PredictionUnit&               pu );

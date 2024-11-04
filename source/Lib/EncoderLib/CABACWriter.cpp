@@ -3050,6 +3050,20 @@ void CABACWriter::intraChromaFusionMode(const PredictionUnit& pu)
 }
 #endif
 
+#if JVET_AJ0081_CHROMA_TMRL
+void CABACWriter::intraChromaTmrl(const PredictionUnit& pu)
+{
+  m_BinEncoder.encodeBin(pu.chromaTmrlFlag ? 1 : 0, Ctx::ChromaTmrlFlag());
+  if (pu.chromaTmrlFlag)
+  {
+    intra_chroma_lmc_mode(pu);
+    CHECK(pu.chromaTmrlIdx >= CHROMA_TMRL_LIST_SIZE, "Chroma tmrl index out of bounds");
+    unary_max_eqprob(pu.chromaTmrlIdx, CHROMA_TMRL_LIST_SIZE - 1);
+  }
+  DTRACE(g_trace_ctx, D_SYNTAX, "intraChromaTmrl() ctx=%d pos=(%d,%d) chromaTmrlFlag=%d chromaTmrlIdx=%d\n", 0, pu.blocks[CHANNEL_TYPE_CHROMA].x, pu.blocks[CHANNEL_TYPE_CHROMA].y, pu.chromaTmrlFlag ? 1 : 0, pu.chromaTmrlIdx);
+}
+#endif
+
 #if JVET_AD0120_LBCCP
 void CABACWriter::ccInsideFilterFlag(const PredictionUnit &pu)
 {
@@ -3092,6 +3106,17 @@ void CABACWriter::intra_chroma_pred_mode(const PredictionUnit& pu)
       return;
     }
   }
+
+#if JVET_AJ0081_CHROMA_TMRL
+  if (PU::hasChromaTmrl(pu) && pu.cs->sps->getUseTmrl())
+  {
+    intraChromaTmrl(pu);
+    if (pu.chromaTmrlFlag)
+    {
+      return;
+    }
+  }
+#endif
 
 #if JVET_AC0071_DBV
 #if JVET_AH0136_CHROMA_REORDERING

@@ -1102,6 +1102,11 @@ void PredictionUnit::initData()
   ccpMergeFusionFlag = 0;
   ccpMergeFusionType = 0;
 #endif
+#if JVET_AJ0081_CHROMA_TMRL
+  chromaMrlIdx = 0;
+  chromaTmrlFlag = false;
+  chromaTmrlIdx = 0;
+#endif
   // inter data
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   colIdx = 0;
@@ -1323,6 +1328,11 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
 #if JVET_AG0059_CCP_MERGE_ENHANCEMENT
   ccpMergeFusionFlag = predData.ccpMergeFusionFlag;
   ccpMergeFusionType = predData.ccpMergeFusionType;
+#endif
+#if JVET_AJ0081_CHROMA_TMRL
+  chromaMrlIdx = predData.chromaMrlIdx;
+  chromaTmrlFlag = predData.chromaTmrlFlag;
+  chromaTmrlIdx = predData.chromaTmrlIdx;
 #endif
   return *this;
 }
@@ -1555,6 +1565,11 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
 #if JVET_AG0059_CCP_MERGE_ENHANCEMENT
   ccpMergeFusionFlag = other.ccpMergeFusionFlag;
   ccpMergeFusionType = other.ccpMergeFusionType;
+#endif
+#if JVET_AJ0081_CHROMA_TMRL
+  chromaMrlIdx = other.chromaMrlIdx;
+  chromaTmrlFlag = other.chromaTmrlFlag;
+  chromaTmrlIdx = other.chromaTmrlIdx;
 #endif
   mergeFlag   = other.mergeFlag;
 #if JVET_AG0276_LIC_FLAG_SIGNALING

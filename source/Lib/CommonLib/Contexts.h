@@ -795,6 +795,9 @@ public:
 #endif
 #if JVET_AB0157_TMRL
   static const CtxSet   TmrlDerive;
+#if JVET_AJ0081_CHROMA_TMRL
+  static const CtxSet   ChromaTmrlFlag;
+#endif
 #endif
 #if JVET_AE0059_INTER_CCCM
   static const CtxSet   InterCccmFlag;

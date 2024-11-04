@@ -668,11 +668,19 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 #if JVET_AG0059_CCP_MERGE_ENHANCEMENT
 #if JVET_AH0136_CHROMA_REORDERING
 #if JVET_AI0136_ADAPTIVE_DUAL_TREE
-  if ( ( (!PU::isLMCMode(pu.intraDir[1]) && compID == COMPONENT_Cb && !pu.cu->bdpcmModeChroma) 
-         && (CS::isDualITree(cs) || (pu.cu->isSST && pu.cu->separateTree) ) && pu.cs->sps->getUseChromaReordering() && pu.cs->slice->isIntra()
-       ) 
+#if JVET_AJ0081_CHROMA_TMRL
+  if (((!PU::isLMCMode(pu.intraDir[1]) && compID == COMPONENT_Cb && !pu.cu->bdpcmModeChroma)
+    && (CS::isDualITree(cs) || (pu.cu->isSST && pu.cu->separateTree)) && pu.cs->sps->getUseChromaReordering() && pu.cs->slice->isIntra()
+    )
+    || ((pu.intraDir[1] == DIMD_CHROMA_IDX || pu.ccpMergeFusionType == 1 || pu.chromaTmrlFlag) && compID == COMPONENT_Cb)
+    )
+#else
+  if (((!PU::isLMCMode(pu.intraDir[1]) && compID == COMPONENT_Cb && !pu.cu->bdpcmModeChroma)
+    && (CS::isDualITree(cs) || (pu.cu->isSST && pu.cu->separateTree)) && pu.cs->sps->getUseChromaReordering() && pu.cs->slice->isIntra()
+    )
     || ((pu.intraDir[1] == DIMD_CHROMA_IDX || pu.ccpMergeFusionType == 1) && compID == COMPONENT_Cb)
     )
+#endif
 #else
   if (((!PU::isLMCMode(pu.intraDir[1]) && compID == COMPONENT_Cb && !pu.cu->bdpcmModeChroma) && CS::isDualITree(cs) && pu.cs->sps->getUseChromaReordering()) || ((pu.intraDir[1] == DIMD_CHROMA_IDX || pu.ccpMergeFusionType == 1) && compID == COMPONENT_Cb))
 #endif
@@ -702,12 +710,31 @@ void DecCu::xIntraRecBlk( TransformUnit& tu, const ComponentID compID )
 #endif
   }
 #endif
+#if JVET_AJ0081_CHROMA_TMRL
+  if (pu.chromaTmrlFlag && compID == COMPONENT_Cb && CS::isDualITree(cs))
+  {
+    CompArea areaCb = pu.Cb();
+    CompArea areaCr = pu.Cr();
+    CompArea lumaArea = CompArea(COMPONENT_Y, pu.chromaFormat, areaCb.lumaPos(), recalcSize(pu.chromaFormat, CHANNEL_TYPE_CHROMA, CHANNEL_TYPE_LUMA, areaCb.size()));
+    m_pcIntraPred->getChromaTmrlList(cs.picture->getRecoBuf(lumaArea), cs.picture->getRecoBuf(areaCb), cs.picture->getRecoBuf(areaCr), lumaArea, areaCb, areaCr, *pu.cu, pu, m_pcInterPred);
+    pu.chromaMrlIdx = m_pcIntraPred->m_chromaTmrlList[pu.chromaTmrlIdx].multiRefIdx;
+    pu.intraDir[1] = m_pcIntraPred->m_chromaTmrlList[pu.chromaTmrlIdx].intraDir;
+    CHECK(pu.intraDir[1] >= NUM_LUMA_MODE, "error intra mode")
+  }
+#endif
 #if JVET_AH0136_CHROMA_REORDERING
 #if JVET_AI0136_ADAPTIVE_DUAL_TREE
+#if JVET_AJ0081_CHROMA_TMRL
   if (
-       (!PU::isLMCMode(pu.intraDir[1]) && compID == COMPONENT_Cb && !pu.cu->bdpcmModeChroma) 
-       && (CS::isDualITree(cs) || (pu.cu->isSST && pu.cu->separateTree) ) && pu.cs->sps->getUseChromaReordering() && pu.cu->slice->isIntra()
+    (!PU::isLMCMode(pu.intraDir[1]) && !pu.chromaTmrlFlag && compID == COMPONENT_Cb && !pu.cu->bdpcmModeChroma)
+    && (CS::isDualITree(cs) || (pu.cu->isSST && pu.cu->separateTree)) && pu.cs->sps->getUseChromaReordering() && pu.cu->slice->isIntra()
     )
+#else
+  if (
+    (!PU::isLMCMode(pu.intraDir[1]) && compID == COMPONENT_Cb && !pu.cu->bdpcmModeChroma)
+    && (CS::isDualITree(cs) || (pu.cu->isSST && pu.cu->separateTree)) && pu.cs->sps->getUseChromaReordering() && pu.cu->slice->isIntra()
+    )
+#endif
 #else
   if ((!PU::isLMCMode(pu.intraDir[1]) && compID == COMPONENT_Cb && !pu.cu->bdpcmModeChroma) && CS::isDualITree(cs) && pu.cs->sps->getUseChromaReordering())
 #endif

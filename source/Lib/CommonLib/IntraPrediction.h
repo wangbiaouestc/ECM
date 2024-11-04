@@ -940,6 +940,12 @@ public:
   void getTmrlSearchRange(const PredictionUnit& pu, int8_t* tmrlRefList, uint8_t* tmrlIntraList, uint8_t& sizeRef, uint8_t& sizeMode);
   TmrlMode m_tmrlList[MRL_LIST_SIZE];
   void getTmrlList(CodingUnit& cu);
+#if JVET_AJ0081_CHROMA_TMRL
+  TmrlMode m_chromaTmrlList[CHROMA_TMRL_LIST_SIZE];
+  void getChromaTmrlSearchRange(const PredictionUnit& pu, int8_t* tmrlRefList, uint8_t* tmrlIntraList, uint8_t& sizeRef, uint8_t& sizeMode);
+  void predChromaTmrlIntraAng(PredictionUnit& pu, const ComponentID compID, Pel* pPred, uint32_t uiStride);
+  void getChromaTmrlList(const CPelBuf& recoBufY, const CPelBuf& recoBufCb, const CPelBuf& recoBufCr, const CompArea& areaY, const CompArea& areaCb, const CompArea& areaCr, CodingUnit& cu, PredictionUnit& pu, InterPrediction* pcInterPred);
+#endif
 #endif
 #if JVET_AG0058_EIP
   void initEipParams(const PredictionUnit& pu, const ComponentID compId);
