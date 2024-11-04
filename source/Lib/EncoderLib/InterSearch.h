@@ -974,6 +974,9 @@ public:
                                      , EncReshape*   m_pcReshape
 #if JVET_Z0153_IBC_EXT_REF
                                     , const uint32_t curPicWidthY
+#if JVET_AJ0172_IBC_ITMP_ALIGN_REF_AREA
+                                    , const uint32_t curPicHeightY 
+#endif
 #endif
                                     );
 

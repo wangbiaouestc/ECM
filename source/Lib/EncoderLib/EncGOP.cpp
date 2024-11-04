@@ -4838,7 +4838,11 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
     pcPic->cs->destroyTemporaryCsData();
 #if JVET_AA0096_MC_BOUNDARY_PADDING
     m_pcFrameMcPadPrediction->init(m_pcEncLib->getRdCost(), pcSlice->getSPS()->getChromaFormatIdc(),
+#if JVET_AJ0172_IBC_ITMP_ALIGN_REF_AREA
+                                   pcSlice->getSPS()->getMaxCUHeight(), NULL, pcPic->getPicWidthInLumaSamples(),pcPic->getPicHeightInLumaSamples());
+#else
                                    pcSlice->getSPS()->getMaxCUHeight(), NULL, pcPic->getPicWidthInLumaSamples());
+#endif
     m_pcFrameMcPadPrediction->mcFramePad(pcPic, *(pcPic->slices[0]));
     m_pcFrameMcPadPrediction->destroy();
 #endif
