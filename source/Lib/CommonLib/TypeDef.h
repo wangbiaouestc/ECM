@@ -51,8 +51,6 @@
 #include <cassert>
 #include <cstdint>
 
-
-
 #define BASE_ENCODER                                      1
 #define BASE_NORMATIVE                                    1
 #define TOOLS                                             1
@@ -258,6 +256,7 @@
 #define JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES    1 // JVET-AE0094: IBC with non-adjacent spatial candidates
 #define JVET_AG0091_ARBVP                                 1 // JVET-AG0091: Auto-relocated block vector prediction
 #define JVET_AI0082_TEMPORAL_BV                           1 // JVET-AI0081: Temporal BV for IBC merge list construction
+#define JVET_AJ0096_SATD_REORDER_INTRA                    1 // JVET-AJ0096: SATD-based reordering for intra coding
 
 #if JVET_AC0071_DBV && JVET_V0130_INTRA_TMP
 #define JVET_AF0066_ENABLE_DBV_4_SINGLE_TREE              1 // JVET-AF0066: Enable DBV mode in single tree configuration
@@ -363,6 +362,7 @@
 #define JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE           1 // JVET-AI0185 adaptive cost function selection in merge mode
 #define JVET_AI0183_MVP_EXTENSION                         1 // JVET-AI0183 MVP extension
 // Inter template matching tools
+#define JVET_AJ0096_SATD_REORDER_INTER                    1 // JVET-AJ0096: SATD-based reordering for inter coding
 #define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction
 #if ENABLE_INTER_TEMPLATE_MATCHING
 #define TM_AMVP                                           1 // Add template matching to non-subblock inter to refine regular AMVP candidates
