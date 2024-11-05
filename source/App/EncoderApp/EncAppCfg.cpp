@@ -1363,6 +1363,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("ScaleMvExtTmvp",                                  m_scaledMvExtTmvp,                                 true, "ScaleMvExtTmvp" )
   ("ScaleMvExtBiTmvp",                                m_scaledMvExtBiTmvp,                               true, "ScaleMvExtBiTmvp" )
 #endif
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+  ("SbTmvpMvExt",                                     m_sbTmvpMvExt,                                     true, "SbTmvpMvExt" )
+#endif
   // ADD_NEW_TOOL : (encoder app) add parsing parameters here
   ( "VirtualBoundariesPresentInSPSFlag",              m_virtualBoundariesPresentFlag,                    true, "Virtual Boundary position information is signalled in SPS or PH (1:SPS, 0:PH)  [default: on]" )
   ("NumVerVirtualBoundaries",                         m_numVerVirtualBoundaries,                           0u, "Number of vertical virtual boundaries (0-3, inclusive)")
@@ -6037,6 +6040,9 @@ void EncAppCfg::xPrintParameter()
 #if JVET_AI0183_MVP_EXTENSION
   msg( VERBOSE, "ScaleMvExtTmvp:%d ", m_scaledMvExtTmvp );
   msg( VERBOSE, "ScaleMvExtBiTmvp:%d ", m_scaledMvExtBiTmvp );
+#endif
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+  msg(VERBOSE, "SbTmvpMvExt:%d ", m_sbTmvpMvExt);
 #endif
 
   // transform and coefficient coding

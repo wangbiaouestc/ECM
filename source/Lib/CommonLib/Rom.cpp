@@ -6189,4 +6189,10 @@ uint32_t g_picAmvpSbTmvpEnabledArea = 0;
 #if JVET_AG0276_LIC_SLOPE_ADJUST
 const int g_licSlopeDeltaSet[LIC_SLOPE_MAX_NUM_DELTA + 1] = {0, 1, -1};
 #endif
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+bool g_isAffBdofChroma = false;
+#endif
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+bool g_deriveOOBMask = false;
+#endif
 //! \}

@@ -998,6 +998,10 @@ public:
   int16_t licScale[AFFINE_MRG_MAX_NUM_CANDS_ALL][2][3];
   int16_t licOffset[AFFINE_MRG_MAX_NUM_CANDS_ALL][2][3];
 #endif
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+  int16_t       licScaleBuf[AFFINE_MRG_MAX_NUM_CANDS_ALL][2][3];
+  int16_t       licOffsetBuf[AFFINE_MRG_MAX_NUM_CANDS_ALL][2][3];
+#endif
 #endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
   bool obmcFlags[AFFINE_MRG_MAX_NUM_CANDS_ALL];

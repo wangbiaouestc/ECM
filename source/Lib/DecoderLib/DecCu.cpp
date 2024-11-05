@@ -2127,6 +2127,9 @@ void DecCu::xReconInter(CodingUnit &cu)
     CHECK(CU::isIBC(cu) && cu.firstPU->mmvdMergeFlag, "IBC and MMVD cannot be used together");
     const bool luma = cu.Y().valid();
     const bool chroma = isChromaEnabled(cu.chromaFormat) && cu.Cb().valid();
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+    g_deriveOOBMask = false;
+#endif
     if (luma && (chroma || !isChromaEnabled(cu.chromaFormat)))
     {
       m_pcInterPred->motionCompensation(cu);

@@ -502,5 +502,11 @@ extern const EIPInfo  g_eipInfoLut[4][4][9];
 #if JVET_AG0276_LIC_SLOPE_ADJUST
 extern const int g_licSlopeDeltaSet[LIC_SLOPE_MAX_NUM_DELTA + 1];
 #endif
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+extern bool g_isAffBdofChroma;
+#endif
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+extern bool g_deriveOOBMask;
+#endif
 #endif  //__TCOMROM__
 

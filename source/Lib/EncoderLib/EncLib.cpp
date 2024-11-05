@@ -1856,6 +1856,14 @@ void EncLib::xInitSPS( SPS& sps )
     setMaxNumAffineMergeCand(getMaxNumAffineMergeCand() - 2);
   }
 #endif
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+  sps.setConfigSbTmvpMvExt(m_sbTmvpMvExt);
+  if (m_intraPeriod == -1)
+  {
+    sps.setConfigSbTmvpMvExt(false);
+    setMaxNumAffineMergeCand(getMaxNumAffineMergeCand() - 2);
+  }
+#endif
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   sps.setUseArmcRefinedMotion               ( m_armcRefinedMotion );
 #endif

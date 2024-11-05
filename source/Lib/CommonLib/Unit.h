@@ -736,6 +736,9 @@ struct InterPredictionData
   uint8_t     mvpNum  [NUM_REF_PIC_LIST_01];
   Mv        mvd     [NUM_REF_PIC_LIST_01];
   Mv        mv      [NUM_REF_PIC_LIST_01];
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+  Mv        mvHighPrec[NUM_REF_PIC_LIST_01];
+#endif
 #if MULTI_PASS_DMVR
   bool      bdmvrRefine;
 #else

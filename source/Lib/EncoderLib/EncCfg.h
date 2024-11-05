@@ -1199,6 +1199,9 @@ protected:
   bool         m_scaledMvExtTmvp;
   bool         m_scaledMvExtBiTmvp;
 #endif
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+  bool         m_sbTmvpMvExt;
+#endif
 
 public:
   EncCfg()
@@ -2002,6 +2005,10 @@ public:
   bool      getConfigScaledMvExtTmvp()                   const { return m_scaledMvExtTmvp; }
   void      setConfigScaledMvExtBiTmvp( bool n )                 { m_scaledMvExtBiTmvp = n; }
   bool      getConfigScaledMvExtBiTmvp()                   const { return m_scaledMvExtBiTmvp; }
+#endif
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+  void      setConfigSbTmvpMvExt( bool n )                 { m_sbTmvpMvExt = n; }
+  bool      getConfigSbTmvpMvExt()                   const { return m_sbTmvpMvExt; }
 #endif
 
   // ADD_NEW_TOOL : (encoder lib) add access functions here

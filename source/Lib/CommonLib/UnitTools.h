@@ -439,6 +439,9 @@ namespace PU
 #endif
     , int* targetRefIdx = nullptr
 #endif
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+    , int sbTmvpType = 0
+#endif
   );
 #if JVET_AI0197_AFFINE_TMVP
   bool getColocatedAffineCMVP(const PredictionUnit &pu, const RefPicList &eRefPicList, const Position &pos, Mv rcMv[3],
@@ -734,6 +737,9 @@ namespace PU
     , int fixRefIdx = 0
 #else
     , bool fixRefIdx = false
+#endif
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+    , int sbTmvpType = 0
 #endif
 #endif
 #else

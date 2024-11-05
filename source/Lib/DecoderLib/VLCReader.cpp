@@ -2550,7 +2550,12 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_AI0183_MVP_EXTENSION
     const uint32_t uiCodeAffMrgMaxNumCands = uiCode;
     READ_FLAG( uiCode, "sps_scaled_mv_ext_b_configure_flag" );                      pcSPS->setConfigScaledMvExtTmvp( uiCode == 1 );
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+    READ_FLAG(uiCode, "sps_sbtmvp_mv_ext_configure_flag");                          pcSPS->setConfigSbTmvpMvExt(uiCode == 1);
+    pcSPS->setMaxNumAffineMergeCand(AFFINE_MRG_MAX_NUM_CANDS - uiCodeAffMrgMaxNumCands - (pcSPS->getConfigScaledMvExtTmvp() ? 0 : 2) - (pcSPS->getConfigSbTmvpMvExt() ? 0 : 2));  
+#else
     pcSPS->setMaxNumAffineMergeCand(AFFINE_MRG_MAX_NUM_CANDS - uiCodeAffMrgMaxNumCands - (pcSPS->getConfigScaledMvExtTmvp() ? 0 : 2));
+#endif
 #else
     pcSPS->setMaxNumAffineMergeCand(AFFINE_MRG_MAX_NUM_CANDS - uiCode);
 #endif

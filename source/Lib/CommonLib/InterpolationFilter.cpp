@@ -54,6 +54,75 @@ CacheModel* InterpolationFilter::m_cacheModel;
 // ====================================================================================================================
 // Tables
 // ====================================================================================================================
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+const TFilterCoeff InterpolationFilter::m_lumaFilter64[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS * 4][12] =
+{
+{   0,    0,    0,    0,    0,  256,    0,    0,    0,    0,    0,    0, },
+{   0,    0,   -1,    2,   -4,  256,    4,   -2,    1,    0,    0,    0, },
+{   0,    1,   -2,    3,   -7,  256,    8,   -4,    2,   -1,    0,    0, },
+{  -1,    1,   -3,    5,  -11,  255,   12,   -5,    3,   -1,    1,    0, },
+{  -1,    2,   -3,    6,  -14,  254,   16,   -7,    4,   -2,    1,    0, },
+{  -1,    2,   -4,    8,  -18,  253,   21,   -9,    5,   -2,    1,    0, },
+{  -1,    3,   -5,   10,  -21,  252,   25,  -11,    6,   -3,    1,    0, },
+{  -1,    3,   -6,   11,  -24,  251,   30,  -13,    7,   -3,    1,    0, },
+{  -1,    3,   -7,   12,  -26,  249,   35,  -15,    8,   -4,    2,    0, },
+{  -2,    4,   -7,   13,  -29,  248,   39,  -16,    9,   -5,    2,    0, },
+{  -2,    4,   -8,   15,  -32,  246,   44,  -18,   10,   -5,    2,    0, },
+{  -2,    4,   -8,   16,  -34,  244,   49,  -20,   11,   -6,    2,    0, },
+{  -2,    5,   -9,   17,  -36,  241,   54,  -22,   12,   -6,    3,   -1, },
+{  -2,    5,  -10,   18,  -38,  239,   60,  -24,   13,   -7,    3,   -1, },
+{  -2,    5,  -10,   19,  -40,  236,   65,  -26,   14,   -7,    3,   -1, },
+{  -2,    5,  -11,   20,  -42,  233,   70,  -27,   14,   -7,    4,   -1, },
+{  -2,    5,  -11,   21,  -43,  230,   75,  -29,   15,   -8,    4,   -1, },
+{  -2,    6,  -12,   22,  -45,  227,   81,  -31,   16,   -9,    4,   -1, },
+{  -2,    6,  -12,   22,  -46,  223,   86,  -32,   17,   -9,    4,   -1, },
+{  -2,    6,  -12,   23,  -47,  220,   91,  -34,   18,  -10,    4,   -1, },
+{  -2,    6,  -13,   24,  -48,  216,   97,  -36,   19,  -10,    4,   -1, },
+{  -2,    6,  -13,   24,  -49,  212,  102,  -37,   19,  -10,    5,   -1, },
+{  -2,    6,  -13,   25,  -50,  208,  108,  -39,   20,  -11,    5,   -1, },
+{  -2,    6,  -13,   25,  -51,  204,  113,  -40,   21,  -11,    5,   -1, },
+{  -2,    7,  -14,   25,  -51,  200,  119,  -42,   22,  -12,    5,   -1, },
+{  -2,    7,  -14,   25,  -51,  195,  124,  -43,   22,  -12,    6,   -1, },
+{  -2,    7,  -14,   25,  -51,  191,  129,  -44,   23,  -12,    6,   -2, },
+{  -2,    7,  -14,   26,  -51,  186,  135,  -45,   23,  -13,    6,   -2, },
+{  -2,    7,  -14,   26,  -51,  181,  140,  -46,   24,  -13,    6,   -2, },
+{  -2,    7,  -14,   26,  -51,  177,  146,  -48,   24,  -13,    6,   -2, },
+{  -2,    7,  -14,   25,  -51,  172,  151,  -48,   25,  -13,    6,   -2, },
+{  -2,    7,  -14,   25,  -50,  167,  156,  -49,   25,  -13,    6,   -2, },
+{  -2,    6,  -13,   25,  -50,  162,  162,  -50,   25,  -13,    6,   -2, },
+{  -2,    6,  -13,   25,  -49,  156,  167,  -50,   25,  -14,    7,   -2, },
+{  -2,    6,  -13,   25,  -48,  151,  172,  -51,   25,  -14,    7,   -2, },
+{  -2,    6,  -13,   24,  -48,  146,  177,  -51,   26,  -14,    7,   -2, },
+{  -2,    6,  -13,   24,  -46,  140,  181,  -51,   26,  -14,    7,   -2, },
+{  -2,    6,  -13,   23,  -45,  135,  186,  -51,   26,  -14,    7,   -2, },
+{  -2,    6,  -12,   23,  -44,  129,  191,  -51,   25,  -14,    7,   -2, },
+{  -1,    6,  -12,   22,  -43,  124,  195,  -51,   25,  -14,    7,   -2, },
+{  -1,    5,  -12,   22,  -42,  119,  200,  -51,   25,  -14,    7,   -2, },
+{  -1,    5,  -11,   21,  -40,  113,  204,  -51,   25,  -13,    6,   -2, },
+{  -1,    5,  -11,   20,  -39,  108,  208,  -50,   25,  -13,    6,   -2, },
+{  -1,    5,  -10,   19,  -37,  102,  212,  -49,   24,  -13,    6,   -2, },
+{  -1,    4,  -10,   19,  -36,   97,  216,  -48,   24,  -13,    6,   -2, },
+{  -1,    4,  -10,   18,  -34,   91,  220,  -47,   23,  -12,    6,   -2, },
+{  -1,    4,   -9,   17,  -32,   86,  223,  -46,   22,  -12,    6,   -2, },
+{  -1,    4,   -9,   16,  -31,   81,  227,  -45,   22,  -12,    6,   -2, },
+{  -1,    4,   -8,   15,  -29,   75,  230,  -43,   21,  -11,    5,   -2, },
+{  -1,    4,   -7,   14,  -27,   70,  233,  -42,   20,  -11,    5,   -2, },
+{  -1,    3,   -7,   14,  -26,   65,  236,  -40,   19,  -10,    5,   -2, },
+{  -1,    3,   -7,   13,  -24,   60,  239,  -38,   18,  -10,    5,   -2, },
+{  -1,    3,   -6,   12,  -22,   54,  241,  -36,   17,   -9,    5,   -2, },
+{   0,    2,   -6,   11,  -20,   49,  244,  -34,   16,   -8,    4,   -2, },
+{   0,    2,   -5,   10,  -18,   44,  246,  -32,   15,   -8,    4,   -2, },
+{   0,    2,   -5,    9,  -16,   39,  248,  -29,   13,   -7,    4,   -2, },
+{   0,    2,   -4,    8,  -15,   35,  249,  -26,   12,   -7,    3,   -1, },
+{   0,    1,   -3,    7,  -13,   30,  251,  -24,   11,   -6,    3,   -1, },
+{   0,    1,   -3,    6,  -11,   25,  252,  -21,   10,   -5,    3,   -1, },
+{   0,    1,   -2,    5,   -9,   21,  253,  -18,    8,   -4,    2,   -1, },
+{   0,    1,   -2,    4,   -7,   16,  254,  -14,    6,   -3,    2,   -1, },
+{   0,    1,   -1,    3,   -5,   12,  255,  -11,    5,   -3,    1,   -1, },
+{   0,    0,   -1,    2,   -4,    8,  256,   -7,    3,   -2,    1,    0, },
+{   0,    0,    0,    1,   -2,    4,  256,   -4,    2,   -1,    0,    0, },
+};
+#endif
 #if IF_12TAP
 const TFilterCoeff InterpolationFilter::m_lumaFilter4x4[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][8] =
 #else
@@ -1673,10 +1742,19 @@ void InterpolationFilter::filterReverseCopy(const ClpRng& clpRng, const Pel* src
 #endif
 
 #if SIMD_4x4_12 && defined(TARGET_SIMD_X86)
-void InterpolationFilter::filter4x4( const ClpRng& clpRng, Pel const *src, int srcStride, Pel *dst, int dstStride, int xFrac, int yFrac, bool isLast)
+void InterpolationFilter::filter4x4( const ClpRng& clpRng, Pel const *src, int srcStride, Pel *dst, int dstStride, int xFrac, int yFrac, bool isLast
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+  , bool useHighPrec
+#endif
+)
 {
-  const TFilterCoeff* coeffH =  m_lumaFilter12[xFrac];
-  const TFilterCoeff* coeffV =  m_lumaFilter12[yFrac];
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+  const TFilterCoeff* coeffH = useHighPrec ? m_lumaFilter64[xFrac] : m_lumaFilter12[xFrac];
+  const TFilterCoeff* coeffV = useHighPrec ? m_lumaFilter64[yFrac] : m_lumaFilter12[yFrac];
+#else
+  const TFilterCoeff* coeffH = m_lumaFilter12[xFrac];
+  const TFilterCoeff* coeffV = m_lumaFilter12[yFrac];
+#endif
 
   src = src - 5 - 5*srcStride; //for 12-tap filter
 
@@ -2086,6 +2164,13 @@ void InterpolationFilter::filterHor(const ComponentID compID, Pel const *src, in
   }
   else if( isLuma( compID ) )
   {
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+    if (nFilterIdx == -2)
+    {
+      filterHor<12>(clpRng, src, srcStride, dst, dstStride, width, height, isLast, m_lumaFilter64[frac], biMCForDMVR);
+      return;
+    }
+#endif
 #if IF_12TAP
     CHECK(frac < 0 || frac >= LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS, "Invalid fraction");
     if (nFilterIdx == 1)
@@ -2286,6 +2371,13 @@ void InterpolationFilter::filterVer(const ComponentID compID, Pel const *src, in
   }
   else if( isLuma( compID ) )
   {
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+    if (nFilterIdx == -2)
+    {
+      filterVer<12>(clpRng, src, srcStride, dst, dstStride, width, height, isFirst, isLast, m_lumaFilter64[frac], biMCForDMVR);
+      return;
+    }
+#endif
 #if IF_12TAP
     CHECK(frac < 0 || frac >= LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS, "Invalid fraction");
     if (nFilterIdx == 1)

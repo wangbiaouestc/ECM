@@ -132,8 +132,17 @@ static const double REFINE_THRESHOLD_AFFINE_MERGE = 0.75;
 static const int SUB_TMVP_CANDIDATE_NUM = 10;
 static const int SUB_TMVP_INDEX = 3;  // 1: 2 subtmvp; 2: 4 subtmvp
 #if JVET_AI0183_MVP_EXTENSION
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+static const int SUB_TMVP_NUM = 18;
+static const int COLIDX_MAP[3][2 * SUB_TMVP_INDEX * 3] = {
+  {  0,  1,  7,  2,  3,  8,  4,  5,  9, -1, -1, -1, -1,  6, 10, -1, -1, -1 },
+  { 11, 13, -1, 15, 16, -1, -1, 14, -1, -1, -1, -1, -1, 17, -1, -1, -1, -1 },
+  { 12, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 },
+};
+#else
 static const int SUB_TMVP_NUM = 11;
 static const int COLIDX_MAP[2 * SUB_TMVP_INDEX * 3] = { 0,1,7,2,3,8,4,5,9,-1,-1,-1,-1,6,10,-1,-1,-1 };
+#endif
 #elif JVET_AH0119_SUBBLOCK_TM
 static const int SUB_TMVP_NUM = 2 * SUB_TMVP_INDEX * 2 - 5;
 static const int COLIDX_MAP[2 * SUB_TMVP_INDEX * 2] = { 0,1,2,3,7,5,4,9,8,6,10,11 };
@@ -235,7 +244,11 @@ static const int TM_ARMC_NUM_LD         =                             5;
 
 #if JVET_Z0139_HIST_AFF || JVET_Z0139_NA_AFF
 #if JVET_AI0183_MVP_EXTENSION
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+static const int AFFINE_MRG_MAX_NUM_CANDS =                         20; ///< AFFINE MERGE
+#else
 static const int AFFINE_MRG_MAX_NUM_CANDS =                         18; ///< AFFINE MERGE
+#endif
 #elif JVET_AF0163_TM_SUBBLOCK_REFINEMENT
 static const int AFFINE_MRG_MAX_NUM_CANDS =                         16; ///< AFFINE MERGE
 #else
@@ -247,9 +260,18 @@ static const int AFFINE_MRG_MAX_NUM_CANDS =                         5; ///< AFFI
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
 static const int AFF_MAX_NON_ADJACENT_INHERITED_CANDS = 6;
 #if JVET_AI0183_MVP_EXTENSION
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+static const int ADAPT_SBTMVP_CAND_NUM = 7;
+#else
 static const int ADAPT_SBTMVP_CAND_NUM = 2;
+#endif
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+static const int RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE = 35 + ADAPT_SBTMVP_CAND_NUM; 
+static const int RMVF_AFFINE_MRG_MAX_CAND_LIST_EFFECT_SIZE = 35; 
+#else
 static const int RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE = 33 + ADAPT_SBTMVP_CAND_NUM;
 static const int RMVF_AFFINE_MRG_MAX_CAND_LIST_EFFECT_SIZE = 33;
+#endif
 #elif JVET_AF0163_TM_SUBBLOCK_REFINEMENT
 static const int RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE = 31;
 #else

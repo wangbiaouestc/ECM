@@ -393,7 +393,9 @@ protected:
   Pel*                 m_Gy;
 #endif
   bool                 m_subPuMC;
-
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+  bool                 m_useHighPrecMv;
+#endif
   int                  m_ibcBufferWidth;
 #if JVET_Z0153_IBC_EXT_REF
   int                  m_ibcBufferHeight;
@@ -499,6 +501,28 @@ protected:
                                  , bool fastOBMC = false
 #endif
                                  );
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+  void xPredInterBlk64(const ComponentID& compID, const PredictionUnit& pu, const Picture* refPic, const Mv& _mv, PelUnitBuf& dstPic, const bool& bi, const ClpRng& clpRng
+    , const bool& bioApplied
+    , bool isIBC
+    , const std::pair<int, int> scalingRatio = SCALE_1X
+    , SizeType dmvrWidth = 0
+    , SizeType dmvrHeight = 0
+    , bool bilinearMC = false
+    , Pel *srcPadBuf = NULL
+    , int32_t srcPadStride = 0
+#if JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+    , bool isAML = false
+#if INTER_LIC
+    , bool doLic = false
+    , Mv   mvCurr = Mv(0, 0)
+#endif
+#endif
+#if JVET_Z0061_TM_OBMC
+    , bool fastOBMC = false
+#endif
+  );
+#endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   void xPredIBCBlkPadding       (const PredictionUnit& pu, ComponentID compID, const Picture* refPic, const ClpRng& clpRng
                                , CPelBuf& refBufBeforePadding, const Position& refOffsetByIntBv, int xFrac, int yFrac
@@ -1604,6 +1628,9 @@ public:
   void xInitBilateralMatching(const int width, const int height, const int bitDepth, const bool useMR, const bool useHadmard);
   Distortion xGetBilateralMatchingErrorAffine(const PredictionUnit& pu, Mv(&mvOffset)[2]);
   bool bmAffineRegression(PredictionUnit &pu, Distortion &minCost);
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+  void bmAffineCpmvSearch(PredictionUnit &pu, Distortion &minCost);
+#endif
 #endif
 public:
   Mv*       getBdofSubPuMvOffset() {return m_bdofSubPuMvOffset;}
