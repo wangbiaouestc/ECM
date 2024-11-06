@@ -1947,6 +1947,11 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
   WRITE_FLAG( pcSPS->getItmpLicExtension ( ) ? 1 : 0 , "sps_itmp_lic_extension_flag" );
   WRITE_FLAG( pcSPS->getItmpLicMode ( ) ? 1 : 0 , "sps_itmp_lic_mode_flag" );
 #endif
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+  WRITE_FLAG(pcSPS->getDisableRefFilter() ? 1 : 0, "sps_ref_filter_disabled_flag");
+  WRITE_FLAG(pcSPS->getDisablePdpc() ? 1 : 0, "sps_pdpc_disabled_flag");
+  WRITE_FLAG(pcSPS->getDisableIntraFusion() ? 1 : 0, "sps_intra_fusion_disabled_flag");
+#endif
 #if !JVET_S0074_SPS_REORDER
   WRITE_FLAG(pcSPS->getUseLmcs() ? 1 : 0, "sps_lmcs_enable_flag");
 #if JVET_AH0103_LOW_DELAY_LFNST_NSPT

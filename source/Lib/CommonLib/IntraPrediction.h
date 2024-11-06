@@ -534,12 +534,24 @@ protected:
   void xPredIntraDc               ( const CPelBuf &pSrc, PelBuf &pDst, const ChannelType channelType, const bool enableBoundaryFilter = true );
 #if JVET_W0123_TIMD_FUSION
 #if JVET_AB0157_INTRA_FUSION
-  void xPredIntraAng              ( const CPelBuf &pSrc, PelBuf &pDst, const ChannelType channelType, const ClpRng& clpRng, const bool bExtIntraDir, const CPelBuf &pSrc2nd, bool isISP = true, int weightMode = 4);
+  void xPredIntraAng              (
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+    const PredictionUnit& pu,
+#endif
+    const CPelBuf &pSrc, PelBuf &pDst, const ChannelType channelType, const ClpRng& clpRng, const bool bExtIntraDir, const CPelBuf &pSrc2nd, bool isISP = true, int weightMode = 4);
 #else
-  void xPredIntraAng              ( const CPelBuf &pSrc, PelBuf &pDst, const ChannelType channelType, const ClpRng& clpRng, const bool bExtIntraDir);
+  void xPredIntraAng              (
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+    const PredictionUnit& pu,
+#endif
+    const CPelBuf &pSrc, PelBuf &pDst, const ChannelType channelType, const ClpRng& clpRng, const bool bExtIntraDir);
 #endif
 #else
-  void xPredIntraAng              ( const CPelBuf &pSrc, PelBuf &pDst, const ChannelType channelType, const ClpRng& clpRng);
+  void xPredIntraAng              (
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+    const PredictionUnit& pu,
+#endif
+    const CPelBuf &pSrc, PelBuf &pDst, const ChannelType channelType, const ClpRng& clpRng);
 #endif
 #if !(JVET_AC0112_IBC_CIIP || JVET_AC0112_IBC_GPM)
 #if JVET_AB0155_SGPM
@@ -571,6 +583,12 @@ protected:
   void xFilterReferenceSamples(const Pel *refBufUnfiltered, Pel *refBufFiltered, const CompArea &area, const SPS &sps,
                                int multiRefIdx
   );
+
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+  void xCopyReferenceSamples(const Pel* refBufUnfiltered, Pel* refBufFiltered, const CompArea& area, const SPS& sps,
+    int multiRefIdx
+  );
+#endif
 
   static int getModifiedWideAngle         ( int width, int height, int predMode );
 #if JVET_W0123_TIMD_FUSION

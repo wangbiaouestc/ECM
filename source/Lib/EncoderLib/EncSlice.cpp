@@ -2066,6 +2066,35 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
   }
 #endif
 
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+  if (m_pcCuEncoder->getEncCfg()->getIntraToolControlMode() == 0)
+  {
+    SPS* spsTmp = const_cast<SPS*>(cs.sps);
+    spsTmp->setDisableRefFilter(true);
+    spsTmp->setDisablePdpc(true);
+    spsTmp->setDisableIntraFusion(true);
+  }
+  else if (m_pcCuEncoder->getEncCfg()->getIntraToolControlMode() == 1)
+  {
+    SPS* spsTmp = const_cast<SPS*>(cs.sps);
+    spsTmp->setDisableRefFilter(false);
+    spsTmp->setDisablePdpc(false);
+    spsTmp->setDisableIntraFusion(false);
+  }
+  else if (m_pcCuEncoder->getEncCfg()->getIntraToolControlMode() == 2)
+  {
+    SPS* spsTmp = const_cast<SPS*>(cs.sps);    
+    if (cs.slice->getPOC() == 0 || cs.slice->getSliceType() == I_SLICE) // ensure sequential and parallel simulation generate same output
+    {
+      hashBlkHitPerc = (hashBlkHitPerc == -1) ? m_pcCuEncoder->getIbcHashMap().calHashBlkMatchPerc(cs.area.Y()) : hashBlkHitPerc;
+      bool isSCC = hashBlkHitPerc >= 20;
+      spsTmp->setDisableRefFilter(isSCC);
+      spsTmp->setDisablePdpc(isSCC);
+      spsTmp->setDisableIntraFusion(isSCC);
+    }
+  }  
+#endif
+
   // for every CTU in the slice
   for( uint32_t ctuIdx = 0; ctuIdx < pcSlice->getNumCtuInSlice(); ctuIdx++ )
   {

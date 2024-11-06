@@ -1579,6 +1579,11 @@ private:
   bool              m_itmpLicExtension;
   bool              m_itmpLicMode;
 #endif
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+  bool              m_disableRefFilter;
+  bool              m_disablePdpc;
+  bool              m_disableIntraFusion;
+#endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   bool              m_DMVDMode;
 #endif
@@ -2301,7 +2306,14 @@ void                    setCCALFEnabledFlag( bool b )                           
   void                    setItmpLicMode(bool b)                                                     { m_itmpLicMode = b; }
   bool                    getItmpLicMode() const                                                     { return m_itmpLicMode; }
 #endif
-
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+  void                    setDisableRefFilter(bool b)                                                     { m_disableRefFilter = b; }
+  bool                    getDisableRefFilter() const                                                     { return m_disableRefFilter; }
+  void                    setDisablePdpc(bool b)                                                          { m_disablePdpc = b; }
+  bool                    getDisablePdpc() const                                                          { return m_disablePdpc; }
+  void                    setDisableIntraFusion(bool b)                                                   { m_disableIntraFusion = b; }
+  bool                    getDisableIntraFusion() const                                                   { return m_disableIntraFusion; }
+#endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   void                    setUseDMVDMode(bool b)                                                          { m_DMVDMode = b; }
   bool                    getUseDMVDMode() const                                                          { return m_DMVDMode; }

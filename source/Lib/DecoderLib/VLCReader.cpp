@@ -2963,6 +2963,12 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
   READ_FLAG( uiCode, "sps_itmp_lic_mode_flag" );                              pcSPS->setItmpLicMode ( uiCode != 0 );
 #endif
 
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+  READ_FLAG(uiCode, "sps_ref_filter_disabled_flag");                    pcSPS->setDisableRefFilter(uiCode != 0);
+  READ_FLAG(uiCode, "sps_pdpc_disabled_flag");                          pcSPS->setDisablePdpc(uiCode != 0);
+  READ_FLAG(uiCode, "sps_intra_fusion_disabled_flag");                  pcSPS->setDisableIntraFusion(uiCode != 0);
+#endif
+
 #if !JVET_S0074_SPS_REORDER
   READ_FLAG(uiCode, "sps_lmcs_enable_flag");                   pcSPS->setUseLmcs(uiCode == 1);
   READ_FLAG( uiCode, "sps_lfnst_enabled_flag" );                    pcSPS->setUseLFNST( uiCode != 0 );

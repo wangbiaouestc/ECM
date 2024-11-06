@@ -628,7 +628,9 @@ protected:
   bool      m_itmpLicExtension;
   bool      m_itmpLicMode;
 #endif
-
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+  int       m_intraToolControlMode;
+#endif
   bool      m_wrapAround;
   unsigned  m_wrapAroundOffset;
 #if JVET_AH0135_TEMPORAL_PARTITIONING
@@ -1683,7 +1685,10 @@ public:
   void      setItmpLicMode                   ( bool b )       { m_itmpLicMode = b; }
   bool      getItmpLicMode                   ()         const { return m_itmpLicMode; }
 #endif
-
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+  void      setIntraToolControlMode          ( int b )        { m_intraToolControlMode = b; }
+  int       getIntraToolControlMode          ()         const { return m_intraToolControlMode; }
+#endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   void      setUseDMVDMode                  (bool b)         { m_DMVDMode = b; }
   bool      getUseDMVDMode                  ()         const { return m_DMVDMode; }

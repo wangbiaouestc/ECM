@@ -1537,7 +1537,11 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
         weightMode = 4;
       }
 #endif
-      xPredIntraAng(srcBuf, piPred, channelType, clpRng, bExtIntraDir, srcBuf2nd, pu.cu->ispMode != NOT_INTRA_SUBPARTITIONS, weightMode);
+      xPredIntraAng(
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+        pu,
+#endif
+        srcBuf, piPred, channelType, clpRng, bExtIntraDir, srcBuf2nd, pu.cu->ispMode != NOT_INTRA_SUBPARTITIONS, weightMode);
         break;
 #else
     default:          xPredIntraAng(srcBuf, piPred, channelType, clpRng, bExtIntraDir); break;
@@ -1662,9 +1666,17 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
         else
 #endif
 #if JVET_W0123_TIMD_FUSION
-        xPredIntraAng(srcBuf, predAngExtra[i], channelType, clpRng, false, srcBuf2nd, pu.cu->ispMode!=NOT_INTRA_SUBPARTITIONS);
+        xPredIntraAng(
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+          pu,
+#endif
+          srcBuf, predAngExtra[i], channelType, clpRng, false, srcBuf2nd, pu.cu->ispMode!=NOT_INTRA_SUBPARTITIONS);
 #else
-        xPredIntraAng(srcBuf, predAngExtra[i], channelType, clpRng);
+        xPredIntraAng(
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+          pu,
+#endif
+          srcBuf, predAngExtra[i], channelType, clpRng);
 #endif
       }
     }
@@ -2089,9 +2101,17 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
 #endif
           case(DC_IDX):     xPredIntraDc(srcBuf, predFusion[i], channelType, false); break;
 #if JVET_AB0157_INTRA_FUSION
-          default:          xPredIntraAng(srcBuf, predFusion[i], channelType, clpRng, false, srcBuf2nd, pu.cu->ispMode!=NOT_INTRA_SUBPARTITIONS); break;
+          default:          xPredIntraAng(
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+            pu,
+#endif
+            srcBuf, predFusion[i], channelType, clpRng, false, srcBuf2nd, pu.cu->ispMode!=NOT_INTRA_SUBPARTITIONS); break;
 #else
-          default:          xPredIntraAng(srcBuf, predFusion[i], channelType, clpRng, bExtIntraDir); break;
+          default:          xPredIntraAng(
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+            pu,
+#endif
+            srcBuf, predFusion[i], channelType, clpRng, bExtIntraDir); break;
 #endif
         }
 
@@ -2212,9 +2232,17 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
 #endif
     case(DC_IDX):     xPredIntraDc(srcBuf3rd, predFusion, channelType, false); break;
 #if JVET_AB0157_INTRA_FUSION
-    default:          xPredIntraAng(srcBuf3rd, predFusion, channelType, clpRng, bExtIntraDir, srcBuf2nd, pu.cu->ispMode!=NOT_INTRA_SUBPARTITIONS, 0); break;
+    default:          xPredIntraAng(
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+      pu,
+#endif
+      srcBuf3rd, predFusion, channelType, clpRng, bExtIntraDir, srcBuf2nd, pu.cu->ispMode!=NOT_INTRA_SUBPARTITIONS, 0); break;
 #else
-    default:          xPredIntraAng(srcBuf3rd, predFusion, channelType, clpRng, bExtIntraDir); break;
+    default:          xPredIntraAng(
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+      pu,
+#endif
+      srcBuf3rd, predFusion, channelType, clpRng, bExtIntraDir); break;
 #endif
     }
 
@@ -2507,9 +2535,17 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
 #if JVET_AB0157_INTRA_FUSION
     default:
        int weightMode = 4;
-      xPredIntraAng(srcBuf2, predFusion, channelType, clpRng, bExtIntraDir, srcBuf2nd, pu.cu->ispMode!=NOT_INTRA_SUBPARTITIONS, weightMode); break;
+      xPredIntraAng(
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+        pu,
+#endif
+        srcBuf2, predFusion, channelType, clpRng, bExtIntraDir, srcBuf2nd, pu.cu->ispMode!=NOT_INTRA_SUBPARTITIONS, weightMode); break;
 #else
-    default: xPredIntraAng(srcBuf2, predFusion, channelType, clpRng, bExtIntraDir); break;
+    default: xPredIntraAng(
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+      pu,
+#endif
+      srcBuf2, predFusion, channelType, clpRng, bExtIntraDir); break;
 #endif
     }
 
@@ -3642,6 +3678,14 @@ void IntraPrediction::initPredIntraParams(const PredictionUnit & pu, const CompA
     }
   }
 
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+  if (pu.cu->cs->sps->getDisablePdpc())
+  {
+    m_ipaParam.applyPDPC = false;
+    m_ipaParam.useGradPDPC = false;
+  }
+#endif
+
   // high level conditions and DC intra prediction
   if(   sps.getSpsRangeExtension().getIntraSmoothingDisabledFlag()
     || !isLuma( chType )
@@ -3743,6 +3787,13 @@ void IntraPrediction::initPredIntraParams(const PredictionUnit & pu, const CompA
 #if JVET_AG0128_REF_LINE_OPT_TIMD_FUSION
   }
 #endif
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+  if (pu.cu->cs->sps->getDisableIntraFusion())
+  {
+    m_ipaParam.fetchRef2nd = false;
+    m_ipaParam.applyFusion = false;
+  }
+#endif
 #endif
 }
 
@@ -3761,12 +3812,24 @@ void IntraPrediction::initPredIntraParams(const PredictionUnit & pu, const CompA
 
 #if JVET_W0123_TIMD_FUSION
 #if JVET_AB0157_INTRA_FUSION
-void IntraPrediction::xPredIntraAng( const CPelBuf &pSrc, PelBuf &pDst, const ChannelType channelType, const ClpRng& clpRng, const bool bExtIntraDir, const CPelBuf &pSrc2nd, bool isISP, int weightMode)
+void IntraPrediction::xPredIntraAng(
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+  const PredictionUnit& pu,
+#endif
+  const CPelBuf &pSrc, PelBuf &pDst, const ChannelType channelType, const ClpRng& clpRng, const bool bExtIntraDir, const CPelBuf &pSrc2nd, bool isISP, int weightMode)
 #else
-void IntraPrediction::xPredIntraAng( const CPelBuf &pSrc, PelBuf &pDst, const ChannelType channelType, const ClpRng& clpRng, const bool bExtIntraDir)
+void IntraPrediction::xPredIntraAng(
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+  const PredictionUnit& pu,
+#endif
+  const CPelBuf &pSrc, PelBuf &pDst, const ChannelType channelType, const ClpRng& clpRng, const bool bExtIntraDir)
 #endif
 #else
-void IntraPrediction::xPredIntraAng( const CPelBuf &pSrc, PelBuf &pDst, const ChannelType channelType, const ClpRng& clpRng)
+void IntraPrediction::xPredIntraAng(
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+  const PredictionUnit& pu,
+#endif
+  const CPelBuf &pSrc, PelBuf &pDst, const ChannelType channelType, const ClpRng& clpRng)
 #endif
 {
   int width =int(pDst.width);
@@ -3851,6 +3914,26 @@ void IntraPrediction::xPredIntraAng( const CPelBuf &pSrc, PelBuf &pDst, const Ch
       int frac32precision = (-k * absInvAngle + 8) >> 4;
       int intpel = frac32precision >> 5;
       int fracpel = frac32precision & 31;
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+      if (pu.cu->cs->sps->getDisableRefFilter())
+      {
+        int left = refSide[Clip3(0, sizeSide + 2 + multiRefIdx, intpel)];
+        int right = refSide[Clip3(0, sizeSide + 2 + multiRefIdx, intpel + 1)];
+        refMain[k] = (Pel)(fracpel > 15 ? right : left);
+      }
+      else
+      {
+        //std::cout << " fracPel: " << fracpel << std::endl;
+        int left_minus1 = refSide[Clip3(0, sizeSide + 2 + multiRefIdx, intpel - 1)];
+        int left = refSide[Clip3(0, sizeSide + 2 + multiRefIdx, intpel)];
+        int right = refSide[Clip3(0, sizeSide + 2 + multiRefIdx, intpel + 1)];
+        int right_plus1 = refSide[Clip3(0, sizeSide + 2 + multiRefIdx, intpel + 2)];
+
+        const TFilterCoeff* f = InterpolationFilter::getWeak4TapFilterTable(fracpel);
+        int val = ((int)f[0] * left_minus1 + (int)f[1] * left + (int)f[2] * right + f[3] * (int)right_plus1 + 32) >> 6;
+        refMain[k] = (Pel)ClipPel(val, clpRng);
+      }
+#else
       //std::cout << " fracPel: " << fracpel << std::endl;
       int left_minus1 = refSide[Clip3(0, sizeSide + 2 + multiRefIdx, intpel - 1)];
       int left        = refSide[Clip3(0, sizeSide + 2 + multiRefIdx, intpel)];
@@ -3860,6 +3943,7 @@ void IntraPrediction::xPredIntraAng( const CPelBuf &pSrc, PelBuf &pDst, const Ch
       const TFilterCoeff* f = InterpolationFilter::getWeak4TapFilterTable(fracpel);
       int val = ((int)f[0] * left_minus1 + (int)f[1] * left + (int)f[2] * right + f[3] * (int)right_plus1 + 32) >> 6;
       refMain[k] = (Pel)ClipPel(val, clpRng);
+#endif
     }
 #else
     for (int x = 0; x <= width + 1 + multiRefIdx; x++)
@@ -3974,6 +4058,27 @@ void IntraPrediction::xPredIntraAng( const CPelBuf &pSrc, PelBuf &pDst, const Ch
         int frac32precision = (-k * absInvAngle + 8) >> 4;
         int intpel          = frac32precision >> 5;
         int fracpel         = frac32precision & 31;
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+        if (pu.cu->cs->sps->getDisableRefFilter())
+        {
+          int left = refSide2nd[Clip3(0, sizeSideRange, intpel)];
+          int right = refSide2nd[Clip3(0, sizeSideRange, intpel + 1)];
+          refMain2nd[k] = (Pel)(fracpel > 15 ? right : left);
+        }
+        else
+        {
+          // std::cout << " fracPel: " << fracpel << std::endl;
+          int leftMinus1 = refSide2nd[Clip3(0, sizeSideRange, intpel - 1)];
+          int left = refSide2nd[Clip3(0, sizeSideRange, intpel)];
+          int right = refSide2nd[Clip3(0, sizeSideRange, intpel + 1)];
+          int rightPlus1 = refSide2nd[Clip3(0, sizeSideRange, intpel + 2)];
+
+          const TFilterCoeff* f = InterpolationFilter::getWeak4TapFilterTable(fracpel);
+          int                 val =
+            ((int)f[0] * leftMinus1 + (int)f[1] * left + (int)f[2] * right + f[3] * (int)rightPlus1 + 32) >> 6;
+          refMain2nd[k] = (Pel)ClipPel(val, clpRng);
+        }
+#else
         // std::cout << " fracPel: " << fracpel << std::endl;
         int leftMinus1  = refSide2nd[Clip3(0, sizeSideRange, intpel - 1)];
         int left        = refSide2nd[Clip3(0, sizeSideRange, intpel)];
@@ -3984,6 +4089,7 @@ void IntraPrediction::xPredIntraAng( const CPelBuf &pSrc, PelBuf &pDst, const Ch
         int                 val =
           ((int) f[0] * leftMinus1 + (int) f[1] * left + (int) f[2] * right + f[3] * (int) rightPlus1 + 32) >> 6;
         refMain2nd[k] = (Pel) ClipPel(val, clpRng);
+#endif
       }
     }
     else
@@ -5409,6 +5515,21 @@ void IntraPrediction::initIntraPatternChType(const CodingUnit &cu, const CompAre
   }
 #endif
   // ----- Step 2: filtered reference samples -----
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+  if (cu.cs->sps->getDisableRefFilter())
+  {
+    m_ipaParam.refFilterFlag = false;
+    xCopyReferenceSamples(refBufUnfiltered, refBufFiltered, area, *cs.sps, cu.firstPU->multiRefIdx);
+  }
+  else if (m_ipaParam.refFilterFlag || forceRefFilterFlag
+#if JVET_AG0092_ENHANCED_TIMD_FUSION
+    || cu.timd
+#endif
+    )
+  {
+    xFilterReferenceSamples(refBufUnfiltered, refBufFiltered, area, *cs.sps, cu.firstPU->multiRefIdx);
+  }
+#else
   if( m_ipaParam.refFilterFlag || forceRefFilterFlag 
 #if JVET_AG0092_ENHANCED_TIMD_FUSION 
    || cu.timd
@@ -5417,6 +5538,7 @@ void IntraPrediction::initIntraPatternChType(const CodingUnit &cu, const CompAre
   {
     xFilterReferenceSamples( refBufUnfiltered, refBufFiltered, area, *cs.sps, cu.firstPU->multiRefIdx );
   }
+#endif
 }
 
 void IntraPrediction::initIntraPatternChTypeISP(const CodingUnit& cu, const CompArea& area, PelBuf& recBuf, const bool forceRefFilterFlag)
@@ -5528,12 +5650,28 @@ void IntraPrediction::initIntraPatternChTypeISP(const CodingUnit& cu, const Comp
     }
   }
   // ----- Step 2: filtered reference samples -----
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+  if (cu.cs->sps->getDisableRefFilter())
+  {
+    m_ipaParam.refFilterFlag = false;
+    Pel* refBufUnfiltered = m_refBuffer[area.compID][PRED_BUF_UNFILTERED];
+    Pel* refBufFiltered = m_refBuffer[area.compID][PRED_BUF_FILTERED];
+    xCopyReferenceSamples(refBufUnfiltered, refBufFiltered, area, *cs.sps, cu.firstPU->multiRefIdx);
+  }
+  else if (m_ipaParam.refFilterFlag || forceRefFilterFlag)
+  {
+    Pel* refBufUnfiltered = m_refBuffer[area.compID][PRED_BUF_UNFILTERED];
+    Pel* refBufFiltered = m_refBuffer[area.compID][PRED_BUF_FILTERED];
+    xFilterReferenceSamples(refBufUnfiltered, refBufFiltered, area, *cs.sps, cu.firstPU->multiRefIdx);
+  }
+#else
   if (m_ipaParam.refFilterFlag || forceRefFilterFlag)
   {
     Pel *refBufUnfiltered = m_refBuffer[area.compID][PRED_BUF_UNFILTERED];
     Pel *refBufFiltered   = m_refBuffer[area.compID][PRED_BUF_FILTERED];
     xFilterReferenceSamples(refBufUnfiltered, refBufFiltered, area, *cs.sps, cu.firstPU->multiRefIdx);
   }
+#endif
 }
 
 #if JVET_V0130_INTRA_TMP
@@ -6445,6 +6583,32 @@ void IntraPrediction::xFillReferenceSamplesForCoLuma(const CPelBuf &recoBuf, Pel
 }
 #endif
 
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+void IntraPrediction::xCopyReferenceSamples(const Pel* refBufUnfiltered, Pel* refBufFiltered, const CompArea& area, const SPS& sps,
+  int multiRefIdx
+)
+{
+  if (area.compID != COMPONENT_Y)
+  {
+    multiRefIdx = 0;
+  }
+  const int predSize = m_topRefLength + multiRefIdx;
+  const int predHSize = m_leftRefLength + multiRefIdx;
+  const size_t predStride = m_refBufferStride[area.compID];
+
+  for (int i = 0; i < predSize; i++)
+  {
+    refBufFiltered[i] = refBufUnfiltered[i];
+  }
+  refBufFiltered += predStride;
+  refBufUnfiltered += predStride;
+  for (int i = 0; i < predHSize; i++)
+  {
+    refBufFiltered[i] = refBufUnfiltered[i];
+  }
+}
+#endif
+
 void IntraPrediction::xFilterReferenceSamples(const Pel *refBufUnfiltered, Pel *refBufFiltered, const CompArea &area,
                                               const SPS &sps, int multiRefIdx)
 {
@@ -6928,6 +7092,13 @@ void IntraPrediction::initPredTimdIntraParams(const PredictionUnit & pu, const C
       m_ipaParam.applyPDPC &= m_ipaParam.angularScale >= 0;
     }
   }
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+  if (pu.cu->cs->sps->getDisablePdpc())
+  {
+    m_ipaParam.applyPDPC = false;
+    m_ipaParam.useGradPDPC = false;
+  }
+#endif
 }
 
 void IntraPrediction::xPredTimdIntraAng( const CPelBuf &pSrc, const ClpRng& clpRng, Pel* pTrueDst, int iDstStride, int iWidth, int iHeight, TemplateType eTempType, int iTemplateWidth , int iTemplateHeight, uint32_t dirMode
