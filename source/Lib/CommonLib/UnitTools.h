@@ -1457,7 +1457,11 @@ void fillNonMPMList(uint8_t* mpm, uint8_t* non_mpm);
 Position getRecoLinesEIP(const CodingUnit& cu, const ComponentID compId);
 bool     getAllowedEipMerge(const CodingUnit &cu, const ComponentID compId);
 bool     getAllowedEip(const CodingUnit &cu, const ComponentID compId);
+#if JVET_AJ0082_MM_EIP
+int getAllowedCurEip(const CodingUnit& cu, const ComponentID compId, static_vector<EIPInfo, NUM_DERIVED_EIP>& eipInfoList, bool bMmEip = false);
+#else 
 int getAllowedCurEip(const CodingUnit& cu, const ComponentID compId, static_vector<EIPInfo, NUM_DERIVED_EIP>& eipInfoList);
+#endif
 #endif
 
 #if JVET_AI0082_TEMPORAL_BV

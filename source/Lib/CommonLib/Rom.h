@@ -498,6 +498,9 @@ extern const Position g_eipFilter[NUM_EIP_SHAPE][EIP_FILTER_TAP - 1];
 extern const Position g_eipFilter[NUM_EIP_SHAPE][EIP_FILTER_TAP];
 #endif
 extern const EIPInfo  g_eipInfoLut[4][4][9];
+#if JVET_AJ0082_MM_EIP
+extern const EIPInfo  g_mmEipInfoLut[4][4][9];
+#endif
 #endif
 #if JVET_AG0276_LIC_SLOPE_ADJUST
 extern const int g_licSlopeDeltaSet[LIC_SLOPE_MAX_NUM_DELTA + 1];

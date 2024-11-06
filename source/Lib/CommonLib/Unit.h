@@ -426,6 +426,9 @@ struct CodingUnit : public UnitArea
   bool eipFlag;
   bool              eipMerge;
   EipModelCandidate eipModel;
+#if JVET_AJ0082_MM_EIP
+  bool              eipMmFlag;
+#endif
 #endif
 #if ENABLE_OBMC
   bool           obmcFlag;

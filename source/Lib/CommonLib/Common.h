@@ -635,7 +635,14 @@ struct EipModelCandidate
 {
   int64_t params[EIP_FILTER_TAP] = { 0 };
   int     filterShape            = 0;
+#if JVET_AJ0082_MM_EIP
+  bool    bMm                     = false;
+  int64_t params1[EIP_FILTER_TAP] = { 0 };
+  Pel     eipMmThrd               = 0;
+  int     eipDimdMode             = -1;
+#else
   int     eipDimdMode            = PLANAR_IDX;
+#endif
 
   inline bool isTheSameParams(const EipModelCandidate& p) const
   {
@@ -643,6 +650,26 @@ struct EipModelCandidate
     {
       return false;
     }
+#if JVET_AJ0082_MM_EIP
+    if (bMm != p.bMm)
+    {
+      return false;
+    }
+    if (bMm)
+    {
+      if (eipMmThrd != p.eipMmThrd)
+      {
+        return false;
+      }
+      for (int i = 0; i < EIP_FILTER_TAP; ++i)
+      {
+        if (params1[i] != p.params1[i])
+        {
+          return false;
+        }
+      }
+    }
+#endif
     for (int i = 0; i < EIP_FILTER_TAP; ++i)
     {
       if (params[i] != p.params[i])

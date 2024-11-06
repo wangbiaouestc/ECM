@@ -6371,6 +6371,29 @@ const CtxSet ContextSetCfg::InterCcpMergeZeroRootCbfIdc = ContextSetCfg::addCtxS
 #if JVET_AG0058_EIP
 const CtxSet ContextSetCfg::EipFlag = ContextSetCfg::addCtxSet
   ({
+#if JVET_AJ0082_MM_EIP
+     {  40,  11, CNU},
+     {  25,  18, CNU},
+     {  17,  27, CNU},
+     {  25,  11, CNU},
+     {   6,   8, DWS},
+     {   6,   8, DWS},
+     {   9,   5, DWS},
+     {   6,   9, DWS},
+     {  25,  32, DWE},
+     {  25,  32, DWE},
+     {  25,   4, DWE},
+     {  25,  32, DWE},
+     { 100, 115, DWO},
+     { 130, 116, DWO},
+     { 102, 163, DWO},
+     { 225,  99, DWO},
+     { 105, 134, DWO},
+     { 241, 132, DWO},
+     { 103, 226, DWO},
+     { 241, 100, DWO},
+     });
+#else
 // ctx 1594 1595
      {  40,  11 },
      {  25,  18 },
@@ -6393,6 +6416,7 @@ const CtxSet ContextSetCfg::EipFlag = ContextSetCfg::addCtxSet
 	 { 103, 226 },
      { 241, 100 },
      });
+#endif
 #endif
 
 #if JVET_AG0059_CCP_MERGE_ENHANCEMENT

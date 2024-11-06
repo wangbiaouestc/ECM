@@ -3575,6 +3575,9 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
   m_pcIntraSearch->m_skipObicLfnstMtsPass = false;
   m_pcIntraSearch->m_skipDimdLfnstMtsPass = false;
 #endif
+#if JVET_AJ0082_MM_EIP
+  m_pcIntraSearch->m_skipEipLfnstMtsPass = false;
+#endif
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
   m_pcIntraSearch->m_skipCCCMSATD = false;
 #endif
