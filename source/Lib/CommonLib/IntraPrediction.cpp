@@ -28156,11 +28156,7 @@ void IntraPrediction::getNeiEipCands(const PredictionUnit& pu, static_vector<Eip
     }
   }
 
-#if JVET_Z0118_GDR  
   auto tryHistEip = [&](const static_vector<EipModelCandidate, MAX_NUM_HEIP_CANDS>& lut)-> void
-#else
-  auto tryHistEip = [&](const LutEIP& eipLut)-> void
-#endif
   {
 #if JVET_AI0136_ADAPTIVE_DUAL_TREE
     if (!pu.cs->slice->isIntra() && pu.cs->slice->getSeparateTreeEnabled())
@@ -28168,24 +28164,18 @@ void IntraPrediction::getNeiEipCands(const PredictionUnit& pu, static_vector<Eip
       return;
     }
 #endif
-#if JVET_Z0118_GDR  
     for (int idx = 0; idx < lut.size() && numCand < maxCands; idx++)
     {
       EipModelCandidate cand;
       pu.cs->getOneModelFromEipLut(lut, cand, idx);
-#else
-    for (int idx = 0; idx < eipLut.lutEip.size() && numCand < maxCands; idx++)
-    {
-      EipModelCandidate cand;
-      pu.cs->getOneModelFromEipLut(eipLut.lutEip, cand, idx);
-#endif
       bool duplication = false;
+
       for (int j = 0; j < candList.size(); j++)
       {
         if (cand.isTheSameParams(candList[j]))
         {
           duplication = true;
-          // THROW("Should not duplicaten");
+          // THROW("Should not duplicated");
           break;
         }
       }

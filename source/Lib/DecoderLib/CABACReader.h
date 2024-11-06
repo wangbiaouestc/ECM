@@ -70,6 +70,10 @@ public:
   const BinStoreVector *getBinBuffer()             const { return m_BinDecoder.getBinBuffer(); }
   void                  updateCtxs  (BinStoreVector *bb) { m_BinDecoder.updateCtxs(bb);        }
 #endif
+#if JVET_AI0087_BTCUS_RESTRICTION
+  bool         isLumaNonBoundaryCu      (const Partitioner& partitioner, SizeType picWidth, SizeType picHeight);
+  void         setBtFirstPart           (const Partitioner& partitioner, SizeType blockSize, CodingStructure& cs, PartSplit setValue);
+#endif
 
 public:
   // slice segment data (clause 7.3.8.1)

@@ -2840,6 +2840,11 @@ void addBIOAvgN_SSE(const Pel* src0, int src0Stride, const Pel* src1, int src1St
   __m128i vClipTmpx = _mm_setzero_si128();
   __m128i vClipTmpy = _mm_setzero_si128();
 
+#if JVET_AI0046_HIGH_PRECISION_BDOF_SAMPLE
+  int bb = 0;
+  int pX = 0, pY = 0;
+  const int tt = 16;
+#endif
   for (int y = 0; y < height; y++)
   {
     for (int x = 0; x < width; x += 4)
@@ -2865,6 +2870,21 @@ void addBIOAvgN_SSE(const Pel* src0, int src0Stride, const Pel* src1, int src1St
       sum = _mm_min_epi16(sum, vibdimax);
       _mm_storel_epi64((__m128i *) (dst + x), sum);
     }
+#if JVET_AI0046_HIGH_PRECISION_BDOF_SAMPLE
+    for (int x = 0; x < width; x++)
+    {
+      pX = (tmpx[x] > tt) ? 1 : ((tmpx[x] < -tt) ? -1 : 0);
+      pY = (tmpy[x] > tt) ? 1 : ((tmpy[x] < -tt) ? -1 : 0);
+      if (pX == 0 && pY == 0)
+      {
+        continue;
+      }
+      int xX = tmpx[x] - 32 * pX;
+      int yY = tmpy[x] - 32 * pY;
+      bb = (int)xX * (gradX0[x + pY * gradStride + pX] - gradX1[x - pY * gradStride - pX]) + (int)yY * (gradY0[x + pY * gradStride + pX] - gradY1[x - pY * gradStride - pX]);
+      dst[x] = ClipPel(rightShift((src0[x + pY * src0Stride + pX] + src1[x - pY * src1Stride - pX] + bb + offset), shift), clpRng);
+    }
+#endif
     dst += dstStride;       src0 += src0Stride;     src1 += src1Stride;
     gradX0 += gradStride; gradX1 += gradStride; gradY0 += gradStride; gradY1 += gradStride;
     tmpx += width; tmpy += width;

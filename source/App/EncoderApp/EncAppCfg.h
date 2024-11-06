@@ -415,7 +415,7 @@ protected:
   bool      m_sbTmvpEnableFlag;
   bool      m_Affine;
   bool      m_AffineType;
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
   bool      m_useAltCost;
 #endif
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT

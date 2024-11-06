@@ -1051,7 +1051,7 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("MMVD",                                            m_MMVD,                                            true, "Enable Merge mode with Motion Vector Difference (0:off, 1:on)  [default: 1]")
   ("Affine",                                          m_Affine,                                         false, "Enable affine prediction (0:off, 1:on)  [default: off]")
   ("AffineType",                                      m_AffineType,                                      true,  "Enable affine type prediction (0:off, 1:on)  [default: on]" )
-#if JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
   ("AltCost",                                         m_useAltCost,                                      true, "Enable alternating cost function based on parity of merge index (0:off, 1:on)  [default: on]")
 #endif
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
@@ -1198,7 +1198,7 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #endif
   ("Geo",                                             m_Geo,                                            false, "Enable geometric partitioning mode (0:off, 1:on)")
 #if JVET_AI0082_GPM_WITH_INTER_IBC
-  ("GeoInterIbc",                                     m_geoInterIbc,                                    true, "GPM with inter and IBC (0:off, 1:on)  [default: off]" )
+  ("GeoInterIbc",                                     m_geoInterIbc,                                    false, "GPM with inter and IBC (0:off, 1:on)  [default: off]" )
 #endif
   ("HashME",                                          m_HashME,                                         false, "Enable hash motion estimation (0:off, 1:on)")
 

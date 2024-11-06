@@ -2648,12 +2648,24 @@ void  AdaptiveLoopFilter::storeAlfScalePrev( CodingStructure& cs, Slice& slice )
 
 void AdaptiveLoopFilter::backupAlfScalePrev( std::vector<int> (&alfScalePrevBckup)[ALF_CTB_MAX_NUM_APS][MAX_NUM_ALF_ALTERNATIVES_LUMA] ) const
 {
-  memcpy( alfScalePrevBckup, m_idxCorrPrev, sizeof(m_idxCorrPrev) );
+  for (int a = 0; a < ALF_CTB_MAX_NUM_APS; a++)
+  {
+    for (int b = 0; b < MAX_NUM_ALF_ALTERNATIVES_LUMA; b++)
+    {
+      alfScalePrevBckup[a][b] = m_idxCorrPrev[a][b];
+    }
+  }
 }
 
 void AdaptiveLoopFilter::restoreAlfScalePrev( const std::vector<int> (&alfScalePrevBckup)[ALF_CTB_MAX_NUM_APS][MAX_NUM_ALF_ALTERNATIVES_LUMA] )
-{ 
-  memcpy( m_idxCorrPrev, alfScalePrevBckup, sizeof(m_idxCorrPrev) );
+{
+  for (int a = 0; a < ALF_CTB_MAX_NUM_APS; a++)
+  {
+    for (int b = 0; b < MAX_NUM_ALF_ALTERNATIVES_LUMA; b++)
+    {
+      m_idxCorrPrev[a][b] = alfScalePrevBckup[a][b];
+    }
+  }
 }
 
 void  AdaptiveLoopFilter::getAlfScalePrev( CodingStructure& cs, Slice& slice )

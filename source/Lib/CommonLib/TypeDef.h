@@ -94,6 +94,7 @@
 #if TU_256
 #define LMCS_CHROMA_CALC_CU                               1 // Derive chroma LMCS parameter based on neighbor CUs. Needed by VPDU removal and 128x128 transform.
 #endif
+#define JVET_AI0087_BTCUS_RESTRICTION                     1 // JVET-AI0087: Restriction on BT CUs from applying QT like partitioning structure
 
 //-- intra
 #define INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS             1 // Enable 2xN and Nx2 block by removing SCIPU constraints
@@ -359,7 +360,7 @@
 #define JVET_AI0197_AFFINE_TMVP                           1 // JVET-AI0197: Affine candidates derived from temporal collocated pictures
 #define JVET_AH0119_SUBBLOCK_TM                           1 // JVET-AH0119 extend affine TM and apply sbtmvp TM
 #define JVET_AI0094_SHARP_MC_FILTER_FOR_BIPRED            1 // JVET-AI0094: Sharp motion compensation filter for bi-prediction
-#define JVET_AH0185_ADAPTIVE_COST_IN_MERGE_MODE           1 // JVET-AI0185 adaptive cost function selection in merge mode
+#define JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE           1 // JVET-AI0185 adaptive cost function selection in merge mode
 #define JVET_AI0183_MVP_EXTENSION                         1 // JVET-AI0183 MVP extension
 // Inter template matching tools
 #define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction

@@ -629,6 +629,7 @@ struct LutCCP
   // Postions for future extensions
 };
 #endif
+
 #if JVET_AG0058_EIP
 struct EipModelCandidate
 {
@@ -662,18 +663,16 @@ struct EipModelCandidate
   }
 };
 
-#if JVET_AG0058_EIP
 struct LutEIP
 {
 #if JVET_Z0118_GDR  
   static_vector<EipModelCandidate, MAX_NUM_HEIP_CANDS> lutEip0;
   static_vector<EipModelCandidate, MAX_NUM_HEIP_CANDS> lutEip1;
 #else
-  static_vector<CccmModel, MAX_NUM_HEIP_CANDS> lutEip;
+  static_vector<EipModelCandidate, MAX_NUM_HEIP_CANDS> lutEip;
 #endif
   // Postions for future extensions
 };
-#endif
 #endif
 
 #if JVET_AG0154_DECODER_DERIVED_CCP_FUSION
