@@ -177,6 +177,10 @@ public:
   bool              m_skipDoLic;
 #endif
 #endif
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+public:
+  AffineAMVPInfo m_affineAmvpInfo[AFFINE_MODEL_NUM][NUM_IMV_MODES][NUM_REF_PIC_LIST_01][MAX_NUM_REF];
+#endif
 #if JVET_AD0140_MVD_PREDICTION
   struct MvdDerivedInfo
   {
@@ -247,6 +251,7 @@ public:
   AMVPInfo m_tplAmvpInfoLIC[NUM_IMV_MODES][NUM_REF_PIC_LIST_01][MAX_NUM_REF];
 #endif
 #endif
+
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
   MergeCtx m_pcMergeCtxList0;
   MergeCtx m_pcMergeCtxList1;
@@ -961,9 +966,10 @@ public:
   int deriveMVSDIdxFromMVDTransSI(const Mv& cMvd, const std::vector<Mv>& cMvdDerived, const MvdSuffixInfo &si);
   Mv  deriveMVDFromMVSDIdxTransSI(int mvsdIdx, const std::vector<Mv> &cMvdDerived, const MvdSuffixInfo &si);
 #endif
+
   int deriveMVSDIdxFromMVDTrans(Mv cMvd, std::vector<Mv>& cMvdDerived);
   Mv deriveMVDFromMVSDIdxTrans(int mvsdIdx, std::vector<Mv>& cMvdDerived);
-  void deriveMvdSignSMVD(const Mv& cMvPred, const Mv& cMvPred2, const Mv& cMvdKnownAtDecoder, PredictionUnit& pu, std::vector<Mv>& cMvdDerived);
+  void deriveMvdSignSMVD(const Mv &cMvPred, const Mv &cMvPred2, const Mv &cMvdKnownAtDecoder, PredictionUnit &pu, std::vector<Mv> &cMvdDerived);
   void deriveMvdSignAffine(const Mv& cMvPred, const Mv& cMvPred2, const Mv& cMvPred3,
 #if JVET_Z0054_BLK_REF_PIC_REORDER
                            const Mv cMvdKnownAtDecoder[3],
@@ -1227,6 +1233,10 @@ public:
     , int mrgCandIdx = -1);
   void    updateAffineCandInfo2(PredictionUnit &pu, AffineMergeCtx& affMrgCtx, uint32_t(*rdCandList)[RMVF_AFFINE_MRG_MAX_CAND_LIST_SIZE], int listsize, int mrgCandIdx = -1);
 #endif
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+  void adjustAffineAMVPCandidates(PredictionUnit &pu, const RefPicList &eRefPicList, const int &refIdx, AffineAMVPInfo &affiAMVPInfo, int extCond);
+  void tmRefineAffineAMVPCandidates(PredictionUnit &pu, const RefPicList &eRefPicList, const int &refIdx, AffineAMVPInfo &affiAMVPInfo, int extCond);
+#endif
 #if JVET_Y0058_IBC_LIST_MODIFY
   void    adjustIBCMergeCandidates(PredictionUnit &pu, MergeCtx& mrgCtx, int mrgCandIdx = -1);
   void    updateIBCCandInfo(PredictionUnit &pu, MergeCtx& mrgCtx, uint32_t(*RdCandList)[IBC_MRG_MAX_NUM_CANDS], int mrgCandIdx = -1);
@@ -1489,6 +1499,11 @@ public:
   void       clearAmvpTmvpBuffer();
 #endif
 #endif
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+  void       clearAffineAmvpBuffer ();
+  void       writeAffineAmvpBuffer (const AffineAMVPInfo& src, const CodingUnit& cu, RefPicList eRefList, int refIdx);
+  bool       readAffineAmvpBuffer  (      AffineAMVPInfo& dst, const CodingUnit& cu, RefPicList eRefList, int refIdx);
+#endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
   static Distortion getDecoderSideDerivedMvCost (const Mv& mvStart, const Mv& mvCur, int searchRangeInFullPel, int weight);
 #if MULTI_PASS_DMVR
@@ -1554,6 +1569,7 @@ private:
 #endif
 
   Mv*       m_bdmvrSubPuMvBuf[2];
+
 #if JVET_X0083_BM_AMVP_MERGE_MODE
 public:
 #if JVET_AD0213_LIC_IMP
@@ -1564,6 +1580,7 @@ public:
   void      amvpMergeModeMvRefinement(PredictionUnit& pu, MvField* mvFieldAmListCommon, const int mvFieldMergeIdx, const int mvFieldAmvpIdx);
 #endif
 #endif
+
 #if JVET_AC0144_AFFINE_DMVR_REGRESSION
 #if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
   void bmAffineInit(const PredictionUnit& pu, int mergeIdx = -1);
@@ -1644,6 +1661,9 @@ public:
 #if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
     , int mergeIdx = -1
 #endif
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+    , bool isInt4PosRefine = false
+#endif
   );
 #if JVET_AH0119_SUBBLOCK_TM
   Distortion xGetTemplateMatchingError(PredictionUnit& pu, AffineMergeCtx &affineMergeCtx, int interpolationIdx=2 , bool isStore=false
@@ -1654,6 +1674,9 @@ public:
   bool processTM4AffineBaseMV(PredictionUnit& pu, AffineMergeCtx &affineMergeCtx, int uiAffMergeCand, Mv(&bestCPMV)[2][3], Distortion& uiCostOri, Distortion& uiCostBest, uint32_t targetList
 #if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
     , int mergeIdx = -1
+#endif
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+    , bool isInt4PosRefine = false
 #endif
   );
   void xUpdateCPMV(PredictionUnit &pu, int32_t targetRefList, const Mv(&curCPMV)[2][3], const int deltaMvHorX, const int deltaMvHorY, const int deltaMvVerX, const int deltaMvVerY, const int baseCP);

@@ -126,9 +126,16 @@ struct AMVPInfo
 
 struct AffineAMVPInfo
 {
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+  unsigned maxStorageSize;
+  Mv       mvCandLT[ AFFINE_AMVP_MAX_CAND ];  ///< array of affine motion vector predictor candidates for left-top corner
+  Mv       mvCandRT[ AFFINE_AMVP_MAX_CAND ];  ///< array of affine motion vector predictor candidates for right-top corner
+  Mv       mvCandLB[ AFFINE_AMVP_MAX_CAND ];  ///< array of affine motion vector predictor candidates for left-bottom corner
+#else
   Mv       mvCandLT[ AMVP_MAX_NUM_CANDS_MEM ];  ///< array of affine motion vector predictor candidates for left-top corner
   Mv       mvCandRT[ AMVP_MAX_NUM_CANDS_MEM ];  ///< array of affine motion vector predictor candidates for right-top corner
   Mv       mvCandLB[ AMVP_MAX_NUM_CANDS_MEM ];  ///< array of affine motion vector predictor candidates for left-bottom corner
+#endif
   unsigned numCand;                       ///< number of motion vector predictor candidates
 };
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION

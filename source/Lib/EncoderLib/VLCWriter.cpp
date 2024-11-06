@@ -1667,6 +1667,9 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
   WRITE_FLAG(pcSPS->getUseAltCost() ? 1 : 0, "sps_alt_cost_enabled_flag");
 #endif
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+  WRITE_FLAG(pcSPS->getUseExtAmvp() ? 1 : 0, "sps_ext_amvp_enabled_flag");
+#endif
   WRITE_FLAG(pcSPS->getUseBcw() ? 1 : 0, "sps_bcw_enabled_flag");
 
   WRITE_FLAG( pcSPS->getUseCiip() ? 1 : 0,                                                  "sps_ciip_enabled_flag" );

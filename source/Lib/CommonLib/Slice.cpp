@@ -108,6 +108,9 @@ Slice::Slice()
 #if JVET_AG0098_AMVP_WITH_SBTMVP
 , m_amvpSbTmvpAmvrEnabledFlag     (false)
 #endif
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+, m_extAmvpLevel                  (0)
+#endif
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
 , m_costForARMC                   ( MAX_UINT )
 #endif
@@ -2122,7 +2125,6 @@ void Slice::copySliceInfo(Slice *pSrc, bool cpyAlmostAll)
 #endif
 
   m_cabacInitFlag                 = pSrc->m_cabacInitFlag;
-
 #if JVET_AG0196_CABAC_RETRAIN
   m_cabacInitSliceType = pSrc->m_cabacInitSliceType;
 #endif
@@ -4294,6 +4296,9 @@ SPS::SPS()
 , m_AffineType                ( false )
 #if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
 , m_useAltCost                ( true )
+#endif
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+, m_useExtAmvp                ( true )
 #endif
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
 , m_useAffineTM               ( false )

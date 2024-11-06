@@ -6021,7 +6021,6 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
 #if JVET_AD0213_LIC_IMP && TM_AMVP
   resetLicEncCtrlPara();
 #endif
-
 #if MULTI_HYP_PRED
   const bool saveMeResultsForMHP = cs.sps->getUseInterMultiHyp()
     && bcwIdx != BCW_DEFAULT
@@ -6312,7 +6311,6 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
           uiMotBits[1] = uiBits[1] - uiMbBits[1];
           uiBits[2] = uiMbBits[2] + uiMotBits[0] + uiMotBits[1];
         }
-
         if( doBiPred )
         {
         // 4-times iteration (default)
@@ -6323,6 +6321,8 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
         {
           iNumIter = 1;
         }
+
+
 #if JVET_X0083_BM_AMVP_MERGE_MODE
         if (amvpMergeModeFlag)
         {
@@ -6383,7 +6383,6 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
           }
 
           bool bChanged = false;
-
           iRefStart = 0;
           iRefEnd   = cs.slice->getNumRefIdx(eRefPicList)-1;
           for (int iRefIdxTemp = iRefStart; iRefIdxTemp <= iRefEnd; iRefIdxTemp++)
@@ -6408,6 +6407,7 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
             xCopyAMVPInfo( &amvp[refListAmvp], &aacAMVPInfo[refListAmvp][iRefIdxTemp]); // must always be done ( also when AMVP_MODE = AM_NONE )
             numberBestMvpIdxLoop = amvp[eRefPicList].numCand;
           }
+
           for (int bestMvpIdxLoop = 0; bestMvpIdxLoop < numberBestMvpIdxLoop; bestMvpIdxLoop++)
           {
             if (amvpMergeModeFlag)
@@ -6659,7 +6659,6 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
         }
         cu.refIdxBi[0] = iRefIdxBi[0];
         cu.refIdxBi[1] = iRefIdxBi[1];
-
         if ( cs.slice->getBiDirPred() && trySmvd )
         {
           Distortion symCost;
@@ -6868,7 +6867,6 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
           }
         }
       } // if (B_SLICE)
-
 #if JVET_AG0098_AMVP_WITH_SBTMVP
       bool       useAmvpSbTmvpBuf = false;
       int        amvpSbTmvpMvdIdx = -1;
@@ -7398,6 +7396,7 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
     }
 #endif
 #if INTER_LIC
+
 #if JVET_X0083_BM_AMVP_MERGE_MODE && JVET_AD0213_LIC_IMP
 #if JVET_AG0098_AMVP_WITH_SBTMVP
     if (cu.licFlag && !amvpMergeModeFlag && !pu.amvpSbTmvpFlag)
@@ -7675,7 +7674,12 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
           && (pu.interDir & (1 << uiRefListIdx)) && (absMvd[0] != Mv(0, 0) || absMvd[1] != Mv(0, 0) || absMvd[2] != Mv(0, 0)) && pu.isMvdPredApplicable())
         {
           AffineAMVPInfo affineAMVPInfo;
-          PU::fillAffineMvpCand(pu, eRefPicList, pu.refIdx[uiRefListIdx], affineAMVPInfo);
+          PU::fillAffineMvpCand(pu, eRefPicList, pu.refIdx[uiRefListIdx], affineAMVPInfo
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+            , this
+#endif    
+          );
+
           const unsigned mvpIdx = pu.mvpIdx[eRefPicList];
 
 #if JVET_AD0140_MVD_PREDICTION
@@ -7739,7 +7743,6 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
         }
       }
 #endif
-
       for (uint32_t uiRefListIdx = 0; uiRefListIdx < 2; uiRefListIdx++)
       {
         RefPicList eRefPicList = RefPicList(uiRefListIdx);
@@ -7757,6 +7760,7 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
           {
             PU::fillMvpCand(pu, RefPicList(uiRefListIdx), iRefIdx, *amvpCand, this);
           }
+
           Mv cMvPred2 = amvpCand->mvCand[pu.mvpIdx[uiRefListIdx]];
 #else
           auto aMvPred = bi ? cMvPredBi : cMvPred;
@@ -10397,6 +10401,7 @@ void InterSearch::xPatternSearchIntRefine(PredictionUnit& pu, IntTZSearchStruct&
 
   cBaseMvd[0] = (rcMv - amvpInfo.mvCand[0]);
   cBaseMvd[1] = (rcMv - amvpInfo.mvCand[1]);
+
   CHECK( (cBaseMvd[0].getHor() & 0x03) != 0 || (cBaseMvd[0].getVer() & 0x03) != 0 , "xPatternSearchIntRefine(): AMVP cand 0 Mvd issue.");
   CHECK( (cBaseMvd[1].getHor() & 0x03) != 0 || (cBaseMvd[1].getVer() & 0x03) != 0 , "xPatternSearchIntRefine(): AMVP cand 1 Mvd issue.");
 
@@ -11210,6 +11215,7 @@ void InterSearch::xPredAffineInterSearch( PredictionUnit&       pu,
     {
     // 4-times iteration (default)
     int iNumIter = 4;
+
     // fast encoder setting or GPB: only one iteration
     if ( m_pcEncCfg->getFastInterSearchMode()==FASTINTERSEARCH_MODE1 || m_pcEncCfg->getFastInterSearchMode()==FASTINTERSEARCH_MODE2 || slice.getPicHeader()->getMvdL1ZeroFlag() )
     {
@@ -11675,9 +11681,7 @@ void InterSearch::xCheckBestAffineMVP( PredictionUnit &pu, AffineAMVPInfo &affin
   {
     return;
   }
-
   int mvNum = pu.cu->affineType ? 3 : 2;
-
   m_pcRdCost->selectMotionLambda( );
   m_pcRdCost->setCostScale ( 0 );
 
@@ -12244,7 +12248,12 @@ void InterSearch::xEstimateAffineAMVP( PredictionUnit&  pu,
   Distortion uiBestCost = std::numeric_limits<Distortion>::max();
 
   // Fill the MV Candidates
-  PU::fillAffineMvpCand( pu, eRefPicList, iRefIdx, affineAMVPInfo );
+  PU::fillAffineMvpCand( pu, eRefPicList, iRefIdx, affineAMVPInfo 
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+                , this
+#endif 
+  );
+
   CHECK( affineAMVPInfo.numCand == 0, "Assertion failed." );
 
   PelUnitBuf predBuf = m_tmpStorageLCU.getBuf( UnitAreaRelative(*pu.cu, pu) );
@@ -12275,6 +12284,7 @@ void InterSearch::xEstimateAffineAMVP( PredictionUnit&  pu,
 
   pu.mvpIdx[eRefPicList] = iBestIdx;
   pu.mvpNum[eRefPicList] = affineAMVPInfo.numCand;
+
   DTRACE( g_trace_ctx, D_COMMON, "#estAffi=%d \n", affineAMVPInfo.numCand );
 }
 
@@ -16318,7 +16328,6 @@ void InterSearch::setEncCtrlParaLicOff(CodingUnit& cu)
 {
   CodingStructure& cs = *cu.cs;
   PredictionUnit&  pu = *cu.firstPU;
-
   isBDOFNotNeeded = (pu.interDir == 1 || pu.interDir == 2 || pu.cu->bcwIdx != BCW_DEFAULT || pu.cu->affine || pu.cu->smvdMode);
   amvpCand0 = &(m_tplAmvpInfo[cu.imv][REF_PIC_LIST_0][pu.refIdx[REF_PIC_LIST_0]]);
   amvpCand1 = &(m_tplAmvpInfo[cu.imv][REF_PIC_LIST_1][pu.refIdx[REF_PIC_LIST_1]]);
@@ -16326,6 +16335,7 @@ void InterSearch::setEncCtrlParaLicOff(CodingUnit& cu)
   amvpCand1Lic = &(m_tplAmvpInfoLIC[cu.imv][REF_PIC_LIST_1][pu.refIdx[REF_PIC_LIST_1]]);
   mvpIdx0 = pu.mvpIdx[REF_PIC_LIST_0];
   mvpIdx1 = pu.mvpIdx[REF_PIC_LIST_1];
+
   if (!cu.affine)
   {
     for (int refList = 0; refList < NUM_REF_PIC_LIST_01; refList++)
@@ -16350,7 +16360,6 @@ void InterSearch::setEncCtrlParaLicOff(CodingUnit& cu)
         pu.cu->licFlag = true;
       }
     }
-
     if (cs.picHeader->getMvdL1ZeroFlag() && pu.interDir == 3)
     {
       if (amvpCand1Lic->mvCand[mvpIdx1] != amvpCand1->mvCand[mvpIdx1])

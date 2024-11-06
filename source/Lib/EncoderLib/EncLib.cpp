@@ -1896,6 +1896,9 @@ void EncLib::xInitSPS( SPS& sps )
     }
   }
 #endif
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+  sps.setUseExtAmvp            ( m_useExtAmvp );
+#endif
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
   sps.setUseAffineTM           ( m_useAffineTM );
 #if JVET_AG0276_NLIC

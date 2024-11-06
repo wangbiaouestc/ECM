@@ -181,11 +181,20 @@ static const int MAX_NUM_REF =                                     16; ///< max.
 static const int MAX_QP =                                          63;
 static const int NOT_VALID =                                       -1;
 
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+static const int AFFINE_AMVP_MAX_CAND =                             10;
+#if TM_AMVP || (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
+static const int REGULAR_AMVP_MAX_NUM_CANDS =                       10; ///< AMVP: advanced motion vector prediction - max number of final candidate for regular inter mode
+#endif
+static const int REGULAR_AMVP_MAX_NUM_CANDS_IBC =                   5;
+#else
 #if TM_AMVP || (JVET_Z0084_IBC_TM && IBC_TM_AMVP) || JVET_AC0060_IBC_BVP_CLUSTER_RRIBC_BVD_SIGN_DERIV
 static const int REGULAR_AMVP_MAX_NUM_CANDS =                       5; ///< AMVP: advanced motion vector prediction - max number of final candidate for regular inter mode
 #endif
+#endif
 static const int AMVP_MAX_NUM_CANDS =                               2; ///< AMVP: advanced motion vector prediction - max number of final candidates
 static const int AMVP_MAX_NUM_CANDS_MEM =                           3; ///< AMVP: advanced motion vector prediction - max number of candidates
+
 #if INTER_RM_SIZE_CONSTRAINTS
 static const int AMVP_DECIMATION_FACTOR =                           1;
 #else

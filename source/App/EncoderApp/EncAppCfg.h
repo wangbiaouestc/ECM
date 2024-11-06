@@ -418,6 +418,9 @@ protected:
 #if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
   bool      m_useAltCost;
 #endif
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+  bool      m_useExtAmvp;
+#endif
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
   bool      m_useAffineTM;
 #if JVET_AG0276_NLIC
