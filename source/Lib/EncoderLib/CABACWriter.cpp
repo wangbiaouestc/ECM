@@ -3056,7 +3056,6 @@ void CABACWriter::intraChromaTmrl(const PredictionUnit& pu)
   m_BinEncoder.encodeBin(pu.chromaTmrlFlag ? 1 : 0, Ctx::ChromaTmrlFlag());
   if (pu.chromaTmrlFlag)
   {
-    intra_chroma_lmc_mode(pu);
     CHECK(pu.chromaTmrlIdx >= CHROMA_TMRL_LIST_SIZE, "Chroma tmrl index out of bounds");
     unary_max_eqprob(pu.chromaTmrlIdx, CHROMA_TMRL_LIST_SIZE - 1);
   }

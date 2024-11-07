@@ -6160,12 +6160,12 @@ void IntraPrediction::xFillReferenceSamples( const CPelBuf &recoBuf, Pel* refBuf
 }
 
 #if JVET_AH0136_CHROMA_REORDERING
-void IntraPrediction::xFillReferenceSamplesForCoLuma(const CPelBuf& recoBuf, Pel* refBufUnfiltered, const CompArea& area, const CodingUnit& cu)
+void IntraPrediction::xFillReferenceSamplesForCoLuma(const CPelBuf &recoBuf, Pel* refBufUnfiltered, const CompArea &area, const CodingUnit &cu)
 {
   const ChannelType      chType = toChannelType(area.compID);
-  const CodingStructure& cs = *cu.cs;
-  const SPS& sps = *cs.sps;
-  const PreCalcValues& pcv = *cs.pcv;
+  const CodingStructure &cs = *cu.cs;
+  const SPS             &sps = *cs.sps;
+  const PreCalcValues   &pcv = *cs.pcv;
 
 #if JVET_AJ0081_CHROMA_TMRL
   const int multiRefIdx = cu.firstPU->multiRefIdx;
@@ -6238,7 +6238,7 @@ void IntraPrediction::xFillReferenceSamplesForCoLuma(const CPelBuf& recoBuf, Pel
 #if JVET_AI0136_ADAPTIVE_DUAL_TREE // to fix chroma ipm reorderding
   if (cu.slice->isIntra())
 #endif
-    numIntraNeighbor += (area.y - multiRefIdx) > 0 ? std::min(numAboveRightUnits, wUnit) : 0;
+  numIntraNeighbor += (area.y - multiRefIdx) > 0 ? std::min(numAboveRightUnits, wUnit) : 0;
   for (int i = totalLeftUnits + leftMrlUnitNum + 1 + aboveMrlUnitNum + numAboveUnits; i < totalLeftUnits + leftMrlUnitNum + 1 + aboveMrlUnitNum + numAboveUnits + numAboveRightUnits; i++)
   {
     neighborFlags[i] = (area.y - multiRefIdx) > 0 ? (i - (totalLeftUnits + 1 + numAboveUnits) < wUnit ? true : false) : false;
@@ -6269,7 +6269,7 @@ void IntraPrediction::xFillReferenceSamplesForCoLuma(const CPelBuf& recoBuf, Pel
 #if JVET_AI0136_ADAPTIVE_DUAL_TREE
   if (cu.slice->isIntra())
 #endif
-    numIntraNeighbor += (area.x - multiRefIdx) > 0 ? std::min(numLeftBelowUnits, hUnit) : 0;
+  numIntraNeighbor += (area.x - multiRefIdx) > 0 ? std::min(numLeftBelowUnits, hUnit) : 0;
   int y = 0;
   for (int i = totalLeftUnits - 1 - numLeftUnits; i > totalLeftUnits - 1 - numLeftUnits - numLeftBelowUnits; i--)
   {
@@ -6337,10 +6337,10 @@ void IntraPrediction::xFillReferenceSamplesForCoLuma(const CPelBuf& recoBuf, Pel
 
   // ----- Step 2: fill reference samples (depending on neighborhood) -----
 
-  const Pel* srcBuf = recoBuf.buf;
+  const Pel*  srcBuf = recoBuf.buf;
   const int   srcStride = recoBuf.stride;
-  Pel* ptrDst = refBufUnfiltered;
-  const Pel* ptrSrc;
+  Pel*  ptrDst = refBufUnfiltered;
+  const Pel*  ptrSrc;
   const Pel   valueDC = 1 << (sps.getBitDepth(chType) - 1);
 
   if (numIntraNeighbor == 0)
