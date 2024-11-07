@@ -431,7 +431,7 @@ void QTBTPartitioner::canSplit( const CodingStructure &cs, bool& canNo, bool& ca
 
   maxMtt = maxBTD;
 
-  if ((!cs.slice->isIntra() && pColPic != NULL && !pColPic->isRefScaled(cs.pps) && pColPic->cs->slice != NULL)
+  if ((!cs.slice->isIntra() && pColPic != NULL && pColPic->cs->slice != NULL)
 #if JVET_AI0136_ADAPTIVE_DUAL_TREE
     && (cs.area.blocks[chType].contains(currArea().blocks[chType].pos().offset((currArea().blocks[chType].size().width) >> 1,
       ((currArea().blocks[chType].size().height) >> 1)))

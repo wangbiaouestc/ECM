@@ -367,11 +367,27 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
         {
           PredictionUnit *pu = currCU.firstPU;
           const CompArea &area = currCU.Y();
+#if JVET_AJ0061_TIMD_MERGE
+          if (currCU.timdMrg)
+          {
+            m_pcIntraPred->deriveTimdMergeModes(currCU.cs->picture->getRecoBuf(area), area, currCU);
+            CHECK(currCU.timdMrgList[currCU.timdMrg - 1][0] < 0, "Wrong timd-merge mode!");
+            pu->intraDir[0] = currCU.timdMrgList[currCU.timdMrg - 1][0];
+            currCU.timdMode = currCU.timdMrgList[currCU.timdMrg - 1][0];
+          }
+          else
+          {
 #if SECONDARY_MPM
           IntraPrediction::deriveDimdMode(currCU.cs->picture->getRecoBuf(area), area, currCU);
 #endif
           currCU.timdMode = m_pcIntraPred->deriveTimdMode(currCU.cs->picture->getRecoBuf(area), area, currCU);
           pu->intraDir[0] = currCU.timdMode;
+          }
+          if (!currCU.timdMrg && !currCU.lfnstIdx)
+          {
+            m_pcTrQuant->getTrTypes(*currCU.firstTU, COMPONENT_Y, currCU.timdmTrType[NUM_TIMD_MERGE_MODES][0], currCU.timdmTrType[NUM_TIMD_MERGE_MODES][1]);
+          }
+#endif
         }
 #endif
 

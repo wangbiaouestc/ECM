@@ -1787,6 +1787,12 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 
 #if JVET_W0123_TIMD_FUSION
   WRITE_FLAG( pcSPS->getUseTimd() ? 1 : 0,                                          "sps_timd_enabled_flag");
+#if JVET_AJ0061_TIMD_MERGE
+  if (pcSPS->getUseTimd())
+  {
+    WRITE_FLAG( pcSPS->getUseTimdMrg() ? 1 : 0,                                     "sps_timd_merge_enabled_flag");
+  }
+#endif
 #endif
 #if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
   if (pcSPS->getUseCiip() && pcSPS->getUseTimd())

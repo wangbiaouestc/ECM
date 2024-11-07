@@ -209,6 +209,12 @@ namespace CU
 // PU tools
 namespace PU
 {
+#if JVET_AJ0061_TIMD_MERGE
+  int canTimdMergeImplicitDst7(const TransformUnit &tu);
+  bool canTimdMerge(const PredictionUnit &pu);
+  std::array<const CodingUnit *, TIMD_MERGE_MAX_NONADJACENT> timdMergeNonAdjacentNeighbours(const PredictionUnit &pu);
+  bool hasTimdMergeCandidate(const PredictionUnit &pu);
+#endif
 #if (JVET_AG0146_DIMD_ITMP_IBC || JVET_AG0152_SGPM_ITMP_IBC || JVET_AG0151_INTRA_TMP_MERGE_MODE)
   int  getItmpMergeCandidate      (const PredictionUnit& pu, std::vector<Mv>& pBvs
 #if JVET_AH0200_INTRA_TMP_BV_REORDER
