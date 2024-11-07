@@ -52,6 +52,7 @@
 #include <cstdint>
 
 
+#define JVET_AJ0161_OBMC_EXTENSION_W_INTRA                1 //JVET-AJ0161: OBMC Extension with Intra Prediction
 
 #define BASE_ENCODER                                      1
 #define BASE_NORMATIVE                                    1

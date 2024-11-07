@@ -160,6 +160,13 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
 
     for( auto &currCU : cs.traverseCUs( CS::getArea( cs, ctuArea, chType ), chType ) )
     {
+#if JVET_AJ0161_OBMC_EXTENSION_W_INTRA
+      m_pcInterPred->setDIMDForOBMC(false);
+      m_pcInterPred->setModeGetCheck(0, false);
+      m_pcInterPred->setModeGetCheck(1, false);
+      m_pcInterPred->setClearModeBuf(0);
+      m_pcInterPred->setClearModeBuf(1);
+#endif
 #if JVET_Z0054_BLK_REF_PIC_REORDER
       m_pcInterPred->setFillCurTplAboveARMC(false);
       m_pcInterPred->setFillCurTplLeftARMC(false);
@@ -2279,7 +2286,11 @@ void DecCu::xReconInter(CodingUnit &cu)
     const UnitArea localUnitArea( cu.cs->area.chromaFormat, Area( 0, 0, cu.Y().width, cu.Y().height ) );
 #if ENABLE_OBMC && JVET_X0090_CIIP_FIX
     cu.isobmcMC = true;
+#if JVET_AJ0161_OBMC_EXTENSION_W_INTRA
+    m_pcInterPred->subBlockOBMC(*cu.firstPU, nullptr, m_pcIntraPred);
+#else
     m_pcInterPred->subBlockOBMC(*cu.firstPU);
+#endif
     cu.isobmcMC = false;
 #endif
 #if JVET_AG0135_AFFINE_CIIP
@@ -2342,7 +2353,11 @@ void DecCu::xReconInter(CodingUnit &cu)
   if (!cu.firstPU->ciipFlag)
 #endif
   {
+#if JVET_AJ0161_OBMC_EXTENSION_W_INTRA
+    m_pcInterPred->subBlockOBMC(*cu.firstPU, nullptr, m_pcIntraPred);
+#else
     m_pcInterPred->subBlockOBMC(*cu.firstPU);
+#endif
   }
 #else
   m_pcInterPred->subBlockOBMC(*cu.firstPU);

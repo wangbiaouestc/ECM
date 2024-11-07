@@ -200,6 +200,10 @@ private:
   static const int  m_LICShiftDiff = 12;
   int               m_LICMultApprox[64];
 #endif
+#if JVET_AJ0161_OBMC_EXTENSION_W_INTRA
+  Pel* m_IntraOBMCBuf[MAX_NUM_COMPONENT];
+  Pel* m_beforeOBMCBuf[MAX_NUM_COMPONENT];
+#endif
 
 #if JVET_AG0136_INTRA_TMP_LIC
   std::array<int, 7> m_arrayLicParams;
@@ -578,7 +582,11 @@ protected:
   bool xCheckIdenticalMotionInfo(MotionInfo orgMotionInfo, MotionInfo targetMotionInfo, MergeType puMergeType);
 #endif
 #if ENABLE_OBMC
+#if JVET_AJ0161_OBMC_EXTENSION_W_INTRA
+  void xSubblockOBMC(const ComponentID eComp, PredictionUnit &pu, PelUnitBuf &pcYuvPredDst, PelUnitBuf &pcYuvPredSrc, PelUnitBuf &pcYuvBefore, int iDir, bool bSubMotion = false, bool bIsIntra = false);
+#else
   void xSubblockOBMC(const ComponentID eComp, PredictionUnit &pu, PelUnitBuf &pcYuvPredDst, PelUnitBuf &pcYuvPredSrc, int iDir, bool bSubMotion = false);
+#endif
   void xSubBlockMotionCompensation(PredictionUnit &pu, PelUnitBuf &pcYuvPred);
   void xSubblockOBMCBlending(const ComponentID eComp, PredictionUnit &pu, PelUnitBuf &pcYuvPredDst, PelUnitBuf &pcYuvPredSrc1, PelUnitBuf &pcYuvPredSrc2, PelUnitBuf &pcYuvPredSrc3, PelUnitBuf &pcYuvPredSrc4, bool isAboveAvail = false, bool isLeftAvail = false, bool isBelowAvail = false, bool isRightAvail = false, bool bSubMotion = false);
 #endif
@@ -747,7 +755,11 @@ public:
   }
 #endif
 #if ENABLE_OBMC
+#if JVET_AJ0161_OBMC_EXTENSION_W_INTRA
+  void    subBlockOBMC(PredictionUnit &pu, PelUnitBuf *pDst = nullptr, IntraPrediction *pcIntraPred = nullptr);
+#else
   void    subBlockOBMC(PredictionUnit  &pu, PelUnitBuf *pDst = nullptr);
+#endif
 #if JVET_AD0193_ADAPTIVE_OBMC_CONTROL
   bool    isSCC(const PredictionUnit  &pu);
   bool    skipObmcConditionByPixel(PredictionUnit& pu, ComponentID comp, int width, int height, const Pel* src, int strideSrc, const Pel* dst, int strideDst, int bitDepth);
@@ -1050,7 +1062,10 @@ public:
   void xSubblockOBMCCopy(const ComponentID eComp, PredictionUnit &pu, PelUnitBuf &pcYuvPredDst,
                          PelUnitBuf &pcYuvPredSrc, int iDir);
   void xSubblockTMOBMC(const ComponentID eComp, PredictionUnit &pu, PelUnitBuf &pcYuvPredDst, PelUnitBuf &pcYuvPredSrc,
-                       int iDir, int iOBMCmode = 0);
+#if JVET_AJ0161_OBMC_EXTENSION_W_INTRA
+                       PelUnitBuf &pcYuvBefore,
+#endif
+    int iDir, int iOBMCmode = 0);
 #endif
 #if JVET_W0090_ARMC_TM || JVET_AA0070_RRIBC
   void    updateCandList(uint32_t uiCand, Distortion uiCost, uint32_t uiMrgCandNum, uint32_t* rdCandList, Distortion* candCostList);
@@ -1705,6 +1720,16 @@ public:
   void setFillCurTplAboveARMC(bool b) { m_fillCurTplAboveARMC = b; }
   void setFillCurTplLeftARMC(bool b) { m_fillCurTplLeftARMC = b; }
 #endif
+#if JVET_AJ0161_OBMC_EXTENSION_W_INTRA
+private:
+  bool m_DIMDForOBMCFilled;
+  int m_modeBuf[2][MAX_CU_SIZE >> MIN_CU_LOG2];
+  int m_modeGetCheck[2];
+public:
+  void setDIMDForOBMC(bool b) { m_DIMDForOBMCFilled = b; }
+  void setModeGetCheck(int i, bool b) { m_modeGetCheck[i] = b; }
+  void setClearModeBuf(int i) { memset(m_modeBuf[i], -1, sizeof(int) * (MAX_CU_SIZE >> MIN_CU_LOG2)); }
+#endif
 
 #if JVET_AG0276_NLIC
 public:
@@ -1871,6 +1896,9 @@ public:
 #endif
 #if JVET_AF0073_INTER_CCP_MERGE
   bool deriveInterCcpMergePrediction( TransformUnit* tu, const PelBuf& lumaReconstruction, PelBuf& inBufCb, PelBuf& inBufCr, PelBuf& outBufCb, PelBuf& outBufCr, CCPModelCandidate interCcpMergeList[], int validNum);
+#endif
+#if JVET_AJ0161_OBMC_EXTENSION_W_INTRA
+  void subBlockIntraForOBMC(PredictionUnit &subPu, const int iSub, const bool bIsAbove, PelUnitBuf &cTmp, IntraPrediction *pcIntraPred);
 #endif
 };
 
