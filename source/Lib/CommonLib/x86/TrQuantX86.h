@@ -434,13 +434,20 @@ void inverseLfnst_SIMD(TCoeff* src, TCoeff*  dst, const int8_t*  trMat, const in
 #if JVET_AC0130_NSPT && INTRA_TRANS_ENC_OPT
 template< X86_VEXT vext >
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
-void computeFwdNspt_SIMD( TCoeff* src, TCoeff* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx )
+void computeFwdNspt_SIMD( TCoeff* src, TCoeff* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx
 #else
-void computeFwdNspt_SIMD( int* src, int* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx )
+void computeFwdNspt_SIMD( int* src, int* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx
 #endif
+#if JVET_AJ0175_NSPT_FOR_NONREG_MODES
+                             , int bktIdx
+#endif
+)
 {
   int trSize = width * height;
 
+#if JVET_AJ0175_NSPT_FOR_NONREG_MODES
+  const int8_t* trMat = TrQuant::getNsptMatrix(mode, width, height, nsptIdx, bktIdx);
+#else
   const int8_t* trMat = g_nspt4x4[ mode ][ nsptIdx ][ 0 ];
   if( width == 8 && height == 8 )
   {
@@ -488,6 +495,7 @@ void computeFwdNspt_SIMD( int* src, int* dst, const uint32_t mode, const uint32_
     trMat = g_nspt32x8[ mode ][ nsptIdx ][ 0 ];
   }
 #endif
+#endif
 
   int shift = shift_1st + shift_2nd - 7;
   int rnd = 1 << ( shift - 1 );
@@ -532,10 +540,17 @@ void computeFwdNspt_SIMD( int* src, int* dst, const uint32_t mode, const uint32_
 template <X86_VEXT vext>
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
 void computeInvNspt_SIMD( TCoeff* src, TCoeff* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd,
-  const int maxLog2TrDynamicRange, int zeroOutSize, int nsptIdx )
+  const int maxLog2TrDynamicRange, int zeroOutSize, int nsptIdx
+#if JVET_AJ0175_NSPT_FOR_NONREG_MODES
+                             , int bktIdx
+#endif
+)
 {
 #else
-void TrQuant::computeInvNspt( int* src, int* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx )
+void TrQuant::computeInvNspt( int* src, int* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx
+#if JVET_AJ0175_NSPT_FOR_NONREG_MODES
+                             , int bktIdx
+#endif
 {
   int             maxLog2TrDynamicRange = 15;
 #endif
@@ -544,6 +559,9 @@ void TrQuant::computeInvNspt( int* src, int* dst, const uint32_t mode, const uin
   const TCoeff    outputMinimum = -( 1 << maxLog2TrDynamicRange );
   const TCoeff    outputMaximum = ( 1 << maxLog2TrDynamicRange ) - 1;
 
+#if JVET_AJ0175_NSPT_FOR_NONREG_MODES
+  const int8_t* trMat = TrQuant::getNsptMatrix(mode, width, height, nsptIdx, bktIdx);
+#else
   const int8_t* trMat = g_nspt4x4[ mode ][ nsptIdx ][ 0 ];
   if( width == 8 && height == 8 )
   {
@@ -590,6 +608,7 @@ void TrQuant::computeInvNspt( int* src, int* dst, const uint32_t mode, const uin
   {
     trMat = g_nspt32x8[ mode ][ nsptIdx ][ 0 ];
   }
+#endif
 #endif
 
   int shift = shift_1st + shift_2nd - 7;

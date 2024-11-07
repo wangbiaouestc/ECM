@@ -287,6 +287,9 @@ namespace PU
 #if JVET_AC0130_NSPT
   int      getNSPTMatrixDim           ( int width, int height );
 #endif
+#if JVET_AJ0175_NSPT_FOR_NONREG_MODES
+  int      getNSPTBucket              ( const TransformUnit &tu );
+#endif
   bool     getUseLFNST8               ( int width, int height );
   uint8_t  getLFNSTIdx                ( int intraMode, int mtsMode = 0 );
   bool     getUseLFNST16              ( int width, int height );

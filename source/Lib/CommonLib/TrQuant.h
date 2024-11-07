@@ -92,24 +92,52 @@ public:
 #if JVET_AC0130_NSPT
 #if INTRA_TRANS_ENC_OPT
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+#if JVET_AJ0175_NSPT_FOR_NONREG_MODES
+  void( *m_computeFwdNspt ) ( TCoeff* src, TCoeff* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx, int bktIdx );
+  void( *m_computeInvNspt ) ( TCoeff* src, TCoeff* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, const int maxLog2TrDynamicRange, int zeroOutSize, int nsptIdx, int bktIdx );
+  static void computeFwdNspt( TCoeff* src, TCoeff* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx, int bktIdx );
+  static void computeInvNspt( TCoeff* src, TCoeff* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, const int maxLog2TrDynamicRange, int zeroOutSize, int nsptIdx, int bktIdx );
+#else
   void( *m_computeFwdNspt ) ( TCoeff* src, TCoeff* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx );
   void( *m_computeInvNspt ) ( TCoeff* src, TCoeff* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, const int maxLog2TrDynamicRange, int zeroOutSize, int nsptIdx );
   static void computeFwdNspt( TCoeff* src, TCoeff* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx );
   static void computeInvNspt( TCoeff* src, TCoeff* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, const int maxLog2TrDynamicRange, int zeroOutSize, int nsptIdx );
+#endif
+#else
+#if JVET_AJ0175_NSPT_FOR_NONREG_MODES
+  void( *m_computeFwdNspt ) ( int* src, int* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx = 0, int bktIdx = 0 );
+  void( *m_computeInvNspt ) ( int* src, int* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx = 0, int bktIdx = 0 );
+  static void computeFwdNspt( int* src, int* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx = 0, int bktIdx = 0 );
+  static void computeInvNspt( int* src, int* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx = 0, int bktIdx = 0 );
 #else
   void( *m_computeFwdNspt ) ( int* src, int* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx = 0 );
   void( *m_computeInvNspt ) ( int* src, int* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx = 0 );
   static void computeFwdNspt( int* src, int* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx = 0 );
   static void computeInvNspt( int* src, int* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx = 0 );
 #endif
+#endif
 #else
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+#if JVET_AJ0175_NSPT_FOR_NONREG_MODES
+  void computeFwdNspt( TCoeff* src, TCoeff* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx, int bktIdx );
+  void computeInvNspt( TCoeff* src, TCoeff* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, const int maxLog2TrDynamicRange, int zeroOutSize, int nsptIdx, int bktIdx );
+#else
   void computeFwdNspt( TCoeff* src, TCoeff* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx );
   void computeInvNspt( TCoeff* src, TCoeff* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, const int maxLog2TrDynamicRange, int zeroOutSize, int nsptIdx );
+#endif
+#else
+#if JVET_AJ0175_NSPT_FOR_NONREG_MODES
+  void computeFwdNspt( int* src, int* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx = 0, int bktIdx = 0 );
+  void computeInvNspt( int* src, int* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx = 0, int bktIdx = 0 );
 #else
   void computeFwdNspt( int* src, int* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx = 0 );
   void computeInvNspt( int* src, int* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx = 0 );
 #endif
+#endif
+#endif
+#if JVET_AJ0175_NSPT_FOR_NONREG_MODES
+  static uint8_t getNsptKernelCluster( const uint32_t mode, const uint32_t width, const uint32_t height, int nsptIdx, int bktIdx );
+  static const int8_t* getNsptMatrix( const uint32_t mode, const uint32_t width, const uint32_t height, int nsptIdx, int bktIdx );
 #endif
 #endif
 

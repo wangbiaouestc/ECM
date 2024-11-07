@@ -82,7 +82,11 @@ void destroyMipFilters();
 #if SIGN_PREDICTION
 #if JVET_Y0141_SIGN_PRED_IMPROVE
 #if JVET_W0119_LFNST_EXTENSION || EXTENDED_LFNST
+#if JVET_AJ0175_NSPT_FOR_NONREG_MODES
+extern       int8_t * g_resiBorderTemplateLFNST[NUM_NSPT_BLOCK_TYPES][6][6][210];
+#else
 extern       int8_t * g_resiBorderTemplateLFNST[6][6][210];
+#endif
 #else
 extern       int8_t * g_resiBorderTemplateLFNST[6][6][16];
 #endif
@@ -251,6 +255,36 @@ extern const     uint8_t  g_lfnstLut[ NUM_INTRA_MODE + NUM_EXT_LUMA_MODE - 1 ];
 #if JVET_AC0130_NSPT
 extern const     uint8_t  g_nsptLut[ 97 ];                      // 97= NUM_LUMA_MODE + NUM_EXT_LUMA_MODE - 1
 
+#if JVET_AJ0175_NSPT_FOR_NONREG_MODES
+extern const     int8_t   g_nspt4x4[ NUM_NSPT_CLUSTERS_4x4 ][ 16 ][ 16 ];
+extern const     int8_t   g_nspt4x8[ NUM_NSPT_CLUSTERS_4x8 ][ 20 ][ 32 ];
+extern const     int8_t   g_nspt8x4[ NUM_NSPT_CLUSTERS_8x4 ][ 20 ][ 32 ];
+extern const     int8_t   g_nspt8x8[ NUM_NSPT_CLUSTERS_8x8 ][ 32 ][ 64 ];
+extern const     int8_t   g_nspt4x16[ NUM_NSPT_CLUSTERS_4x16 ][ 24 ][ 64 ];
+extern const     int8_t   g_nspt16x4[ NUM_NSPT_CLUSTERS_16x4 ][ 24 ][ 64 ];
+extern const     int8_t   g_nspt8x16[ NUM_NSPT_CLUSTERS_8x16 ][ 40 ][ 128 ];
+extern const     int8_t   g_nspt16x8[ NUM_NSPT_CLUSTERS_16x8 ][ 40 ][ 128 ];
+#if JVET_AE0086_LARGE_NSPT
+extern const     int8_t   g_nspt4x32[ NUM_NSPT_CLUSTERS_4x32 ][ 20 ][ 128 ];
+extern const     int8_t   g_nspt32x4[ NUM_NSPT_CLUSTERS_32x4 ][ 20 ][ 128 ];
+extern const     int8_t   g_nspt8x32[ NUM_NSPT_CLUSTERS_8x32 ][ 24 ][ 256 ];
+extern const     int8_t   g_nspt32x8[ NUM_NSPT_CLUSTERS_32x8 ][ 24 ][ 256 ];
+#endif
+extern const     uint8_t  g_nsptIdx_4x4[ 35 ][ NUM_NSPT_BLOCK_TYPES ][ 3 ];
+extern const     uint8_t  g_nsptIdx_4x8[ 35 ][ NUM_NSPT_BLOCK_TYPES ][ 3 ];
+extern const     uint8_t  g_nsptIdx_8x4[ 35 ][ NUM_NSPT_BLOCK_TYPES ][ 3 ];
+extern const     uint8_t  g_nsptIdx_8x8[ 35 ][ NUM_NSPT_BLOCK_TYPES ][ 3 ];
+extern const     uint8_t  g_nsptIdx_4x16[ 35 ][ NUM_NSPT_BLOCK_TYPES ][ 3 ];
+extern const     uint8_t  g_nsptIdx_16x4[ 35 ][ NUM_NSPT_BLOCK_TYPES ][ 3 ];
+extern const     uint8_t  g_nsptIdx_8x16[ 35 ][ NUM_NSPT_BLOCK_TYPES ][ 3 ];
+extern const     uint8_t  g_nsptIdx_16x8[ 35 ][ NUM_NSPT_BLOCK_TYPES ][ 3 ];
+#if JVET_AE0086_LARGE_NSPT
+extern const     uint8_t  g_nsptIdx_4x32[ 35 ][ NUM_NSPT_BLOCK_TYPES ][ 3 ];
+extern const     uint8_t  g_nsptIdx_32x4[ 35 ][ NUM_NSPT_BLOCK_TYPES ][ 3 ];
+extern const     uint8_t  g_nsptIdx_8x32[ 35 ][ NUM_NSPT_BLOCK_TYPES ][ 3 ];
+extern const     uint8_t  g_nsptIdx_32x8[ 35 ][ NUM_NSPT_BLOCK_TYPES ][ 3 ];
+#endif
+#else
 extern const     int8_t   g_nspt4x4[ 35 ][ 3 ][ 16 ][ 16 ];
 extern const     int8_t   g_nspt4x8[ 35 ][ 3 ][ 20 ][ 32 ];
 extern const     int8_t   g_nspt8x4[ 35 ][ 3 ][ 20 ][ 32 ];
@@ -265,6 +299,8 @@ extern const     int8_t   g_nspt32x4[ 35 ][ 3 ][ 20 ][ 128 ];
 extern const     int8_t   g_nspt8x32[ 35 ][ 3 ][ 24 ][ 256 ];
 extern const     int8_t   g_nspt32x8[ 35 ][ 3 ][ 24 ][ 256 ];
 #endif
+#endif
+
 #endif
 #if JVET_AH0209_PDP
 extern int16_t g_weights4x4[11][16][36];
