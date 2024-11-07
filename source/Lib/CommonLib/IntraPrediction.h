@@ -258,7 +258,7 @@ public:
 #if MMLM
   bool m_encPreRDRun;
 #endif
-#if JVET_AJ0161_OBMC_EXTENSION_W_INTRA
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA
   int m_isIntraForOBMC;
   bool m_refSampleForOBMC;
   Pel m_refSampleForOBMCBuf[MAX_INTRA_SIZE + 3];
@@ -567,7 +567,7 @@ protected:
 #endif
 
   void xFillReferenceSamples      ( const CPelBuf &recoBuf,      Pel* refBufUnfiltered, const CompArea &area, const CodingUnit &cu );
-#if JVET_AJ0161_OBMC_EXTENSION_W_INTRA
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA
   void xFillReferenceSamplesOBMC( const CPelBuf &recoBuf, Pel* refBufUnfiltered, const CompArea &area, const CodingUnit &cu );
 #endif
 #if JVET_AH0136_CHROMA_REORDERING
@@ -820,7 +820,7 @@ public:
   );
 #endif
 
-#if JVET_AJ0161_OBMC_EXTENSION_W_INTRA
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA
   const IntraPredParam* getIpaParam () { return &m_ipaParam; };
   bool getGradForOBMC(const PredictionUnit pu, const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu, const bool isAbove, const int blkSize, int* modeBuf);
 #endif
@@ -1054,7 +1054,7 @@ public:
   void initIntraPatternChType     (const CodingUnit &cu, const CompArea &area, const bool forceRefFilterFlag = false); // use forceRefFilterFlag to get both filtered and unfiltered buffers
 #endif
 #endif
-#if JVET_AJ0161_OBMC_EXTENSION_W_INTRA
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA
   void initIntraPatternChTypeOBMC(const CodingUnit &cu, const CompArea &area);
 #endif
   void initIntraPatternChTypeISP  (const CodingUnit& cu, const CompArea& area, PelBuf& piReco, const bool forceRefFilterFlag = false); // use forceRefFilterFlag to get both filtered and unfiltered buffers

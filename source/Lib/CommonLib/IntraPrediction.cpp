@@ -152,7 +152,7 @@ IntraPrediction::IntraPrediction()
 #if MMLM
   m_encPreRDRun = false;
 #endif
-#if JVET_AJ0161_OBMC_EXTENSION_W_INTRA
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA
   m_isIntraForOBMC = 0;
   m_refSampleForOBMC = false;
   memset(m_refSampleForOBMCBuf, -1, sizeof( Pel ) * (MAX_INTRA_SIZE + 3));
@@ -3648,7 +3648,7 @@ void IntraPrediction::initPredIntraParams(const PredictionUnit & pu, const CompA
     }
   }
 
-#if JVET_AJ0161_OBMC_EXTENSION_W_INTRA
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA
   if (pu.cu->isobmcMC)
   {
     m_ipaParam.applyPDPC &= (m_isIntraForOBMC == 0);
@@ -3697,7 +3697,7 @@ void IntraPrediction::initPredIntraParams(const PredictionUnit & pu, const CompA
 #endif
     }
 
-#if JVET_AJ0161_OBMC_EXTENSION_W_INTRA
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA
     if (pu.cu->isobmcMC)
       filterFlag = false;
 #endif
@@ -3863,7 +3863,7 @@ void IntraPrediction::xPredIntraAng( const CPelBuf &pSrc, PelBuf &pDst, const Ch
 
     // Extend the Main reference to the left.
     int sizeSide = bIsModeVer ? height : width;
-#if JVET_AJ0161_OBMC_EXTENSION_W_INTRA
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA
     if (m_refSampleForOBMC && (m_isIntraForOBMC == 2 && intraPredAngle == -32))
     {
       for (int k = 1; k <= width + 2; k++)
@@ -3876,7 +3876,7 @@ void IntraPrediction::xPredIntraAng( const CPelBuf &pSrc, PelBuf &pDst, const Ch
     // left extend by 1
     for (int k = -(sizeSide + 1); k <= -1; k++)
     {
-#if JVET_AJ0161_OBMC_EXTENSION_W_INTRA
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA
       if (m_refSampleForOBMC && !(m_isIntraForOBMC == 2 && intraPredAngle == -32))
       {
         if ((m_isIntraForOBMC == 1 && bIsModeVer == true) || (m_isIntraForOBMC == 2 && bIsModeVer == false))
@@ -5360,7 +5360,7 @@ inline int  isAboveAvailable      ( const CodingUnit &cu, const ChannelType &chT
 inline int  isLeftAvailable       ( const CodingUnit &cu, const ChannelType &chType, const Position &posLT, const uint32_t uiNumUnitsInPU, const uint32_t unitWidth, bool *validFlags );
 inline int  isAboveRightAvailable ( const CodingUnit &cu, const ChannelType &chType, const Position &posRT, const uint32_t uiNumUnitsInPU, const uint32_t unitHeight, bool *validFlags );
 inline int  isBelowLeftAvailable  ( const CodingUnit &cu, const ChannelType &chType, const Position &posLB, const uint32_t uiNumUnitsInPU, const uint32_t unitHeight, bool *validFlags );
-#if JVET_AJ0161_OBMC_EXTENSION_W_INTRA
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA
 inline int  isAboveAvailableOBMC      ( const CodingUnit &cu, const ChannelType &chType, const Position &posLT, const uint32_t uiNumUnitsInPU, const uint32_t unitWidth, bool *validFlags, const int isForOBMC );
 inline int  isLeftAvailableOBMC       ( const CodingUnit &cu, const ChannelType &chType, const Position &posLT, const uint32_t uiNumUnitsInPU, const uint32_t unitWidth, bool *validFlags, const int isForOBMC );
 inline int  isAboveRightAvailableOBMC ( const CodingUnit &cu, const ChannelType &chType, const Position &posRT, const uint32_t uiNumUnitsInPU, const uint32_t unitHeight, bool *validFlags, const int isForOBMC );
@@ -5410,7 +5410,7 @@ void IntraPrediction::initIntraPatternChType(const CodingUnit &cu, const CompAre
   m_ipaParam.fetchRef2nd &= !cu.firstPU->ibcGpmFlag;
 #endif
 #endif
-#if JVET_AJ0161_OBMC_EXTENSION_W_INTRA
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA
   if (cu.isobmcMC)
   {
     applyFusion = false;
@@ -5471,7 +5471,7 @@ void IntraPrediction::initIntraPatternChType(const CodingUnit &cu, const CompAre
   }
 }
 
-#if JVET_AJ0161_OBMC_EXTENSION_W_INTRA
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA
 void IntraPrediction::initIntraPatternChTypeOBMC(const CodingUnit &cu, const CompArea &area)
 {
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
@@ -5868,7 +5868,7 @@ void IntraPrediction::xFillReferenceSamples2(const CPelBuf &recoBuf, const CompA
 void IntraPrediction::xFillReferenceSamples( const CPelBuf &recoBuf, Pel* refBufUnfiltered, const CompArea &area, const CodingUnit &cu )
 {
 #if JVET_AH0209_PDP
-#if JVET_AJ0161_OBMC_EXTENSION_W_INTRA
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA
   if (m_isIntraForOBMC == 0)
 #endif
   if (!cu.firstPU->multiRefIdx && !cu.ispMode && !cu.plIdx)
@@ -6238,7 +6238,7 @@ void IntraPrediction::xFillReferenceSamples( const CPelBuf &recoBuf, Pel* refBuf
   }
 }
 
-#if JVET_AJ0161_OBMC_EXTENSION_W_INTRA
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA
 void IntraPrediction::xFillReferenceSamplesOBMC( const CPelBuf &recoBuf, Pel* refBufUnfiltered, const CompArea &area, const CodingUnit &cu )
 {
   m_refAvailable                = false;
@@ -6907,7 +6907,7 @@ void IntraPrediction::xFilterReferenceSamples(const Pel *refBufUnfiltered, Pel *
 
   refBufFiltered[0] = topLeft;
 
-#if JVET_AJ0161_OBMC_EXTENSION_W_INTRA
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA
   if (!(m_isIntraForOBMC == 2 && m_refSampleForOBMC))
   {
 #endif
@@ -6915,7 +6915,7 @@ void IntraPrediction::xFilterReferenceSamples(const Pel *refBufUnfiltered, Pel *
   {
     refBufFiltered[i] = (refBufUnfiltered[i - 1] + 2 * refBufUnfiltered[i] + refBufUnfiltered[i + 1] + 2) >> 2;
   }
-#if JVET_AJ0161_OBMC_EXTENSION_W_INTRA
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA
   }
 #endif
   refBufFiltered[predSize] = refBufUnfiltered[predSize];
@@ -6925,7 +6925,7 @@ void IntraPrediction::xFilterReferenceSamples(const Pel *refBufUnfiltered, Pel *
 
   refBufFiltered[0] = topLeft;
 
-#if JVET_AJ0161_OBMC_EXTENSION_W_INTRA
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA
   if (!(m_isIntraForOBMC == 1 && m_refSampleForOBMC))
   {
 #endif
@@ -6933,7 +6933,7 @@ void IntraPrediction::xFilterReferenceSamples(const Pel *refBufUnfiltered, Pel *
   {
     refBufFiltered[i] = (refBufUnfiltered[i - 1] + 2 * refBufUnfiltered[i] + refBufUnfiltered[i + 1] + 2) >> 2;
   }
-#if JVET_AJ0161_OBMC_EXTENSION_W_INTRA
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA
   }
 #endif
   refBufFiltered[predHSize] = refBufUnfiltered[predHSize];
@@ -10500,7 +10500,7 @@ void IntraPrediction::ibcCiipBlending(Pel *pDst, int strideDst, const Pel *pSrc0
 }
 #endif
 
-#if JVET_AJ0161_OBMC_EXTENSION_W_INTRA
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA
 bool IntraPrediction::getGradForOBMC(const PredictionUnit pu, const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu, const bool isAbove, const int blkSize, int* modeBuf)
 {
   const int templateSize = 1;
@@ -13025,7 +13025,7 @@ int isBelowLeftAvailable(const CodingUnit &cu, const ChannelType &chType, const 
   return numIntra;
 }
 
-#if JVET_AJ0161_OBMC_EXTENSION_W_INTRA
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA
 int isAboveAvailableOBMC(const CodingUnit &cu, const ChannelType &chType, const Position &posLT, const uint32_t uiNumUnitsInPU, const uint32_t unitWidth, bool *bValidFlags, const int isForOBMC)
 {
   if (isForOBMC == 2)
