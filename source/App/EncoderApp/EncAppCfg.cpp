@@ -1161,6 +1161,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #endif
 #if JVET_W0123_TIMD_FUSION
   ( "TIMD",                                           m_timd,                                            true,  "Enable template based intra mode derivation\n" )
+#if JVET_AJ0061_TIMD_MERGE
+  ( "TIMDM",                                          m_timdMrg,                                         true,  "Enable merge mode for template based intra mode derivation (TIMD)\n" )
+#endif
 #endif
 #if JVET_AB0155_SGPM
   ( "SGPM",                                           m_sgpm,                                            true,  "Enable spatial geometric partitioning mode\n" )
@@ -1198,7 +1201,7 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #endif
   ("Geo",                                             m_Geo,                                            false, "Enable geometric partitioning mode (0:off, 1:on)")
 #if JVET_AI0082_GPM_WITH_INTER_IBC
-  ("GeoInterIbc",                                     m_geoInterIbc,                                    false, "GPM with inter and IBC (0:off, 1:on)  [default: off]" )
+  ("GeoInterIbc",                                     m_geoInterIbc,                                    true, "GPM with inter and IBC (0:off, 1:on)  [default: off]" )
 #endif
   ("HashME",                                          m_HashME,                                         false, "Enable hash motion estimation (0:off, 1:on)")
 
@@ -2031,6 +2034,13 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
       m_MSBExtendedBitDepth[1] = m_inputBitDepth[1];
     }
 #endif
+  }
+#endif
+
+#if JVET_AJ0061_TIMD_MERGE
+  if (!m_timd)
+  {
+    m_timdMrg = false;
   }
 #endif
 
@@ -4113,6 +4123,13 @@ bool EncAppCfg::xCheckParameter()
       msg(WARNING, "TIMD is forcefully disabled since the enable flag of non-inter-TM tools is set off. \n");
       m_timd = false;
     }
+#if JVET_AJ0061_TIMD_MERGE
+  if (!m_timd)
+  {
+    msg(WARNING, "TIMDM is forcefully disabled since timd mode is set to off. \n");
+    m_timdMrg = false;
+  }
+#endif
 #endif
 #if JVET_AB0155_SGPM
     if (m_sgpm)
@@ -5913,6 +5930,9 @@ void EncAppCfg::xPrintParameter()
 #endif
 #if JVET_W0123_TIMD_FUSION
   msg(VERBOSE, "TIMD:%d ", m_timd);
+#if JVET_AJ0061_TIMD_MERGE
+  msg(VERBOSE, "TIMDM:%d ", m_timdMrg);
+#endif
 #endif
 #if JVET_AB0155_SGPM
   msg(VERBOSE, "SGPM:%d ", m_sgpm);

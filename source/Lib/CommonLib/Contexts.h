@@ -739,6 +739,9 @@ public:
 #endif
 #if JVET_W0123_TIMD_FUSION
   static const CtxSet   TimdFlag;
+#if JVET_AJ0061_TIMD_MERGE
+  static const CtxSet   TimdMrgFlag;
+#endif
 #endif
 #if JVET_AB0155_SGPM
   static const CtxSet   SgpmFlag;
@@ -1130,8 +1133,8 @@ public:
   TempCtx ( CtxCache* cache, const Ctx& ctx    )  : m_ctx( *cache->get() ), m_cache( cache ) { m_ctx = ctx; }
   TempCtx ( CtxCache* cache, SubCtx&&   subCtx )  : m_ctx( *cache->get() ), m_cache( cache ) { m_ctx = std::forward<SubCtx>(subCtx); }
   ~TempCtx()                                      { m_cache->cache( &m_ctx ); }
-  void operator=( const Ctx& ctx )          { m_ctx = ctx ; }
-  void operator=( SubCtx&&   subCtx )       { m_ctx = std::forward<SubCtx>( subCtx ); }
+  const Ctx& operator=( const Ctx& ctx )          { return ( m_ctx = ctx ); }
+  SubCtx     operator=( SubCtx&&   subCtx )       { return m_ctx = std::forward<SubCtx>( subCtx ); }
   operator const Ctx& ()           const          { return m_ctx; }
   operator       Ctx& ()                          { return m_ctx; }
 private:

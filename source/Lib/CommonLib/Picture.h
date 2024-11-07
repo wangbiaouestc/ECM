@@ -171,7 +171,6 @@ void create(
   int  getPOC()                               const { return poc; }
 #if JVET_AG0145_ADAPTIVE_CLIPPING
   ClpRng getLumaClpRng()                      const { return lumaClpRng; }
-  void calcLumaClpParams();
 #endif
   int  getDecodingOrderNumber()               const { return m_decodingOrderNumber; }
   void setDecodingOrderNumber(const int val)        { m_decodingOrderNumber = val;  }

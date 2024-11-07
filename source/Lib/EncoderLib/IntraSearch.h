@@ -590,6 +590,10 @@ private:
   int64_t m_coeffAbsSumDCT2;
 #endif
 #endif
+#if JVET_AJ0061_TIMD_MERGE
+  static_vector<ModeInfo, NumTimdMode> m_uiSavedRdModeListTimd;
+  static_vector<double,   NumTimdMode> m_uiSavedModeCostTimd;
+#endif
 #if JVET_AE0169_BIPREDICTIVE_IBC
   double     m_bestIntraSADHADCost;
 #endif
@@ -638,6 +642,9 @@ private:
   static_vector<ModeInfo, NUM_DERIVED_EIP + MAX_MERGE_EIP> m_uiSavedHadModeListEip;
   static_vector<double, NUM_DERIVED_EIP + MAX_MERGE_EIP>   m_dSavedModeCostEip;
   static_vector<double, NUM_DERIVED_EIP + MAX_MERGE_EIP>   m_dSavedHadListEip;
+#endif
+#if JVET_AJ0061_TIMD_MERGE
+  Pel* m_timdPredBuf[NumTimdMode];
 #endif
 #if JVET_AH0076_OBIC
   Pel* m_dimdPredBuf;
@@ -723,6 +730,15 @@ protected:
 public:
 #if INTRA_TRANS_ENC_OPT
   bool            m_skipTimdLfnstMtsPass;
+#endif
+#if JVET_AJ0061_TIMD_MERGE
+  bool            m_skipTimdMrgLfnstMtsPass;
+  bool            m_skipObicMode;
+  bool            m_skipDimdMode;
+  uint64_t        m_satdCostOBIC;
+  uint64_t        m_satdCostDIMD;
+  bool            m_skipTimdMode[NumTimdMode];
+  uint64_t        m_satdCostTIMD[NumTimdMode][2]; 
 #endif
 #if JVET_AH0076_OBIC
   bool            m_skipObicLfnstMtsPass;

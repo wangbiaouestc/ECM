@@ -2014,6 +2014,9 @@ void EncLib::xInitSPS( SPS& sps )
 #endif
 #if JVET_W0123_TIMD_FUSION
   sps.setUseTimd            ( m_timd );
+#if JVET_AJ0061_TIMD_MERGE
+  sps.setUseTimdMrg          ( m_timdMrg );
+#endif
 #endif
 #if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
   sps.setUseCiipTimd        ( m_ciipTimd );

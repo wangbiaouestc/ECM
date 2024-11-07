@@ -165,6 +165,9 @@ public:
 #if JVET_W0123_TIMD_FUSION
   void        cu_timd_flag              ( const CodingUnit&             cu );
 #endif
+#if JVET_AJ0061_TIMD_MERGE
+  void        cu_timd_merge_flag        ( const CodingUnit&             cu );
+#endif
 #if JVET_AB0155_SGPM
   void        sgpm_flag                 (const CodingUnit&              cu );
 #endif

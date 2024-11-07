@@ -1442,6 +1442,16 @@ void TrQuant::xT( const TransformUnit &tu, const ComponentID &compID, const CPel
   int trTypeHor = DCT2;
   int trTypeVer = DCT2;
 
+#if JVET_AJ0061_TIMD_MERGE
+  if (tu.cu->timdMrg && !tu.cu->lfnstIdx)
+  {
+    // Timd-Mrg CUs inherit transform type from their cands
+    int implicitDst7 = PU::canTimdMergeImplicitDst7(tu);
+    trTypeHor = (implicitDst7 & 2) ? DST7 : tu.cu->timdmTrType[tu.cu->timdMrg - 1][0];
+    trTypeVer = (implicitDst7 & 1) ? DST7 : tu.cu->timdmTrType[tu.cu->timdMrg - 1][1];
+  }
+  else
+#endif
   getTrTypes ( tu, compID, trTypeHor, trTypeVer );
 #if TU_256
   int  skipWidth  =  width  > JVET_C0024_ZERO_OUT_TH ? width  - JVET_C0024_ZERO_OUT_TH : 0;
@@ -1579,6 +1589,16 @@ void TrQuant::xIT( const TransformUnit &tu, const ComponentID &compID, const CCo
   int trTypeHor = DCT2;
   int trTypeVer = DCT2;
 
+#if JVET_AJ0061_TIMD_MERGE
+  if (tu.cu->timdMrg && !tu.cu->lfnstIdx)
+  {
+    // Timd-Mrg CUs inherit transform type from their cands
+    int implicitDst7 = PU::canTimdMergeImplicitDst7(tu);
+    trTypeHor = (implicitDst7 & 2) ? DST7 : tu.cu->timdmTrType[tu.cu->timdMrg - 1][0];
+    trTypeVer = (implicitDst7 & 1) ? DST7 : tu.cu->timdmTrType[tu.cu->timdMrg - 1][1];
+  }
+  else
+#endif
   getTrTypes ( tu, compID, trTypeHor, trTypeVer );
 #if TU_256
   int skipWidth  =  width  > JVET_C0024_ZERO_OUT_TH ? width  - JVET_C0024_ZERO_OUT_TH : 0;
@@ -2542,6 +2562,16 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
   else
   {
     int trHor, trVer;
+#if JVET_AJ0061_TIMD_MERGE
+    if (tu.cu->timdMrg && !tu.cu->lfnstIdx)
+    {
+      // Timd-Mrg CUs inherit transform type from their cands
+      int implicitDst7 = PU::canTimdMergeImplicitDst7(tu);
+      trHor = (implicitDst7 & 2) ? DST7 : tu.cu->timdmTrType[tu.cu->timdMrg - 1][0];
+      trVer = (implicitDst7 & 1) ? DST7 : tu.cu->timdmTrType[tu.cu->timdMrg - 1][1];
+    }
+    else
+#endif
     getTrTypes(tu, residCompID, trHor, trVer);
 #if JVET_W0103_INTRA_MTS
     actualTrIdx = trHor * NUM_TRANS_TYPE + trVer;

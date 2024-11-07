@@ -252,6 +252,18 @@ private:
 };
 #endif
 
+#if JVET_AJ0061_TIMD_MERGE
+struct TimdMergeInfo
+{
+  int timdMode[TIMD_FUSION_NUM];
+  int timdFusionWeight[TIMD_FUSION_NUM];
+  bool timdModeCheckWA[TIMD_FUSION_NUM];
+  int8_t timdLocDep[TIMD_FUSION_NUM];
+  bool timdIsBlended;
+  int timdmTrType[2];
+};
+#endif
+
 class IntraPrediction
 {
 public:
@@ -867,6 +879,13 @@ public:
   );
 #else
   void initPredTimdIntraParams    (const PredictionUnit & pu, const CompArea area, int dirMode);
+#endif
+#if JVET_AJ0061_TIMD_MERGE
+  void deriveTimdMergeModes       ( const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu);
+  void searchTimdMrgCus           ( const CodingUnit &cu, static_vector<const CodingUnit*, NUM_TIMD_MERGE_CUS> &cuNeighbours );
+  void genTimdMrgList             ( const CodingUnit &cu, const static_vector<const CodingUnit*, NUM_TIMD_MERGE_CUS> &cuNeighbours, static_vector<TimdMergeInfo, NUM_TIMD_MERGE_CUS> &timdMrgList );
+  template<typename T, size_t N>
+  void calcTimdMrgCandCosts       ( const CodingUnit &cu, static_vector<TimdMergeInfo, NUM_TIMD_MERGE_CUS> &timdMrgList, static_vector<T, N>& uiModeList, static_vector<uint64_t, N>& candCostList );
 #endif
   void predTimdIntraAng           ( const ComponentID compId, const PredictionUnit &pu, uint32_t uiDirMode, Pel* pPred, uint32_t uiStride, uint32_t iWidth, uint32_t iHeight, TemplateType eTempType, int32_t iTemplateWidth, int32_t iTemplateHeight);
 #if JVET_AG0146_DIMD_ITMP_IBC

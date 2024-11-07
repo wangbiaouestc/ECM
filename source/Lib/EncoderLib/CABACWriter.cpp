@@ -355,8 +355,6 @@ void CABACWriter::coding_tree_unit( CodingStructure& cs, const UnitArea& area, i
   }
 
 #if JVET_AI0136_ADAPTIVE_DUAL_TREE
-  cs.setLumaPointers( cs );
-
   coding_tree( cs, partitioner, cuCtx, qps );
   qps[CH_L] = cuCtx.qp;
 #else
@@ -811,9 +809,6 @@ void CABACWriter::coding_tree(const CodingStructure& cs, Partitioner& partitione
     partitionerSST->chType = CH_L;
 
     cs.slice->setProcessingIntraRegion   ( true );
-    
-    cu.slice->setProcessingIntraRegion   ( true );
-
     cs.slice->setProcessingSeparateTrees ( cu.separateTree );
     cs.slice->setIntraRegionRoot         ( &partitioner );
     cs.slice->setProcessingChannelType   ( CH_L );
@@ -832,7 +827,6 @@ void CABACWriter::coding_tree(const CodingStructure& cs, Partitioner& partitione
       qps[CH_C] = cuCtxChroma.qp;
     }
     cs.slice->setProcessingIntraRegion( false );
-    cu.slice->setProcessingIntraRegion( false );
   }
 #endif
 
@@ -891,11 +885,7 @@ void CABACWriter::split_cu_mode( const PartSplit split, const CodingStructure& c
   bool disableBTV = false;
   bool disableBTH = false;
 
-  if (CABACWriter::isLumaNonBoundaryCu(partitioner, cs.picture->lwidth(), cs.picture->lheight()) 
-#if JVET_AI0136_ADAPTIVE_DUAL_TREE
-  && (!(cs.slice->getProcessingIntraRegion() && cs.slice->getProcessingSeparateTrees()) || cs.slice->isIntra()) 
-#endif
-  )
+  if (CABACWriter::isLumaNonBoundaryCu(partitioner, cs.picture->lwidth(), cs.picture->lheight()) && (!(cs.slice->getProcessingIntraRegion() && cs.slice->getProcessingSeparateTrees()) || cs.slice->isIntra()) )
   {
     if ((partitioner.currBtDepth == 0) && (partitioner.currArea().lwidth() == partitioner.currArea().lheight()))
     {
@@ -1059,7 +1049,7 @@ void CABACWriter::split_cu_mode( const PartSplit split, const CodingStructure& c
 
     Picture* pColPic = cs.slice->getRefPic(RefPicList(cs.slice->isInterB() ? 1 - cs.slice->getColFromL0Flag() : 0), cs.slice->getColRefIdx());
 
-    if (!cs.slice->isIntra() && pColPic != NULL && !pColPic->isRefScaled(cs.pps) && pColPic->cs->slice != NULL
+    if (!cs.slice->isIntra() && pColPic != NULL && pColPic->cs->slice != NULL
       && (pColPic->cs->area.Y().contains(partitioner.currArea().blocks[partitioner.chType].pos().offset((partitioner.currArea().blocks[partitioner.chType].lumaSize().width) >> 1,
         ((partitioner.currArea().blocks[partitioner.chType].lumaSize().height) >> 1)))))
     {
@@ -1155,10 +1145,7 @@ void CABACWriter::split_cu_mode( const PartSplit split, const CodingStructure& c
 
 #if JVET_AI0087_BTCUS_RESTRICTION
   if (CABACWriter::isLumaNonBoundaryCu(partitioner, cs.picture->lwidth(), cs.picture->lheight())
-#if JVET_AI0136_ADAPTIVE_DUAL_TREE
-      && (!(cs.slice->getProcessingIntraRegion() && cs.slice->getProcessingSeparateTrees()) || cs.slice->isIntra())
-#endif
-      )
+      && (!(cs.slice->getProcessingIntraRegion() && cs.slice->getProcessingSeparateTrees()) || cs.slice->isIntra()))
   {
     if (updatePartInfo && (partitioner.currBtDepth == 1) && (partitioner.currPartIdx() == 0))
     {
@@ -2061,6 +2048,12 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
   }
 #if JVET_W0123_TIMD_FUSION
   cu_timd_flag(cu);
+#if JVET_AJ0061_TIMD_MERGE
+  if (cu.timdMrg)
+  {
+    return;
+  }
+#endif
 #endif
 #if JVET_AG0058_EIP
   cu_eip_flag(cu);
@@ -2287,6 +2280,12 @@ void CABACWriter::intra_luma_pred_mode( const PredictionUnit& pu )
   }
 #if JVET_W0123_TIMD_FUSION
   cu_timd_flag(*pu.cu);
+#if JVET_AJ0061_TIMD_MERGE
+  if (pu.cu->timdMrg)
+  {
+    return;
+  }
+#endif
 #endif
 #if JVET_AG0058_EIP
   cu_eip_flag(*pu.cu);
@@ -2507,7 +2506,26 @@ void CABACWriter::cu_timd_flag( const CodingUnit& cu )
   unsigned ctxId = DeriveCtx::CtxTimdFlag(cu);
   m_BinEncoder.encodeBin(cu.timd, Ctx::TimdFlag(ctxId));
   DTRACE(g_trace_ctx, D_SYNTAX, "cu_timd_flag() ctx=%d pos=(%d,%d) timd=%d\n", ctxId, cu.lumaPos().x, cu.lumaPos().y, cu.timd);
+#if JVET_AJ0061_TIMD_MERGE
+  cu_timd_merge_flag(cu);
+#endif
 }
+
+#if JVET_AJ0061_TIMD_MERGE
+void CABACWriter::cu_timd_merge_flag( const CodingUnit& cu )
+{
+  if (!cu.timd || cu.dimd)
+  {
+    return;
+  }
+  if (!PU::canTimdMerge(*cu.firstPU))
+  {
+    return;
+  }
+  int ctxId = cu.lwidth() * cu.lheight() >= 64 ? 0 : 1;
+  m_BinEncoder.encodeBin(cu.timdMrg ? 1 : 0, Ctx::TimdMrgFlag(ctxId));  
+}
+#endif
 #endif
 
 #if JVET_AB0155_SGPM
@@ -6518,7 +6536,7 @@ void CABACWriter::geo_merge_idx1(const PredictionUnit& pu)
 #if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
 uint64_t CABACWriter::geo_blend_est( const TempCtx& ctxStart, const int flag )
 {
-  getCtx() = SubCtx(Ctx::GeoBlendFlag,ctxStart);
+  getCtx() = ctxStart;
   resetBits();
 
   m_BinEncoder.encodeBin( flag, Ctx::GeoBlendFlag() );
@@ -6677,7 +6695,7 @@ uint64_t CABACWriter::geo_mmvdIdx_est(const TempCtx& ctxStart, const int geoMMVD
 #if JVET_AG0164_AFFINE_GPM
 uint64_t CABACWriter::geo_affFlag_est(const TempCtx& ctxStart, const int flag, int ctxOffset)
 {
-  getCtx() = SubCtx(Ctx::AffineFlag,ctxStart);
+  getCtx() = ctxStart;
   resetBits();
 
   m_BinEncoder.encodeBin(flag, Ctx::AffineFlag(ctxOffset));
@@ -6694,7 +6712,7 @@ uint64_t CABACWriter::geoBldFlagEst(const PredictionUnit& pu, const TempCtx& ctx
 uint64_t CABACWriter::geoBldFlagEst(const TempCtx& ctxStart, const int flag)
 #endif
 {
-  getCtx() = SubCtx(Ctx::GeoBldFlag,ctxStart);
+  getCtx() = ctxStart;
   resetBits();
 #if JVET_AH0314_ADAPTIVE_GPM_BLENDING_IMPROV
   int blkSizeSmall = pu.lwidth() < pu.lheight() ? pu.lwidth() : pu.lheight();

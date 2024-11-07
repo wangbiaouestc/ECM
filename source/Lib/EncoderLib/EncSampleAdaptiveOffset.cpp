@@ -6823,7 +6823,7 @@ void EncSampleAdaptiveOffset::determineCcSaoControlIdc(CodingStructure& cs, cons
       uint8_t  bestSetIdc = 0;
       uint8_t  bestSetIdx = 0;
 
-      m_CABACEstimator->getCtx() = SubCtx(Ctx::CcSaoControlIdc,ctxBest);
+      m_CABACEstimator->getCtx() = ctxBest;
       ctxStart                   = SubCtx(Ctx::CcSaoControlIdc, m_CABACEstimator->getCtx());
 
       for (int setIdx = 0; setIdx <= MAX_CCSAO_SET_NUM; setIdx++)
@@ -6832,7 +6832,7 @@ void EncSampleAdaptiveOffset::determineCcSaoControlIdc(CodingStructure& cs, cons
           continue;
 
         uint8_t setIdc = ccSaoParam.mapIdxToIdc[setIdx];
-        m_CABACEstimator->getCtx() = SubCtx(Ctx::CcSaoControlIdc,ctxStart);
+        m_CABACEstimator->getCtx() = ctxStart;
         m_CABACEstimator->resetBits();
         const Position lumaPos = Position({ xCtb << getComponentScaleX(compID, cs.pcv->chrFormat),
                                             yCtb << getComponentScaleY(compID, cs.pcv->chrFormat) });
@@ -6886,7 +6886,7 @@ void EncSampleAdaptiveOffset::determineCcSaoControlIdc(CodingStructure& cs, cons
   }
 
   curTotalRate = prevRate;
-  m_CABACEstimator->getCtx() = SubCtx(Ctx::CcSaoControlIdc,ctxInitial);
+  m_CABACEstimator->getCtx() = ctxInitial;
   m_CABACEstimator->resetBits();
   ctbIdx = 0;
   for (int yCtb = 0; yCtb < picHeightC; yCtb += ctuHeightC)
@@ -6908,7 +6908,7 @@ void EncSampleAdaptiveOffset::determineCcSaoControlIdc(CodingStructure& cs, cons
 #endif
 
   // restore for next iteration
-  m_CABACEstimator->getCtx() = SubCtx(Ctx::CcSaoControlIdc,ctxInitial);
+  m_CABACEstimator->getCtx() = ctxInitial;
 }
 
 int EncSampleAdaptiveOffset::lengthUvlc(int uiCode)
@@ -7117,7 +7117,7 @@ void EncSampleAdaptiveOffset::deriveCcSaoRDO(CodingStructure& cs, const Componen
       }
     }
 
-    m_CABACEstimator->getCtx() = SubCtx(Ctx::CcSaoControlIdc,ctxStartCcSaoControlFlag);
+    m_CABACEstimator->getCtx() = ctxStartCcSaoControlFlag;
 
     int64_t curTotalDist = 0;
     double  curTotalRate = 0;

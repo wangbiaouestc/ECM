@@ -407,6 +407,26 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   timdFusionWeight[0] = other.timdFusionWeight[0];
   timdFusionWeight[1] = other.timdFusionWeight[1];
 #endif
+#if JVET_AJ0061_TIMD_MERGE
+  timdMrg = other.timdMrg;
+  for (int i = 0; i <= NUM_TIMD_MERGE_MODES; i++)
+  {
+    timdmTrType[i][0] = other.timdmTrType[i][0];
+    timdmTrType[i][1] = other.timdmTrType[i][1];
+  }
+  for (int i = 0; i < NUM_TIMD_MERGE_MODES; i++)
+  {
+    timdMrgIsBlended[i] = other.timdMrgIsBlended[i];
+    for (int j = 0; j < TIMD_FUSION_NUM; j++)
+    {
+      timdMrgList[i][j] = other.timdMrgList[i][j];
+      timdMrgFusionWeight[i][j] = other.timdMrgFusionWeight[i][j];
+      timdMrgModeCheckWA[i][j] = other.timdMrgModeCheckWA[i][j];
+      timdMrgLocDep[i][j] = other.timdMrgLocDep[i][j];
+    }
+  }
+  timdMrgCand = other.timdMrgCand;
+#endif
 #endif
 #if JVET_AB0155_SGPM
   timdHor      = other.timdHor;
@@ -706,6 +726,26 @@ void CodingUnit::initData()
 #else
   timdFusionWeight[0] = -1;
   timdFusionWeight[1] = -1;
+#endif
+#if JVET_AJ0061_TIMD_MERGE
+  timdMrg = 0;
+  for (int i = 0; i <= NUM_TIMD_MERGE_MODES; i++)
+  {
+    timdmTrType[i][0] = TransType::DCT2;
+    timdmTrType[i][1] = TransType::DCT2;
+  }
+  for (int i = 0; i < NUM_TIMD_MERGE_MODES; i++)
+  {
+    timdMrgIsBlended[i] = false;
+    for (int j = 0; j < TIMD_FUSION_NUM; j++)
+    {
+      timdMrgList[i][j] = INVALID_TIMD_IDX;
+      timdMrgFusionWeight[i][j] = -1;
+      timdMrgModeCheckWA[i][j] = true;
+      timdMrgLocDep[i][j] = 0;
+    }
+  }
+  timdMrgCand = -1;
 #endif
 #endif
 #if JVET_AB0155_SGPM
