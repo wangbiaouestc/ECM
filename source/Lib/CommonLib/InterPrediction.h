@@ -200,7 +200,7 @@ private:
   static const int  m_LICShiftDiff = 12;
   int               m_LICMultApprox[64];
 #endif
-#if JVET_AJ0161_OBMC_EXT_WITH_INTRA
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
   Pel* m_IntraOBMCBuf[MAX_NUM_COMPONENT];
   Pel* m_beforeOBMCBuf[MAX_NUM_COMPONENT];
 #endif
@@ -582,7 +582,7 @@ protected:
   bool xCheckIdenticalMotionInfo(MotionInfo orgMotionInfo, MotionInfo targetMotionInfo, MergeType puMergeType);
 #endif
 #if ENABLE_OBMC
-#if JVET_AJ0161_OBMC_EXT_WITH_INTRA
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
   void xSubblockOBMC(const ComponentID eComp, PredictionUnit &pu, PelUnitBuf &pcYuvPredDst, PelUnitBuf &pcYuvPredSrc, PelUnitBuf &pcYuvBefore, int iDir, bool bSubMotion = false, bool bIsIntra = false);
 #else
   void xSubblockOBMC(const ComponentID eComp, PredictionUnit &pu, PelUnitBuf &pcYuvPredDst, PelUnitBuf &pcYuvPredSrc, int iDir, bool bSubMotion = false);
@@ -755,7 +755,7 @@ public:
   }
 #endif
 #if ENABLE_OBMC
-#if JVET_AJ0161_OBMC_EXT_WITH_INTRA
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
   void    subBlockOBMC(PredictionUnit &pu, PelUnitBuf *pDst = nullptr, IntraPrediction *pcIntraPred = nullptr);
 #else
   void    subBlockOBMC(PredictionUnit  &pu, PelUnitBuf *pDst = nullptr);
@@ -1062,7 +1062,7 @@ public:
   void xSubblockOBMCCopy(const ComponentID eComp, PredictionUnit &pu, PelUnitBuf &pcYuvPredDst,
                          PelUnitBuf &pcYuvPredSrc, int iDir);
   void xSubblockTMOBMC(const ComponentID eComp, PredictionUnit &pu, PelUnitBuf &pcYuvPredDst, PelUnitBuf &pcYuvPredSrc,
-#if JVET_AJ0161_OBMC_EXT_WITH_INTRA
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
     PelUnitBuf &pcYuvBefore,
 #endif
     int iDir, int iOBMCmode = 0);
@@ -1720,7 +1720,7 @@ public:
   void setFillCurTplAboveARMC(bool b) { m_fillCurTplAboveARMC = b; }
   void setFillCurTplLeftARMC(bool b) { m_fillCurTplLeftARMC = b; }
 #endif
-#if JVET_AJ0161_OBMC_EXT_WITH_INTRA
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
 private:
   bool m_DIMDForOBMCFilled;
   int m_modeBuf[2][MAX_CU_SIZE >> MIN_CU_LOG2];
@@ -1897,7 +1897,7 @@ public:
 #if JVET_AF0073_INTER_CCP_MERGE
   bool deriveInterCcpMergePrediction( TransformUnit* tu, const PelBuf& lumaReconstruction, PelBuf& inBufCb, PelBuf& inBufCr, PelBuf& outBufCb, PelBuf& outBufCr, CCPModelCandidate interCcpMergeList[], int validNum);
 #endif
-#if JVET_AJ0161_OBMC_EXT_WITH_INTRA
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
   void subBlockIntraForOBMC(PredictionUnit &subPu, const int iSub, const bool bIsAbove, PelUnitBuf &cTmp, IntraPrediction *pcIntraPred);
 #endif
 };

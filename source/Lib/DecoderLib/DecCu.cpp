@@ -160,7 +160,7 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
 
     for( auto &currCU : cs.traverseCUs( CS::getArea( cs, ctuArea, chType ), chType ) )
     {
-#if JVET_AJ0161_OBMC_EXT_WITH_INTRA
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
       m_pcInterPred->setDIMDForOBMC(false);
       m_pcInterPred->setModeGetCheck(0, false);
       m_pcInterPred->setModeGetCheck(1, false);
@@ -2286,7 +2286,7 @@ void DecCu::xReconInter(CodingUnit &cu)
     const UnitArea localUnitArea( cu.cs->area.chromaFormat, Area( 0, 0, cu.Y().width, cu.Y().height ) );
 #if ENABLE_OBMC && JVET_X0090_CIIP_FIX
     cu.isobmcMC = true;
-#if JVET_AJ0161_OBMC_EXT_WITH_INTRA
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
     m_pcInterPred->subBlockOBMC(*cu.firstPU, nullptr, m_pcIntraPred);
 #else
     m_pcInterPred->subBlockOBMC(*cu.firstPU);
@@ -2353,7 +2353,7 @@ void DecCu::xReconInter(CodingUnit &cu)
   if (!cu.firstPU->ciipFlag)
 #endif
   {
-#if JVET_AJ0161_OBMC_EXT_WITH_INTRA
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
     m_pcInterPred->subBlockOBMC(*cu.firstPU, nullptr, m_pcIntraPred);
 #else
     m_pcInterPred->subBlockOBMC(*cu.firstPU);

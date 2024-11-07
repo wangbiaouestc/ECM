@@ -292,7 +292,7 @@
 #if ENABLE_OBMC
 #define JVET_AC0335_CONTENT_ADAPTIVE_OBMC_ENABLING        1 // JVET-AC0335: Content adaptive OBMC enabling
 #define JVET_AD0193_ADAPTIVE_OBMC_CONTROL                 1 // JVET-AD0193: Adaptive OBMC control
-#define JVET_AJ0161_OBMC_EXT_WITH_INTRA                   1 // JVET-AJ0161: OBMC extension with Intra Prediction
+#define JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED              1 // JVET-AJ0161: OBMC Extension with Intra Prediction
 #endif
 
 #if JVET_X0049_BDMVR_SW_OPT

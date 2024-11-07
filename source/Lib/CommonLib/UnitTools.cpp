@@ -33059,7 +33059,7 @@ int buildHistogram(const Pel *pReco, int iStride, uint32_t uiHeight, uint32_t ui
 }
 #endif
 
-#if JVET_AJ0161_OBMC_EXT_WITH_INTRA
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
 void calcGradForOBMC(const PredictionUnit pu, const Pel *pReco, const int iStride, const uint32_t totalUnits, const int templateSize, const int blkSize, int *modeBuf, const int isAbove, const bool isExistFirst, const bool isExistLast)
 {
   int       angTable[17]   = { 0,     2048,  4096,  6144,  8192,  12288, 16384, 20480, 24576,

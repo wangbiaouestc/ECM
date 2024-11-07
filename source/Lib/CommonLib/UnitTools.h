@@ -1469,6 +1469,6 @@ void getTemporalBv(const PredictionUnit &pu, std::vector<MotionInfo>& temporalMi
 int buildHistogram(const Pel *pReco, int iStride, uint32_t uiHeight, uint32_t uiWidth, int *piHistogram, int direction, int bw, int bh);
 #endif
 
-#if JVET_AJ0161_OBMC_EXT_WITH_INTRA
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
 void calcGradForOBMC(const PredictionUnit pu, const Pel *pReco, const int iStride, const uint32_t totalUnits, const int templateSize, const int blkSize, int *modeBuf, const int isAbove, const bool isExistFirst, const bool isExistLast);
 #endif
