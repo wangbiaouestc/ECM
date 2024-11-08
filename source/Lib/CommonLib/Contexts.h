@@ -568,6 +568,9 @@ public:
 #endif
 #if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
   static const CtxSet   GeoBlendFlag;
+#if JVET_AJ0274_REGRESSION_GPM_TM
+  static const CtxSet   GeoBlendTMFlag;
+#endif
 #endif
 #if JVET_W0097_GPM_MMVD_TM
   static const CtxSet   GeoMmvdFlag;

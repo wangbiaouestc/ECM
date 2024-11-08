@@ -822,6 +822,9 @@ public:
 #endif
 #if JVET_AG0164_AFFINE_GPM
                               , AffineMergeCtx &gpmAffMrgCtx
+#if JVET_AJ0274_GPM_AFFINE_TM
+                              , AffineMergeCtx &gpmAffTmMrgCtx
+#endif
 #endif
 #if JVET_AE0046_BI_GPM
                               , Mv(&subMvBuf)[MRG_MAX_NUM_CANDS << 1][MAX_NUM_SUBCU_DMVR]

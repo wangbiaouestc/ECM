@@ -675,6 +675,9 @@ struct InterPredictionData
   uint8_t     geoTmType;
 #endif
 #endif
+#if JVET_AJ0274_REGRESSION_GPM_TM
+  bool        geoBlendTmFlag;
+#endif
 #if JVET_AA0058_GPM_ADAPTIVE_BLENDING
   uint8_t     geoBldIdx;
 #endif

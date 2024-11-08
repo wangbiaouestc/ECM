@@ -1204,6 +1204,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setMaxNumGeoCand                                     ( m_maxNumGeoCand );
 #if JVET_AG0164_AFFINE_GPM
   m_cEncLib.setMaxNumGpmAffCand                                  ( m_maxNumGpmAffCand );
+#if JVET_AJ0274_GPM_AFFINE_TM
+  m_cEncLib.setMaxNumGpmAffTmCand                                ( m_maxNumGpmAffTmCand );
+#endif
 #endif
   m_cEncLib.setMaxNumIBCMergeCand                                ( m_maxNumIBCMergeCand );
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND

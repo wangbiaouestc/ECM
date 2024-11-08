@@ -6519,5 +6519,30 @@ const CtxSet ContextSetCfg::SeparateTree = ContextSetCfg::addCtxSet
   { DWO, DWO, DWO },
   });
 #endif
+#if JVET_AJ0274_REGRESSION_GPM_TM
+const CtxSet ContextSetCfg::GeoBlendTMFlag = ContextSetCfg::addCtxSet
+({
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { CNU, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  { DWS, },
+  { DWE, },
+  { DWE, },
+  { DWE, },
+  { DWE, },
+  { DWO, },
+  { DWO, },
+  { DWO, },
+  { DWO, },
+  { DWO, },
+  { DWO, },
+  { DWO, },
+  { DWO, },
+    });
+#endif
 // CONTEXTS WSA STOP
 #endif

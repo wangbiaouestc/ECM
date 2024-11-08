@@ -1634,6 +1634,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #endif
 #if JVET_AG0164_AFFINE_GPM
   ("MaxNumGPMAffCand",                                m_maxNumGpmAffCand,                                  9u, "Maximum number of geometric partitioning mode candidates")
+#if JVET_AJ0274_GPM_AFFINE_TM
+  ("MaxNumGPMAffTmCand",                              m_maxNumGpmAffTmCand,                                6u, "Maximum number of affine candidates for geometric partitioning mode with TM")
+#endif
 #endif
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
 #if NON_ADJACENT_MRG_CAND
@@ -4063,6 +4066,9 @@ bool EncAppCfg::xCheckParameter()
 #if JVET_AG0164_AFFINE_GPM
   xConfirmPara( m_maxNumGpmAffCand > GEO_MAX_NUM_UNI_AFF_CANDS, "MaxNumGeoCand must be no more than GEO_MAX_NUM_UNI_CANDS." );
   xConfirmPara( 0 < m_maxNumGpmAffCand && m_maxNumGpmAffCand < 2, "MaxNumGeoCand must be no less than 2 unless MaxNumGeoCand is 0." );
+#if JVET_AJ0274_GPM_AFFINE_TM
+  xConfirmPara( m_maxNumGpmAffTmCand > m_maxNumGpmAffCand, "MaxNumGeoAffTmCand must be no more than MaxNumGeoAffCand." );
+#endif
 #endif
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
   xConfirmPara( m_maxNumMHPCand > GEO_MAX_NUM_UNI_CANDS, "m_maxNumMHPCand must be no more than GEO_MAX_NUM_UNI_CANDS." );
@@ -5557,6 +5563,9 @@ void EncAppCfg::xPrintParameter()
   msg( DETAILS, "Max Num Geo Merge Candidates           : %d\n", m_maxNumGeoCand );
 #if JVET_AG0164_AFFINE_GPM
   msg( DETAILS, "Max Num Gpm Affine Merge Candidates    : %d\n", m_maxNumGpmAffCand );
+#if JVET_AJ0274_GPM_AFFINE_TM
+  msg( DETAILS, "Max Num Gpm Affine Tm Merge Candidates : %d\n", m_maxNumGpmAffTmCand );
+#endif
 #endif
 
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND

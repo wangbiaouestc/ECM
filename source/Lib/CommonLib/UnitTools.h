@@ -172,6 +172,9 @@ namespace CU
   uint8_t numSbtModeRdo               (uint8_t sbtAllowed);
   bool    isSbtMode                   (const uint8_t sbtInfo);
   bool    isSameSbtSize               (const uint8_t sbtInfo1, const uint8_t sbtInfo2);
+#if JVET_AJ0274_REGRESSION_GPM_TM
+  bool    checkGeoBlendTmAvail        (const CodingUnit& currCU, const CodingStructure* bestCS);
+#endif
 #if JVET_AI0050_SBT_LFNST
   void    getSBTPosAndSize            (const CodingUnit &cu, Position& pos, Size& size, uint8_t sbtMode);
 #endif
@@ -822,6 +825,9 @@ namespace PU
   bool isAffineGPMSizeValid(const PredictionUnit& pu);
 
   int  getAffGPMCtxOffset(const PredictionUnit& pu);
+#if JVET_AJ0274_GPM_AFFINE_TM
+  bool isAffineGpmTmValid(const PredictionUnit& pu);
+#endif
 #endif
 #if JVET_W0097_GPM_MMVD_TM
 #if TM_MRG
@@ -852,6 +858,9 @@ namespace PU
   void spanGeoMMVDMotionInfo(PredictionUnit& pu, MergeCtx& geoMrgCtx 
 #if JVET_AG0164_AFFINE_GPM
      , AffineMergeCtx& geoAffMrgCtx
+#if JVET_AJ0274_GPM_AFFINE_TM
+     , AffineMergeCtx& geoAffTmMrgCtx
+#endif
 #endif
     , MergeCtx& geoTmMrgCtx0, MergeCtx& geoTmMrgCtx1, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool tmFlag0, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool tmFlag1, const bool mmvdFlag1, const uint8_t mmvdIdx1, const uint8_t bldIdx,const uint8_t *intraMPM,
 #if JVET_AI0082_GPM_WITH_INTER_IBC

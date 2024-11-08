@@ -5863,6 +5863,9 @@ void CABACReader::merge_data( PredictionUnit& pu )
         pu.cu->geoFlag = true;
 #if JVET_AG0112_REGRESSION_BASED_GPM_BLENDING
         pu.cu->geoBlendFlag = false;
+#if JVET_AJ0274_REGRESSION_GPM_TM
+        pu.geoBlendTmFlag = false;
+#endif
 #endif
 #if JVET_AE0046_BI_GPM
         PU::setGpmDirMode(pu);
@@ -5985,6 +5988,9 @@ void CABACReader::merge_idx( PredictionUnit& pu )
 #if JVET_AI0082_GPM_WITH_INTER_IBC
         pu.gpmInterIbcFlag = false;
 #endif
+#if JVET_AJ0274_REGRESSION_GPM_TM
+        pu.geoBlendTmFlag = m_BinDecoder.decodeBin(Ctx::GeoBlendTMFlag());
+#endif
         return;
       }
 #endif
@@ -6076,6 +6082,9 @@ void CABACReader::merge_idx( PredictionUnit& pu )
       pu.gpmInterIbcFlag = (isIbc0 || isIbc1);
 #endif
 #endif
+#if JVET_AJ0274_GPM_AFFINE_TM
+      bool affGpmTmValid = isAffGPMValid && PU::isAffineGpmTmValid(pu);
+#endif
 
 #if TM_MRG
       if (!pu.geoMMVDFlag0 && !pu.geoMMVDFlag1)
@@ -6087,12 +6096,20 @@ void CABACReader::merge_idx( PredictionUnit& pu )
         }
         else
 #endif
+#if JVET_AJ0274_GPM_AFFINE_TM
+        if (!affGpmTmValid && (pu.affineGPM[0] || pu.affineGPM[1]))
+        {
+          pu.tmMergeFlag = false;
+        }
+        else
+#else
 #if JVET_AG0164_AFFINE_GPM
         if (pu.affineGPM[0] || pu.affineGPM[1])
         {
           pu.tmMergeFlag = false;
         }
         else
+#endif
 #endif
         tm_merge_flag(pu);
         if (pu.tmMergeFlag)
@@ -6431,6 +6448,12 @@ void CABACReader::geo_merge_idx(PredictionUnit& pu)
 #else
   const int maxNumGeoCand = pu.cs->sps->getMaxNumGeoCand();
 #endif
+#if JVET_AJ0274_GPM_AFFINE_TM
+  if (pu.affineGPM[0] && pu.tmMergeFlag)
+  {
+    maxNumGeoCand = pu.cs->sps->getMaxNumGpmAffTmCand();
+  }
+#endif
   CHECK(maxNumGeoCand < 2, "Incorrect max number of geo candidates");
   CHECK(pu.cu->lheight() > 64 || pu.cu->lwidth() > 64, "Incorrect block size of geo flag");
   int numCandminus2 = maxNumGeoCand - 2;
@@ -6456,6 +6479,12 @@ void CABACReader::geo_merge_idx(PredictionUnit& pu)
 
 #if JVET_AG0164_AFFINE_GPM
   maxNumGeoCand = pu.affineGPM[1] ? pu.cs->sps->getMaxNumGpmAffCand() : pu.cs->sps->getMaxNumGeoCand();
+#if JVET_AJ0274_GPM_AFFINE_TM
+  if (pu.affineGPM[1] && pu.tmMergeFlag)
+  {
+    maxNumGeoCand = pu.cs->sps->getMaxNumGpmAffTmCand();
+  }
+#endif
   numCandminus2 = maxNumGeoCand - 2;
 #endif
 
@@ -6516,6 +6545,12 @@ void CABACReader::geo_merge_idx1(PredictionUnit& pu)
 #endif
 #if JVET_AG0164_AFFINE_GPM
   int maxNumGeoCand = pu.affineGPM[0] ? pu.cs->sps->getMaxNumGpmAffCand() : pu.cs->sps->getMaxNumGeoCand();
+#if JVET_AJ0274_GPM_AFFINE_TM
+  if (pu.affineGPM[0] && pu.tmMergeFlag)
+  {
+    maxNumGeoCand = pu.cs->sps->getMaxNumGpmAffTmCand();
+  }
+#endif
 #else
   const int maxNumGeoCand = pu.cs->sps->getMaxNumGeoCand();
 #endif
@@ -6590,6 +6625,12 @@ void CABACReader::geo_merge_idx1(PredictionUnit& pu)
 
 #if JVET_AG0164_AFFINE_GPM
   maxNumGeoCand = pu.affineGPM[1] ? pu.cs->sps->getMaxNumGpmAffCand() : pu.cs->sps->getMaxNumGeoCand();
+#if JVET_AJ0274_GPM_AFFINE_TM
+  if (pu.affineGPM[1] && pu.tmMergeFlag)
+  {
+    maxNumGeoCand = pu.cs->sps->getMaxNumGpmAffTmCand();
+  }
+#endif
   numCandminus2 = maxNumGeoCand - 2;
 #endif
 

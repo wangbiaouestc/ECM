@@ -8351,7 +8351,11 @@ void InterSearch::setGeoSplitModeToSyntaxTable(PredictionUnit& pu, MergeCtx& mer
 }
 
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG
+#if JVET_AJ0274_GPM_AFFINE_TM
+void InterSearch::setGeoTMSplitModeToSyntaxTable(PredictionUnit& pu, MergeCtx(&mergeCtx)[GEO_NUM_TM_MV_CAND], const AffineMergeCtx& affMergeCtx, int mergeCand0, int mergeCand1, int mmvdCand0, int mmvdCand1)
+#else
 void InterSearch::setGeoTMSplitModeToSyntaxTable(PredictionUnit& pu, MergeCtx(&mergeCtx)[GEO_NUM_TM_MV_CAND], int mergeCand0, int mergeCand1, int mmvdCand0, int mmvdCand1)
+#endif
 {
   const int idx0 = mmvdCand0 + 1;
   const int idx1 = mmvdCand1 + 1;
@@ -8364,6 +8368,9 @@ void InterSearch::setGeoTMSplitModeToSyntaxTable(PredictionUnit& pu, MergeCtx(&m
                         , m_gpmPartTplCost[idx0][mergeCand0]
                         , m_gpmPartTplCost[idx1][mergeCand1]
                         , mergeCtx
+#if JVET_AJ0274_GPM_AFFINE_TM
+                        , affMergeCtx
+#endif
                         , mergeCand0
                         , mergeCand1
                         , numValidInList
@@ -8472,10 +8479,17 @@ bool InterSearch::selectGeoSplitModes(PredictionUnit &pu,
 }
 
 #if JVET_W0097_GPM_MMVD_TM && TM_MRG
-bool InterSearch::selectGeoTMSplitModes (PredictionUnit &pu, 
+#if JVET_AJ0274_GPM_AFFINE_TM
+bool InterSearch::selectGeoTMSplitModes (PredictionUnit &pu,
+                                         uint32_t (&gpmTplCostPart0)[2][GEO_NUM_PARTITION_MODE],
+                                         uint32_t (&gpmTplCostPart1)[2][GEO_NUM_PARTITION_MODE],
+                                         MergeCtx (&mergeCtx)[GEO_NUM_TM_MV_CAND], const AffineMergeCtx& affMergeCtx,int mergeCand0, int mergeCand1, uint8_t& numValidInList, uint8_t (&modeList)[GEO_NUM_SIG_PARTMODE])
+#else
+bool InterSearch::selectGeoTMSplitModes (PredictionUnit &pu,
                                          uint32_t (&gpmTplCostPart0)[2][GEO_NUM_PARTITION_MODE],
                                          uint32_t (&gpmTplCostPart1)[2][GEO_NUM_PARTITION_MODE],
                                          MergeCtx (&mergeCtx)[GEO_NUM_TM_MV_CAND], int mergeCand0, int mergeCand1, uint8_t& numValidInList, uint8_t (&modeList)[GEO_NUM_SIG_PARTMODE])
+#endif
 {
   if (!m_bAMLTemplateAvailabe[0] && !m_bAMLTemplateAvailabe[1])
   {
@@ -8483,7 +8497,11 @@ bool InterSearch::selectGeoTMSplitModes (PredictionUnit &pu,
     return false;
   }
 
+#if JVET_AJ0274_GPM_AFFINE_TM
+  if (PU::checkRprRefExistingInGpm(pu, mergeCtx[GEO_TM_OFF], mergeCand0, mergeCtx[GEO_TM_OFF], mergeCand1, affMergeCtx))
+#else
   if (PU::checkRprRefExistingInGpm(pu, mergeCtx[GEO_TM_OFF], mergeCand0, mergeCtx[GEO_TM_OFF], mergeCand1))
+#endif
   {
     bool backupTplValid[2] = {m_bAMLTemplateAvailabe[0], m_bAMLTemplateAvailabe[1]};
     m_bAMLTemplateAvailabe[0] = false;
@@ -8504,15 +8522,25 @@ bool InterSearch::selectGeoTMSplitModes (PredictionUnit &pu,
   // First partition
   if (fillRefTplPart0)
   {
+#if JVET_AJ0274_GPM_AFFINE_TM
+    fillPartGPMRefTemplate<0, false>(pu, mergeCtx[GEO_TM_SHAPE_AL], mergeCand0, -1, pRefTopPart0[GEO_TM_SHAPE_AL], pRefLeftPart0[GEO_TM_SHAPE_AL], &affMergeCtx);
+    fillPartGPMRefTemplate<0, false>(pu, mergeCtx[GEO_TM_SHAPE_A ], mergeCand0, -1, pRefTopPart0[GEO_TM_SHAPE_A ], pRefLeftPart0[GEO_TM_SHAPE_A ], &affMergeCtx);
+#else
     fillPartGPMRefTemplate<0, false>(pu, mergeCtx[GEO_TM_SHAPE_AL], mergeCand0, -1, pRefTopPart0[GEO_TM_SHAPE_AL], pRefLeftPart0[GEO_TM_SHAPE_AL]);
     fillPartGPMRefTemplate<0, false>(pu, mergeCtx[GEO_TM_SHAPE_A ], mergeCand0, -1, pRefTopPart0[GEO_TM_SHAPE_A ], pRefLeftPart0[GEO_TM_SHAPE_A ]);
+#endif
   }
 
   // Second
   if (fillRefTplPart1)
   {
+#if JVET_AJ0274_GPM_AFFINE_TM
+    fillPartGPMRefTemplate<1, false>(pu, mergeCtx[GEO_TM_SHAPE_AL], mergeCand1, -1, pRefTopPart1[GEO_TM_SHAPE_AL], pRefLeftPart1[GEO_TM_SHAPE_AL], &affMergeCtx);
+    fillPartGPMRefTemplate<1, false>(pu, mergeCtx[GEO_TM_SHAPE_L ], mergeCand1, -1, pRefTopPart1[GEO_TM_SHAPE_L ], pRefLeftPart1[GEO_TM_SHAPE_L ], &affMergeCtx);
+#else
     fillPartGPMRefTemplate<1, false>(pu, mergeCtx[GEO_TM_SHAPE_AL], mergeCand1, -1, pRefTopPart1[GEO_TM_SHAPE_AL], pRefLeftPart1[GEO_TM_SHAPE_AL]);
     fillPartGPMRefTemplate<1, false>(pu, mergeCtx[GEO_TM_SHAPE_L ], mergeCand1, -1, pRefTopPart1[GEO_TM_SHAPE_L ], pRefLeftPart1[GEO_TM_SHAPE_L ]);
+#endif
   }
 
   // Get mode lists

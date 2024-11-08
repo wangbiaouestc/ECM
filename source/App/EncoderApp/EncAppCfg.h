@@ -984,6 +984,9 @@ protected:
   uint32_t      m_maxNumGeoCand;
 #if JVET_AG0164_AFFINE_GPM
   uint32_t      m_maxNumGpmAffCand;
+#if JVET_AJ0274_GPM_AFFINE_TM
+  uint32_t      m_maxNumGpmAffTmCand;
+#endif
 #endif
   uint32_t      m_maxNumIBCMergeCand;                             ///< Max number of IBC merge candidates
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND

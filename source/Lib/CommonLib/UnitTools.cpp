@@ -197,6 +197,41 @@ bool CU::isOnCtuBottom( const CodingUnit& cu )
   return cuBottomY % ctuHeight == 0;
 }
 
+#if JVET_AJ0274_REGRESSION_GPM_TM
+bool CU::checkGeoBlendTmAvail(const CodingUnit& currCU, const CodingStructure* bestCS)
+{
+  const CodingUnit* bestCUTest = bestCS->getCU(CHANNEL_TYPE_LUMA);
+  bool skipGeoBlendTM = false;
+
+  if (currCU.slice->getCheckLDC() && !currCU.slice->getCheckLDB() && bestCUTest->skip && !bestCUTest->affine && !bestCUTest->mmvdSkip && !bestCUTest->geoFlag && !bestCUTest->firstPU->tmMergeFlag)
+  {
+    skipGeoBlendTM = true;
+  }
+  else if (currCU.slice->getCheckLDC() && !currCU.slice->getCheckLDB() && bestCUTest->affine)
+  {
+    skipGeoBlendTM = true;
+  }
+  else if (currCU.slice->getCheckLDC() && !currCU.slice->getCheckLDB() && !bestCUTest->skip && bestCUTest->geoFlag && bestCUTest->firstPU->gpmIntraFlag)
+  {
+    skipGeoBlendTM = true;
+  }
+  else if (currCU.slice->getCheckLDB() && !bestCUTest->skip && bestCUTest->geoFlag && (bestCUTest->firstPU->geoMMVDFlag0 || bestCUTest->firstPU->geoMMVDFlag1)
+    && !bestCUTest->firstPU->gpmIntraFlag && !bestCUTest->firstPU->affineGPM[0] && !bestCUTest->firstPU->affineGPM[1])
+  {
+    skipGeoBlendTM = true;
+  }
+  else if (currCU.slice->getCheckLDB() && bestCUTest->skip && !bestCUTest->affine && !bestCUTest->mmvdSkip && !bestCUTest->geoFlag && !bestCUTest->firstPU->tmMergeFlag)
+  {
+    skipGeoBlendTM = true;
+  }
+  else if (!currCU.slice->getCheckLDC() && bestCUTest->skip && !bestCUTest->affine && !bestCUTest->mmvdSkip && !bestCUTest->geoFlag && !bestCUTest->firstPU->tmMergeFlag)
+  {
+    skipGeoBlendTM = true;
+  }
+  return skipGeoBlendTM;
+}
+#endif
+
 #if JVET_AI0136_ADAPTIVE_DUAL_TREE
 bool CU::isPartitionerOnCtuBottom( const CodingUnit& cu, const Partitioner& partitioner )
 {
@@ -29621,6 +29656,9 @@ void PU::spanGeoIBCMotionInfo(PredictionUnit &pu, MergeCtx &geoMrgCtx)
 void PU::spanGeoMMVDMotionInfo(PredictionUnit& pu, MergeCtx& geoMrgCtx 
 #if JVET_AG0164_AFFINE_GPM
   , AffineMergeCtx& geoAffMrgCtx
+#if JVET_AJ0274_GPM_AFFINE_TM
+  , AffineMergeCtx& geoAffTmMrgCtx
+#endif
 #endif
   , MergeCtx& geoTmMrgCtx0, MergeCtx& geoTmMrgCtx1, const uint8_t splitDir, const uint8_t mergeIdx0, const uint8_t mergeIdx1, const bool tmFlag0, const bool mmvdFlag0, const uint8_t mmvdIdx0, const bool tmFlag1, const bool mmvdFlag1, const uint8_t mmvdIdx1, const uint8_t bldIdx, const uint8_t *intraMPM,
 #if JVET_AI0082_GPM_WITH_INTER_IBC
@@ -29973,12 +30011,21 @@ void PU::spanGeoMMVDMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const u
   int affMvBufStride = MAX_CU_SIZE >> 2;
   if (pu.affineGPM[0])
   {
+#if JVET_AJ0274_GPM_AFFINE_TM
+    pu.gpmPartAffType[0] = tmFlag0 ? geoAffTmMrgCtx.affineType[mergeIdx0] : geoAffMrgCtx.affineType[mergeIdx0];
+#else
     pu.gpmPartAffType[0] = geoAffMrgCtx.affineType[mergeIdx0];
+#endif
     CHECK(pu.gpmPartAffType[0] == AFFINE_MODEL_NUM, "Invalid affine type");
     pu.gpmPartRefIdx[0][0] = pu.gpmPartRefIdx[0][1] = -1;
 
+#if JVET_AJ0274_GPM_AFFINE_TM
+    pu.cu->affineType = tmFlag0 ? geoAffTmMrgCtx.affineType[mergeIdx0] : geoAffMrgCtx.affineType[mergeIdx0];
+    MvField* cpmvMvField0 = tmFlag0 ? geoAffTmMrgCtx.mvFieldNeighbours[mergeIdx0 << 1] : geoAffMrgCtx.mvFieldNeighbours[mergeIdx0 << 1];
+#else
     pu.cu->affineType = geoAffMrgCtx.affineType[mergeIdx0];
     MvField* cpmvMvField0 = geoAffMrgCtx.mvFieldNeighbours[mergeIdx0 << 1];
+#endif
     if (cpmvMvField0[0].refIdx >= 0)
     {
       PU::setAllAffineMv(pu, cpmvMvField0[0].mv + deltaMv, cpmvMvField0[1].mv + deltaMv, cpmvMvField0[2].mv + deltaMv, REF_PIC_LIST_0);
@@ -29989,7 +30036,11 @@ void PU::spanGeoMMVDMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const u
       pu.gpmPartmvAffi[0][0][2] = cpmvMvField0[2].mv + deltaMv;
 
     }
+#if JVET_AJ0274_GPM_AFFINE_TM
+    MvField* cpmvMvField1 = tmFlag0 ? geoAffTmMrgCtx.mvFieldNeighbours[(mergeIdx0 << 1) + 1] : geoAffMrgCtx.mvFieldNeighbours[(mergeIdx0 << 1) + 1];
+#else
     MvField* cpmvMvField1 = geoAffMrgCtx.mvFieldNeighbours[(mergeIdx0 << 1) + 1];
+#endif
     if (cpmvMvField1[0].refIdx >= 0)
     {
       PU::setAllAffineMv(pu, cpmvMvField1[0].mv + deltaMv, cpmvMvField1[1].mv + deltaMv, cpmvMvField1[2].mv + deltaMv, REF_PIC_LIST_1);
@@ -30016,12 +30067,21 @@ void PU::spanGeoMMVDMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const u
   }
   if (pu.affineGPM[1])
   {
+#if JVET_AJ0274_GPM_AFFINE_TM
+    pu.gpmPartAffType[1] = tmFlag0 ? geoAffTmMrgCtx.affineType[mergeIdx1] : geoAffMrgCtx.affineType[mergeIdx1];
+#else
     pu.gpmPartAffType[1] = geoAffMrgCtx.affineType[mergeIdx1];
+#endif
     CHECK(pu.gpmPartAffType[1] == AFFINE_MODEL_NUM, "Invalid affine type");
     pu.gpmPartRefIdx[1][0] = pu.gpmPartRefIdx[1][1] = -1;
 
+#if JVET_AJ0274_GPM_AFFINE_TM
+    pu.cu->affineType = tmFlag0 ? geoAffTmMrgCtx.affineType[mergeIdx1] : geoAffMrgCtx.affineType[mergeIdx1];
+    MvField* cpmvMvField0 = tmFlag0 ? geoAffTmMrgCtx.mvFieldNeighbours[(mergeIdx1 << 1)] : geoAffMrgCtx.mvFieldNeighbours[(mergeIdx1 << 1)];
+#else
     pu.cu->affineType = geoAffMrgCtx.affineType[mergeIdx1];
     MvField* cpmvMvField0 = geoAffMrgCtx.mvFieldNeighbours[(mergeIdx1 << 1)];
+#endif
     if (cpmvMvField0[0].refIdx >= 0)
     {
       PU::setAllAffineMv(pu, cpmvMvField0[0].mv + deltaMv, cpmvMvField0[1].mv + deltaMv, cpmvMvField0[2].mv + deltaMv, REF_PIC_LIST_0);
@@ -30031,7 +30091,11 @@ void PU::spanGeoMMVDMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const u
       pu.gpmPartmvAffi[1][0][1] = cpmvMvField0[1].mv + deltaMv;
       pu.gpmPartmvAffi[1][0][2] = cpmvMvField0[2].mv + deltaMv;
     }
+#if JVET_AJ0274_GPM_AFFINE_TM
+    MvField* cpmvMvField1 = tmFlag0 ? geoAffTmMrgCtx.mvFieldNeighbours[(mergeIdx1 << 1) + 1] : geoAffMrgCtx.mvFieldNeighbours[(mergeIdx1 << 1) + 1];
+#else
     MvField* cpmvMvField1 = geoAffMrgCtx.mvFieldNeighbours[(mergeIdx1 << 1) + 1];
+#endif
     if (cpmvMvField1[0].refIdx >= 0)
     {
       PU::setAllAffineMv(pu, cpmvMvField1[0].mv + deltaMv, cpmvMvField1[1].mv + deltaMv, cpmvMvField1[2].mv + deltaMv, REF_PIC_LIST_1);
@@ -30247,9 +30311,15 @@ void PU::spanGeoMMVDMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const u
 #if JVET_AG0164_AFFINE_GPM
         if (pu.affineGPM[0])
         {
+#if JVET_AJ0274_GPM_AFFINE_TM
+          mb.at(x, y).interDir = tmFlag0 ? geoAffTmMrgCtx.interDirNeighbours[mergeIdx0] : geoAffMrgCtx.interDirNeighbours[mergeIdx0];
+          mb.at(x, y).refIdx[0] = tmFlag0 ? geoAffTmMrgCtx.mvFieldNeighbours[mergeIdx0 << 1][0].refIdx : geoAffMrgCtx.mvFieldNeighbours[mergeIdx0 << 1][0].refIdx;
+          mb.at(x, y).refIdx[1] = tmFlag0 ? geoAffTmMrgCtx.mvFieldNeighbours[(mergeIdx0 << 1) + 1][0].refIdx :geoAffMrgCtx.mvFieldNeighbours[(mergeIdx0 << 1) + 1][0].refIdx;
+#else
           mb.at(x, y).interDir = geoAffMrgCtx.interDirNeighbours[mergeIdx0];
           mb.at(x, y).refIdx[0] = geoAffMrgCtx.mvFieldNeighbours[mergeIdx0 << 1][0].refIdx;
           mb.at(x, y).refIdx[1] = geoAffMrgCtx.mvFieldNeighbours[(mergeIdx0 << 1) + 1][0].refIdx;
+#endif
           mb.at(x, y).mv[0] = pMvBufP0L0[x];
           mb.at(x, y).mv[1] = pMvBufP0L1[x];
         }
@@ -30327,9 +30397,15 @@ void PU::spanGeoMMVDMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const u
 #if JVET_AG0164_AFFINE_GPM
         if (pu.affineGPM[1])
         {
+#if JVET_AJ0274_GPM_AFFINE_TM
+          mb.at(x, y).interDir = tmFlag0 ? geoAffTmMrgCtx.interDirNeighbours[mergeIdx1] : geoAffMrgCtx.interDirNeighbours[mergeIdx1];
+          mb.at(x, y).refIdx[0] = tmFlag0 ? geoAffTmMrgCtx.mvFieldNeighbours[mergeIdx1 << 1][0].refIdx : geoAffMrgCtx.mvFieldNeighbours[mergeIdx1 << 1][0].refIdx;
+          mb.at(x, y).refIdx[1] = tmFlag0 ? geoAffTmMrgCtx.mvFieldNeighbours[(mergeIdx1 << 1) + 1][0].refIdx : geoAffMrgCtx.mvFieldNeighbours[(mergeIdx1 << 1) + 1][0].refIdx;
+#else
           mb.at(x, y).interDir = geoAffMrgCtx.interDirNeighbours[mergeIdx1];
           mb.at(x, y).refIdx[0] = geoAffMrgCtx.mvFieldNeighbours[mergeIdx1 << 1][0].refIdx;
           mb.at(x, y).refIdx[1] = geoAffMrgCtx.mvFieldNeighbours[(mergeIdx1 << 1) + 1][0].refIdx;
+#endif
           mb.at(x, y).mv[0] = pMvBufP1L0[x];
           mb.at(x, y).mv[1] = pMvBufP1L1[x];
         }
@@ -33087,6 +33163,25 @@ bool PU::isAffineGPMValid(const PredictionUnit& pu)
   return true;
 }
 
+#if JVET_AJ0274_GPM_AFFINE_TM
+bool PU::isAffineGpmTmValid(const PredictionUnit& pu)
+{
+  if (pu.cu->slice->getSPS()->getMaxNumGpmAffTmCand() <= 0)
+  {
+    return false;
+  }
+  if (pu.lwidth() * pu.lheight() >= 4096)
+  {
+    return false;
+  }
+  if ((pu.cs->slice->getTLayer() <= 1 && !pu.cs->slice->getCheckLDC()) || pu.cs->slice->getTLayer() >= 5)
+  {
+    return false;
+  }
+  return true;
+}
+#endif
+
 void PU::getGeoAffMergeCandidates(PredictionUnit& pu, AffineMergeCtx& gpmAffMrgCtx, InterPrediction* pcInterPred
 #if !JVET_AH0314_LIC_INHERITANCE_FOR_MRG
                                 , AffineMergeCtx* affMergeCtx
@@ -33244,6 +33339,13 @@ void PU::getGeoAffMergeCandidates(PredictionUnit& pu, AffineMergeCtx& gpmAffMrgC
 #if JVET_AG0276_NLIC
       bool isLic = tmpMergeCtx.licFlags[i];
 #endif
+#if JVET_AJ0274_GPM_AFFINE_TM
+      bool useInheritedOrig = useInherited;
+      if (tmpMergeCtx.interDirNeighbours[i] == 3 && pu.cs->sps->getMaxNumGpmAffTmCand() > 0)
+      {
+        useInherited = false;
+      }
+#endif
       gpmAffMrgCtx.licFlags[gpmAffMrgCtx.numValidMergeCand] = false;
       gpmAffMrgCtx.licInheritPara[gpmAffMrgCtx.numValidMergeCand] = false;
       if (useInherited)
@@ -33267,6 +33369,9 @@ void PU::getGeoAffMergeCandidates(PredictionUnit& pu, AffineMergeCtx& gpmAffMrgC
         }
 #endif
       }
+#endif
+#if JVET_AJ0274_GPM_AFFINE_TM
+      useInherited = useInheritedOrig;
 #endif
 
       if (gpmAffMrgCtx.xCheckSimilarMotion(gpmAffMrgCtx.numValidMergeCand))
@@ -33299,6 +33404,13 @@ void PU::getGeoAffMergeCandidates(PredictionUnit& pu, AffineMergeCtx& gpmAffMrgC
 #if JVET_AG0276_NLIC
       bool isLic = tmpMergeCtx.licFlags[i];
 #endif
+#if JVET_AJ0274_GPM_AFFINE_TM
+      bool useInheritedOrig = useInherited;
+      if (tmpMergeCtx.interDirNeighbours[i] == 3 && pu.cs->sps->getMaxNumGpmAffTmCand() > 0)
+      {
+        useInherited = false;
+      }
+#endif
       gpmAffMrgCtx.licFlags[gpmAffMrgCtx.numValidMergeCand] = false;
       gpmAffMrgCtx.licInheritPara[gpmAffMrgCtx.numValidMergeCand] = false;
       if (useInherited)
@@ -33322,6 +33434,9 @@ void PU::getGeoAffMergeCandidates(PredictionUnit& pu, AffineMergeCtx& gpmAffMrgC
         }
 #endif
       }
+#endif
+#if JVET_AJ0274_GPM_AFFINE_TM
+      useInherited = useInheritedOrig;
 #endif
       if (gpmAffMrgCtx.xCheckSimilarMotion(gpmAffMrgCtx.numValidMergeCand))
       {
