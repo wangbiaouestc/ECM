@@ -151,6 +151,9 @@ void LoopFilter::destroy()
  \param  pcPic   picture class (Pic) pointer
  */
 void LoopFilter::loopFilterPic( CodingStructure& cs
+#if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+  , PelUnitBuf& alfCodingInfo, bool storeInfo
+#endif
                                 )
 {
   const PreCalcValues& pcv = *cs.pcv;
@@ -193,7 +196,11 @@ void LoopFilter::loopFilterPic( CodingStructure& cs
           continue;
         }
 #endif
+#if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+        xDeblockCU( currCU, EDGE_VER, storeInfo, alfCodingInfo );
+#else
         xDeblockCU( currCU, EDGE_VER );
+#endif
       }
 
 
@@ -215,7 +222,11 @@ void LoopFilter::loopFilterPic( CodingStructure& cs
             continue;
           }
 #endif
+#if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+          xDeblockCU( currCU, EDGE_VER, storeInfo, alfCodingInfo );
+#else
           xDeblockCU( currCU, EDGE_VER );
+#endif
         }
       }
     }
@@ -245,7 +256,11 @@ void LoopFilter::loopFilterPic( CodingStructure& cs
           continue;
         }
 #endif
+#if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+        xDeblockCU( currCU, EDGE_HOR, storeInfo, alfCodingInfo );
+#else
         xDeblockCU( currCU, EDGE_HOR );
+#endif
       }
 
 #if JVET_AI0136_ADAPTIVE_DUAL_TREE
@@ -266,7 +281,11 @@ void LoopFilter::loopFilterPic( CodingStructure& cs
             continue;
           }
 #endif
+#if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+          xDeblockCU( currCU, EDGE_HOR, storeInfo, alfCodingInfo );
+#else
           xDeblockCU( currCU, EDGE_HOR );
+#endif
         }
       }
     }
@@ -299,7 +318,11 @@ void LoopFilter::resetFilterLengths()
  \param cu               the CU to be deblocked
  \param edgeDir          the direction of the edge in block boundary (horizontal/vertical), which is added newly
 */
+#if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+void LoopFilter::xDeblockCU( CodingUnit& cu, const DeblockEdgeDir edgeDir, bool storeInfo, PelUnitBuf& alfCodingInfo )
+#else
 void LoopFilter::xDeblockCU( CodingUnit& cu, const DeblockEdgeDir edgeDir )
+#endif
 {
   const PreCalcValues& pcv = *cu.cs->pcv;
   const Area area          = cu.Y().valid() ? cu.Y() : Area( recalcPosition( cu.chromaFormat, cu.chType, CHANNEL_TYPE_LUMA, cu.blocks[cu.chType].pos() ), recalcSize( cu.chromaFormat, cu.chType, CHANNEL_TYPE_LUMA, cu.blocks[cu.chType].size() ) );
@@ -425,6 +448,46 @@ void LoopFilter::xDeblockCU( CodingUnit& cu, const DeblockEdgeDir edgeDir )
   }
 
   const unsigned uiPelsInPart = pcv.minCUWidth;
+#if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+  auto storeBoundaryInfo = [this, cu, uiPelsInPart, edgeDir]( char bs, Position pos, ComponentID comp, PelUnitBuf& bsBuf) -> void
+  {
+    Size sz;
+    Position posPQ;
+
+    int edgeLongside = uiPelsInPart;
+    int edgeShortside = 2;
+
+    int scaleX = getComponentScaleX( comp, cu.chromaFormat );
+    int scaleY = getComponentScaleY( comp, cu.chromaFormat );
+
+    if(edgeDir == EDGE_HOR)
+    {
+      sz.width = edgeLongside;
+      sz.height= edgeShortside << scaleY;
+      posPQ = Position( pos.x, pos.y - ( 1 << scaleY) );
+    }
+    else
+    {
+      sz.height= edgeLongside;
+      sz.width = edgeShortside << scaleX;
+      posPQ = Position( pos.x - ( 1 << scaleX) , pos.y);
+    }
+
+    auto bsComp = BsGet(bs, comp);
+    Pel toFill = bsComp > 0 ? 1 : 0;
+
+    int bsStride = bsBuf.get(comp).stride;
+    Pel* bsPtr = bsBuf.get(comp).buf + (posPQ.y >> scaleY) * bsStride + (posPQ.x >> scaleX);
+    for(int y = 0; y < sz.height >> scaleY; y++)
+    {
+      for(int x = 0; x < sz.width >> scaleX; x++)
+      {
+        bsPtr[x] = std::max( bsPtr[x], toFill );
+      }
+      bsPtr += bsStride;
+    }
+  };
+#endif
 
   for( int y = 0; y < area.height; y += uiPelsInPart )
   {
@@ -442,6 +505,12 @@ void LoopFilter::xDeblockCU( CodingUnit& cu, const DeblockEdgeDir edgeDir )
 #endif
         {
           bS |= xGetBoundaryStrengthSingle( cu, edgeDir, localPos, CHANNEL_TYPE_LUMA );
+#if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+          if( cu.blocks[COMPONENT_Y].valid() && storeInfo )
+          {
+            storeBoundaryInfo(bS, Position(area.x + x, area.y + y), COMPONENT_Y, alfCodingInfo);
+          }
+#endif
         }
 #if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
         if(cu.treeType != TREE_L && cu.chromaFormat != CHROMA_400 && cu.blocks[COMPONENT_Cb].valid())

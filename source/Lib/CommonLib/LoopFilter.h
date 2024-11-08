@@ -129,7 +129,11 @@ public:
   ~LoopFilter();
 
   /// CU-level deblocking function
+#if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+  void xDeblockCU(CodingUnit& cu, const DeblockEdgeDir edgeDir, bool storeInfo, PelUnitBuf& alfCodingInfo);
+#else
   void xDeblockCU(CodingUnit& cu, const DeblockEdgeDir edgeDir);
+#endif
   void  initEncPicYuvBuffer(ChromaFormat chromaFormat, const Size &size, const unsigned maxCUSize);
   PelStorage& getDbEncPicYuvBuffer() { return m_encPicYuvBuffer; }
   void  setEnc(bool b) { m_enc = b; }
@@ -139,6 +143,9 @@ public:
 
   /// picture-level deblocking filter
   void loopFilterPic              ( CodingStructure& cs
+#if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+  , PelUnitBuf& alfCodingInfo, bool storeInfo
+#endif
                                     );
 
   static int getBeta              ( const int qp )

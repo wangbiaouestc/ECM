@@ -815,6 +815,9 @@ void DecLib::executeLoopFilters()
     m_cALF.copyResiData(cs);
   }
 #endif
+#if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+  m_cALF.callCodingInfoBuf( cs ).fill( 0 );
+#endif
 
   // deblocking filter
 #if DB_PARAM_TID
@@ -842,8 +845,12 @@ void DecLib::executeLoopFilters()
   }  
 #endif
 
-
+#if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+  PelUnitBuf codingInfoBuf = m_cALF.callCodingInfoBuf( cs );
+  m_cLoopFilter.loopFilterPic( cs, codingInfoBuf, true );
+#else
   m_cLoopFilter.loopFilterPic( cs );
+#endif
 
 #if !MULTI_PASS_DMVR
   CS::setRefinedMotionField(cs);

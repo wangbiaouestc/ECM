@@ -417,7 +417,11 @@ static const int MAX_CCSAO_BAND_NUM_U_BAND_BITS = 4;
 #endif
 
 static const int MAX_NUM_ALF_ALTERNATIVES_CHROMA =                  8;
+#if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+static const int MAX_NUM_ALF_CLASSES         =                     24;
+#else
 static const int MAX_NUM_ALF_CLASSES         =                     25;
+#endif
 #if ALF_IMPROVEMENT
 static const int MAX_NUM_ALF_ALTERNATIVES_LUMA = 4;
 static const int EXT_LENGTH = 2;
@@ -544,8 +548,13 @@ static const int ALF_RESI_SHIFT_OFFSET       =                      4;
 static const int NUM_RESI_ABS_PAD            =                      8;
 static const int ALF_PADDING_SIZE_PRED       =                      3;
 static const int ALF_NUM_CLASSIFIER          =                      3;
+#if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+static const int ALF_CLASSES_RESI            =                     24;
+static const int ALF_CLASSES_NEW             =                     24;
+#else
 static const int ALF_CLASSES_RESI            =                     25;
 static const int ALF_CLASSES_NEW             =                     25;
+#endif
 static const int ALF_NUM_CLASSES_CLASSIFIER[ALF_NUM_CLASSIFIER] = { MAX_NUM_ALF_CLASSES, ALF_CLASSES_NEW, ALF_CLASSES_RESI };
 #else
 static const int ALF_NUM_CLASSIFIER          =                      2;

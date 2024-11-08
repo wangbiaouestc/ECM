@@ -2218,6 +2218,9 @@ void EncLib::xInitSPS( SPS& sps )
 #if JVET_AH0057_CCALF_COEFF_PRECISION
   sps.setCCALFPrecisionFlag( m_ccalfPrecision );
 #endif
+#if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+  sps.setAlfLumaFixedFilterAdjust( m_intraPeriod < 0 ? false : true );
+#endif
   sps.setJointCbCrEnabledFlag( m_JointCbCrMode );
   sps.setMaxTLayers( m_maxTempLayer );
   sps.setTemporalIdNestingFlag( ( m_maxTempLayer == 1 ) ? true : false );

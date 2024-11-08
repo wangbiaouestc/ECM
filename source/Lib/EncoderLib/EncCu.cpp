@@ -23000,13 +23000,23 @@ void EncCu::xCalDebCost( CodingStructure &cs, Partitioner &partitioner, bool cal
     if ( leftEdgeAvai )
     {
       m_pcLoopFilter->resetFilterLengths();
+#if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+      //No Impact on OBMC Buffer
+      m_pcLoopFilter->xDeblockCU( *cu, EDGE_VER, false, m_tempWoOBMCBuffer );
+#else
       m_pcLoopFilter->xDeblockCU( *cu, EDGE_VER );
+#endif
     }
 
     if (topEdgeAvai)
     {
       m_pcLoopFilter->resetFilterLengths();
+#if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+      //No Impact on OBMC Buffer
+      m_pcLoopFilter->xDeblockCU( *cu, EDGE_HOR, false, m_tempWoOBMCBuffer );
+#else
       m_pcLoopFilter->xDeblockCU( *cu, EDGE_HOR );
+#endif
     }
 
     //update current CU SSE

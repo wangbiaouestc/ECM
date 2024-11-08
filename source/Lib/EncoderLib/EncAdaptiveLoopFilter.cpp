@@ -1421,6 +1421,9 @@ void EncAdaptiveLoopFilter::ALFProcess( CodingStructure& cs, const double *lambd
 #endif
   const CPelBuf &resiLuma = resiYuv.get(COMPONENT_Y);
 #endif
+#if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+  PelUnitBuf recYuvCodingInfo = m_tempBufCodingInfo.getBuf( cs.area );
+#endif
 #if JVET_AI0166_CCALF_CHROMA_SAO_INPUT
   m_tempBufSAO.copyFrom(cs.getRecoBuf());
   PelUnitBuf recYuvSAO = m_tempBufSAO.getBuf(cs.area);
@@ -1483,7 +1486,23 @@ void EncAdaptiveLoopFilter::ALFProcess( CodingStructure& cs, const double *lambd
             buf.extendBorderPel( MAX_ALF_PADDING_SIZE );
 #endif
             buf = buf.subBuf( UnitArea( cs.area.chromaFormat, Area( clipL ? 0 : MAX_ALF_PADDING_SIZE, clipT ? 0 : MAX_ALF_PADDING_SIZE, w, h ) ) );
+#if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+            PelUnitBuf bufCodingInfo = m_tempBufCodingInfo2.subBuf( UnitArea( CHROMA_400, Area( 0, 0, wBuf, hBuf ) ) );
+            bufCodingInfo.copyFrom( recYuvCodingInfo.subBuf( UnitArea( CHROMA_400, Area( xStart - ( clipL ? 0 : MAX_ALF_PADDING_SIZE ), yStart - ( clipT ? 0 : MAX_ALF_PADDING_SIZE ), wBuf, hBuf ) ) ) );
+            // pad top-left unavailable samples for raster slice
+            if( xStart == xPos && yStart == yPos && ( rasterSliceAlfPad & 1 ) )
+            {
+              bufCodingInfo.padBorderPel( MAX_ALF_PADDING_SIZE, 1 );
+            }
 
+            // pad bottom-right unavailable samples for raster slice
+            if( xEnd == xPos + width && yEnd == yPos + height && ( rasterSliceAlfPad & 2 ) )
+            {
+              bufCodingInfo.padBorderPel( MAX_ALF_PADDING_SIZE, 2 );
+            }
+            mirroredPaddingForAlf(cs, bufCodingInfo, MAX_ALF_PADDING_SIZE, true, false);
+            bufCodingInfo = bufCodingInfo.subBuf( UnitArea( CHROMA_400, Area( clipL ? 0 : MAX_ALF_PADDING_SIZE, clipT ? 0 : MAX_ALF_PADDING_SIZE, w, h ) ) );
+#endif
 #if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
             PelUnitBuf bufResi = m_tempBufResi2.subBuf(UnitArea(cs.area.chromaFormat, Area(0, 0, wBuf, hBuf)));
             bufResi.copyFrom(resiYuv.subBuf(
@@ -1543,6 +1562,9 @@ void EncAdaptiveLoopFilter::ALFProcess( CodingStructure& cs, const double *lambd
             const Area blkDstChroma( xStart >> scaleX, yStart >> scaleY, w >> scaleX, h >> scaleY );
             deriveFixedFilterChroma( m_classifier, buf, bufDb, blkDstChroma, blkSrcChroma, cs, -1, MAX_NUM_COMPONENT );
 #endif
+#if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+            calcAlfLumaCodingInfoBlk(cs, m_classifierCodingInfo[0], blkDst, blkSrc, buf.get(COMPONENT_Y), 2, 2, m_inputBitDepth[CHANNEL_TYPE_LUMA], bufResi.get(COMPONENT_Y), m_laplacian[0], bufCodingInfo.get(COMPONENT_Y) );
+#endif
 #if JVET_X0071_ALF_BAND_CLASSIFIER
             deriveClassification( m_classifier, buf.get( COMPONENT_Y ),
 #if JVET_AC0162_ALF_RESIDUAL_SAMPLES_INPUT
@@ -1576,6 +1598,9 @@ void EncAdaptiveLoopFilter::ALFProcess( CodingStructure& cs, const double *lambd
         int scaleY = getChannelTypeScaleY(CHANNEL_TYPE_CHROMA, m_chromaFormat);
         Area blkChroma(xPos >> scaleX, yPos >> scaleY, width >> scaleX, height >> scaleY);
         deriveFixedFilterChroma( m_classifier, recYuv, recYuvBeforeDb, blkChroma, blkChroma, cs, -1, MAX_NUM_COMPONENT );
+#endif
+#if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+        calcAlfLumaCodingInfoBlk(cs, m_classifierCodingInfo[0], blk, blk, recYuv.get(COMPONENT_Y), 2, 2, m_inputBitDepth[CHANNEL_TYPE_LUMA], resiYuv.get(COMPONENT_Y), m_laplacian[0], recYuvCodingInfo.get(COMPONENT_Y) );
 #endif
 #if JVET_X0071_ALF_BAND_CLASSIFIER
         deriveClassification( m_classifier, recLuma,
