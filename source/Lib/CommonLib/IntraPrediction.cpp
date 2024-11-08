@@ -1544,10 +1544,18 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
         srcBuf, piPred, channelType, clpRng, bExtIntraDir, srcBuf2nd, pu.cu->ispMode != NOT_INTRA_SUBPARTITIONS, weightMode);
         break;
 #else
-    default:          xPredIntraAng(srcBuf, piPred, channelType, clpRng, bExtIntraDir); break;
+    default:          xPredIntraAng(
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+      pu,
+#endif
+      srcBuf, piPred, channelType, clpRng, bExtIntraDir); break;
 #endif
 #else
-    default:          xPredIntraAng(srcBuf, piPred, channelType, clpRng); break;
+    default:          xPredIntraAng(
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+      pu,
+#endif
+      srcBuf, piPred, channelType, clpRng); break;
 #endif
     }
 #if CIIP_PDPC
@@ -3924,24 +3932,24 @@ void IntraPrediction::xPredIntraAng(
       else
       {
         //std::cout << " fracPel: " << fracpel << std::endl;
-        int left_minus1 = refSide[Clip3(0, sizeSide + 2 + multiRefIdx, intpel - 1)];
+        int leftMinus1 = refSide[Clip3(0, sizeSide + 2 + multiRefIdx, intpel - 1)];
         int left = refSide[Clip3(0, sizeSide + 2 + multiRefIdx, intpel)];
         int right = refSide[Clip3(0, sizeSide + 2 + multiRefIdx, intpel + 1)];
-        int right_plus1 = refSide[Clip3(0, sizeSide + 2 + multiRefIdx, intpel + 2)];
+        int rightPlus1 = refSide[Clip3(0, sizeSide + 2 + multiRefIdx, intpel + 2)];
 
         const TFilterCoeff* f = InterpolationFilter::getWeak4TapFilterTable(fracpel);
-        int val = ((int)f[0] * left_minus1 + (int)f[1] * left + (int)f[2] * right + f[3] * (int)right_plus1 + 32) >> 6;
+        int val = ((int)f[0] * leftMinus1 + (int)f[1] * left + (int)f[2] * right + f[3] * (int)rightPlus1 + 32) >> 6;
         refMain[k] = (Pel)ClipPel(val, clpRng);
       }
 #else
       //std::cout << " fracPel: " << fracpel << std::endl;
-      int left_minus1 = refSide[Clip3(0, sizeSide + 2 + multiRefIdx, intpel - 1)];
+      int leftMinus1 = refSide[Clip3(0, sizeSide + 2 + multiRefIdx, intpel - 1)];
       int left        = refSide[Clip3(0, sizeSide + 2 + multiRefIdx, intpel)];
       int right       = refSide[Clip3(0, sizeSide + 2 + multiRefIdx, intpel + 1)];
-      int right_plus1 = refSide[Clip3(0, sizeSide + 2 + multiRefIdx, intpel + 2)];
+      int rightPlus1 = refSide[Clip3(0, sizeSide + 2 + multiRefIdx, intpel + 2)];
 
       const TFilterCoeff* f = InterpolationFilter::getWeak4TapFilterTable(fracpel);
-      int val = ((int)f[0] * left_minus1 + (int)f[1] * left + (int)f[2] * right + f[3] * (int)right_plus1 + 32) >> 6;
+      int val = ((int)f[0] * leftMinus1 + (int)f[1] * left + (int)f[2] * right + f[3] * (int)rightPlus1 + 32) >> 6;
       refMain[k] = (Pel)ClipPel(val, clpRng);
 #endif
     }
