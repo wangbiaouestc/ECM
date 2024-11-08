@@ -6189,4 +6189,97 @@ uint32_t g_picAmvpSbTmvpEnabledArea = 0;
 #if JVET_AG0276_LIC_SLOPE_ADJUST
 const int g_licSlopeDeltaSet[LIC_SLOPE_MAX_NUM_DELTA + 1] = {0, 1, -1};
 #endif
+
+#if JVET_AJ0061_TIMD_MERGE
+uint64_t g_timdMrgCost[EXT_VDIA_IDX + 1];
+static constexpr std::array<std::array<PosType, TIMD_MERGE_MAX_NONADJACENT>, MAX_CU_DEPTH - MIN_CU_LOG2 + 1> timdMergeOffsetXTable()
+{
+  std::array<std::array<PosType, TIMD_MERGE_MAX_NONADJACENT>, MAX_CU_DEPTH - MIN_CU_LOG2 + 1> tab {{{0}}};
+  for (size_t widthLog2MinusMinCU = 0; widthLog2MinusMinCU < MAX_CU_DEPTH - MIN_CU_LOG2 + 1; widthLog2MinusMinCU++)
+  {
+    size_t i = 0;
+    const PosType width = 1 << (widthLog2MinusMinCU + MIN_CU_LOG2);
+    int       offsetX           = 0;
+    int offsetX2 = width >> 1;
+    const int numNACandidate[7] = { 11, 13, 10, 2, 2, 2, 2 };
+    const int idxMap[7][15] = { {0, 1, 2, 3, 4, 7, 8, 9, 10, 11, 12}, {0, 1, 2, 3, 4, 7, 8, 9, 10, 11, 12, 13, 14}, {0, 1, 3, 4, 5, 6, 7, 8, 11, 12}, {0, 1}, {0, 1}, {0, 1}, {0, 1} };
+    for (int iDistanceIndex = 0; iDistanceIndex < 7 ; iDistanceIndex++)
+    {
+      const int iNADistanceHor = width  * (iDistanceIndex + 1);
+      const int offsetX0 = -iNADistanceHor - 1;
+      const int offsetX1 = width + iNADistanceHor - 1;
+      for (int iNASPIdx = 0; iNASPIdx < numNACandidate[iDistanceIndex]; iNASPIdx++)
+      {
+        switch (idxMap[iDistanceIndex][iNASPIdx])
+        {                                                                             // Angle CCW from (1,0), approx.
+          case 0:  offsetX = offsetX2;                                        break;  //  90°
+          case 1:  offsetX = offsetX0;                                        break;  // 180°
+          case 2:  offsetX = offsetX0;                                        break;  // 135°
+          case 3:  offsetX = offsetX0;                                        break;  // 157.5°
+          case 4:  offsetX = (offsetX0 + offsetX2) >> 1;                      break;  // 112.5°
+          case 5:  offsetX = offsetX0;                                        break;  // 146.25°
+          case 6:  offsetX = ((offsetX2 + (offsetX0 + offsetX2)) >> 1) >> 1;  break;  // 123.75°
+          case 7:  offsetX = offsetX1;                                        break;  //   0°
+          case 8:  offsetX = -1;                                              break;  // 270°
+          case 9:  offsetX = offsetX1;                                        break;  //  45°
+          case 10: offsetX = offsetX0;                                        break;  // 215°
+          case 11: offsetX = (offsetX2 + offsetX1) >> 1;                      break;  //  67.5°
+          case 12: offsetX = offsetX0;                                        break;  // 197.5°
+          case 13: offsetX = offsetX1;                                        break;  //  22.5°
+          case 14: offsetX = (offsetX0 + offsetX2) >> 1;                      break;  // 242.5°
+          default: printf("error!"); exit(0);                                 break;
+        }
+        tab[widthLog2MinusMinCU][i++] = offsetX;
+      }
+    }
+  }
+  return tab;
+}
+const std::array<std::array<PosType, TIMD_MERGE_MAX_NONADJACENT>, MAX_CU_DEPTH - MIN_CU_LOG2 + 1> g_timdMergeOffsetXTable = timdMergeOffsetXTable();
+
+static constexpr std::array<std::array<PosType, TIMD_MERGE_MAX_NONADJACENT>, MAX_CU_DEPTH - MIN_CU_LOG2 + 1> timdMergeOffsetYTable()
+{
+  std::array<std::array<PosType, TIMD_MERGE_MAX_NONADJACENT>, MAX_CU_DEPTH - MIN_CU_LOG2 + 1> tab {{{0}}};
+  for (size_t heightLog2MinusMinCU = 0; heightLog2MinusMinCU < MAX_CU_DEPTH - MIN_CU_LOG2 + 1; heightLog2MinusMinCU++)
+  {
+    size_t i = 0;
+    const PosType height = 1 << (heightLog2MinusMinCU + MIN_CU_LOG2);
+    int       offsetY           = 0;
+    int offsetY2 = height >> 1;
+    const int numNACandidate[7] = { 11, 13, 10, 2, 2, 2, 2 };
+    const int idxMap[7][15] = { {0, 1, 2, 3, 4, 7, 8, 9, 10, 11, 12}, {0, 1, 2, 3, 4, 7, 8, 9, 10, 11, 12, 13, 14}, {0, 1, 3, 4, 5, 6, 7, 8, 11, 12}, {0, 1}, {0, 1}, {0, 1}, {0, 1} };
+    for (int iDistanceIndex = 0; iDistanceIndex < 7 ; iDistanceIndex++)
+    {
+      const int iNADistanceVer = height * (iDistanceIndex + 1);
+      const int offsetY0 = height + iNADistanceVer - 1;
+      const int offsetY1 = -iNADistanceVer - 1;
+      for (int iNASPIdx = 0; iNASPIdx < numNACandidate[iDistanceIndex]; iNASPIdx++)
+      {
+        switch (idxMap[iDistanceIndex][iNASPIdx])
+        {                                                                             // Angle CCW from (1,0), approx.
+          case 0:  offsetY = offsetY1;                                        break;  // 90°
+          case 1:  offsetY = offsetY2;                                        break;  // 180°
+          case 2:  offsetY = offsetY1;                                        break;  // 135°
+          case 3:  offsetY = (offsetY1 + offsetY2) >> 1;                      break;  // 157.5°
+          case 4:  offsetY = offsetY1;                                        break;  // 112.5°
+          case 5:  offsetY = ((offsetY2 + (offsetY1 + offsetY2)) >> 1) >> 1;  break;  // 146.25°
+          case 6:  offsetY = offsetY1;                                        break;  // 123.75°
+          case 7:  offsetY = -1;                                              break;  //   0°
+          case 8:  offsetY = offsetY0;                                        break;  // 270°
+          case 9:  offsetY = offsetY1;                                        break;  //  45°
+          case 10: offsetY = offsetY0;                                        break;  // 215°
+          case 11: offsetY = offsetY1;                                        break;  //  67.5°
+          case 12: offsetY = (offsetY2 + offsetY0) >> 1;                      break;  // 197.5°
+          case 13: offsetY = (offsetY1 + offsetY2) >> 1;                      break;  //  22.5°
+          case 14: offsetY = offsetY0;                                        break;  // 242.5°
+          default: printf("error!"); exit(0);                                 break;
+        }
+        tab[heightLog2MinusMinCU][i++] = offsetY;
+      }
+    }
+  }
+  return tab;
+}
+const std::array<std::array<PosType, TIMD_MERGE_MAX_NONADJACENT>, MAX_CU_DEPTH - MIN_CU_LOG2 + 1> g_timdMergeOffsetYTable = timdMergeOffsetYTable();
+#endif
 //! \}

@@ -5607,6 +5607,161 @@ uint32_t PU::getCoLocatedIntraLumaMode(const PredictionUnit &pu)
 }
 #endif
 
+#if JVET_AJ0061_TIMD_MERGE
+int PU::canTimdMergeImplicitDst7(const TransformUnit &tu)
+{
+  if(!CS::isDualITree(*tu.cs))
+  {
+    return 0;
+  }
+  const int minTuSizeDst7 = 4;
+  const int maxTuSizeDst7 = 16;
+  const int compID = COMPONENT_Y;
+  int  width = tu.blocks[compID].width;
+  int  height = tu.blocks[compID].height;
+  bool widthDstOk = width >= minTuSizeDst7 && width <= maxTuSizeDst7;
+  bool heightDstOk = height >= minTuSizeDst7 && height <= maxTuSizeDst7;
+  /*
+  * 0: no
+  * 1: only ver
+  * 2: only hor
+  * 3: both hor and ver
+  */
+  return (2 * widthDstOk + heightDstOk);
+}
+
+bool PU::canTimdMerge(const PredictionUnit &pu)
+{
+  if (!pu.cu->cs->sps->getUseTimdMrg())
+  {
+    return false;
+  }
+  if (pu.cu->predMode != MODE_INTRA)
+  {
+    return false;
+  }
+  if (!isLuma(pu.chType))
+  {
+    return false;
+  }
+  if (!pu.cu->slice->getSPS()->getUseTimd())
+  {
+    return false;
+  }
+  if (!pu.Y().valid())
+  {
+    return false;
+  }
+  if (pu.Y().area() <= 16)
+  {
+    return false;
+  }
+  if (pu.Y().area() > 1024 && pu.cu->slice->getSliceType() == I_SLICE)
+  {
+    return false;
+  }
+  if (!PU::hasTimdMergeCandidate(pu))
+  {
+    return false;
+  }
+  return true;
+}
+
+static inline const CodingUnit* getTimdMergeNeighbour(const PredictionUnit &pu, size_t idx)
+{
+  static_assert(g_timdMergeOffsetXTable.size() == g_timdMergeOffsetYTable.size());
+  CHECK(!(idx < TIMD_MERGE_MAX_NONADJACENT), "Invalid TIMD-Merge non-adjacent neighbour index");
+  const int widthLog2MinusMinCU = floorLog2(pu.cu->lwidth()) - MIN_CU_LOG2;
+  const int heightLog2MinusMinCU = floorLog2(pu.cu->lheight()) - MIN_CU_LOG2;
+  const int dx = g_timdMergeOffsetXTable[widthLog2MinusMinCU][idx];
+  const int dy = g_timdMergeOffsetYTable[heightLog2MinusMinCU][idx];
+  return pu.cu->cs->getCURestricted(pu.cu->lumaPos().offset(dx, dy), *pu.cu, CH_L);
+}
+
+std::array<const CodingUnit *, TIMD_MERGE_MAX_NONADJACENT> PU::timdMergeNonAdjacentNeighbours(const PredictionUnit &pu)
+{
+  std::array<const CodingUnit *, TIMD_MERGE_MAX_NONADJACENT> neighbours;
+  for (size_t i = 0; i < neighbours.size(); i++)
+  {
+    neighbours[i] = getTimdMergeNeighbour(pu, i);
+  }
+  return neighbours;
+}
+
+// Returns true if at least one of the CUs from the TIMD-merge
+// neighbour map is a suitable candidate for TIMD-merge, false otherwise.
+bool PU::hasTimdMergeCandidate(const PredictionUnit &pu)
+{
+  if (pu.cu->cs->pcv->isEncoder && pu.cu->timdMrgCand >= 0)
+  {
+    return pu.cu->timdMrgCand > 0;
+  }
+  else
+  {
+    int step = 4;
+    const CodingUnit *cuLeft = NULL;
+    const CodingUnit *cuTop = NULL;
+    for (int i = 0; i <= pu.cu->lheight(); i += step)
+    {
+      cuLeft = pu.cu->cs->getCURestricted(pu.cu->lumaPos().offset(-1, i), *pu.cu, CH_L);
+      if (cuLeft && CU::isIntra(*cuLeft) && cuLeft->timd)
+      {
+        return true;
+      }
+    }
+
+    for (int i = 0; i <= pu.cu->lwidth(); i += step)
+    {
+      cuTop = pu.cu->cs->getCURestricted(pu.cu->lumaPos().offset(i, -1), *pu.cu, CH_L);
+      if (cuTop && CU::isIntra(*cuTop) && cuTop->timd)
+      {
+        return true;
+      }
+    }
+
+    const CodingUnit* cuNeighbour = pu.cu->cs->getCURestricted(pu.cu->lumaPos().offset(-1, -1), *pu.cu, CH_L);
+    if (cuNeighbour && CU::isIntra(*cuNeighbour) && cuNeighbour->timd)
+    {
+      return true;
+    }
+
+    const CodingUnit *cuLeft2 = cuLeft ? pu.cu->cs->getCURestricted(cuLeft->lumaPos().offset(cuLeft->lwidth() - 1, cuLeft->lheight()), *pu.cu, CH_L) : NULL;
+    const CodingUnit *cuTop2 = cuTop ? pu.cu->cs->getCURestricted(cuTop->lumaPos().offset(cuTop->lwidth(), cuTop->lheight() - 1), *pu.cu, CH_L) : NULL;
+    cuNeighbour = cuLeft2;
+    if (cuNeighbour && CU::isIntra(*cuNeighbour) && cuNeighbour->timd)
+    {
+      return true;
+    }
+    cuNeighbour = cuTop2;
+    if (cuNeighbour && CU::isIntra(*cuNeighbour) && cuNeighbour->timd)
+    {
+      return true;
+    }
+      
+    cuNeighbour = cuLeft2 ? pu.cu->cs->getCURestricted(cuLeft2->lumaPos().offset(cuLeft2->lwidth() - 1, cuLeft2->lheight()), *pu.cu, CH_L) : NULL;
+    if (cuNeighbour && CU::isIntra(*cuNeighbour) && cuNeighbour->timd)
+    {
+      return true;
+    }
+    cuNeighbour = cuTop2 ? pu.cu->cs->getCURestricted(cuTop2->lumaPos().offset(cuTop2->lwidth(), cuTop2->lheight() - 1), *pu.cu, CH_L) : NULL;
+    if (cuNeighbour && CU::isIntra(*cuNeighbour) && cuNeighbour->timd)
+    {
+      return true;
+    }
+
+    for (const CodingUnit *nonAdjacentNeighbour : PU::timdMergeNonAdjacentNeighbours(pu))
+    {
+      if (nonAdjacentNeighbour && CU::isIntra(*nonAdjacentNeighbour) && nonAdjacentNeighbour->timd)
+      {
+        return true;
+      }
+    }
+
+    return false;
+  }
+}
+#endif
+
 #if JVET_AC0071_DBV
 #if JVET_AH0136_CHROMA_REORDERING
 bool PU::isDbvMode(int mode)
@@ -31323,6 +31478,9 @@ bool CU::isMTSAllowed(const CodingUnit &cu, const ComponentID compID)
 #if JVET_W0123_TIMD_FUSION
   mtsAllowed &= !(cu.timd && cu.firstPU->multiRefIdx);
 #endif
+#if JVET_AJ0061_TIMD_MERGE
+  mtsAllowed &= !cu.timdMrg; // Timd-Mrg CUs inherit transform type from their cands
+#endif
   mtsAllowed &= !(cu.bdpcmMode && cuWidth <= tsMaxSize && cuHeight <= tsMaxSize);
 
   return mtsAllowed;
@@ -31723,7 +31881,9 @@ bool TU::isTSAllowed(const TransformUnit &tu, const ComponentID compID)
   tsAllowed &= !(tu.cu->bdpcmModeChroma && isChroma(compID));
   tsAllowed &= tu.blocks[compID].width <= transformSkipMaxSize && tu.blocks[compID].height <= transformSkipMaxSize;
   tsAllowed &= !tu.cu->sbtInfo;
-
+#if JVET_AJ0061_TIMD_MERGE
+  tsAllowed &= !tu.cu->timdMrg;
+#endif
   return tsAllowed;
 }
 

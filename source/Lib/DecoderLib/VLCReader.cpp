@@ -2768,6 +2768,16 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #endif
 #if JVET_W0123_TIMD_FUSION
   READ_FLAG(uiCode, "sps_timd_enabled_flag");                        pcSPS->setUseTimd( uiCode != 0 );
+#if JVET_AJ0061_TIMD_MERGE
+  if (pcSPS->getUseTimd())
+  {
+    READ_FLAG(uiCode, "sps_timd_merge_enabled_flag");                pcSPS->setUseTimdMrg( uiCode != 0 );
+  }
+  else
+  {
+    pcSPS->setUseTimdMrg( false );
+  }
+#endif
 #endif
 #if JVET_X0141_CIIP_TIMD_TM && JVET_W0123_TIMD_FUSION
   if (pcSPS->getUseCiip() && pcSPS->getUseTimd())

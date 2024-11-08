@@ -943,6 +943,13 @@ void EncApp::xInitLibCfg()
 #endif
 #if JVET_W0123_TIMD_FUSION
   m_cEncLib.setUseTimd                                           ( m_timd );
+#if JVET_AJ0061_TIMD_MERGE
+  m_cEncLib.setUseTimdMrg                                        ( m_timdMrg );
+  if (!m_timd)
+  {
+    m_cEncLib.setUseTimdMrg                                        ( false );
+  }
+#endif
 #endif
 #if JVET_AB0155_SGPM
   m_cEncLib.setUseSgpm                                           ( m_sgpm );

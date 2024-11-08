@@ -1161,6 +1161,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #endif
 #if JVET_W0123_TIMD_FUSION
   ( "TIMD",                                           m_timd,                                            true,  "Enable template based intra mode derivation\n" )
+#if JVET_AJ0061_TIMD_MERGE
+  ( "TIMDM",                                          m_timdMrg,                                         true,  "Enable merge mode for TIMD\n" )
+#endif
 #endif
 #if JVET_AB0155_SGPM
   ( "SGPM",                                           m_sgpm,                                            true,  "Enable spatial geometric partitioning mode\n" )
@@ -2031,6 +2034,13 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
       m_MSBExtendedBitDepth[1] = m_inputBitDepth[1];
     }
 #endif
+  }
+#endif
+
+#if JVET_AJ0061_TIMD_MERGE
+  if (!m_timd)
+  {
+    m_timdMrg = false;
   }
 #endif
 
@@ -4113,6 +4123,13 @@ bool EncAppCfg::xCheckParameter()
       msg(WARNING, "TIMD is forcefully disabled since the enable flag of non-inter-TM tools is set off. \n");
       m_timd = false;
     }
+#if JVET_AJ0061_TIMD_MERGE
+    if (!m_timd)
+    {
+      msg(WARNING, "TIMDM is forcefully disabled since timd mode is set to off. \n");
+      m_timdMrg = false;
+    }
+#endif
 #endif
 #if JVET_AB0155_SGPM
     if (m_sgpm)
@@ -5913,6 +5930,9 @@ void EncAppCfg::xPrintParameter()
 #endif
 #if JVET_W0123_TIMD_FUSION
   msg(VERBOSE, "TIMD:%d ", m_timd);
+#if JVET_AJ0061_TIMD_MERGE
+  msg(VERBOSE, "TIMDM:%d ", m_timdMrg);
+#endif
 #endif
 #if JVET_AB0155_SGPM
   msg(VERBOSE, "SGPM:%d ", m_sgpm);
