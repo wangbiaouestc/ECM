@@ -833,6 +833,9 @@ void EncApp::xInitLibCfg()
 #if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
   m_cEncLib.setUseAltCost                                        ( m_useAltCost );
 #endif
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+  m_cEncLib.setUseExtAmvp                                        ( m_useExtAmvp );
+#endif
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
   m_cEncLib.setUseAffineTM                                       ( m_useAffineTM );
 #if JVET_AG0276_NLIC

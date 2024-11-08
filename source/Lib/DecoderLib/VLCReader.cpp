@@ -2625,7 +2625,9 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
 #if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
   READ_FLAG( uiCode, "sps_alt_cost_enabled_flag");                  pcSPS->setUseAltCost(uiCode != 0);
 #endif
-
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+  READ_FLAG( uiCode, "sps_ext_amvp_enabled_flag");                  pcSPS->setUseExtAmvp(uiCode != 0);
+#endif
   READ_FLAG( uiCode,    "sps_bcw_enabled_flag" );                   pcSPS->setUseBcw( uiCode != 0 );
   READ_FLAG( uiCode,     "sps_ciip_enabled_flag" );                           pcSPS->setUseCiip             ( uiCode != 0 );
 #if JVET_X0141_CIIP_TIMD_TM && TM_MRG
@@ -5425,7 +5427,6 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
       pcSlice->setCabacInitFlag( uiCode ? true : false );
       pcSlice->setEncCABACTableIdx( pcSlice->getSliceType() == B_SLICE ? ( uiCode ? P_SLICE : B_SLICE ) : ( uiCode ? B_SLICE : P_SLICE ) );
     }
-
     if ( picHeader->getEnableTMVPFlag() )
     {
       if( pcSlice->getSliceType() == P_SLICE )

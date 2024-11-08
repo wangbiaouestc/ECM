@@ -1719,6 +1719,13 @@ void EncSlice::compressSlice( Picture* pcPic, const bool bCompressEntireSlice, c
     pcSlice->setAmvpSbTmvpEnabledFlag(false);
   }
 #endif
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+  if (!pcSlice->isIntra())
+  {
+    int picH = pcSlice->getPic()->getPicHeightInLumaSamples();
+    pcSlice->setExtAmvpLevel(picH >= 2160 ? 3 : (picH >= 1080 ? 2 : (picH >= 720 ? 1 : 0)));
+  }
+#endif
 
   if ( bWp_explicit )
   {

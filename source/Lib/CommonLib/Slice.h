@@ -1805,6 +1805,9 @@ private:
 #if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
   bool              m_useAltCost;
 #endif
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+  bool              m_useExtAmvp;
+#endif
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
   bool              m_useAffineTM;
 #if JVET_AG0276_NLIC
@@ -2692,6 +2695,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION 
   void      setUseFastSubTmvp     ( bool b )                                        { m_fastSubTmvp = b; }
   bool      getUseFastSubTmvp     ()                                      const     { return m_fastSubTmvp; }
+#endif
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+  void      setUseExtAmvp         ( bool b )                                        { m_useExtAmvp = b; }
+  bool      getUseExtAmvp          ()                                      const     { return m_useExtAmvp; }
 #endif
 #if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
   void      setUseAltCost         ( bool b )                                        { m_useAltCost = b; }
@@ -3753,6 +3760,9 @@ private:
   bool                       m_amvpSbTmvpAmvrEnabledFlag;
   bool                       m_amvpSbTmvpEnabledFlag;
 #endif
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+  int                        m_extAmvpLevel;
+#endif
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
   uint32_t                   m_costForARMC;
 #endif
@@ -3796,7 +3806,6 @@ private:
   uint32_t                   m_numSubstream;
 
   bool                       m_cabacInitFlag;
-
 #if JVET_AG0196_CABAC_RETRAIN
   SliceType                  m_cabacInitSliceType;
 #endif
@@ -4015,6 +4024,9 @@ public:
   bool                        getAmvpSbTmvpAmvrEnabledFlag() const                   { return m_amvpSbTmvpAmvrEnabledFlag;                               }
   bool                        getAmvpSbTmvpEnabledFlag() const                       { return m_amvpSbTmvpEnabledFlag;                                   }
 #endif
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+  int                         getExtAmvpLevel() const                                 { return m_extAmvpLevel;                                   }
+#endif
   void                        checkColRefIdx(uint32_t curSliceSegmentIdx, const Picture* pic);
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
   uint32_t                    getCostForARMC() const                                 { return m_costForARMC;                                         }
@@ -4213,6 +4225,9 @@ public:
   void                        setAmvpSbTmvpNumColPic(uint8_t numPic)                 { m_amvpSbTmvpNumColPic = numPic;                                   }
   void                        setAmvpSbTmvpAmvrEnabledFlag(bool b)                   { m_amvpSbTmvpAmvrEnabledFlag = b;                                  }
 #endif
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+  void                        setExtAmvpLevel(int b)                            { m_extAmvpLevel = b;                                    }
+#endif
 #if JVET_AA0093_DIVERSITY_CRITERION_FOR_ARMC
   void                        setCostForARMC(uint32_t cost)                          { m_costForARMC = cost;                                         }
 #endif
@@ -4349,7 +4364,6 @@ public:
 
   void                        setCabacInitFlag( bool val )                           { m_cabacInitFlag = val;                                        } //!< set CABAC initial flag
   bool                        getCabacInitFlag()                               const { return m_cabacInitFlag;                                       } //!< get CABAC initial flag
-
 #if JVET_AG0196_CABAC_RETRAIN
   void                        setCabacInitSliceType( SliceType val )                 { m_cabacInitSliceType = val; }
   SliceType                   getCabacInitSliceType()                          const { return m_cabacInitSliceType; }

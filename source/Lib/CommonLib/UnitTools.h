@@ -490,7 +490,11 @@ namespace PU
 #else
   void fillIBCMvpCand                 (PredictionUnit &pu, AMVPInfo &amvpInfo);
 #endif
-  void fillAffineMvpCand              (      PredictionUnit &pu, const RefPicList &eRefPicList, const int &refIdx, AffineAMVPInfo &affiAMVPInfo);
+  void fillAffineMvpCand              (      PredictionUnit &pu, const RefPicList &eRefPicList, const int &refIdx, AffineAMVPInfo &affiAMVPInfo
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+    , InterPrediction* interPred = nullptr
+#endif
+  );
   bool addMVPCandUnscaled             (const PredictionUnit &pu, const RefPicList &eRefPicList, const int &iRefIdx, const Position &pos, const MvpDir &eDir, AMVPInfo &amvpInfo);
   void xInheritedAffineMv             ( const PredictionUnit &pu, const PredictionUnit* puNeighbour, RefPicList eRefPicList, Mv rcMv[3] );
 #if JVET_AA0107_RMVF_AFFINE_MERGE_DERIVATION
@@ -920,6 +924,11 @@ namespace PU
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
   bool checkAffineTMCondition(const PredictionUnit& pu);
 #endif
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+  int checkExtAffineAmvpCondition(const PredictionUnit& pu);
+  int checkExtRegularAmvpCondition(const PredictionUnit& pu);
+#endif
+
 #if INTER_LIC
   void spanLicFlags(PredictionUnit &pu, const bool LICFlag);
 #endif

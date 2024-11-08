@@ -1054,6 +1054,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
   ("AltCost",                                         m_useAltCost,                                      true, "Enable alternating cost function based on parity of merge index (0:off, 1:on)  [default: on]")
 #endif
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+  ("ExtAmvp",                                         m_useExtAmvp,                                      true, "Enable extended amvp candidates (0:off, 1:on)  [default: on]")
+#endif
 #if JVET_AF0163_TM_SUBBLOCK_REFINEMENT
   ("AffineTM",                                        m_useAffineTM,                                     true, "Enable TM-based subblock motion refinement (0:off, 1:on)  [default: on]")
 #if JVET_AG0276_NLIC

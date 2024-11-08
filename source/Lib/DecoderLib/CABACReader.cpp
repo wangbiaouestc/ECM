@@ -2184,7 +2184,6 @@ void CABACReader::cu_pred_data( CodingUnit &cu )
     return;
   }
   MergeCtx mrgCtx;
-
   for( auto &pu : CU::traversePUs( cu ) )
   {
 #if JVET_AD0140_MVD_PREDICTION

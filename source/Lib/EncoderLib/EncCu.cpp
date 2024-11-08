@@ -1329,6 +1329,9 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
 
 
   m_pcInterSearch->resetSavedAffineMotion();
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+  m_pcInterSearch->clearAffineAmvpBuffer();
+#endif
 #if TM_AMVP
   if (!slice.isIntra())
   {
@@ -1473,7 +1476,6 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
       }
 #endif
 #endif
-
       if( ( currTestMode.opts & ETO_IMV ) != 0 )
       {
         const bool skipAltHpelIF = ( int( ( currTestMode.opts & ETO_IMV ) >> ETO_IMV_SHIFT ) == 4 ) && ( bestIntPelCost > 1.25 * bestCS->cost );
@@ -21777,10 +21779,10 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
 #endif
   tempCS->initStructData( encTestMode.qp );
   m_pcInterSearch->setAffineModeSelected(false);
+
 #if JVET_AD0213_LIC_IMP
   m_pcInterSearch->setDoAffineLic(true);
 #endif
-
   m_pcInterSearch->resetBufferedUniMotions();
   int bcwLoopNum = (tempCS->slice->isInterB() ? BCW_NUM : 1);
   bcwLoopNum = (tempCS->sps->getUseBcw() ? bcwLoopNum : 1);
@@ -21949,6 +21951,7 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
 #else
   m_pcInterSearch->predInterSearch( cu, partitioner );
 #endif
+
 #if INTER_LIC
   if (cu.slice->getUseLIC() && lic) { m_pcInterSearch->swapUniMvBuffer(); }
 #endif
@@ -22449,10 +22452,10 @@ bool EncCu::xCheckRDCostInterIMV(CodingStructure *&tempCS, CodingStructure *&bes
 #else
   m_pcInterSearch->predInterSearch( cu, partitioner );
 #endif
+
 #if INTER_LIC
   if (cu.slice->getUseLIC() && lic) { m_pcInterSearch->swapUniMvBuffer(); }
 #endif
-
   if ( cu.firstPU->interDir <= 3 )
   {
     bcwIdx = CU::getValidBcwIdx(cu);

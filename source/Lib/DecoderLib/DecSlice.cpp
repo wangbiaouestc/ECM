@@ -520,6 +520,14 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
 #endif
 #endif
 
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+  if (!slice->isIntra())
+  {
+    int picH = slice->getPic()->getPicHeightInLumaSamples();
+    slice->setExtAmvpLevel(picH >= 2160 ? 3 : (picH >= 1080 ? 2 : (picH >= 720 ? 1 : 0)));
+  }
+#endif
+
   // for every CTU in the slice segment...
 
 #if JVET_Z0135_TEMP_CABAC_WIN_WEIGHT

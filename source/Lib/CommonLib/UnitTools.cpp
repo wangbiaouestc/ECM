@@ -9744,6 +9744,7 @@ void PU::getInterMergeCandidatesSubTMVP(const PredictionUnit &pu, MergeCtx& mrgC
 #endif
     );
   }
+
   mrgCtx.numValidMergeCand = cnt;
 
   return;
@@ -17908,6 +17909,124 @@ bool PU::checkAffineTMCondition(const PredictionUnit& pu)
   return (min > 1) || !pu.cu->slice->getCheckLDC();
 }
 #endif
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+int PU::checkExtAffineAmvpCondition(const PredictionUnit& pu)
+{
+  if(pu.cu->cs->sps->getUseExtAmvp() == false)
+  {
+    return 0x000;
+  }
+  
+  if(pu.cu->cs->sps->getTMToolsEnableFlag() == false)
+  {
+    return 0x001;
+  }
+
+  int clevel = pu.cu->slice->getExtAmvpLevel();
+  int wxh = pu.lheight() * pu.lwidth();
+  if(pu.cu->slice->getCheckLDB())
+  {
+    if(clevel < 2 && wxh <= 4*4)
+    {
+      return 0x000;
+    }
+    else if (!clevel && wxh > 64*64)
+    {
+      return 0x000;
+    }
+    else if (clevel >= 2 && wxh <= 8*8)
+    {
+      return 0x000;
+    }
+    else if (!clevel)
+    {
+      return 0x221;
+    }
+    else
+    {
+      return 0x111;
+    }
+  }
+  else
+  {
+    if (!clevel)
+    {
+      if(pu.cs->slice->getTLayer() > 4)
+      {
+        return 0x000;
+      }
+      else if (wxh <= 4*4 || wxh > 64*64 || pu.lheight() >= 5* pu.lwidth() || pu.lwidth() >= 5* pu.lheight())
+      {
+        return 0x000;
+      }
+      else
+      {
+        return 0x311;
+      }
+    }
+    else if (clevel <= 2 )
+    {
+      if (pu.lheight() >= 4* pu.lwidth() || pu.lwidth() >= 4* pu.lheight())
+      {
+        return 0x000;
+      }
+      else
+      {
+        return 0x211;
+      }
+    }
+    else
+    {
+      if(pu.cs->slice->getTLayer() > 3 || wxh <= 4*4)
+      {
+        return 0x000;
+      }
+      else
+      {
+        return 0x111;
+      }
+    }
+  }
+}
+int PU::checkExtRegularAmvpCondition(const PredictionUnit& pu)
+{
+  if(pu.cu->cs->sps->getUseExtAmvp() == false)
+  {
+    return 0x00;
+  }
+
+  int clevel = pu.cu->slice->getExtAmvpLevel();
+  int wxh = pu.lheight() * pu.lwidth();
+  if(pu.cu->slice->getCheckLDB())
+  {
+    return 0x00;
+  }
+  else if (clevel <= 2 && pu.cs->slice->getTLayer() > 4)
+  {
+    return 0x00;
+  }
+  else if (!clevel)
+  {
+    if (pu.lheight() * pu.lwidth() > 64*64 || pu.lheight() >= 5* pu.lwidth() || pu.lwidth() >= 5* pu.lheight())
+    {
+      return 0x00;
+    }
+    else
+    {
+      return 0x10;
+    }
+  }
+  else if (clevel > 2)
+  {
+    if(pu.cs->slice->getTLayer() > 4 || wxh <= 4*4 || wxh > 128*128)
+    {
+      return 0x00;
+    }
+  }
+  return 0x11;
+}
+#endif
+
 #if MULTI_PASS_DMVR
 #if JVET_AE0046_BI_GPM
 bool PU::checkBDMVRCondition(const PredictionUnit& pu, bool disregardGpmFlag)
@@ -19273,7 +19392,11 @@ inline void PU::getRribcBvpCand(PredictionUnit &pu, AMVPInfo *pInfo)
 inline void PU::clusterBvpCand(const int cbWidth, const int cbHeight, AMVPInfo *pInfo)
 {
   int                                                numGroups = 0;
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+  std::array<bool, (REGULAR_AMVP_MAX_NUM_CANDS_IBC + 1)> validCand;
+#else
   std::array<bool, (REGULAR_AMVP_MAX_NUM_CANDS + 1)> validCand;
+#endif
   validCand.fill(true);
   Mv         bestCand;
   Distortion bestCost;
@@ -19283,7 +19406,11 @@ inline void PU::clusterBvpCand(const int cbWidth, const int cbHeight, AMVPInfo *
   // Clustering of AMVP candidates into two groups
   if (pInfo->numCand > AMVP_MAX_NUM_CANDS)
   {
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+    int numCand = std::min((int) pInfo->numCand, REGULAR_AMVP_MAX_NUM_CANDS_IBC + 1);
+#else
     int numCand = std::min((int) pInfo->numCand, REGULAR_AMVP_MAX_NUM_CANDS + 1);
+#endif
     for (int i = 0; i < numCand; i++)
     {
       if (validCand[i])
@@ -19378,7 +19505,11 @@ void PU::fillIBCMvpCand(PredictionUnit &pu, AMVPInfo &amvpInfo)
                           AML_MERGE_TEMPLATE_SIZE, cbHeight);
 
       int candIdx = 0;
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+      while ((pInfo->numCand < (REGULAR_AMVP_MAX_NUM_CANDS_IBC + 1)) && (candIdx < mergeCtx.numAMVPMergeCand))
+#else
       while ((pInfo->numCand < (REGULAR_AMVP_MAX_NUM_CANDS + 1)) && (candIdx < mergeCtx.numAMVPMergeCand))
+#endif
       {
         pInfo->mvCand[pInfo->numCand] = mergeCtx.mvFieldNeighbours[candIdx << 1].mv;
         pInfo->mvCost[pInfo->numCand] =
@@ -19652,7 +19783,12 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
 
   pInfo->numCand = 0;
 #if TM_AMVP
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+  int extRegularAmvpCond = PU::checkExtRegularAmvpCondition(pu);
+  pInfo->maxStorageSize         = interPred != nullptr ? ((extRegularAmvpCond & 0x0f) ? REGULAR_AMVP_MAX_NUM_CANDS : REGULAR_AMVP_MAX_NUM_CANDS_IBC) : AMVP_MAX_NUM_CANDS;
+#else
   pInfo->maxStorageSize         = interPred != nullptr ? REGULAR_AMVP_MAX_NUM_CANDS : AMVP_MAX_NUM_CANDS;
+#endif
   pInfo->maxSimilarityThreshold = interPred != nullptr ? 1 : 0;
 #endif
 
@@ -19989,8 +20125,172 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
   }
 #endif
 
+
 #if TM_AMVP
   // Non-adjacent candidates
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+  if (extRegularAmvpCond & 0xff)
+  {
+    auto getNAcand = [&](Position pos) -> void
+    {
+      const unsigned        plevel        = pu.cs->sps->getLog2ParallelMergeLevelMinus2() + 2;
+      const PredictionUnit *puNonAdjacent = cs.getPURestricted(pos, pu, pu.chType);
+
+#if JVET_Y0065_GPM_INTRA
+      bool isAvailableNonAdjacent = puNonAdjacent && isDiffMER(pu.lumaPos(), pos, plevel) && CU::isInter(*puNonAdjacent->cu) && puNonAdjacent->getMotionInfo(pos).isInter;
+#else
+      bool isAvailableNonAdjacent = puNonAdjacent && isDiffMER(pu.lumaPos(), pos, plevel) && CU::isInter(*puNonAdjacent->cu);
+#endif
+
+      if (isAvailableNonAdjacent)
+      {
+        MotionInfo miNeighbor = puNonAdjacent->getMotionInfo(pos);
+
+        const int        currRefPOC     = cs.slice->getRefPic(eRefPicList, refIdx)->getPOC();
+        const RefPicList eRefPicList2nd = (eRefPicList == REF_PIC_LIST_0) ? REF_PIC_LIST_1 : REF_PIC_LIST_0;
+        int numDir = pu.cu->slice->getExtAmvpLevel() ? 2 : 1;
+        for (int predictorSource = 0; predictorSource < numDir; predictorSource++)
+        {
+          const RefPicList eRefPicListIndex = (predictorSource == 0) ? eRefPicList : eRefPicList2nd;
+          const int        neibRefIdx       = miNeighbor.refIdx[eRefPicListIndex];
+
+          if (neibRefIdx >= 0 && currRefPOC == cs.slice->getRefPOC(eRefPicListIndex, neibRefIdx))
+          {
+            miNeighbor.mv[eRefPicListIndex].roundTransPrecInternal2Amvr(pu.cu->imv);
+            pInfo->mvCand[(pInfo->numCand)] = miNeighbor.mv[eRefPicListIndex];
+            if (!pInfo->xCheckSimilarMotion(pInfo->numCand))
+            {
+              pInfo->numCand++;
+            }
+          }
+          if (pInfo->numCand > pInfo->maxStorageSize)
+          {
+            pInfo->numCand = pInfo->maxStorageSize;
+          }
+        }
+      }
+    };
+
+    // Non-adjacent candidates
+    if (pInfo->numCand < pInfo->maxStorageSize && interPred != nullptr)
+    {
+      // Non-adjacent candidates round 1
+      int offsetX  = 0;
+      int offsetY  = 0;
+      int offsetX0 = 0;
+      int offsetX1 = 0;
+      int offsetX2 = pu.Y().width >> 1;
+      int offsetY0 = 0;
+      int offsetY1 = 0;
+      int offsetY2 = pu.Y().height >> 1;
+
+      const int horNAInterval       = pu.Y().width;
+      const int verNAInterval       = pu.Y().height;
+      const int numNACandidate01[7] = { 7, 9, 9, 9, 9, 9, 9 };
+      const int idxMap01[7][9]      = { { 0, 1, 2, 3, 4, 5, 6 },       { 0, 1, 2, 3, 4, 5, 6, 7, 8 },
+                                   { 0, 1, 2, 3, 4, 5, 6, 7, 8 }, { 0, 1, 2, 3, 4, 5, 6, 7, 8 },
+                                   { 0, 1, 2, 3, 4, 5, 6, 7, 8 }, { 0, 1, 2, 3, 4, 5, 6, 7, 8 },
+                                   { 0, 1, 2, 3, 4, 5, 6, 7, 8 } };
+
+      for (int iDistanceIndex = 0; iDistanceIndex < 7 && pInfo->numCand < pInfo->maxStorageSize; iDistanceIndex++)
+      {
+        const int iNADistanceHor = horNAInterval * (iDistanceIndex + 1);
+        const int iNADistanceVer = verNAInterval * (iDistanceIndex + 1);
+
+        for (int naspIdx = 0; naspIdx < numNACandidate01[iDistanceIndex] && pInfo->numCand < pInfo->maxStorageSize;
+             naspIdx++)
+        {
+          switch (idxMap01[iDistanceIndex][naspIdx])
+          {
+          case 0:
+            offsetX = offsetX0 = -iNADistanceHor - 1;
+            offsetY = offsetY0 = verNAInterval + iNADistanceVer - 1;
+            break;
+          case 1:
+            offsetX = offsetX1 = horNAInterval + iNADistanceHor - 1;
+            offsetY = offsetY1 = -iNADistanceVer - 1;
+            break;
+          case 2:
+            offsetX = offsetX2;
+            offsetY = offsetY1;
+            break;
+          case 3:
+            offsetX = offsetX0;
+            offsetY = offsetY2;
+            break;
+          case 4:
+            offsetX = offsetX0;
+            offsetY = offsetY1;
+            break;
+          case 5:
+            offsetX = -1;
+            offsetY = offsetY0;
+            break;
+          case 6:
+            offsetX = offsetX1;
+            offsetY = -1;
+            break;
+          case 7:
+            offsetX = offsetX0 >> 1;
+            offsetY = offsetY0;
+            break;
+          case 8:
+            offsetX = offsetX1;
+            offsetY = offsetY1 >> 1;
+            break;
+          default:
+            printf("error!");
+            exit(0);
+            break;
+          }
+          getNAcand(posLT.offset(offsetX, offsetY));
+        }
+      }
+
+      // Non-adjacent candidates round 2
+      const int numNACandidate2[7] = { 4, 4, 4, 4, 4, 4, 4 };
+      const int idxMap2[7][5]      = { { 0, 1, 2, 3 }, { 0, 1, 2, 3 }, { 0, 1, 2, 3 }, { 0, 1, 2, 3 },
+                                  { 0, 1, 2, 3 }, { 0, 1, 2, 3 }, { 0, 1, 2, 3 } };
+
+      for (int iDistanceIndex = 0; iDistanceIndex < 7 && pInfo->numCand < pInfo->maxStorageSize; iDistanceIndex++)
+      {
+        const int horNADistance = horNAInterval * (iDistanceIndex + 1);
+        const int verNADistance = verNAInterval * (iDistanceIndex + 1);
+
+        for (int naspIdx = 0; naspIdx < numNACandidate2[iDistanceIndex] && pInfo->numCand < pInfo->maxStorageSize;
+             naspIdx++)
+        {
+          switch (idxMap2[iDistanceIndex][naspIdx])
+          {
+          case 0:
+            offsetX = offsetX0 = -horNADistance - 1;
+            offsetY            = offsetY2 + ((verNAInterval + verNADistance - 1 - offsetY2) >> 1);
+            break;
+          case 1:
+            offsetX = offsetX2 + ((horNAInterval + horNADistance - 1 - offsetX2) >> 1);
+            offsetY = offsetY0 = -verNADistance - 1;
+            break;
+          case 2:
+            offsetX = offsetX0;
+            offsetY = offsetY0 + ((offsetY2 - offsetY0) >> 1);
+            break;
+          case 3:
+            offsetX = offsetX0 + ((offsetX2 - offsetX0) >> 1);
+            offsetY = offsetY0;
+            break;
+          default:
+            printf("error!");
+            exit(0);
+            break;
+          }
+
+          getNAcand(posLT.offset(offsetX, offsetY));
+        }
+      }
+    }
+  }
+else
+#endif
   if (pInfo->numCand < pInfo->maxStorageSize && interPred != nullptr)
   {
     const unsigned plevel = pu.cs->sps->getLog2ParallelMergeLevelMinus2() + 2;
@@ -20071,6 +20371,7 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
     const int currRefPOC = cs.slice->getRefPic(eRefPicList, refIdx)->getPOC();
     addAMVPHMVPCand(pu, eRefPicList, currRefPOC, *pInfo);
   }
+
 #if TM_AMVP
   if (pInfo->numCand > pInfo->maxStorageSize)
   {
@@ -20122,6 +20423,7 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
         input.push_back(temp);
       }
       stable_sort(input.begin(), input.end(), costIncSort);
+
       for (int candIdx = 1; candIdx < pInfo->numCand; ++candIdx)
       {
         if (input.at(candIdx).cost > 5 * input.at(0).cost)
@@ -20156,7 +20458,6 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
     pu.reduceTplSize = false;
 #endif
-
     pInfo->numCand = 1;
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
     if (!armcRefinedMotion)
@@ -21311,7 +21612,11 @@ bool PU::addSpatialAffineMergeHMVPCand(const PredictionUnit& pu, AffineMergeCtx&
 bool PU::addSpatialAffineAMVPHMVPCand(PredictionUnit & pu, const RefPicList & eRefPicList, const int& refIdx, AffineAMVPInfo & affiAMVPInfo, static_vector<AffineMotionInfo, MAX_NUM_AFF_HMVP_CANDS>* lutAff, int iHMVPlistIdx,
   int neiIdx[], int iNeiNum, int aiNeibeInherited[], bool bFoundOne)
 {
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+  if (affiAMVPInfo.numCand >= affiAMVPInfo.maxStorageSize)
+#else
   if (affiAMVPInfo.numCand >= AMVP_MAX_NUM_CANDS)
+#endif
   {
     return false;
   }
@@ -21402,7 +21707,11 @@ bool PU::addSpatialAffineAMVPHMVPCand(PredictionUnit & pu, const RefPicList & eR
 
     affiAMVPInfo.numCand++;
 
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+    if (affiAMVPInfo.numCand == affiAMVPInfo.maxStorageSize)
+#else
     if (affiAMVPInfo.numCand == AMVP_MAX_NUM_CANDS)
+#endif
     {
       return true;
     }
@@ -21452,9 +21761,18 @@ bool PU::checkLastAffineAMVPCandRedundancy(const PredictionUnit& pu, AffineAMVPI
   return true;
 }
 #endif
-void PU::fillAffineMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const int &refIdx, AffineAMVPInfo &affiAMVPInfo)
+void PU::fillAffineMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const int &refIdx, AffineAMVPInfo &affiAMVPInfo
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+    , InterPrediction* interPred
+#endif
+)
 {
   affiAMVPInfo.numCand = 0;
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+  int extAffineAmvpCond = PU::checkExtAffineAmvpCondition(pu);
+  int extAffineAmvpVal = extAffineAmvpCond >> 8 & 0x0f;
+  affiAMVPInfo.maxStorageSize = (extAffineAmvpVal == 0) ? AMVP_MAX_NUM_CANDS : ((extAffineAmvpVal == 2) ? 4 : ((extAffineAmvpVal == 3) ? 5 : AFFINE_AMVP_MAX_CAND));
+#endif
 
   if (refIdx < 0)
   {
@@ -21465,6 +21783,15 @@ void PU::fillAffineMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, co
   bool isClean = pu.cs->isClean(pu.cu->Y().bottomRight(), CHANNEL_TYPE_LUMA);
 #endif
 
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+  if (interPred != nullptr)
+  {
+    if(interPred->readAffineAmvpBuffer(affiAMVPInfo, *pu.cu, eRefPicList, refIdx))
+    {
+      return;
+    }  
+  }
+#endif
   // insert inherited affine candidates
   Mv outputAffineMv[3];
   Position posLT = pu.Y().topLeft();
@@ -21566,7 +21893,11 @@ void PU::fillAffineMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, co
 
   for (int affHMVPIdx = 0; affHMVPIdx < 1; affHMVPIdx++)
   {
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+   if (affiAMVPInfo.numCand < affiAMVPInfo.maxStorageSize && leftAffNeiNum > 0)
+#else
     if (affiAMVPInfo.numCand < AMVP_MAX_NUM_CANDS && leftAffNeiNum > 0)
+#endif
     {
 #if JVET_Z0118_GDR
       addSpatialAffineAMVPHMVPCand(pu, eRefPicList, refIdx, affiAMVPInfo, (isClean) ? pu.cs->motionLut.lutAff1 : pu.cs->motionLut.lutAff0, 0, leftNeiIdx, leftAffNeiNum, aiNeibeInherited, true);
@@ -21574,7 +21905,11 @@ void PU::fillAffineMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, co
       addSpatialAffineAMVPHMVPCand(pu, eRefPicList, refIdx, affiAMVPInfo, pu.cs->motionLut.lutAff, 0, leftNeiIdx, leftAffNeiNum, aiNeibeInherited, true);
 #endif
     }
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+    if (affiAMVPInfo.numCand < affiAMVPInfo.maxStorageSize && aboveAffNeiNum > 0)
+#else
     if (affiAMVPInfo.numCand < AMVP_MAX_NUM_CANDS && aboveAffNeiNum > 0)
+#endif
     {
 #if JVET_Z0118_GDR
       addSpatialAffineAMVPHMVPCand(pu, eRefPicList, refIdx, affiAMVPInfo, (isClean) ? pu.cs->motionLut.lutAff1 : pu.cs->motionLut.lutAff0, 0, aboveNeiIdx, aboveAffNeiNum, aiNeibeInherited, true);
@@ -21600,7 +21935,11 @@ void PU::fillAffineMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, co
   }
 #endif
 
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+  if ( affiAMVPInfo.numCand >= affiAMVPInfo.maxStorageSize )
+#else
   if ( affiAMVPInfo.numCand >= AMVP_MAX_NUM_CANDS )
+#endif
   {
     for (int i = 0; i < affiAMVPInfo.numCand; i++)
     {
@@ -21608,6 +21947,22 @@ void PU::fillAffineMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, co
       affiAMVPInfo.mvCandRT[i].roundAffinePrecInternal2Amvr(pu.cu->imv);
       affiAMVPInfo.mvCandLB[i].roundAffinePrecInternal2Amvr(pu.cu->imv);
     }
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+  if (interPred != nullptr)
+  {
+    if ((extAffineAmvpCond >> 4 & 0x0f) == 1)
+    {
+      interPred->tmRefineAffineAMVPCandidates(pu, eRefPicList, refIdx, affiAMVPInfo, extAffineAmvpCond);
+      interPred->adjustAffineAMVPCandidates(pu, eRefPicList, refIdx, affiAMVPInfo, extAffineAmvpCond);
+    }
+    else
+    {
+      interPred->adjustAffineAMVPCandidates(pu, eRefPicList, refIdx, affiAMVPInfo, extAffineAmvpCond);
+      interPred->tmRefineAffineAMVPCandidates(pu, eRefPicList, refIdx, affiAMVPInfo, extAffineAmvpCond);
+    }
+    interPred->writeAffineAmvpBuffer(affiAMVPInfo, *pu.cu, eRefPicList, refIdx);
+  }
+#endif
     return;
   }
 
@@ -21677,7 +22032,11 @@ void PU::fillAffineMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, co
 #if JVET_Z0139_HIST_AFF
   for (int affHMVPIdx = 1; affHMVPIdx < MAX_NUM_AFF_HMVP_CANDS; affHMVPIdx++)
   {
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+    if (affiAMVPInfo.numCand < affiAMVPInfo.maxStorageSize && leftAffNeiNum > 0)
+#else
     if (affiAMVPInfo.numCand < AMVP_MAX_NUM_CANDS && leftAffNeiNum > 0)
+#endif
     {
 #if JVET_Z0118_GDR
       addSpatialAffineAMVPHMVPCand(pu, eRefPicList, refIdx, affiAMVPInfo, (isClean) ? pu.cs->motionLut.lutAff1 : pu.cs->motionLut.lutAff0, 0, leftNeiIdx, leftAffNeiNum, aiNeibeInherited, true);
@@ -21685,7 +22044,11 @@ void PU::fillAffineMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, co
       addSpatialAffineAMVPHMVPCand(pu, eRefPicList, refIdx, affiAMVPInfo, pu.cs->motionLut.lutAff, 0, leftNeiIdx, leftAffNeiNum, aiNeibeInherited, true);
 #endif
     }
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+    if (affiAMVPInfo.numCand < affiAMVPInfo.maxStorageSize && aboveAffNeiNum > 0)
+#else
     if (affiAMVPInfo.numCand < AMVP_MAX_NUM_CANDS && aboveAffNeiNum > 0)
+#endif
     {
 #if JVET_Z0118_GDR
       addSpatialAffineAMVPHMVPCand(pu, eRefPicList, refIdx, affiAMVPInfo, (isClean) ? pu.cs->motionLut.lutAff1 : pu.cs->motionLut.lutAff0, 0, aboveNeiIdx, aboveAffNeiNum, aiNeibeInherited, true);
@@ -21696,10 +22059,17 @@ void PU::fillAffineMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, co
   }
 #endif
 
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+  if ( affiAMVPInfo.numCand < affiAMVPInfo.maxStorageSize )
+  {
+    // check corner MVs
+    for ( int i = 2; i >= 0 && affiAMVPInfo.numCand < affiAMVPInfo.maxStorageSize; i-- )
+#else
   if ( affiAMVPInfo.numCand < 2 )
   {
     // check corner MVs
     for ( int i = 2; i >= 0 && affiAMVPInfo.numCand < AMVP_MAX_NUM_CANDS; i-- )
+#endif
     {
       if ( cornerMVPattern & (1 << i) ) // MV i exist
       {
@@ -21714,7 +22084,11 @@ void PU::fillAffineMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, co
     }
 
     // Get Temporal Motion Predictor
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+    if ( affiAMVPInfo.numCand < affiAMVPInfo.maxStorageSize && pu.cs->picHeader->getEnableTMVPFlag() )
+#else
     if ( affiAMVPInfo.numCand < 2 && pu.cs->picHeader->getEnableTMVPFlag() )
+#endif
     {
       const int refIdxCol = refIdx;
 
@@ -21758,14 +22132,22 @@ void PU::fillAffineMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, co
     }
 
 #if JVET_Z0139_NA_AFF
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+    if (affiAMVPInfo.numCand < affiAMVPInfo.maxStorageSize)
+#else
     if (affiAMVPInfo.numCand < AMVP_MAX_NUM_CANDS)
+#endif
     {
       addNonAdjCstAffineMVPCandUnscaled(pu, eRefPicList, refIdx, affiAMVPInfo);
     }
 #endif
 
 #if JVET_Z0139_HIST_AFF
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+    if (affiAMVPInfo.numCand < affiAMVPInfo.maxStorageSize)
+#else
     if (affiAMVPInfo.numCand < AMVP_MAX_NUM_CANDS)
+#endif
     {
       for (int affHMVPIdx = 0; affHMVPIdx < MAX_NUM_AFF_HMVP_CANDS; affHMVPIdx++)
       {
@@ -21777,6 +22159,157 @@ void PU::fillAffineMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, co
       }
     }
 #endif
+
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+    // Get Temporal Motion Predictor
+    if (((extAffineAmvpCond & 0x00f) == 1) && (affiAMVPInfo.numCand < affiAMVPInfo.maxStorageSize) && pu.cs->picHeader->getEnableTMVPFlag())
+    {
+     //>> MTK colocated-RightBottom
+      // offset the pos to be sure to "point" to the same position the uiAbsPartIdx would've pointed to
+      //const PreCalcValues &pcv = *cs.pcv;
+      bool                 isC0Avail;
+      bool                 isC1Avail;
+      bool                 boundaryCond;
+      const SubPic        &curSubPic = pu.cs->slice->getPPS()->getSubPicFromPos(pu.lumaPos());
+      Position             posRB     = pu.Y().bottomRight().offset(-3, -3);
+      const PreCalcValues& pcv = *pu.cs->pcv;
+      Position             posCenter = pu.Y().center();
+      Position             posC0;
+      Position             posC1;
+      
+      int  iRefIdx = refIdx;
+
+      bool bExistMV0;
+      Mv   cColMv0[3];
+
+      int offsetX0 = 0, offsetX1 = 0, offsetX2 = 0, offsetX3 = pu.Y().width >> 1;
+      int offsetY0 = 0, offsetY1 = 0, offsetY2 = 0, offsetY3 = pu.Y().height >> 1;
+
+      const int numNACandidate[5] = { 2, 2, 2, 2, 2 };
+      const int idxMap[5][2]      = { { 0, 1 }, { 0, 2 }, { 0, 2 }, { 0, 2 }, { 0, 2 } };
+
+      for (int iDistanceIndex = 0; iDistanceIndex < TMVP_DISTANCE_LEVEL && affiAMVPInfo.numCand < affiAMVPInfo.maxStorageSize; iDistanceIndex++)
+      {
+        const int iNADistanceHor = pu.Y().width * iDistanceIndex;
+        const int iNADistanceVer = pu.Y().height * iDistanceIndex;
+
+        for (int iNASPIdx = 0; iNASPIdx < numNACandidate[iDistanceIndex] && affiAMVPInfo.numCand < affiAMVPInfo.maxStorageSize; iNASPIdx++)
+        {
+          switch (idxMap[iDistanceIndex][iNASPIdx])
+          {
+          case 0:
+            offsetX0 = offsetX2 = 4 + iNADistanceHor;
+            offsetY0 = offsetY2 = 4 + iNADistanceVer;
+            offsetX1            = iNADistanceHor;
+            offsetY1            = iNADistanceVer;
+            break;
+          case 1:
+            offsetX0 = 4;
+            offsetY0 = 0;
+            offsetX1 = 0;
+            offsetY1 = 4;
+            break;
+          case 2:
+            offsetX0 = offsetX2;
+            offsetY0 = 4 - offsetY3;
+            offsetX1 = 4 - offsetX3;
+            offsetY1 = offsetY2;
+            break;
+          default:
+            printf("error!");
+            exit(0);
+            break;
+          }
+          isC0Avail = false;
+          if (curSubPic.getTreatedAsPicFlag())
+          {
+            boundaryCond = ((posRB.x + offsetX0) <= curSubPic.getSubPicRight()
+                            && (posRB.y + offsetY0) <= curSubPic.getSubPicBottom());
+          }
+          else
+          {
+            boundaryCond = ((posRB.x + offsetX0) < pcv.lumaWidth) && ((posRB.y + offsetY0) < pcv.lumaHeight);
+          }
+          if (boundaryCond)
+          {
+            posC0     = posRB.offset(offsetX0, offsetY0);
+            isC0Avail = true;
+          }
+
+          if (idxMap[iDistanceIndex][iNASPIdx] == 0)
+          {
+            isC1Avail = false;
+            if (curSubPic.getTreatedAsPicFlag())
+            {
+            boundaryCond = ((posCenter.x + offsetX1) <= curSubPic.getSubPicRight()
+                            && (posCenter.y + offsetY1) <= curSubPic.getSubPicBottom());
+            }
+            else
+            {
+            boundaryCond = ((posCenter.x + offsetX1) < pcv.lumaWidth) && ((posCenter.y + offsetY1) < pcv.lumaHeight);
+            }
+            if (boundaryCond)
+            {
+              posC1     = posCenter.offset(offsetX1, offsetY1);
+              isC1Avail = true;
+            }
+          }
+          else
+          {
+            isC1Avail = false;
+            if (curSubPic.getTreatedAsPicFlag())
+            {
+            boundaryCond = ((posRB.x + offsetX1) <= curSubPic.getSubPicRight()
+                            && (posRB.y + offsetY1) <= curSubPic.getSubPicBottom());
+            }
+            else
+            {
+            boundaryCond = ((posRB.x + offsetX1) < pcv.lumaWidth) && ((posRB.y + offsetY1) < pcv.lumaHeight);
+            }
+            if (boundaryCond)
+            {
+              posC1     = posRB.offset(offsetX1, offsetY1);
+              isC1Avail = true;
+            }
+          }
+          bExistMV0 = false;
+
+          EAffineModel affineType =  (EAffineModel) (pu.cu->affineType);
+          bExistMV0                                    = (isC0Avail
+                        && getColocatedAffineCMVP(pu, eRefPicList, posC0, cColMv0, iRefIdx, false,
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+                                                 pu.cu->slice->isInterB(),
+#endif
+                           NULL, &affineType))
+                      || (isC1Avail
+                        && getColocatedAffineCMVP(pu, eRefPicList, posC1, cColMv0, iRefIdx, false,
+#if JVET_AC0185_ENHANCED_TEMPORAL_MOTION_DERIVATION
+                                                    pu.cu->slice->isInterB(),
+#endif
+                          NULL, &affineType));
+
+          if (bExistMV0)
+          {
+            cColMv0[0].roundAffinePrecInternal2Amvr(pu.cu->imv);
+            affiAMVPInfo.mvCandLT[affiAMVPInfo.numCand] = cColMv0[0];
+            cColMv0[1].roundAffinePrecInternal2Amvr(pu.cu->imv);
+            affiAMVPInfo.mvCandRT[affiAMVPInfo.numCand] = cColMv0[1];
+            cColMv0[2].roundAffinePrecInternal2Amvr(pu.cu->imv);
+            affiAMVPInfo.mvCandLB[affiAMVPInfo.numCand] = cColMv0[2];
+#if JVET_Z0139_HIST_AFF
+          if (checkLastAffineAMVPCandRedundancy(pu, affiAMVPInfo))
+#endif
+            {
+              affiAMVPInfo.numCand++;
+            }
+
+          }
+          }
+          }
+
+    }
+#endif
+
 #if JVET_Z0139_HIST_AFF
     if (affiAMVPInfo.numCand < AMVP_MAX_NUM_CANDS)
 #else
@@ -21800,8 +22333,23 @@ void PU::fillAffineMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, co
     affiAMVPInfo.mvCandRT[i].roundAffinePrecInternal2Amvr(pu.cu->imv);
     affiAMVPInfo.mvCandLB[i].roundAffinePrecInternal2Amvr(pu.cu->imv);
   }
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+  if (interPred != nullptr)
+  {
+    if ((extAffineAmvpCond >> 4 & 0x0f) == 1)
+    {
+      interPred->tmRefineAffineAMVPCandidates(pu, eRefPicList, refIdx, affiAMVPInfo, extAffineAmvpCond);
+      interPred->adjustAffineAMVPCandidates(pu, eRefPicList, refIdx, affiAMVPInfo, extAffineAmvpCond);
+    }
+    else
+    {
+      interPred->adjustAffineAMVPCandidates(pu, eRefPicList, refIdx, affiAMVPInfo, extAffineAmvpCond);
+      interPred->tmRefineAffineAMVPCandidates(pu, eRefPicList, refIdx, affiAMVPInfo, extAffineAmvpCond);
+    }
+    interPred->writeAffineAmvpBuffer(affiAMVPInfo, *pu.cu, eRefPicList, refIdx);
+  }
+#endif
 }
-
 bool PU::addMVPCandUnscaled( const PredictionUnit &pu, const RefPicList &eRefPicList, const int &iRefIdx, const Position &pos, const MvpDir &eDir, AMVPInfo &info )
 {
         CodingStructure &cs    = *pu.cs;
@@ -22445,7 +22993,11 @@ bool PU::addNonAdjCstAffineMVPCandUnscaled(const PredictionUnit &pu, const RefPi
 
       if (addNonAdjCstAffineMVPConstructedCPMV(pu, miNew, isAvailableNew, posNew, refPicList, refIdx, affiAmvpInfo))
       {
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+        if (affiAmvpInfo.numCand >= affiAmvpInfo.maxStorageSize)
+#else
         if (affiAmvpInfo.numCand >= AMVP_MAX_NUM_CANDS)
+#endif
         {
           return true;
         }
@@ -22607,7 +23159,11 @@ bool PU::addNonAdjCstAffineMVPConstructedCPMV( const PredictionUnit &pu, MotionI
       }
       affiAmvpInfo.numCand++;
       isConverted = true;
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+      if (affiAmvpInfo.numCand >= affiAmvpInfo.maxStorageSize)
+#else
       if (affiAmvpInfo.numCand >= AMVP_MAX_NUM_CANDS)
+#endif
       {
         return true;
       }
@@ -31106,8 +31662,16 @@ AMVPInfo PU::getMultiHypMVPCandsAMVP(PredictionUnit &pu, const RefPicList eRefPi
   {
     AffineAMVPInfo affineAMVPInfo;
     PU::fillAffineMvpCand(pu, RefPicList(refListForAMVP), refIdxForAMVP, affineAMVPInfo);
+#if JVET_AJ0126_INTER_AMVP_ENHANCEMENT
+    amvpInfo.numCand = (affineAMVPInfo.numCand <= AMVP_MAX_NUM_CANDS) ? affineAMVPInfo.numCand : AMVP_MAX_NUM_CANDS;
+    for (int i = 0; i < amvpInfo.numCand; i++) 
+    {
+      amvpInfo.mvCand[i] = affineAMVPInfo.mvCandLT[i];
+    }
+#else
     amvpInfo.numCand = affineAMVPInfo.numCand;
     memcpy(amvpInfo.mvCand, affineAMVPInfo.mvCandLT, sizeof(amvpInfo.mvCand));
+#endif
   }
   else
   {
@@ -31125,7 +31689,6 @@ AMVPInfo PU::getMultiHypMVPCands(PredictionUnit &pu, const MultiHypPredictionDat
   CHECK(MHRefPics.empty(), "Multi Hyp: MHRefPics.empty()");
   const auto eRefPicList = RefPicList(MHRefPics[mhRefIdxForAMVPList].refList);
   const int iRefIdx = MHRefPics[mhRefIdxForAMVPList].refIdx;
-
   return (pu.mergeFlag ? PU::getMultiHypMVPCandsMerge : PU::getMultiHypMVPCandsAMVP)(pu, eRefPicList, iRefIdx);
 }
 
