@@ -1894,6 +1894,10 @@ private:
 #endif
 #endif
 
+#if JVET_AJ0172_IBC_ITMP_ALIGN_REF_AREA
+  bool              m_largeIBCLSR;
+#endif
+
 #if LUMA_ADAPTIVE_DEBLOCKING_FILTER_QP_OFFSET
   bool              m_LadfEnabled;
   int               m_LadfNumIntervals;
@@ -2662,6 +2666,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if JVET_AH0066_JVET_AH0202_CCP_MERGE_LUMACBF0
   void      setUseInterCcpMergeZeroLumaCbf   ( bool b )                              { m_interCcpMergeZeroLumaCbf = b; }
   bool      getUseInterCcpMergeZeroLumaCbf   ()                           const      { return m_interCcpMergeZeroLumaCbf; }
+#endif
+#if JVET_AJ0172_IBC_ITMP_ALIGN_REF_AREA
+  void      setUseLargeIBCLSR   ( bool b )                                           { m_largeIBCLSR = b; }
+  bool      getUseLargeIBCLSR   ()                                        const      { return m_largeIBCLSR; }
 #endif
   void      setUseMRL             ( bool b )                                        { m_MRL = b; }
   bool      getUseMRL             ()                                      const     { return m_MRL; }

@@ -559,7 +559,11 @@ void InterPrediction::destroy()
 
 #if INTER_LIC || (TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC
 #if JVET_Z0153_IBC_EXT_REF
+#if JVET_AJ0172_IBC_ITMP_ALIGN_REF_AREA
+void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, const int ctuSize, Reshape* reshape, const int picWidth, const int picHeight )
+#else
 void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, const int ctuSize, Reshape* reshape, const int picWidth )
+#endif
 #else
 void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, const int ctuSize, Reshape* reshape )
 #endif
@@ -839,12 +843,16 @@ void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, cons
 #if JVET_Z0118_GDR
 #if JVET_Z0153_IBC_EXT_REF
   m_ibcBufferWidth  = (picWidth + ctuSize - 1) / ctuSize * ctuSize;
+#if JVET_AJ0172_IBC_ITMP_ALIGN_REF_AREA
+  m_ibcBufferHeight = (picHeight + ctuSize - 1) / ctuSize * ctuSize;
+#else
   m_ibcBufferHeight = 3 * ctuSize;
 #if JVET_AA0106_IBCBUF_CTU256
     if( 256 == ctuSize )
     {
       m_ibcBufferHeight = 2 * ctuSize;
     }
+#endif
 #endif
 
   if (m_ibcBuffer0.bufs.empty())

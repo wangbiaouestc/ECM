@@ -111,7 +111,7 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
     m_pcInterPred->resetIBCBuffer(cs.pcv->chrFormat, cs.slice->getSPS()->getMaxCUHeight());
     cs.resetIBCBuffer = false;
   }
-#if JVET_Z0153_IBC_EXT_REF
+#if JVET_Z0153_IBC_EXT_REF && !JVET_AJ0172_IBC_ITMP_ALIGN_REF_AREA
   else
   {
     const int ctuSize = cs.slice->getSPS()->getMaxCUHeight();

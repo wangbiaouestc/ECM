@@ -8775,7 +8775,7 @@ bool PU::searchBv(const PredictionUnit& pu, int xPos, int yPos, int width, int h
   const int ctuSizeLog2 = floorLog2(ctuSize);
 
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
-#if JVET_AC0071_DBV
+#if JVET_AC0071_DBV && !JVET_AJ0172_IBC_ITMP_ALIGN_REF_AREA
 #if JVET_AI0136_ADAPTIVE_DUAL_TREE
   const bool isDBV = (pu.cs->slice->getSliceType() == I_SLICE && ( CS::isDualITree(*pu.cs) || (pu.cu->isSST && pu.cu->separateTree) ) && pu.cu->slice->getSPS()->getUseIntraDBV())
 #else
@@ -8917,6 +8917,12 @@ bool PU::searchBv(const PredictionUnit& pu, int xPos, int yPos, int width, int h
     return false;
   }
 
+#if JVET_AJ0172_IBC_ITMP_ALIGN_REF_AREA
+  if (((refTopY >> ctuSizeLog2) == (yPos >> ctuSizeLog2)) && ((refRightX >> ctuSizeLog2) > (xPos >> ctuSizeLog2)))
+  {
+    return false;
+  }
+#else
 #if JVET_Z0084_IBC_TM || JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   unsigned curTileIdx = pu.cs->pps->getTileIdx(Position(xPos, yPos));
 #else
@@ -9055,6 +9061,7 @@ bool PU::searchBv(const PredictionUnit& pu, int xPos, int yPos, int width, int h
 #endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS && JVET_AC0071_DBV
   }
+#endif
 #endif
 
   // in the same CTU, or valid area from left CTU. Check if the reference block is already coded
@@ -19250,6 +19257,12 @@ inline void PU::getRribcBvpCand(PredictionUnit &pu, AMVPInfo *pInfo)
   }
   else if (pu.cu->rribcFlipType == 2)
   {
+#if JVET_AJ0172_IBC_ITMP_ALIGN_REF_AREA
+    pInfo->mvCand[0] = Mv(0, std::max(-static_cast<int>(pu.lheight()), -pu.Y().y));
+    pInfo->mvCand[0].changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
+    pInfo->mvCand[1] = Mv(0, - pu.Y().y);
+    pInfo->mvCand[1].changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
+#else
     const int ctbSize     = pu.cs->sps->getCTUSize();
     const int numCurrCtuY = (pu.Y().y >> (floorLog2(ctbSize)));
     unsigned int lcuWidth = pu.cs->slice->getSPS()->getMaxCUWidth();
@@ -19266,6 +19279,7 @@ inline void PU::getRribcBvpCand(PredictionUnit &pu, AMVPInfo *pInfo)
     pInfo->mvCand[0].changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
     pInfo->mvCand[1] = Mv(0,rrTop);
     pInfo->mvCand[1].changePrecision(MV_PRECISION_INT, MV_PRECISION_INTERNAL);
+#endif
   }
 }
 #endif

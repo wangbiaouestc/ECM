@@ -440,6 +440,9 @@ void InterSearch::init( EncCfg*        pcEncCfg,
                       , EncReshape*    pcReshape
 #if JVET_Z0153_IBC_EXT_REF
                       , const uint32_t curPicWidthY 
+#if JVET_AJ0172_IBC_ITMP_ALIGN_REF_AREA
+                      , const uint32_t curPicHeightY 
+#endif
 #endif
 )
 {
@@ -494,7 +497,11 @@ void InterSearch::init( EncCfg*        pcEncCfg,
   const ChromaFormat cform = pcEncCfg->getChromaFormatIdc();
 #if INTER_LIC || (TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
 #if JVET_Z0153_IBC_EXT_REF
+#if JVET_AJ0172_IBC_ITMP_ALIGN_REF_AREA
+  InterPrediction::init( pcRdCost, cform, maxCUHeight, m_pcReshape, curPicWidthY, curPicHeightY );
+#else
   InterPrediction::init( pcRdCost, cform, maxCUHeight, m_pcReshape, curPicWidthY );
+#endif
 #else
   InterPrediction::init( pcRdCost, cform, maxCUHeight, m_pcReshape );
 #endif
@@ -1984,7 +1991,11 @@ void InterSearch::xIntraPatternSearch(PredictionUnit &pu, IntTZSearchStruct &cSt
 #endif
     {
 #if JVET_Z0153_IBC_EXT_REF
+#if JVET_AJ0172_IBC_ITMP_ALIGN_REF_AREA
+      int verTop = pu.cu->slice->getSPS()->getUseLargeIBCLSR()? -(int)lcuWidth * 2:- (int)lcuWidth;
+#else
       int verTop = - (int)lcuWidth;
+#endif
       int verBottom = std::min((int)(lcuWidth>>2), (int)(lcuWidth - (cuPelY % lcuWidth) - roiHeight));
       int horLeft = - (int)lcuWidth*2;
       int horRight = lcuWidth>>2;
@@ -3206,12 +3217,16 @@ void InterSearch::xSetIntraSearchRange(PredictionUnit& pu, int iRoiWidth, int iR
   const int picWidth = pu.cs->slice->getPPS()->getPicWidthInLumaSamples();
 
   srLeft = -cuPelX;
+#if JVET_AJ0172_IBC_ITMP_ALIGN_REF_AREA
+  srTop = -cuPelY;
+#else
   srTop = - 2 * lcuWidth - (cuPelY % lcuWidth);
 #if JVET_AA0106_IBCBUF_CTU256
   if (256 == lcuWidth)
   {
     srTop = -lcuWidth - (cuPelY % lcuWidth);
   }
+#endif
 #endif
   srRight = picWidth - cuPelX - iRoiWidth;
   srBottom = lcuWidth - (cuPelY % lcuWidth) - iRoiHeight;  
@@ -4952,6 +4967,11 @@ inline void InterSearch::getBestBvpBvOneZeroComp(PredictionUnit &pu, Mv cMv, Dis
   }
   else if (cMv.getHor() == 0)
   {
+#if JVET_AJ0172_IBC_ITMP_ALIGN_REF_AREA
+    bvpCand[0] = Mv(0, std::max(-(int) pu.lheight(), -pu.Y().y));
+    bvpCand[1] = Mv(0, -pu.Y().y);
+    bvOneZeroCompCost = m_pcRdCost->getBvHorZeroCompCost(cMv.getVer(), pu.cs->sps->getAMVREnabledFlag(), &tempImv, &tempIdx, bvpCand);
+#else
     const int ctbSize     = pu.cs->sps->getCTUSize();
     const int numCurrCtuY = (pu.Y().y >> (floorLog2(ctbSize)));
     unsigned int lcuWidth = pu.cs->slice->getSPS()->getMaxCUWidth();
@@ -4967,6 +4987,7 @@ inline void InterSearch::getBestBvpBvOneZeroComp(PredictionUnit &pu, Mv cMv, Dis
     bvpCand[0] = Mv(0, std::max(-(int) pu.lheight(), rrTop));
     bvpCand[1] = Mv(0, rrTop);
     bvOneZeroCompCost = m_pcRdCost->getBvHorZeroCompCost(cMv.getVer(), pu.cs->sps->getAMVREnabledFlag(), &tempImv, &tempIdx, bvpCand);
+#endif
   }
 
   if (bvOneZeroCompCost < initCost)
@@ -16952,6 +16973,12 @@ bool InterSearch::searchBv(PredictionUnit& pu, int xPos, int yPos, int width, in
     return false;
   }
 
+#if JVET_AJ0172_IBC_ITMP_ALIGN_REF_AREA
+  if (((refTopY >> ctuSizeLog2) == (yPos >> ctuSizeLog2)) && ((refRightX >> ctuSizeLog2) > (xPos >> ctuSizeLog2)))
+  {
+    return false;
+  }
+#else
   unsigned curTileIdx = pu.cs->pps->getTileIdx(pu.lumaPos());
   unsigned refTileIdx = pu.cs->pps->getTileIdx(Position(refLeftX, refTopY));
   if (curTileIdx != refTileIdx)
@@ -17051,6 +17078,7 @@ bool InterSearch::searchBv(PredictionUnit& pu, int xPos, int yPos, int width, in
   }
   else
     return false;
+#endif
 #endif
 
   // in the same CTU, or valid area from left CTU. Check if the reference block is already coded

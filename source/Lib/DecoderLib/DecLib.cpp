@@ -1111,7 +1111,11 @@ void DecLib::finishPicture(int& poc, PicList*& rpcListPic, MsgLevel msgl )
   m_pcPic->cs->destroyTemporaryCsData();
 #if JVET_AA0096_MC_BOUNDARY_PADDING
   m_cFrameMcPadPrediction.init(&m_cRdCost, pcSlice->getSPS()->getChromaFormatIdc(), pcSlice->getSPS()->getMaxCUHeight(),
+#if JVET_AJ0172_IBC_ITMP_ALIGN_REF_AREA
+                               NULL, m_pcPic->getPicWidthInLumaSamples(),m_pcPic->getPicHeightInLumaSamples());
+#else
                                NULL, m_pcPic->getPicWidthInLumaSamples());
+#endif
   m_cFrameMcPadPrediction.mcFramePad(m_pcPic, *(m_pcPic->slices[0]));
 #endif
 
@@ -1967,7 +1971,11 @@ void DecLib::xActivateParameterSets( const InputNALUnit nalu )
     m_cIntraPred.init( sps->getChromaFormatIdc(), sps->getBitDepth( CHANNEL_TYPE_LUMA ) );
 #if INTER_LIC || (TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
 #if JVET_Z0153_IBC_EXT_REF
+#if JVET_AJ0172_IBC_ITMP_ALIGN_REF_AREA
+    m_cInterPred.init(&m_cRdCost, sps->getChromaFormatIdc(), sps->getMaxCUHeight(), &m_cReshaper, sps->getMaxPicWidthInLumaSamples(),sps->getMaxPicHeightInLumaSamples());
+#else
     m_cInterPred.init(&m_cRdCost, sps->getChromaFormatIdc(), sps->getMaxCUHeight(), &m_cReshaper, sps->getMaxPicWidthInLumaSamples());
+#endif
 #else
     m_cInterPred.init( &m_cRdCost, sps->getChromaFormatIdc(), sps->getMaxCUHeight(), &m_cReshaper);
 #endif

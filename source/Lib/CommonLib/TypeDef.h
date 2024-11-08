@@ -258,6 +258,7 @@
 #define JVET_AE0094_IBC_NONADJACENT_SPATIAL_CANDIDATES    1 // JVET-AE0094: IBC with non-adjacent spatial candidates
 #define JVET_AG0091_ARBVP                                 1 // JVET-AG0091: Auto-relocated block vector prediction
 #define JVET_AI0082_TEMPORAL_BV                           1 // JVET-AI0081: Temporal BV for IBC merge list construction
+#define JVET_AJ0172_IBC_ITMP_ALIGN_REF_AREA               1 // JVET-AJ0172: Unified reference area of IBC and IntraTMP
 
 #if JVET_AC0071_DBV && JVET_V0130_INTRA_TMP
 #define JVET_AF0066_ENABLE_DBV_4_SINGLE_TREE              1 // JVET-AF0066: Enable DBV mode in single tree configuration

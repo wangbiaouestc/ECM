@@ -751,6 +751,9 @@ void EncLib::init( bool isFieldCoding, AUWriterIf* auWriterIf )
                      , &m_cReshaper
 #if JVET_Z0153_IBC_EXT_REF
                      , pps0.getPicWidthInLumaSamples()
+#if JVET_AJ0172_IBC_ITMP_ALIGN_REF_AREA
+                     , pps0.getPicHeightInLumaSamples()
+#endif
 #endif
   );
 
