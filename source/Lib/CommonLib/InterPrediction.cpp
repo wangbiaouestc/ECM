@@ -2118,6 +2118,7 @@ void InterPrediction::xPredInterBiBDMVR(PredictionUnit &pu, PelUnitBuf &pcYuvPre
 #endif
 
       if (biocheck0
+        && biocheck1
 #if JVET_AJ0097_BDOF_LDB
         && (PU::isBiPredFromDifferentDirEqDistPoc(pu) || bioLDB)
 #else
