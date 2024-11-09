@@ -6254,12 +6254,16 @@ static void simdGaussFiltering(CodingStructure &cs, Pel ***gaussPic, const CPelB
           }   // for l
         }     // for k
 #if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+        mmClassIdxBsP = _mm256_set1_epi16( 0 );
+        mmClassIdxBsN = _mm256_set1_epi16( 0 );
         if( useBounCondition )
         {
           mmClassIdxTmp   = _mm256_loadu_si256((const __m256i *) (pClassCodingInfo + j));
           mmClassIdxBsP   = _mm256_srai_epi16(mmClassIdxTmp, 1);
           mmClassIdxBsN   = _mm256_sub_epi16( mm01Vector, mmClassIdxBsP);
         }
+        mmClassIdxResiP = _mm256_set1_epi16( 0 );
+        mmClassIdxResiN = _mm256_set1_epi16( 0 );
         if( useResiCondition )
         {
           mmClassIdxTmp   = _mm256_loadu_si256((const __m256i *) (pClassCodingInfo + j));
@@ -6493,12 +6497,16 @@ static void simdGaussFiltering(CodingStructure &cs, Pel ***gaussPic, const CPelB
         }//for l
       }//for k
 #if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+      mmClassIdxBsP = _mm_set1_epi16( 0 );
+      mmClassIdxBsN = _mm_set1_epi16( 0 );
       if( useBounCondition )
       {
         mmClassIdxTmp   = _mm_loadu_si128( (const __m128i *) (pClassCodingInfo + j));
         mmClassIdxBsP   = _mm_srai_epi16( mmClassIdxTmp, 1 );
         mmClassIdxBsN   = _mm_sub_epi16( mm01Vector, mmClassIdxBsP );
       }
+      mmClassIdxResiP = _mm_set1_epi16( 0 );
+      mmClassIdxResiN = _mm_set1_epi16( 0 );
       if( useResiCondition )
       {
         mmClassIdxTmp   = _mm_loadu_si128( (const __m128i *) (pClassCodingInfo + j));
@@ -7034,12 +7042,16 @@ static void simdFilter13x13Blk( AlfClassifier **classifier, const CPelBuf &srcLu
         params[31] = _mm256_unpackhi_epi64(_mm256_unpackhi_epi32(rawCoef[0][8], rawCoef[1][8]), _mm256_unpackhi_epi32(rawCoef[2][8], rawCoef[3][8]));
 #endif
 #if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+        mmClassIdxBsP = _mm256_set1_epi16( 0 );
+        mmClassIdxBsN = _mm256_set1_epi16( 0 );
         if( useBounCondition )
         {
           mmClassIdxTmp   = _mm256_loadu_si256( (const __m256i *) (pClassCodingInfo + j));
           mmClassIdxBsP   = _mm256_srai_epi16( mmClassIdxTmp, 1 );
           mmClassIdxBsN   = _mm256_sub_epi16( mm01Vector, mmClassIdxBsP );
         }
+        mmClassIdxResiP = _mm256_set1_epi16( 0 );
+        mmClassIdxResiN = _mm256_set1_epi16( 0 );
         if( useResiCondition )
         {
           mmClassIdxTmp   = _mm256_loadu_si256( (const __m256i *) (pClassCodingInfo + j));
@@ -7419,12 +7431,16 @@ static void simdFilter13x13Blk( AlfClassifier **classifier, const CPelBuf &srcLu
       params[31] = _mm_unpackhi_epi64(_mm_unpackhi_epi32(rawCoef[0][8], rawCoef[1][8]), _mm_unpackhi_epi32(rawCoef[2][8], rawCoef[3][8]));
 #endif
 #if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+      mmClassIdxBsP = _mm_set1_epi16( 0 );
+      mmClassIdxBsN = _mm_set1_epi16( 0 );
       if( useBounCondition )
       {
         mmClassIdxTmp = _mm_loadu_si128( (const __m128i *) ( pClassCodingInfo + j ) );
         mmClassIdxBsP = _mm_srai_epi16( mmClassIdxTmp, 1 );
         mmClassIdxBsN = _mm_sub_epi16( mm01Vector, mmClassIdxBsP );
       }
+      mmClassIdxResiP = _mm_set1_epi16( 0 );
+      mmClassIdxResiN = _mm_set1_epi16( 0 );
       if( useResiCondition )
       {
         mmClassIdxTmp = _mm_loadu_si128( (const __m128i *) ( pClassCodingInfo + j ) );
@@ -7849,12 +7865,16 @@ static void simdFixFilter9x9Db9Blk(AlfClassifier **classifier, const CPelBuf &sr
         params[19] = _mm256_unpacklo_epi64(_mm256_unpackhi_epi32(rawCoef[0][5], rawCoef[1][5]), _mm256_unpackhi_epi32(rawCoef[2][5], rawCoef[3][5]));
         params[20] = _mm256_unpackhi_epi64(_mm256_unpackhi_epi32(rawCoef[0][5], rawCoef[1][5]), _mm256_unpackhi_epi32(rawCoef[2][5], rawCoef[3][5]));
 #if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+        mmClassIdxBsP = _mm256_set1_epi16( 0 );
+        mmClassIdxBsN = _mm256_set1_epi16( 0 );
         if( useBounCondition )
         {
           mmClassIdxTmp   = _mm256_loadu_si256( (const __m256i *) (pClassCodingInfo + j));
           mmClassIdxBsP   = _mm256_srai_epi16( mmClassIdxTmp, 1 );
           mmClassIdxBsN   = _mm256_sub_epi16( mm01Vector, mmClassIdxBsP );
         }
+        mmClassIdxResiP = _mm256_set1_epi16( 0 );
+        mmClassIdxResiN = _mm256_set1_epi16( 0 );
         if( useResiCondition )
         {
           mmClassIdxTmp   = _mm256_loadu_si256( (const __m256i *) (pClassCodingInfo + j));
@@ -8146,12 +8166,16 @@ static void simdFixFilter9x9Db9Blk(AlfClassifier **classifier, const CPelBuf &sr
         params[20] = _mm_unpackhi_epi64(_mm_unpackhi_epi32(rawCoef[0][5], rawCoef[1][5]), _mm_unpackhi_epi32(rawCoef[2][5], rawCoef[3][5]));
 
 #if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+        mmClassIdxBsP = _mm_set1_epi16( 0 );
+        mmClassIdxBsN = _mm_set1_epi16( 0 );
         if( useBounCondition )
         {
           mmClassIdxTmp   = _mm_loadu_si128( (const __m128i *) (pClassCodingInfo + j));
           mmClassIdxBsP   = _mm_srai_epi16( mmClassIdxTmp, 1 );
           mmClassIdxBsN   = _mm_sub_epi16( mm01Vector, mmClassIdxBsP );
         }
+        mmClassIdxResiP = _mm_set1_epi16( 0 );
+        mmClassIdxResiN = _mm_set1_epi16( 0 );
         if( useResiCondition )
         {
           mmClassIdxTmp   = _mm_loadu_si128( (const __m128i *) (pClassCodingInfo + j));
@@ -8905,12 +8929,16 @@ static void simdFilterResi9x9Db9Blk(AlfClassifier **classifier, const CPelBuf &s
         params[9]  = _mm256_unpacklo_epi64(_mm256_unpackhi_epi32(rawCoef[0][2], rawCoef[1][2]), _mm256_unpackhi_epi32(rawCoef[2][2], rawCoef[3][2]));
         params[10] = _mm256_unpackhi_epi64(_mm256_unpackhi_epi32(rawCoef[0][2], rawCoef[1][2]), _mm256_unpackhi_epi32(rawCoef[2][2], rawCoef[3][2]));
 #if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+        mmClassIdxBsP = _mm256_set1_epi16( 0 );
+        mmClassIdxBsN = _mm256_set1_epi16( 0 );
         if (useBounCondition)
         {
           mmClassIdxTmp = _mm256_loadu_si256((const __m256i *) (pClassCodingInfo + j));
           mmClassIdxBsP = _mm256_srai_epi16(mmClassIdxTmp, 1);
           mmClassIdxBsN = _mm256_sub_epi16(mm01Vector, mmClassIdxBsP);
         }
+        mmClassIdxResiP = _mm256_set1_epi16( 0 );
+        mmClassIdxResiN = _mm256_set1_epi16( 0 );
         if (useResiCondition)
         {
           mmClassIdxTmp   = _mm256_loadu_si256((const __m256i *) (pClassCodingInfo + j));
@@ -9152,12 +9180,16 @@ static void simdFilterResi9x9Db9Blk(AlfClassifier **classifier, const CPelBuf &s
       params[9] = _mm_unpacklo_epi64(_mm_unpackhi_epi32(rawCoef[0][2], rawCoef[1][2]), _mm_unpackhi_epi32(rawCoef[2][2], rawCoef[3][2]));
       params[10] = _mm_unpackhi_epi64(_mm_unpackhi_epi32(rawCoef[0][2], rawCoef[1][2]), _mm_unpackhi_epi32(rawCoef[2][2], rawCoef[3][2]));
 #if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+      mmClassIdxBsP = _mm_set1_epi16( 0 );
+      mmClassIdxBsN = _mm_set1_epi16( 0 );
       if( useBounCondition )
       {
         mmClassIdxTmp   = _mm_loadu_si128( (const __m128i *) (pClassCodingInfo + j));
         mmClassIdxBsP   = _mm_srai_epi16( mmClassIdxTmp, 1 );
         mmClassIdxBsN   = _mm_sub_epi16( mm01Vector, mmClassIdxBsP );
       }
+      mmClassIdxResiP = _mm_set1_epi16( 0 );
+      mmClassIdxResiN = _mm_set1_epi16( 0 );
       if( useResiCondition )
       {
         mmClassIdxTmp   = _mm_loadu_si128( (const __m128i *) (pClassCodingInfo + j));
