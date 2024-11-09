@@ -1898,7 +1898,7 @@ public:
   bool deriveInterCcpMergePrediction( TransformUnit* tu, const PelBuf& lumaReconstruction, PelBuf& inBufCb, PelBuf& inBufCr, PelBuf& outBufCb, PelBuf& outBufCr, CCPModelCandidate interCcpMergeList[], int validNum);
 #endif
 #if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
-  void subBlockIntraForOBMC(PredictionUnit &subPu, const int iSub, const bool IsAbove, PelUnitBuf &cTmp, IntraPrediction *pcIntraPred);
+  void subBlockIntraForOBMC(PredictionUnit &subPu, const int iSub, const bool isAbove, PelUnitBuf &cTmp, IntraPrediction *pcIntraPred);
 #endif
 };
 
