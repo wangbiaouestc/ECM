@@ -2020,6 +2020,36 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
     }
   }
 #endif
+
+#if JVET_AJ0097_BDOF_LDB
+  if (m_pcCuEncoder->getEncCfg()->getBIO())
+  {
+    hashBlkHitPerc = (hashBlkHitPerc == -1) ? m_pcCuEncoder->getIbcHashMap().calHashBlkMatchPerc(cs.area.Y()) : hashBlkHitPerc;
+    bool isSCC = hashBlkHitPerc >= 10;
+
+    int curPoc = cs.slice->getPOC();
+    bool lowdelayRefExist = false;
+    int n0 = pcSlice->getNumRefIdx(REF_PIC_LIST_0);
+    int n1 = pcSlice->getNumRefIdx(REF_PIC_LIST_1);
+
+    for (int idx0 = 0; idx0 < n0; idx0++)
+    {
+      int poc0 = pcSlice->getRefPOC(REF_PIC_LIST_0, idx0);
+
+      for (int idx1 = 0; idx1 < n1; idx1++)
+      {
+        int poc1 = pcSlice->getRefPOC(REF_PIC_LIST_1, idx1);
+        if ((curPoc - poc0) * (curPoc - poc1) > 0)
+        {
+          lowdelayRefExist = true;
+          break;
+        }
+      }
+    }
+    cs.picHeader->setDisBdofFlag(isSCC && lowdelayRefExist);
+  }
+#endif
+
 #if JVET_AI0082_GPM_WITH_INTER_IBC
   if (m_pcCuEncoder->getEncCfg()->getUseGeoInterIbc())
   {
