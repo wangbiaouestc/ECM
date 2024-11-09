@@ -172,7 +172,7 @@ public:
 
   void filter4x4( const ClpRng& clpRng, Pel const *src, int srcStride, Pel *dst, int dstStride, int xFrac, int yFrac, bool isLast
 #if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
-    , bool useHighPrec = false
+  , bool useHighPrec = false
 #endif
   );
 

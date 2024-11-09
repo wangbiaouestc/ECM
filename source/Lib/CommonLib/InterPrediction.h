@@ -177,6 +177,10 @@ public:
   bool              m_skipDoLic;
 #endif
 #endif
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+  bool              m_isAffBdofChroma;
+  bool              m_isDeriveOobMask;
+#endif
 #if JVET_AD0140_MVD_PREDICTION
   struct MvdDerivedInfo
   {
@@ -1709,6 +1713,12 @@ public:
   Mv*       getBdofSubPuMvBuf()                    { return m_bdofSubPuMvBuf;          }
   void      setDoAffineSubPuBdof(bool doAffineSubPuBdof)  { m_doAffineSubPuBdof = doAffineSubPuBdof; }
   bool      getDoAffineSubPuBdof()                        { return m_doAffineSubPuBdof; }
+#endif
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+  void      setAffineBdofChroma(bool isAffineBdofChroma) { m_isAffBdofChroma = isAffineBdofChroma; }
+  bool      getAffineBdofChroma() { return m_isAffBdofChroma; }
+  void      setDeriveOobMask(bool isDeriveOobMask) { m_isDeriveOobMask = isDeriveOobMask; }
+  bool      getDeriveOobMask() { return m_isDeriveOobMask; }
 #endif
   void xFillIBCBuffer(CodingUnit &cu);
 #if JVET_Z0118_GDR

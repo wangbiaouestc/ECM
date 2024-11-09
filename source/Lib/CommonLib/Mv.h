@@ -531,7 +531,7 @@ bool wrapClipMv( Mv& rcMv, const Position& pos,
                  const SPS *sps
                , const PPS* pps
 #if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
-  , const int mvShift = MV_FRACTIONAL_BITS_INTERNAL
+               , const int mvShift = MV_FRACTIONAL_BITS_INTERNAL
 #endif
 );
 

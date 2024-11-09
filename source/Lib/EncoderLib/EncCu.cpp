@@ -9158,9 +9158,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
             pu.availableBdofRefinedMv = AFFINE_SUBPU_BDOF_NOT_APPLY;
             auto bufferedMrgType = pu.mergeType;
             pu.mergeType = MRG_TYPE_SUBPU_ATMVP;
-            g_isAffBdofChroma = true;
+            m_pcInterSearch->setAffineBdofChroma(true);
             m_pcInterSearch->motionCompensation(pu, REF_PIC_LIST_X, false, true);
-            g_isAffBdofChroma = false;
+            m_pcInterSearch->setAffineBdofChroma(false);
             pu.mergeType = bufferedMrgType;
 #endif
           }
@@ -9465,9 +9465,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
             pu.availableBdofRefinedMv = AFFINE_SUBPU_BDOF_NOT_APPLY;
             auto bufferedMrgType = pu.mergeType;
             pu.mergeType = MRG_TYPE_SUBPU_ATMVP;
-            g_isAffBdofChroma = true;
+            m_pcInterSearch->setAffineBdofChroma(true);
             m_pcInterSearch->motionCompensation(pu, REF_PIC_LIST_X, false, true);
-            g_isAffBdofChroma = false;
+            m_pcInterSearch->setAffineBdofChroma(false);
             pu.mergeType = bufferedMrgType;
 #endif
           }
@@ -9479,7 +9479,7 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
           {
 #if JVET_AG0135_AFFINE_CIIP
 #if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
-          tempCS->getPredBuf().copyFrom(acMergeAffineBuffer[uiMergeCand], true);
+            tempCS->getPredBuf().copyFrom(acMergeAffineBuffer[uiMergeCand], true);
 #else
             tempCS->getPredBuf().copyFrom(acMergeAffineBuffer[uiMergeCand]);
 #endif
@@ -9502,9 +9502,9 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
             pu.availableBdofRefinedMv = AFFINE_SUBPU_BDOF_NOT_APPLY;
             auto bufferedMrgType = pu.mergeType;
             pu.mergeType = MRG_TYPE_SUBPU_ATMVP;
-            g_isAffBdofChroma = true;
+            m_pcInterSearch->setAffineBdofChroma(true);
             m_pcInterSearch->motionCompensation(pu, REF_PIC_LIST_X, false, true);
-            g_isAffBdofChroma = false;
+            m_pcInterSearch->setAffineBdofChroma(false);
             pu.mergeType = bufferedMrgType;
 #endif
           }
@@ -9540,10 +9540,10 @@ void EncCu::xCheckRDCostMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&
                 }
                 else
                 {
-                  g_deriveOOBMask = true;
+                  m_pcInterSearch->setDeriveOobMask(true);
                   tempCS->getPredBuf().copyFrom(*acMergeTempBuffer[uiMrgHADIdx], true);
                   m_pcInterSearch->motionCompensation(pu, REF_PIC_LIST_X, true, true);
-                  g_deriveOOBMask = false;
+                  m_pcInterSearch->setDeriveOobMask(false);
                 }
               }
               else
