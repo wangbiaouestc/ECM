@@ -201,7 +201,7 @@ private:
   int               m_LICMultApprox[64];
 #endif
 #if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
-  Pel* m_IntraOBMCBuf[MAX_NUM_COMPONENT];
+  Pel* m_intraOBMCBuf[MAX_NUM_COMPONENT];
   Pel* m_beforeOBMCBuf[MAX_NUM_COMPONENT];
 #endif
 
@@ -1722,11 +1722,11 @@ public:
 #endif
 #if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
 private:
-  bool m_DIMDForOBMCFilled;
+  bool m_dimdForOBMCFilled;
   int m_modeBuf[2][MAX_CU_SIZE >> MIN_CU_LOG2];
   int m_modeGetCheck[2];
 public:
-  void setDIMDForOBMC(bool b) { m_DIMDForOBMCFilled = b; }
+  void setDIMDForOBMC(bool b) { m_dimdForOBMCFilled = b; }
   void setModeGetCheck(int i, bool b) { m_modeGetCheck[i] = b; }
   void setClearModeBuf(int i) { memset(m_modeBuf[i], -1, sizeof(int) * (MAX_CU_SIZE >> MIN_CU_LOG2)); }
 #endif
@@ -1898,7 +1898,7 @@ public:
   bool deriveInterCcpMergePrediction( TransformUnit* tu, const PelBuf& lumaReconstruction, PelBuf& inBufCb, PelBuf& inBufCr, PelBuf& outBufCb, PelBuf& outBufCr, CCPModelCandidate interCcpMergeList[], int validNum);
 #endif
 #if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
-  void subBlockIntraForOBMC(PredictionUnit &subPu, const int iSub, const bool bIsAbove, PelUnitBuf &cTmp, IntraPrediction *pcIntraPred);
+  void subBlockIntraForOBMC(PredictionUnit &subPu, const int iSub, const bool IsAbove, PelUnitBuf &cTmp, IntraPrediction *pcIntraPred);
 #endif
 };
 

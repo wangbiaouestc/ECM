@@ -469,7 +469,7 @@ void InterPrediction::destroy()
 #if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
   for (uint32_t ch = 0; ch < MAX_NUM_COMPONENT; ch++)
   {
-    xFree(m_IntraOBMCBuf[ch]); m_IntraOBMCBuf[ch] = nullptr;
+    xFree(m_intraOBMCBuf[ch]); m_intraOBMCBuf[ch] = nullptr;
     xFree(m_beforeOBMCBuf[ch]); m_beforeOBMCBuf[ch] = nullptr;
   }
 #endif
@@ -653,7 +653,7 @@ void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, cons
 #if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
     for( uint32_t c = 0; c < MAX_NUM_COMPONENT; c++ )
     {
-      m_IntraOBMCBuf[c] = (Pel*)xMalloc(Pel, MAX_CU_SIZE * MAX_CU_SIZE);
+      m_intraOBMCBuf[c] = (Pel*)xMalloc(Pel, MAX_CU_SIZE * MAX_CU_SIZE);
       m_beforeOBMCBuf[c] = (Pel*)xMalloc(Pel, MAX_CU_SIZE * MAX_CU_SIZE);
     }
 #endif
@@ -8215,17 +8215,17 @@ void InterPrediction::subBlockOBMC(PredictionUnit  &pu, PelUnitBuf* pDst)
 #endif
 
 #if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
-  if (!m_DIMDForOBMCFilled)
+  if (!m_dimdForOBMCFilled)
   {
     m_modeGetCheck[0] = pcIntraPred->getGradForOBMC(pu, pu.cu->cs->picture->getRecoBuf(pu.Y()), pu.Y(), *pu.cu, true, pu.cs->pcv->minCUWidth, m_modeBuf[0]);
     m_modeGetCheck[1] = pcIntraPred->getGradForOBMC(pu, pu.cu->cs->picture->getRecoBuf(pu.Y()), pu.Y(), *pu.cu, false, pu.cs->pcv->minCUWidth, m_modeBuf[1]);
 
-    m_DIMDForOBMCFilled = true;
+    m_dimdForOBMCFilled = true;
   }
 
-  PelUnitBuf predIntra = PelUnitBuf(pu.chromaFormat, PelBuf(m_IntraOBMCBuf[COMPONENT_Y], pu.blocks[COMPONENT_Y].width, pu.blocks[COMPONENT_Y].height),
-    PelBuf(m_IntraOBMCBuf[COMPONENT_Cb], pu.blocks[COMPONENT_Cb].width, pu.blocks[COMPONENT_Cb].height),
-    PelBuf(m_IntraOBMCBuf[COMPONENT_Cr], pu.blocks[COMPONENT_Cr].width, pu.blocks[COMPONENT_Cr].height));
+  PelUnitBuf predIntra = PelUnitBuf(pu.chromaFormat, PelBuf(m_intraOBMCBuf[COMPONENT_Y], pu.blocks[COMPONENT_Y].width, pu.blocks[COMPONENT_Y].height),
+    PelBuf(m_intraOBMCBuf[COMPONENT_Cb], pu.blocks[COMPONENT_Cb].width, pu.blocks[COMPONENT_Cb].height),
+    PelBuf(m_intraOBMCBuf[COMPONENT_Cr], pu.blocks[COMPONENT_Cr].width, pu.blocks[COMPONENT_Cr].height));
 #endif
 
   const UnitArea   orgPuArea = pu;
@@ -8503,9 +8503,9 @@ void InterPrediction::subBlockOBMC(PredictionUnit  &pu, PelUnitBuf* pDst)
             cumLength++;
           }
 
-          const bool bIntraOBMCCond = (((iBlkBoundary == 0) && ((m_modeBuf[iBlkBoundary][iSub] >= DIA_IDX) && (m_modeBuf[iBlkBoundary][iSub] <= VDIA_IDX)))
+          const bool intraOBMCCond = (((iBlkBoundary == 0) && ((m_modeBuf[iBlkBoundary][iSub] >= DIA_IDX) && (m_modeBuf[iBlkBoundary][iSub] <= VDIA_IDX)))
             || ((iBlkBoundary == 1) && (m_modeBuf[iBlkBoundary][iSub] > DC_IDX) && (m_modeBuf[iBlkBoundary][iSub] <= DIA_IDX)));
-          if (!bIntraOBMCCond)
+          if (!intraOBMCCond)
           {
             iSub += currLength;
             continue;
@@ -40372,23 +40372,23 @@ std::vector<Mv> InterPrediction::deriveMVDFromMVSDIdxAffineSI(PredictionUnit& pu
 #endif
 
 #if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
-  void InterPrediction::subBlockIntraForOBMC(PredictionUnit &subPu, const int iSub, const bool bIsAbove, PelUnitBuf &cTmp, IntraPrediction *pcIntraPred)
+  void InterPrediction::subBlockIntraForOBMC(PredictionUnit &subPu, const int iSub, const bool isAbove, PelUnitBuf &cTmp, IntraPrediction *pcIntraPred)
   {
     const uint32_t uiMinCUW = subPu.cs->pcv->minCUWidth;
     const int scaleX = getComponentScaleX((ComponentID)COMPONENT_Cb, subPu.chromaFormat);
     const int scaleY = getComponentScaleX((ComponentID)COMPONENT_Cb, subPu.chromaFormat);
 
     const int origIntraDir[2] = {subPu.intraDir[0], subPu.intraDir[1]};
-    subPu.intraDir[0] = m_modeBuf[bIsAbove ? 0 : 1][iSub];
-    subPu.intraDir[1] = m_modeBuf[bIsAbove ? 0 : 1][iSub];
+    subPu.intraDir[0] = m_modeBuf[isAbove ? 0 : 1][iSub];
+    subPu.intraDir[1] = m_modeBuf[isAbove ? 0 : 1][iSub];
 
-    pcIntraPred->m_isIntraForOBMC = (iSub == 0) ? 0 : (bIsAbove ? 1 : 2);
+    pcIntraPred->m_isIntraForOBMC = (iSub == 0) ? 0 : (isAbove ? 1 : 2);
 
-    bool bPrepareRef = false;
-    bPrepareRef |= (bIsAbove && subPu.Y().topLeft().x != 0 && subPu.intraDir[0] < VER_IDX);
-    bPrepareRef |= (!bIsAbove && subPu.Y().topLeft().y != 0 && subPu.intraDir[0] > HOR_IDX);
-    bPrepareRef &= pcIntraPred->m_isIntraForOBMC != 0;
-    pcIntraPred->m_refSampleForOBMC = bPrepareRef;
+    bool prepareRef = false;
+    prepareRef |= (isAbove && subPu.Y().topLeft().x != 0 && subPu.intraDir[0] < VER_IDX);
+    prepareRef |= (!isAbove && subPu.Y().topLeft().y != 0 && subPu.intraDir[0] > HOR_IDX);
+    prepareRef &= pcIntraPred->m_isIntraForOBMC != 0;
+    pcIntraPred->m_refSampleForOBMC = prepareRef;
 
     CodingUnit *origCu = subPu.cu;
     CodingUnit tempCu = *subPu.cu;
@@ -40398,23 +40398,23 @@ std::vector<Mv> InterPrediction::deriveMVDFromMVSDIdxAffineSI(PredictionUnit& pu
     
     for (uint32_t c = 0; c < MAX_NUM_COMPONENT; c++)
     {
-      const uint32_t uiScaledMinCUW = c == 0 ? uiMinCUW : (bIsAbove ? (uiMinCUW >> scaleX) : (uiMinCUW >> scaleY));
+      const uint32_t uiScaledMinCUW = c == 0 ? uiMinCUW : (isAbove ? (uiMinCUW >> scaleX) : (uiMinCUW >> scaleY));
 
       if (iSub != 0)
         pcIntraPred->initIntraPatternChTypeOBMC(tempCu, subPu.blocks[c]);
       else
         pcIntraPred->initIntraPatternChType(tempCu, subPu.blocks[c]);
-      const int sizeSide = (bIsAbove ? subPu.blocks[c].height : subPu.blocks[c].width) + 2;
+      const int sizeSide = (isAbove ? subPu.blocks[c].height : subPu.blocks[c].width) + 2;
 
-      if (bPrepareRef)
+      if (prepareRef)
       {
         memset(pcIntraPred->m_refSampleForOBMCBuf, -1, sizeof( Pel ) * (MAX_INTRA_SIZE + 3));
         memset(pcIntraPred->m_refSampleForOBMCBufFiltered, -1, sizeof( Pel ) * (MAX_INTRA_SIZE + 3));
         const PelBuf pRecoBuf = subPu.cu->cs->picture->getRecoBuf().bufs[c];
         for (int i = 0; i <= sizeSide; i++)
         {
-          const int currPos_ = bIsAbove ? (subPu.blocks[c].topLeft().x - 1 - i) : (subPu.blocks[c].topLeft().y - 1 - i);
-          const Position currPos = bIsAbove ? Position(currPos_, subPu.blocks[c].topLeft().y - 1) : Position(subPu.blocks[c].topLeft().x - 1, currPos_);
+          const int currPos_ = isAbove ? (subPu.blocks[c].topLeft().x - 1 - i) : (subPu.blocks[c].topLeft().y - 1 - i);
+          const Position currPos = isAbove ? Position(currPos_, subPu.blocks[c].topLeft().y - 1) : Position(subPu.blocks[c].topLeft().x - 1, currPos_);
 
           if ((currPos_ + 1) % uiScaledMinCUW == 0)
           {

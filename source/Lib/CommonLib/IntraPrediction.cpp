@@ -5869,9 +5869,10 @@ void IntraPrediction::xFillReferenceSamples( const CPelBuf &recoBuf, Pel* refBuf
 {
 #if JVET_AH0209_PDP
 #if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
-  if (m_isIntraForOBMC == 0)
-#endif
+  if (m_isIntraForOBMC == 0 && !cu.firstPU->multiRefIdx && !cu.ispMode && !cu.plIdx)
+#else
   if (!cu.firstPU->multiRefIdx && !cu.ispMode && !cu.plIdx)
+#endif
   {
     xFillReferenceSamples2(recoBuf, area, cu);
   }

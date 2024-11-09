@@ -33060,7 +33060,7 @@ int buildHistogram(const Pel *pReco, int iStride, uint32_t uiHeight, uint32_t ui
 #endif
 
 #if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
-void calcGradForOBMC(const PredictionUnit pu, const Pel *pReco, const int iStride, const uint32_t totalUnits, const int templateSize, const int blkSize, int *modeBuf, const int isAbove, const bool isExistFirst, const bool isExistLast)
+void calcGradForOBMC(const PredictionUnit pu, const Pel *pReco, const int iStride, const int totalUnits, const int templateSize, const int blkSize, int *modeBuf, const int isAbove, const bool isExistFirst, const bool isExistLast)
 {
   int       angTable[17]   = { 0,     2048,  4096,  6144,  8192,  12288, 16384, 20480, 24576,
                        28672, 32768, 36864, 40960, 47104, 53248, 59392, 65536 };
@@ -33075,7 +33075,7 @@ void calcGradForOBMC(const PredictionUnit pu, const Pel *pReco, const int iStrid
   MotionInfo mi;
 
   const int extraPosNum = 2;
-  bool bPrevSaved = false;
+  bool prevSaved = false;
   int savedPrevAmp[extraPosNum << 1];
   int savedPrevAng[extraPosNum << 1];
 
@@ -33122,7 +33122,7 @@ void calcGradForOBMC(const PredictionUnit pu, const Pel *pReco, const int iStrid
         i += forNext;
       }
       
-      bPrevSaved = false;
+      prevSaved = false;
       continue;
     }
 
@@ -33137,7 +33137,7 @@ void calcGradForOBMC(const PredictionUnit pu, const Pel *pReco, const int iStrid
         continue;
       
       int iAmp = 0, iAngUneven = -1;
-      if (j < extraPosNum && bPrevSaved)
+      if (j < extraPosNum && prevSaved)
       {
         iAmp = savedPrevAmp[j + extraPosNum];
         iAngUneven = savedPrevAng[j + extraPosNum];        
@@ -33228,7 +33228,7 @@ void calcGradForOBMC(const PredictionUnit pu, const Pel *pReco, const int iStrid
       }
     }
 
-    bPrevSaved = true;
+    prevSaved = true;
     modeBuf[i] = bestMode;
     i++;
   }
