@@ -3470,7 +3470,11 @@ static void simdFilter13x13BlkExtDbResiDirect(
     adjustShift -= shiftPrecis; // add more precision
   }
   const int shift = adjustShift;
+#if JVET_AJ0237_INTERNAL_12BIT
+  const Pel currBase = 1 << (clpRng.bd - 1);
+#else
   const Pel currBase = 512;
+#endif
   int round = 1 << (shift - 1);
 
   __m128i curBase = _mm_set_epi16( currBase, currBase, currBase, currBase, currBase, currBase, currBase, currBase );
@@ -4065,7 +4069,11 @@ static void simdFilter13x13BlkExtDbResi(
     adjustShift -= shiftPrecis; // add more precision
   }
   const int shift = adjustShift;
+#if JVET_AJ0237_INTERNAL_12BIT
+  const Pel currBase = 1 << (clpRng.bd - 1);
+#else
   const Pel currBase = 512;
+#endif
   int round = 1 << (shift - 1);
 
   __m128i curBase = _mm_set_epi16( currBase, currBase, currBase, currBase, currBase, currBase, currBase, currBase );
@@ -4615,7 +4623,11 @@ static void simdGaussFiltering(CodingStructure &cs, Pel ***gaussPic, const CPelB
     int clipIdx = gaussClipIdxTable[filterSetIdx][i];
     gaussClipTable[i] = clippingValues[clipIdx];
   }
+#if JVET_AJ0237_INTERNAL_12BIT
+  int16_t diffTH = 32 << std::max(0, cs.sps->getBitDepth(CHANNEL_TYPE_LUMA) - 10);
+#else
   int16_t diffTH = 32;
+#endif
 
   const __m128i offsetMax = _mm_set1_epi16(diffTH);
   const __m128i offsetMin = _mm_sub_epi16(_mm_setzero_si128(), offsetMax);
@@ -6062,9 +6074,19 @@ static void simdFixFilter9x9Db9Blk(AlfClassifier **classifier, const CPelBuf &sr
 #endif
 }
 
+#if JVET_AJ0237_INTERNAL_12BIT
+template<X86_VEXT vext>
+static void simdDeriveVariance(const CPelBuf& srcLuma, const Area& blkDst, const Area& blk, uint32_t ***variance, int bits)
+#else
 template<X86_VEXT vext>
 static void simdDeriveVariance(const CPelBuf &srcLuma, const Area &blkDst, const Area &blk, uint32_t ***variance)
+#endif
 {
+#if JVET_AJ0237_INTERNAL_12BIT
+  // temporary buffer, could be optimized
+  int64_t tempData[2][(256 + 10) >> 1][((256 + 16) >> 1) + 8];
+  int bdShift = 2 * std::max(0, bits - 10);
+#endif
   const size_t imgStride = srcLuma.stride;
   const Pel *  srcExt = srcLuma.buf;
   int fl = DIST_CLASS;
@@ -6076,16 +6098,19 @@ static void simdDeriveVariance(const CPelBuf &srcLuma, const Area &blkDst, const
   int numSample2 = 128 * 128;
   int offset = numSample2 >> 1;
 
+#if !JVET_AJ0237_INTERNAL_12BIT
   int num[8]{ numSample, numSample, numSample, numSample, numSample, numSample, numSample, numSample };
   int mul[8]{ 13, 13, 13, 13, 13, 13, 13, 13 };
   int off[8]{ offset, offset, offset, offset, offset, offset, offset, offset };
+#endif
 #if USE_AVX2
   if (vext >= AVX2 && (blk.width % 32) == 0)
   {
+#if !JVET_AJ0237_INTERNAL_12BIT
     __m256i n = _mm256_loadu_si256((__m256i *) num);
     __m256i m13 = _mm256_loadu_si256((__m256i *) mul);
     __m256i o = _mm256_loadu_si256((__m256i *) off);
-
+#endif
     const int posX = blk.pos().x;
     const int posY = blk.pos().y;
 
@@ -6215,6 +6240,41 @@ static void simdDeriveVariance(const CPelBuf &srcLuma, const Area &blkDst, const
 
         if (i == 8)
         {
+#if JVET_AJ0237_INTERNAL_12BIT
+          for (int kk = 0; kk < 4; kk++)
+          {
+            __m256i x8Low   = _mm256_cvtepi32_epi64(_mm_loadu_si128((__m128i*) & variance[2][iOffset - 4][jOffset + kk * 4]));
+            __m256i y8Low   = _mm256_cvtepi32_epi64(_mm_loadu_si128((__m128i*) & variance[3][iOffset - 4][jOffset + kk * 4]));
+            __m256i x6Low   = _mm256_cvtepi32_epi64(_mm_loadu_si128((__m128i*) & variance[2][iOffset - 3][jOffset + kk * 4]));
+            __m256i y6Low   = _mm256_cvtepi32_epi64(_mm_loadu_si128((__m128i*) & variance[3][iOffset - 3][jOffset + kk * 4]));
+            __m256i x4Low   = _mm256_cvtepi32_epi64(_mm_loadu_si128((__m128i*) & variance[2][iOffset - 2][jOffset + kk * 4]));
+            __m256i y4Low   = _mm256_cvtepi32_epi64(_mm_loadu_si128((__m128i*) & variance[3][iOffset - 2][jOffset + kk * 4]));
+            __m256i x2Low   = _mm256_cvtepi32_epi64(_mm_loadu_si128((__m128i*) & variance[2][iOffset - 1][jOffset + kk * 4]));
+            __m256i y2Low   = _mm256_cvtepi32_epi64(_mm_loadu_si128((__m128i*) & variance[3][iOffset - 1][jOffset + kk * 4]));
+            __m256i sumLow  = _mm256_cvtepi32_epi64(_mm_loadu_si128((__m128i*) & variance[2][iOffset    ][jOffset + kk * 4]));
+            __m256i sum2Low = _mm256_cvtepi32_epi64(_mm_loadu_si128((__m128i*) & variance[3][iOffset    ][jOffset + kk * 4]));
+
+            x8Low = _mm256_add_epi64(sumLow, x8Low);
+            y8Low = _mm256_add_epi64(sum2Low, y8Low);
+
+            x4Low = _mm256_add_epi64(x6Low, x4Low);
+            y4Low = _mm256_add_epi64(y6Low, y4Low);
+
+            x2Low = _mm256_add_epi64(x8Low, x2Low);
+            y2Low = _mm256_add_epi64(y8Low, y2Low);
+
+            sumLow  = _mm256_add_epi64(x4Low, x2Low);
+            sum2Low = _mm256_add_epi64(y4Low, y2Low);
+
+            _mm256_storeu_si256((__m256i*) &tempData[0][iOffset - 4][jOffset + kk * 4], sumLow);
+            _mm256_storeu_si256((__m256i*) &tempData[1][iOffset - 4][jOffset + kk * 4], sum2Low);
+
+            variance[VARIANCE][iOffset - 4][jOffset + kk * 4] = (uint32_t)((13 * ((numSample * tempData[1][iOffset - 4][jOffset + kk * 4] - tempData[0][iOffset - 4][jOffset + kk * 4] * tempData[0][iOffset - 4][jOffset + kk * 4] + offset) >> 3)) >> (14 + bdShift));
+            variance[VARIANCE][iOffset - 4][jOffset + kk * 4 + 1] = (uint32_t)((13 * ((numSample * tempData[1][iOffset - 4][jOffset + kk * 4 + 1] - tempData[0][iOffset - 4][jOffset + kk * 4 + 1] * tempData[0][iOffset - 4][jOffset + kk * 4 + 1] + offset) >> 3)) >> (14 + bdShift));
+            variance[VARIANCE][iOffset - 4][jOffset + kk * 4 + 2] = (uint32_t)((13 * ((numSample * tempData[1][iOffset - 4][jOffset + kk * 4 + 2] - tempData[0][iOffset - 4][jOffset + kk * 4 + 2] * tempData[0][iOffset - 4][jOffset + kk * 4 + 2] + offset) >> 3)) >> (14 + bdShift));
+            variance[VARIANCE][iOffset - 4][jOffset + kk * 4 + 3] = (uint32_t)((13 * ((numSample * tempData[1][iOffset - 4][jOffset + kk * 4 + 3] - tempData[0][iOffset - 4][jOffset + kk * 4 + 3] * tempData[0][iOffset - 4][jOffset + kk * 4 + 3] + offset) >> 3)) >> (14 + bdShift));
+          }
+#else
           x8 = _mm256_loadu_si256((__m256i *)&variance[2][iOffset - 4][jOffset]);
           y8 = _mm256_loadu_si256((__m256i *)&variance[3][iOffset - 4][jOffset]);
           x6 = _mm256_loadu_si256((__m256i *)&variance[2][iOffset - 3][jOffset]);
@@ -6273,9 +6333,37 @@ static void simdDeriveVariance(const CPelBuf &srcLuma, const Area &blkDst, const
           summ2 = _mm256_srli_epi32(summ2, 14);
           _mm256_storeu_si256((__m256i *) &variance[VARIANCE][iOffset - 4][jOffset], sum2);
           _mm256_storeu_si256((__m256i *) &variance[VARIANCE][iOffset - 4][jOffset + 8], summ2);
+#endif
         }
         else if (i > 8)
         {
+#if JVET_AJ0237_INTERNAL_12BIT
+          for (int kk = 0; kk < 4; kk++)
+          {
+            __m256i x8Low = _mm256_cvtepi32_epi64(_mm_loadu_si128((__m128i*) &variance[2][iOffset - 5][jOffset + kk * 4]));
+            __m256i y8Low = _mm256_cvtepi32_epi64(_mm_loadu_si128((__m128i*) &variance[3][iOffset - 5][jOffset + kk * 4]));
+
+            __m256i x6Low = _mm256_loadu_si256((__m256i*) &tempData[0][iOffset - 5][jOffset + kk * 4]);
+            __m256i y6Low = _mm256_loadu_si256((__m256i*) &tempData[1][iOffset - 5][jOffset + kk * 4]);
+
+            __m256i sumLow  = _mm256_cvtepi32_epi64(_mm_loadu_si128((__m128i*) &variance[2][iOffset][jOffset + kk * 4]));
+            __m256i sum2Low = _mm256_cvtepi32_epi64(_mm_loadu_si128((__m128i*) &variance[3][iOffset][jOffset + kk * 4]));
+
+            x6Low = _mm256_sub_epi64(x6Low, x8Low);
+            y6Low = _mm256_sub_epi64(y6Low, y8Low);
+
+            sumLow  = _mm256_add_epi64(x6Low, sumLow);
+            sum2Low = _mm256_add_epi64(y6Low, sum2Low);
+
+            _mm256_storeu_si256((__m256i*)& tempData[0][iOffset - 4][jOffset + kk * 4], sumLow);
+            _mm256_storeu_si256((__m256i*)& tempData[1][iOffset - 4][jOffset + kk * 4], sum2Low);
+
+            variance[VARIANCE][iOffset - 4][jOffset + kk * 4] = (uint32_t)((13 * ((numSample * tempData[1][iOffset - 4][jOffset + kk * 4] - tempData[0][iOffset - 4][jOffset + kk * 4] * tempData[0][iOffset - 4][jOffset + kk * 4] + offset) >> 3)) >> (14 + bdShift));
+            variance[VARIANCE][iOffset - 4][jOffset + kk * 4 + 1] = (uint32_t)((13 * ((numSample * tempData[1][iOffset - 4][jOffset + kk * 4 + 1] - tempData[0][iOffset - 4][jOffset + kk * 4 + 1] * tempData[0][iOffset - 4][jOffset + kk * 4 + 1] + offset) >> 3)) >> (14 + bdShift));
+            variance[VARIANCE][iOffset - 4][jOffset + kk * 4 + 2] = (uint32_t)((13 * ((numSample * tempData[1][iOffset - 4][jOffset + kk * 4 + 2] - tempData[0][iOffset - 4][jOffset + kk * 4 + 2] * tempData[0][iOffset - 4][jOffset + kk * 4 + 2] + offset) >> 3)) >> (14 + bdShift));
+            variance[VARIANCE][iOffset - 4][jOffset + kk * 4 + 3] = (uint32_t)((13 * ((numSample * tempData[1][iOffset - 4][jOffset + kk * 4 + 3] - tempData[0][iOffset - 4][jOffset + kk * 4 + 3] * tempData[0][iOffset - 4][jOffset + kk * 4 + 3] + offset) >> 3)) >> (14 + bdShift));
+          }
+#else
           x8 = _mm256_loadu_si256((__m256i *)&variance[2][iOffset - 5][jOffset]);
           xx8 = _mm256_loadu_si256((__m256i *)&variance[2][iOffset - 5][jOffset + 8]);
           y8 = _mm256_loadu_si256((__m256i *)&variance[3][iOffset - 5][jOffset]);
@@ -6315,6 +6403,7 @@ static void simdDeriveVariance(const CPelBuf &srcLuma, const Area &blkDst, const
           summ2 = _mm256_srli_epi32(summ2, 14);
           _mm256_storeu_si256((__m256i *) &variance[VARIANCE][iOffset - 4][jOffset], sum2);
           _mm256_storeu_si256((__m256i *) &variance[VARIANCE][iOffset - 4][jOffset + 8], summ2);
+#endif
         }
       }
 
@@ -6323,10 +6412,11 @@ static void simdDeriveVariance(const CPelBuf &srcLuma, const Area &blkDst, const
   else
   {
 #endif
+#if !JVET_AJ0237_INTERNAL_12BIT
     __m128i n = _mm_loadu_si128((__m128i *) num);
     __m128i m13 = _mm_loadu_si128((__m128i *) mul);
     __m128i o = _mm_loadu_si128((__m128i *) off);
-
+#endif
     const int posX = blk.pos().x;
     const int posY = blk.pos().y;
 
@@ -6396,6 +6486,39 @@ static void simdDeriveVariance(const CPelBuf &srcLuma, const Area &blkDst, const
 
         if (i == 8)
         {
+#if JVET_AJ0237_INTERNAL_12BIT
+          for (int kk = 0; kk < 2; kk++)
+          {
+            __m128i x8Low   = _mm_cvtepi32_epi64(_mm_loadu_si128((__m128i*) & variance[2][iOffset - 4][jOffset + kk * 2]));
+            __m128i y8Low   = _mm_cvtepi32_epi64(_mm_loadu_si128((__m128i*) & variance[3][iOffset - 4][jOffset + kk * 2]));
+            __m128i x6Low   = _mm_cvtepi32_epi64(_mm_loadu_si128((__m128i*) & variance[2][iOffset - 3][jOffset + kk * 2]));
+            __m128i y6Low   = _mm_cvtepi32_epi64(_mm_loadu_si128((__m128i*) & variance[3][iOffset - 3][jOffset + kk * 2]));
+            __m128i x4Low   = _mm_cvtepi32_epi64(_mm_loadu_si128((__m128i*) & variance[2][iOffset - 2][jOffset + kk * 2]));
+            __m128i y4Low   = _mm_cvtepi32_epi64(_mm_loadu_si128((__m128i*) & variance[3][iOffset - 2][jOffset + kk * 2]));
+            __m128i x2Low   = _mm_cvtepi32_epi64(_mm_loadu_si128((__m128i*) & variance[2][iOffset - 1][jOffset + kk * 2]));
+            __m128i y2Low   = _mm_cvtepi32_epi64(_mm_loadu_si128((__m128i*) & variance[3][iOffset - 1][jOffset + kk * 2]));
+            __m128i sumLow  = _mm_cvtepi32_epi64(_mm_loadu_si128((__m128i*) & variance[2][iOffset    ][jOffset + kk * 2]));
+            __m128i sum2Low = _mm_cvtepi32_epi64(_mm_loadu_si128((__m128i*) & variance[3][iOffset    ][jOffset + kk * 2]));
+
+            x8Low   = _mm_add_epi64(sumLow, x8Low);
+            y8Low   = _mm_add_epi64(sum2Low, y8Low);
+
+            x4Low   = _mm_add_epi64(x6Low, x4Low);
+            y4Low   = _mm_add_epi64(y6Low, y4Low);
+
+            x2Low   = _mm_add_epi64(x8Low, x2Low);
+            y2Low   = _mm_add_epi64(y8Low, y2Low);
+
+            sumLow  = _mm_add_epi64(x4Low, x2Low);
+            sum2Low = _mm_add_epi64(y4Low, y2Low);
+
+            _mm_storeu_si128((__m128i*) &tempData[0][iOffset - 4][jOffset + kk * 2], sumLow);
+            _mm_storeu_si128((__m128i*) &tempData[1][iOffset - 4][jOffset + kk * 2], sum2Low);
+
+            variance[VARIANCE][iOffset - 4][jOffset + kk * 2] = (uint32_t)((13 * ((numSample * tempData[1][iOffset - 4][jOffset + kk * 2] - tempData[0][iOffset - 4][jOffset + kk * 2] * tempData[0][iOffset - 4][jOffset + kk * 2] + offset) >> 3)) >> (14 + bdShift));
+            variance[VARIANCE][iOffset - 4][jOffset + kk * 2 + 1] = (uint32_t)((13 * ((numSample * tempData[1][iOffset - 4][jOffset + kk * 2 + 1] - tempData[0][iOffset - 4][jOffset + kk * 2 + 1] * tempData[0][iOffset - 4][jOffset + kk * 2 + 1] + offset) >> 3)) >> (14 + bdShift));
+          }
+#else
           x8 = _mm_loadu_si128((__m128i *)&variance[2][iOffset - 4][jOffset]);
           y8 = _mm_loadu_si128((__m128i *)&variance[3][iOffset - 4][jOffset]);
           x6 = _mm_loadu_si128((__m128i *)&variance[2][iOffset - 3][jOffset]);
@@ -6427,9 +6550,33 @@ static void simdDeriveVariance(const CPelBuf &srcLuma, const Area &blkDst, const
           sum2 = _mm_mullo_epi32(sum2, m13);
           sum2 = _mm_srli_epi32(sum2, 14);
           _mm_storeu_si128((__m128i *) &variance[VARIANCE][iOffset - 4][jOffset], sum2);
+#endif
         }
         else if (i > 8)
         {
+#if JVET_AJ0237_INTERNAL_12BIT
+          for (int kk = 0; kk < 2; kk++)
+          {
+            __m128i x8Low = _mm_cvtepi32_epi64(_mm_loadu_si128((__m128i*) & variance[2][iOffset - 5][jOffset + kk * 2]));
+            __m128i y8Low = _mm_cvtepi32_epi64(_mm_loadu_si128((__m128i*) & variance[3][iOffset - 5][jOffset + kk * 2]));
+            __m128i x6Low = _mm_loadu_si128((__m128i*) &tempData[0][iOffset - 5][jOffset + kk * 2]);
+            __m128i y6Low = _mm_loadu_si128((__m128i*) &tempData[1][iOffset - 5][jOffset + kk * 2]);
+            __m128i sumLow  = _mm_cvtepi32_epi64(_mm_loadu_si128((__m128i*) & variance[2][iOffset][jOffset + kk * 2]));
+            __m128i sum2Low = _mm_cvtepi32_epi64(_mm_loadu_si128((__m128i*) & variance[3][iOffset][jOffset + kk * 2]));
+
+            x6Low = _mm_sub_epi32(x6Low, x8Low);
+            y6Low = _mm_sub_epi32(y6Low, y8Low);
+
+            sumLow  = _mm_add_epi32(x6Low, sumLow);
+            sum2Low = _mm_add_epi32(y6Low, sum2Low);
+
+            _mm_storeu_si128((__m128i*) & tempData[0][iOffset - 4][jOffset + kk * 2], sumLow);
+            _mm_storeu_si128((__m128i*) & tempData[1][iOffset - 4][jOffset + kk * 2], sum2Low);
+
+            variance[VARIANCE][iOffset - 4][jOffset + kk * 2] = (uint32_t)((13 * ((numSample * tempData[1][iOffset - 4][jOffset + kk * 2] - tempData[0][iOffset - 4][jOffset + kk * 2] * tempData[0][iOffset - 4][jOffset + kk * 2] + offset) >> 3)) >> (14 + bdShift));
+            variance[VARIANCE][iOffset - 4][jOffset + kk * 2 + 1] = (uint32_t)((13 * ((numSample * tempData[1][iOffset - 4][jOffset + kk * 2 + 1] - tempData[0][iOffset - 4][jOffset + kk * 2 + 1] * tempData[0][iOffset - 4][jOffset + kk * 2 + 1] + offset) >> 3)) >> (14 + bdShift));
+          }
+#else
           x8 = _mm_loadu_si128((__m128i *)&variance[2][iOffset - 5][jOffset]);
           y8 = _mm_loadu_si128((__m128i *)&variance[3][iOffset - 5][jOffset]);
           x6 = _mm_loadu_si128((__m128i *)&variance[0][iOffset - 5][jOffset]);
@@ -6451,6 +6598,7 @@ static void simdDeriveVariance(const CPelBuf &srcLuma, const Area &blkDst, const
           sum2 = _mm_mullo_epi32(sum2, m13);
           sum2 = _mm_srli_epi32(sum2, 14);
           _mm_storeu_si128((__m128i *) &variance[VARIANCE][iOffset - 4][jOffset], sum2);
+#endif
         }
       }
 

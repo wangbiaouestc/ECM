@@ -13891,7 +13891,11 @@ void IntraPrediction::reorderPLT(CodingStructure& cs, Partitioner& partitioner, 
 }
 
 #if MMLM && LMS_LINEAR_MODEL
+#if JVET_AJ0237_INTERNAL_12BIT
+int IntraPrediction::xCalcLMParametersGeneralized(int64_t x, int64_t y, int64_t xx, int64_t xy, int count, int bitDepth, int& a, int& b, int& iShift)
+#else
 int IntraPrediction::xCalcLMParametersGeneralized(int x, int y, int xx, int xy, int count, int bitDepth, int &a, int &b, int &iShift)
+#endif
 {
 
   uint32_t uiInternalBitDepth = bitDepth;
@@ -13907,23 +13911,42 @@ int IntraPrediction::xCalcLMParametersGeneralized(int x, int y, int xx, int xy, 
 
   int iCountShift = g_aucLog2[count];
 
+#if JVET_AJ0237_INTERNAL_12BIT
+  int iTempShift = uiInternalBitDepth + iCountShift - ((uiInternalBitDepth > 10) ? 31 : 15);
+#else
   int iTempShift = uiInternalBitDepth + iCountShift - 15;
+#endif
 
   if (iTempShift > 0)
   {
+#if JVET_AJ0237_INTERNAL_12BIT
+    x = (x + ((int64_t)1 << (iTempShift - 1))) >> iTempShift;
+    y = (y + ((int64_t)1 << (iTempShift - 1))) >> iTempShift;
+    xx = (xx + ((int64_t)1 << (iTempShift - 1))) >> iTempShift;
+    xy = (xy + ((int64_t)1 << (iTempShift - 1))) >> iTempShift;
+#else
     x = (x + (1 << (iTempShift - 1))) >> iTempShift;
     y = (y + (1 << (iTempShift - 1))) >> iTempShift;
     xx = (xx + (1 << (iTempShift - 1))) >> iTempShift;
     xy = (xy + (1 << (iTempShift - 1))) >> iTempShift;
+#endif
     iCountShift -= iTempShift;
   }
   /////// xCalcLMParameters
 
+#if JVET_AJ0237_INTERNAL_12BIT
+  int64_t avgX = x >> iCountShift;
+  int64_t avgY = y >> iCountShift;
+
+  int64_t RErrX = x & ((1 << iCountShift) - 1);
+  int64_t RErrY = y & ((1 << iCountShift) - 1);
+#else
   int avgX = x >> iCountShift;
   int avgY = y >> iCountShift;
 
   int RErrX = x & ((1 << iCountShift) - 1);
   int RErrY = y & ((1 << iCountShift) - 1);
+#endif
 
   int iB = 7;
   iShift = 13 - iB;
@@ -13936,19 +13959,33 @@ int IntraPrediction::xCalcLMParametersGeneralized(int x, int y, int xx, int xy, 
   }
   else
   {
+#if JVET_AJ0237_INTERNAL_12BIT
+    int64_t a1 = xy - (avgX * avgY << iCountShift) - avgX * RErrY - avgY * RErrX;
+    int64_t a2 = xx - (avgX * avgX << iCountShift) - 2 * avgX * RErrX;
+#else
     int a1 = xy - (avgX * avgY << iCountShift) - avgX * RErrY - avgY * RErrX;
     int a2 = xx - (avgX * avgX << iCountShift) - 2 * avgX * RErrX;
+#endif
     const int iShiftA1 = uiInternalBitDepth - 2;
     const int iShiftA2 = 5;
     const int iAccuracyShift = uiInternalBitDepth + 4;
 
     int iScaleShiftA2 = 0;
     int iScaleShiftA1 = 0;
+
+#if JVET_AJ0237_INTERNAL_12BIT
+    int64_t a1s = a1;
+    int64_t a2s = a2;
+
+    iScaleShiftA1 = a1 == 0 ? 0 : floorLog2Uint64(abs(a1)) - iShiftA1;
+    iScaleShiftA2 = a2 == 0 ? 0 : floorLog2Uint64(abs(a2)) - iShiftA2;
+#else
     int a1s = a1;
     int a2s = a2;
 
     iScaleShiftA1 = a1 == 0 ? 0 : floorLog2(abs(a1)) - iShiftA1;
     iScaleShiftA2 = a2 == 0 ? 0 : floorLog2(abs(a2)) - iShiftA2;
+#endif
 
     if (iScaleShiftA1 < 0)
     {
@@ -13969,7 +14006,11 @@ int IntraPrediction::xCalcLMParametersGeneralized(int x, int y, int xx, int xy, 
     if (a2s >= 32)
     {
       uint32_t a2t = m_auShiftLM[a2s - 32];
+#if JVET_AJ0237_INTERNAL_12BIT
+      a = int(a1s * a2t);
+#else
       a = a1s * a2t;
+#endif
     }
     else
     {
@@ -13995,8 +14036,11 @@ int IntraPrediction::xCalcLMParametersGeneralized(int x, int y, int xx, int xy, 
 
     iShift = (iShift + iB) - n;
     a = a >> n;
-
+#if JVET_AJ0237_INTERNAL_12BIT
+    b = int(avgY - ((a * avgX) >> iShift));
+#else
     b = avgY - ((a * avgX) >> iShift);
+#endif
   }
   return 0;
 }
@@ -14069,7 +14113,11 @@ int IntraPrediction::xLMSampleClassifiedTraining(int count, int mean, int meanC,
     }
   }
 
+#if JVET_AJ0237_INTERNAL_12BIT
+  int64_t x[2], y[2], xy[2], xx[2];
+#else
   int x[2], y[2], xy[2], xx[2];
+#endif
   for (int group = 0; group < 2; group++)
   {
     x[group] = y[group] = xy[group] = xx[group] = 0;
@@ -14221,7 +14269,11 @@ void IntraPrediction::xGetLMParametersLMS(const PredictionUnit &pu, const Compon
   srcColor0 = temp.bufAt(0, 0);
   curChroma0 = getPredictorPtr(compID);
 
+#if JVET_AJ0237_INTERNAL_12BIT
+  int64_t x = 0, y = 0, xx = 0, xy = 0;
+#else
   int x = 0, y = 0, xx = 0, xy = 0;
+#endif
   int iCountShift = 0;
   unsigned uiInternalBitDepth = sps.getBitDepth(CHANNEL_TYPE_CHROMA);
 
@@ -14461,25 +14513,42 @@ void IntraPrediction::xGetLMParametersLMS(const PredictionUnit &pu, const Compon
       return;
     }
   }
-
+#if JVET_AJ0237_INTERNAL_12BIT
+  int iTempShift = uiInternalBitDepth + iCountShift - ((uiInternalBitDepth > 10) ? 31 : 15);
+#else
   int iTempShift = uiInternalBitDepth + iCountShift - 15;
+#endif
 
   if (iTempShift > 0)
   {
+#if JVET_AJ0237_INTERNAL_12BIT
+    x = (x + ((int64_t)1 << (iTempShift - 1))) >> iTempShift;
+    y = (y + ((int64_t)1 << (iTempShift - 1))) >> iTempShift;
+    xx = (xx + ((int64_t)1 << (iTempShift - 1))) >> iTempShift;
+    xy = (xy + ((int64_t)1 << (iTempShift - 1))) >> iTempShift;
+#else
     x = (x + (1 << (iTempShift - 1))) >> iTempShift;
     y = (y + (1 << (iTempShift - 1))) >> iTempShift;
     xx = (xx + (1 << (iTempShift - 1))) >> iTempShift;
     xy = (xy + (1 << (iTempShift - 1))) >> iTempShift;
+#endif
     iCountShift -= iTempShift;
   }
 
   /////// xCalcLMParameters
+#if JVET_AJ0237_INTERNAL_12BIT
+  int64_t avgX = x >> iCountShift;
+  int64_t avgY = y >> iCountShift;
 
+  int64_t RErrX = x & ((1 << iCountShift) - 1);
+  int64_t RErrY = y & ((1 << iCountShift) - 1);
+#else
   int avgX = x >> iCountShift;
   int avgY = y >> iCountShift;
 
   int RErrX = x & ((1 << iCountShift) - 1);
   int RErrY = y & ((1 << iCountShift) - 1);
+#endif
 
   int iB = 7;
   int a      = 0;
@@ -14492,20 +14561,32 @@ void IntraPrediction::xGetLMParametersLMS(const PredictionUnit &pu, const Compon
   }
   else
   {
+#if JVET_AJ0237_INTERNAL_12BIT
+    int64_t a1 = xy - (avgX * avgY << iCountShift) - avgX * RErrY - avgY * RErrX;
+    int64_t a2 = xx - (avgX * avgX << iCountShift) - 2 * avgX * RErrX;
+#else
     int a1 = xy - (avgX * avgY << iCountShift) - avgX * RErrY - avgY * RErrX;
     int a2 = xx - (avgX * avgX << iCountShift) - 2 * avgX * RErrX;
+#endif
     const int iShiftA1 = uiInternalBitDepth - 2;
     const int iShiftA2 = 5;
     const int iAccuracyShift = uiInternalBitDepth + 4;
 
     int iScaleShiftA2 = 0;
     int iScaleShiftA1 = 0;
+#if JVET_AJ0237_INTERNAL_12BIT
+    int64_t a1s = a1;
+    int64_t a2s = a2;
+
+    iScaleShiftA1 = a1 == 0 ? 0 : floorLog2Uint64(abs(a1)) - iShiftA1;
+    iScaleShiftA2 = a2 == 0 ? 0 : floorLog2Uint64(abs(a2)) - iShiftA2;
+#else
     int a1s = a1;
     int a2s = a2;
 
     iScaleShiftA1 = a1 == 0 ? 0 : floorLog2(abs(a1)) - iShiftA1;
     iScaleShiftA2 = a2 == 0 ? 0 : floorLog2(abs(a2)) - iShiftA2;
-
+#endif
     if (iScaleShiftA1 < 0)
     {
       iScaleShiftA1 = 0;
@@ -14525,7 +14606,11 @@ void IntraPrediction::xGetLMParametersLMS(const PredictionUnit &pu, const Compon
     if (a2s >= 32)
     {
       uint32_t a2t = m_auShiftLM[a2s - 32];
+#if JVET_AJ0237_INTERNAL_12BIT
+      a = int(a1s * a2t);
+#else
       a = a1s * a2t;
+#endif
     }
     else
     {
@@ -14551,7 +14636,11 @@ void IntraPrediction::xGetLMParametersLMS(const PredictionUnit &pu, const Compon
 
     iShift = (iShift + iB) - n;
     a = a >> n;
+#if JVET_AJ0237_INTERNAL_12BIT
+    b = int(avgY - ((a * avgX) >> iShift));
+#else
     b = avgY - ((a * avgX) >> iShift);
+#endif
 
     cclmModel.setFirstModel( a, b, iShift );
   }
@@ -20678,7 +20767,11 @@ void IntraPrediction::xCclmApplyModel(const PredictionUnit &pu, const ComponentI
       samples[0] = refLumaBlk.at(x, y);   // C
       samples[1] = cccmModel.bias();
 
+#if JVET_AJ0237_INTERNAL_12BIT
+      piPred.at(x, y) = ClipPel<Pel>(Pel((cccmModel.params[0] * samples[0] + cccmModel.params[1] * samples[1] + cccmModel.decimRound) >> cccmModel.decimBits), clpRng);
+#else
       piPred.at(x, y) = ClipPel<Pel>(Pel((cccmModel.params[0] * samples[0] + cccmModel.params[1] * samples[1] + CCCM_DECIM_ROUND) >> CCCM_DECIM_BITS), clpRng);
+#endif
     }
   }
 }
@@ -21662,7 +21755,11 @@ void IntraPrediction::combineCcpAndInter(PredictionUnit& pu, PelBuf& inPredCb, P
 #define DIV_INTR_BITS      (DIV_PREC_BITS - DIV_SLOT_BITS)
 #define DIV_INTR_ROUND     (1 << DIV_INTR_BITS >> 1)
 
+#if JVET_AJ0237_INTERNAL_12BIT
+int64_t xDivide(int64_t num, int64_t denom, int decimBits) // Note: assumes positive denominator
+#else
 int64_t xDivide(int64_t num, int64_t denom) // Note: assumes positive denominator
+#endif
 {
   static const int pow2W[8] = {   214,   153,   113,    86,    67,    53,    43,    35  }; // DIV_PREC_BITS_POW2
   static const int pow2O[8] = {  4822,  5952,  6624,  6792,  6408,  5424,  3792,  1466  }; // DIV_PREC_BITS
@@ -21676,11 +21773,19 @@ int64_t xDivide(int64_t num, int64_t denom) // Note: assumes positive denominato
 
   int scale     = ((pow2W[diffFull] * ((normDiff2 * normDiff2) >> DIV_PREC_BITS)) >> DIV_PREC_BITS_POW2) - (normDiff2 >> 1) + pow2B[diffFull];
 
+#if JVET_AJ0237_INTERNAL_12BIT
+  return ((num << (decimBits - DIV_PREC_BITS)) * scale + round) >> shift;
+#else
   return ( (num << (CCCM_DECIM_BITS - DIV_PREC_BITS)) * scale + round) >> shift;
+#endif
 }
 
 #if JVET_AC0053_GAUSSIAN_SOLVER
+#if JVET_AJ0237_INTERNAL_12BIT
+void xGetDivScaleRoundShift(int64_t denom, int decimBits, int& scale, int& round, int& shift) // Note: assumes positive denominator
+#else
 void xGetDivScaleRoundShift(int64_t denom, int &scale, int &round, int &shift) // Note: assumes positive denominator
+#endif
 {
   static const int pow2W[8] = {   214,   153,   113,    86,    67,    53,    43,    35  }; // DIV_PREC_BITS_POW2
   static const int pow2O[8] = {  4822,  5952,  6624,  6792,  6408,  5424,  3792,  1466  }; // DIV_PREC_BITS
@@ -21693,7 +21798,11 @@ void xGetDivScaleRoundShift(int64_t denom, int &scale, int &round, int &shift) /
   int normDiff2 = normDiff - pow2O[diffFull];
 
   scale         = ((pow2W[diffFull] * ((normDiff2 * normDiff2) >> DIV_PREC_BITS)) >> DIV_PREC_BITS_POW2) - (normDiff2 >> 1) + pow2B[diffFull];
+#if JVET_AJ0237_INTERNAL_12BIT
+  scale       <<= decimBits - DIV_PREC_BITS;
+#else
   scale       <<= CCCM_DECIM_BITS - DIV_PREC_BITS;
+#endif
 }
 #endif
 
@@ -21703,8 +21812,22 @@ void xGetDivScaleRoundShift(int64_t denom, int &scale, int &round, int &shift) /
 #undef DIV_INTR_BITS
 #undef DIV_INTR_ROUND
 
+#if JVET_AJ0237_INTERNAL_12BIT
+int xCccmDivideLowPrec(int64_t num, int64_t denom, int decimBits)
+#else
 int xCccmDivideLowPrec(int64_t num, int64_t denom)
+#endif
 {
+#if JVET_AJ0237_INTERNAL_12BIT
+  if (num < 0)
+  {
+    return -int(xDivide(-num, denom, decimBits) >> decimBits);
+  }
+  else
+  {
+    return int(xDivide(num, denom, decimBits) >> decimBits);
+  }
+#else
   if ( num < 0 )
   {
     return -int(xDivide(-num, denom) >> CCCM_DECIM_BITS);
@@ -21713,12 +21836,20 @@ int xCccmDivideLowPrec(int64_t num, int64_t denom)
   {
     return int(xDivide(num, denom) >> CCCM_DECIM_BITS);
   }
+#endif
 }
 
+#if JVET_AJ0237_INTERNAL_12BIT
+int64_t xCccmDivide(int64_t num, int64_t denom, int decimBits) // Note: assumes positive denominator
+{
+  return xDivide(num, denom, decimBits);
+}
+#else
 int64_t xCccmDivide(int64_t num, int64_t denom) // Note: assumes positive denominator
 {
   return xDivide(num, denom);
 }
+#endif
 #endif
 
 #if JVET_AD0120_LBCCP || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
@@ -23618,7 +23749,16 @@ int IntraPrediction::xBvgCccmCalcBlkAver(const PredictionUnit& pu) const
     }
   }
 #if JVET_AB0174_CCCM_DIV_FREE
+#if JVET_AJ0237_INTERNAL_12BIT
+#if JVET_AJ0237_INTERNAL_12BIT
+  const int bd = pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA);
+  return numSamples == 0 ? (1 << (bd - 1)) : xCccmDivideLowPrec(sumSamples, numSamples, DECIM_BITS(bd));
+#else
+  return numSamples == 0 ? ((1 << pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)) - 1) : xCccmDivideLowPrec(sumSamples, numSamples);
+#endif
+#else
   return numSamples == 0 ? 512 : xCccmDivideLowPrec(sumSamples, numSamples);
+#endif
 #else
   return numSamples == 0 ? 512 : ( sumSamples + numSamples/2) / numSamples;
 #endif
@@ -24146,7 +24286,16 @@ int IntraPrediction::xCccmCalcRefAver(const PredictionUnit& pu
 #endif
 
 #if JVET_AB0174_CCCM_DIV_FREE
+#if JVET_AJ0237_INTERNAL_12BIT
+#if JVET_AJ0237_INTERNAL_12BIT
+  const int bd = pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA);
+  return numSamples == 0 ? (1 << (bd - 1)) : xCccmDivideLowPrec(sumSamples, numSamples, DECIM_BITS(bd));
+#else
+  return numSamples == 0 ? ((1 << pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)) - 1) : xCccmDivideLowPrec(sumSamples, numSamples);
+#endif
+#else
   return numSamples == 0 ? 512 : xCccmDivideLowPrec(sumSamples, numSamples);
+#endif
 #else
   return numSamples == 0 ? 512 : ( sumSamples + numSamples/2) / numSamples;
 #endif
@@ -25077,7 +25226,11 @@ int IntraPrediction::xCflmCalcRefAver(const PredictionUnit& pu, const CompArea& 
   }
 
 #if JVET_AD0184_REMOVAL_OF_DIVISION_OPERATIONS
+#if JVET_AJ0237_INTERNAL_12BIT
+  return numSamples == 0 ? (1 << (pu.cu->slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA) - 1)) : PU::getMeanValue(sumSamples + (numSamples >> 1), numSamples);
+#else
   return numSamples == 0 ? 512 : PU::getMeanValue( sumSamples + (numSamples >> 1), numSamples);
+#endif
 #else
   return numSamples == 0 ? 512 : (sumSamples + numSamples / 2) / numSamples;
 #endif
@@ -25087,7 +25240,11 @@ int IntraPrediction::xCflmCalcRefAver(const PredictionUnit& pu, const CompArea& 
 #if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA || JVET_AC0119_LM_CHROMA_FUSION || JVET_AG0058_EIP || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
     
 #if JVET_AC0053_GAUSSIAN_SOLVER
+#if JVET_AJ0237_INTERNAL_12BIT
+void CccmCovariance::gaussBacksubstitution( TCccmCoeff* x, int numEq, int col, int round, int bits)
+#else
 void CccmCovariance::gaussBacksubstitution( TCccmCoeff* x, int numEq, int col )
+#endif
 {
   x[numEq-1] = C[numEq-1][col];
 
@@ -25097,7 +25254,11 @@ void CccmCovariance::gaussBacksubstitution( TCccmCoeff* x, int numEq, int col )
 
     for( int j = i+1; j < numEq; j++ )
     {
+#if JVET_AJ0237_INTERNAL_12BIT
+      x[i] -= FIXED_MULT(C[i][j], x[j], round, bits);
+#else
       x[i] -= FIXED_MULT(C[i][j], x[j]);
+#endif
     }
   }
 }
@@ -25114,6 +25275,11 @@ void CccmCovariance::gaussElimination( TCccmCoeff A[CCCM_NUM_PARAMS_MAX][CCCM_NU
   int reg = interCccmMode ? 1 : 2 << (bd - 8);
 #else
   int reg = 2 << (bd - 8);
+#endif
+
+#if JVET_AJ0237_INTERNAL_12BIT
+  const int decimBits = DECIM_BITS(bd);
+  const int decimRound = (1 << (decimBits - 1));
 #endif
   
   // Create an [M][M+2] matrix system (could have been done already when calculating auto/cross-correlations)
@@ -25137,7 +25303,11 @@ void CccmCovariance::gaussElimination( TCccmCoeff A[CCCM_NUM_PARAMS_MAX][CCCM_NU
 #if JVET_AB0174_CCCM_DIV_FREE
     int scale, round, shift;
     
+#if JVET_AJ0237_INTERNAL_12BIT
+    xGetDivScaleRoundShift(diag, decimBits, scale, round, shift);
+#else
     xGetDivScaleRoundShift(diag, scale, round, shift);
+#endif
 #endif
 
     for( int j = i+1; j < numEq+numFilters; j++ )
@@ -25157,7 +25327,11 @@ void CccmCovariance::gaussElimination( TCccmCoeff A[CCCM_NUM_PARAMS_MAX][CCCM_NU
       // On row j all elements with k < i+1 are now zero (not zeroing those here as backsubstitution does not need them)
       for( int k = i + 1; k < numEq+numFilters; k++ )
       {
+#if JVET_AJ0237_INTERNAL_12BIT
+        dst[k] -= FIXED_MULT(scale, src[k], decimRound, decimBits);
+#else
          dst[k] -= FIXED_MULT(scale, src[k]);
+#endif
       }
     }
   }
@@ -25165,12 +25339,21 @@ void CccmCovariance::gaussElimination( TCccmCoeff A[CCCM_NUM_PARAMS_MAX][CCCM_NU
   // Solve with backsubstitution
   if ( numFilters == 2 )
   {
+#if JVET_AJ0237_INTERNAL_12BIT
+    gaussBacksubstitution(x0, numEq, colChr0, decimRound, decimBits);
+    gaussBacksubstitution(x1, numEq, colChr1, decimRound, decimBits);
+#else
     gaussBacksubstitution(x0, numEq, colChr0);
     gaussBacksubstitution(x1, numEq, colChr1);
+#endif
   }
   else
   {
+#if JVET_AJ0237_INTERNAL_12BIT
+    gaussBacksubstitution(x0, numEq, colChr0, decimRound, decimBits);
+#else
     gaussBacksubstitution(x0, numEq, colChr0);
+#endif
   }
 }
 
@@ -25345,7 +25528,11 @@ void CccmCovariance::solve1( const Pel A[CCCM_NUM_PARAMS_MAX][CCCM_REF_SAMPLES_M
 #endif
 
   // Scale the matrix and vector to selected dynamic range
+#if JVET_AJ0237_INTERNAL_12BIT
+  int matrixShift = ((model.bd > 10) ? CCCM_MATRIX_BITS_HBD : 28) - 2 * model.bd - ceilLog2(sampleNum);
+#else
   int matrixShift = 28 - 2 * model.bd - ceilLog2( sampleNum );
+#endif
 
   if( matrixShift > 0 )
   {
@@ -25394,7 +25581,11 @@ void CccmCovariance::solve1( const Pel A[CCCM_NUM_PARAMS_MAX][CCCM_REF_SAMPLES_M
 
 #if JVET_AB0174_CCCM_DIV_FREE
   // Add the chroma offset to bias term (after shifting up by CCCM_DECIM_BITS and down by cccmModelCb.bd - 1)
+#if JVET_AJ0237_INTERNAL_12BIT
+  model.params[numParams - 1] += chromaOffset << (model.decimBits - (model.bd - 1));
+#else
   model.params[numParams - 1] += chromaOffset << (CCCM_DECIM_BITS - (model.bd - 1));
+#endif
 #endif
 }
 
@@ -25464,7 +25655,11 @@ void CccmCovariance::solve2( const Pel A[CCCM_NUM_PARAMS_MAX][CCCM_REF_SAMPLES_M
   // Scale the matrix and vector to selected dynamic range
   CHECK( modelCb.bd != modelCr.bd, "Bitdepth of Cb and Cr is different" );
 #if JVET_AE0059_INTER_CCCM
+#if JVET_AJ0237_INTERNAL_12BIT
+  int matrixShift = ((modelCb.bd > 10) ? CCCM_MATRIX_BITS_HBD : (interCccmMode ? 28 : CCCM_MATRIX_BITS)) - 2 * modelCb.bd - ceilLog2(sampleNum);
+#else
   int matrixShift = (interCccmMode ? 28 : CCCM_MATRIX_BITS) - 2 * modelCb.bd - ceilLog2( sampleNum );
+#endif
 #else
   int matrixShift = CCCM_MATRIX_BITS - 2 * modelCb.bd - ceilLog2( sampleNum );
 #endif
@@ -25532,8 +25727,13 @@ void CccmCovariance::solve2( const Pel A[CCCM_NUM_PARAMS_MAX][CCCM_REF_SAMPLES_M
 
 #if JVET_AB0174_CCCM_DIV_FREE
   // Add the chroma offset to bias term (after shifting up by CCCM_DECIM_BITS and down by cccmModelCb.bd - 1)
+#if JVET_AJ0237_INTERNAL_12BIT
+  modelCb.params[numParams - 1] += chromaOffsetCb << (modelCb.decimBits - (modelCb.bd - 1));
+  modelCr.params[numParams - 1] += chromaOffsetCr << (modelCr.decimBits - (modelCr.bd - 1));
+#else
   modelCb.params[numParams - 1] += chromaOffsetCb << (CCCM_DECIM_BITS - (modelCb.bd - 1));
   modelCr.params[numParams - 1] += chromaOffsetCr << (CCCM_DECIM_BITS - (modelCr.bd - 1));
+#endif
 #endif
 }
 #endif
@@ -27376,7 +27576,12 @@ void CccmCovariance::solveEip(const TCccmCoeff* A, const TCccmCoeff* Y, const in
 
 #if JVET_AI0066_REGULARIZED_EIP
   // Regularization parameter: L2 multiplier * number of parameters
+#if JVET_AJ0237_INTERNAL_12BIT
+  int regShift = 2 * std::max(0, model.bd - 10);
+  const int regularizationParam = ((sampleNum <= REGULARIZED_EIP_L2_SAMPLE_THRESHOLD) ? REGULARIZED_EIP_L2_SMALL * numParams : REGULARIZED_EIP_L2_LARGE * numParams) << regShift;
+#else
   const int regularizationParam = (sampleNum <= REGULARIZED_EIP_L2_SAMPLE_THRESHOLD) ? REGULARIZED_EIP_L2_SMALL * numParams : REGULARIZED_EIP_L2_LARGE * numParams;
+#endif
   
   for (int coli0 = 0; coli0 < numParams - 1; coli0++) // The last term (bias) is not regularized.
   {
@@ -27397,7 +27602,11 @@ void CccmCovariance::solveEip(const TCccmCoeff* A, const TCccmCoeff* Y, const in
   }
 #endif
   // Scale the matrix and vector to selected dynamic range
+#if JVET_AJ0237_INTERNAL_12BIT
+  int matrixShift = ((model.bd > 10) ? CCCM_MATRIX_BITS_HBD : 28) - 2 * model.bd - ceilLog2(sampleNum);
+#else
   int matrixShift = 28 - 2 * model.bd - ceilLog2(sampleNum);
+#endif
 
   if (matrixShift > 0)
   {
@@ -27445,7 +27654,11 @@ void CccmCovariance::solveEip(const TCccmCoeff* A, const TCccmCoeff* Y, const in
 
 #if JVET_AB0174_CCCM_DIV_FREE
   // Add the chroma offset to bias term (after shifting up by CCCM_DECIM_BITS and down by cccmModelCb.bd - 1)
+#if JVET_AJ0237_INTERNAL_12BIT
+  model.params[numParams - 1] += lumaOffset << (model.decimBits - (model.bd - 1));
+#else
   model.params[numParams - 1] += lumaOffset << (CCCM_DECIM_BITS - (model.bd - 1));
+#endif
 #endif
 }
 

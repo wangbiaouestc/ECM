@@ -2293,7 +2293,11 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
   ComponentID residCompID = compID;
   bool bJccrWithCr = bIsJCCR && !(tu.jointCbCr >> 1);
 #if JVET_AI0096_SIGN_PRED_BIT_DEPTH_FIX
+#if JVET_AJ0237_INTERNAL_12BIT
+  const int signPredShift = SIGN_PRED_RESIDUAL_BITS;
+#else
   const int signPredShift = 10 + SIGN_PRED_RESIDUAL_BITS  - tu.cs->sps->getBitDepth(toChannelType(COMPONENT_Y));
+#endif
   const int signPredOffset = 1 << (signPredShift - 1);
 #endif
   if(bJccrWithCr)
@@ -2391,14 +2395,23 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
     int spArea = tu.cs->sps->getSignPredArea();
     int signPredWidth = std::min((int)width, spArea);
     int signPredHeight = std::min((int)height, spArea);
+#if JVET_AJ0237_INTERNAL_12BIT
+    int16_t* pTemplate = (int16_t*)xMalloc(int16_t, stride * h * w);
+    AreaBuf<int16_t> templateBuf(pTemplate, stride, length, h * w);
+#else
     int8_t         *pTemplate      = (int8_t *) xMalloc(int8_t, stride * h * w);
     AreaBuf<int8_t> templateBuf(pTemplate, stride, length, h * w);
+#endif
 #else
     int8_t *pTemplate = (int8_t *) xMalloc(int8_t, stride * SIGN_PRED_FREQ_RANGE * SIGN_PRED_FREQ_RANGE);
     AreaBuf<int8_t> templateBuf(pTemplate, stride, length, SIGN_PRED_FREQ_RANGE * SIGN_PRED_FREQ_RANGE);
 #endif
     Position prev(0,0);
+#if JVET_AJ0237_INTERNAL_12BIT
+    int16_t* templ = templateBuf.buf;
+#else
     int8_t *templ = templateBuf.buf;
+#endif
 #if JVET_Y0141_SIGN_PRED_IMPROVE
     for (int j = 0; j < signPredHeight*signPredWidth; ++j)
     {
@@ -2424,8 +2437,12 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
 
       for (uint32_t i = 0; i < height; i++)
       {
+#if JVET_AJ0237_INTERNAL_12BIT
+        templ[i] = (int16_t)(*pelResi);
+#else
         CHECK(*pelResi < -128 || *pelResi > 127, "value exceeds 8-bit range");
         templ[i] = (int8_t)(*pelResi);
+#endif
         pelResi -= resi.stride;
       }
 
@@ -2433,8 +2450,12 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
 
       for (uint32_t i = 0; i < width; i++)
       {
+#if JVET_AJ0237_INTERNAL_12BIT
+        templ[i + height] = (int16_t)pelResi[i];
+#else
         CHECK(pelResi[i] < -128 || pelResi[i] > 127, "value exceeds 8-bit range");
         templ[i + height] = (int8_t) pelResi[i];
+#endif
       }
 #if !JVET_Y0141_SIGN_PRED_IMPROVE
       templ += templateBuf.stride;
@@ -2465,9 +2486,15 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
     PelBuf   resi(memTmpResid, width, height);
     int signPredHeight = 4;
     int signPredWidth = 4;
+#if JVET_AJ0237_INTERNAL_12BIT
+    int16_t* pTemplate = (int16_t*)xMalloc(int16_t, stride * signPredHeight * signPredWidth);
+    AreaBuf<int16_t> templateBuf(pTemplate, stride, length, signPredHeight* signPredWidth);
+    int16_t* templ = templateBuf.buf;
+#else
     int8_t         *pTemplate      = (int8_t *) xMalloc(int8_t, stride * signPredHeight * signPredWidth);
     AreaBuf<int8_t> templateBuf(pTemplate, stride, length, signPredHeight * signPredWidth);
     int8_t *templ = templateBuf.buf;
+#endif
     for (int j = 0; j < signPredHeight*signPredWidth; ++j)
     {
       coeff.fill(0);
@@ -2485,8 +2512,12 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
 
       for (uint32_t i = 0; i < height; i++)
       {
+#if JVET_AJ0237_INTERNAL_12BIT
+        templ[i] = (int16_t)(*pelResi);
+#else
         CHECK(*pelResi < -128 || *pelResi > 127, "value exceeds 8-bit range");
         templ[i] = (int8_t)(*pelResi);
+#endif
         pelResi -= resi.stride;
       }
 
@@ -2494,8 +2525,12 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
 
       for (uint32_t i = 0; i < width; i++)
       {
+#if JVET_AJ0237_INTERNAL_12BIT
+        templ[i + height] = (int16_t)pelResi[i];
+#else
         CHECK(pelResi[i] < -128 || pelResi[i] > 127, "value exceeds 8-bit range");
         templ[i + height] = (int8_t) pelResi[i];
+#endif
       }
       templ += templateBuf.stride;
     }
@@ -2575,6 +2610,16 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
   const uint32_t w = std::min(uiWidth, (uint32_t)SIGN_PRED_FREQ_RANGE);
   const uint32_t h = std::min(uiHeight, (uint32_t)SIGN_PRED_FREQ_RANGE);
 
+#if JVET_AJ0237_INTERNAL_12BIT
+   AreaBuf<const int16_t> templateNormalizedBuf =
+    (lfnstEnabled ? AreaBuf<const int16_t>()
+                  : AreaBuf<const int16_t>(g_resiBorderTemplate[log2Width - 2][log2Height - 2][actualTrIdx], stride,
+                                          length, w * h));
+  AreaBuf<const int16_t> templateLfnstNormalizedBuf =
+    (lfnstEnabled ? AreaBuf<const int16_t>(g_resiBorderTemplateLFNST[log2Width - 2][log2Height - 2][actualLfnstIdx],
+                                          stride, length, signPredWidth * signPredHeight)
+                  : AreaBuf<const int16_t>());
+#else
   AreaBuf<const int8_t> templateNormalizedBuf =
     (lfnstEnabled ? AreaBuf<const int8_t>()
                   : AreaBuf<const int8_t>(g_resiBorderTemplate[log2Width - 2][log2Height - 2][actualTrIdx], stride,
@@ -2583,6 +2628,7 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
     (lfnstEnabled ? AreaBuf<const int8_t>(g_resiBorderTemplateLFNST[log2Width - 2][log2Height - 2][actualLfnstIdx],
                                           stride, length, signPredWidth * signPredHeight)
                   : AreaBuf<const int8_t>());
+#endif
 #else
   AreaBuf<const int8_t> templateNormalizedBuf(g_resiBorderTemplate[log2Width - 2][log2Height - 2][actualTrIdx], stride,
                                               length, SIGN_PRED_FREQ_RANGE * SIGN_PRED_FREQ_RANGE);
@@ -2643,7 +2689,11 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
     CHECK(coeffVal == 0, "coefficient value should be nonzero");
 #endif
 
+#if JVET_AJ0237_INTERNAL_12BIT
+    const int16_t* templateBasisVec;
+#else
     const int8_t *templateBasisVec;
+#endif
 
 #if JVET_Y0141_SIGN_PRED_IMPROVE
     if (lfnstEnabled)

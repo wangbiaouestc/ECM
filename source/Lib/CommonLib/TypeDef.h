@@ -502,6 +502,7 @@
 #define JVET_Z0150_MEMORY_USAGE_PRINT                     1 // JVET-Z0150: Print memory usage
 #define JVET_Z0118_GDR                                    1 // JVET-Z0118: GDR
 #define JVET_AD0169_SMALL_SCALE_DOWNSAMPLING              1 // JVET-AD0169: Downsampling filters in range 1.1 to 1.35 based on Kaiser(7) windowed sinc
+#define JVET_AJ0237_INTERNAL_12BIT                        1 // JVET-AJ0237: Modifications for better operation at 12-bit internal bitdepth
 
 #if JVET_Z0118_GDR
 #define GDR_LEAK_TEST                                     0

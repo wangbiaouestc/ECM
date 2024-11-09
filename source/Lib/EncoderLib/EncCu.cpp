@@ -115,6 +115,9 @@ void EncCu::create( EncCfg* encCfg )
 #if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
   m_bilateralFilter = new BilateralFilter();;
   m_bilateralFilter->create();
+#if JVET_AJ0237_INTERNAL_12BIT
+  m_bilateralFilter->setInternalBitDepth(encCfg->getBitDepth(CHANNEL_TYPE_LUMA));
+#endif
 #endif
 
   unsigned      uiMaxWidth    = encCfg->getMaxCUWidth();

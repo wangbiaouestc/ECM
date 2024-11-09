@@ -216,7 +216,11 @@ private: //methods
   void deriveModeMergeRDO(const BitDepths &bitDepths, int ctuRsAddr, SAOBlkParam* mergeList[NUM_SAO_MERGE_TYPES], bool* sliceEnabled, std::vector<SAOStatData**>& blkStats, SAOBlkParam& modeParam, double& modeNormCost );
   int64_t getDistortion(const int channelBitDepth, int typeIdc, int typeAuxInfo, int* offsetVal, SAOStatData& statData);
   void deriveOffsets(ComponentID compIdx, const int channelBitDepth, int typeIdc, SAOStatData& statData, int* quantOffsets, int& typeAuxInfo);
+#if JVET_AJ0237_INTERNAL_12BIT
+  inline int64_t estSaoDist(int64_t count, int64_t offset, int64_t diffSum, int shift, int bdShift = 0);
+#else
   inline int64_t estSaoDist(int64_t count, int64_t offset, int64_t diffSum, int shift);
+#endif
   inline int estIterOffset(int typeIdx, double lambda, int offsetInput, int64_t count, int64_t diffSum, int shift, int bitIncrease, int64_t& bestDist, double& bestCost, int offsetTh );
   void addPreDBFStatistics(std::vector<SAOStatData**>& blkStats);
 #if JVET_W0066_CCSAO
@@ -335,8 +339,13 @@ private: //methods
                         , CcSaoStatData frameStats[MAX_CCSAO_SET_NUM]
                         , short offset[MAX_CCSAO_SET_NUM][MAX_CCSAO_CLASS_NUM]);
   inline int estCcSaoIterOffset(const double lambda, const int offsetInput, const int64_t count, const int64_t diffSum, const int shift, const int bitIncrease, int64_t& bestDist, double& bestCost, const int offsetTh);
+#if JVET_AJ0237_INTERNAL_12BIT
+  void getCcSaoDistortion(const ComponentID compID, const int setIdx, CcSaoStatData* blkStats[MAX_CCSAO_SET_NUM]
+                        , short offset[MAX_CCSAO_SET_NUM][MAX_CCSAO_CLASS_NUM], int64_t* trainingDistortion[MAX_CCSAO_SET_NUM], const int shift);
+#else
   void getCcSaoDistortion(const ComponentID compID, const int setIdx, CcSaoStatData* blkStats[MAX_CCSAO_SET_NUM]
                         , short offset[MAX_CCSAO_SET_NUM][MAX_CCSAO_CLASS_NUM], int64_t* trainingDistortion[MAX_CCSAO_SET_NUM]);
+#endif
 #if JVET_Y0106_CCSAO_EDGE_CLASSIFIER && !JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
   void getCcSaoDistortionEdge(const ComponentID compID, const int setIdx,
                               CcSaoStatData *blkStatsEdge[MAX_CCSAO_SET_NUM],

@@ -625,11 +625,19 @@ MsgLevel g_verbosity = VERBOSE;
 #if SIGN_PREDICTION
 #if JVET_Y0141_SIGN_PRED_IMPROVE
 #if JVET_W0119_LFNST_EXTENSION || EXTENDED_LFNST
+#if JVET_AJ0237_INTERNAL_12BIT
+int16_t* g_resiBorderTemplateLFNST[6][6][210];
+#else
 int8_t * g_resiBorderTemplateLFNST[6][6][210];
+#endif
 #else
 int8_t * g_resiBorderTemplateLFNST[6][6][16];
 #endif
+#if JVET_AJ0237_INTERNAL_12BIT
+int16_t* g_resiBorderTemplate[6][6][NUM_TRANS_TYPE * NUM_TRANS_TYPE];
+#else
 int8_t * g_resiBorderTemplate[6][6][NUM_TRANS_TYPE*NUM_TRANS_TYPE];
+#endif
 #else
 const int8_t * g_resiBorderTemplate[6][6][NUM_TRANS_TYPE*NUM_TRANS_TYPE];
 #endif

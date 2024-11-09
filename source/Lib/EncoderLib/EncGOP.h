@@ -140,8 +140,10 @@ private:
   PicList*                m_pcListPic;
 
   HLSWriter*              m_HLSWriter;
+#if !JVET_AJ0237_INTERNAL_12BIT
 #if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
   BilateralFilter         m_cBilateralFilter;
+#endif
 #endif
   LoopFilter*             m_pcLoopFilter;
 
@@ -214,6 +216,12 @@ private:
 #endif
 
 public:
+#if JVET_AJ0237_INTERNAL_12BIT
+#if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
+  BilateralFilter         m_cBilateralFilter;
+#endif
+#endif
+
   EncGOP();
   virtual ~EncGOP();
 

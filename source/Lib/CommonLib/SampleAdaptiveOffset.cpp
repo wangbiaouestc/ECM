@@ -2158,7 +2158,12 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(const ComponentID compID, 
   const int edgePosXB  = g_ccSaoEdgePosX[edgeDir][1], edgePosYB = g_ccSaoEdgePosY[edgeDir][1];
   const int bandCmp    = g_ccSaoBandTab [bandIdc][0];
   const int bandNum    = g_ccSaoBandTab [bandIdc][1];
+#if JVET_AJ0237_INTERNAL_12BIT
+  const int bdShift = std::max(0, bitDepth - 10);
+  const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr] << bdShift;
+#else
   const int edgeThrVal = g_ccSaoEdgeThr [edgeIdc][edgeThr];
+#endif
   const int edgeNum    = g_ccSaoEdgeNum [edgeIdc][0];
   const int edgeNumUni = g_ccSaoEdgeNum [edgeIdc][1];
   const int srcStrideE = edgeCmp == COMPONENT_Y ? srcStrideY : edgeCmp == COMPONENT_Cb ? srcStrideU : srcStrideV;
@@ -2216,7 +2221,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(const ComponentID compID, 
           const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
         
           const int classIdx = bandIdx * edgeNum + edgeIdx;
+#if JVET_AJ0237_INTERNAL_12BIT
+          dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
           dst[x] = dst[x] + offset[classIdx];
+#endif
 #else
           const Pel *colY = srcY + x;
           const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
@@ -2295,7 +2304,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(const ComponentID compID, 
           const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
         
           const int classIdx = bandIdx * edgeNum + edgeIdx;
+#if JVET_AJ0237_INTERNAL_12BIT
+          dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
           dst[x] = dst[x] + offset[classIdx];
+#endif
 #else
           const Pel *colY = srcY + x;
           const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
@@ -2369,7 +2382,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(const ComponentID compID, 
         const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
         
         const int classIdx = bandIdx * edgeNum + edgeIdx;
+#if JVET_AJ0237_INTERNAL_12BIT
+        dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
         dst[x] = dst[x] + offset[classIdx];
+#endif
 #else
         const Pel *colY = srcY + x;
         const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
@@ -2436,7 +2453,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(const ComponentID compID, 
           const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
         
           const int classIdx = bandIdx * edgeNum + edgeIdx;
+#if JVET_AJ0237_INTERNAL_12BIT
+          dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
           dst[x] = dst[x] + offset[classIdx];
+#endif
 #else
           const Pel *colY = srcY + x;
           const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
@@ -2504,7 +2525,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(const ComponentID compID, 
         const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
         
         const int classIdx = bandIdx * edgeNum + edgeIdx;
+#if JVET_AJ0237_INTERNAL_12BIT
+        dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
         dst[x] = dst[x] + offset[classIdx];
+#endif
 #else
         const Pel *colY = srcY + x;
         const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
@@ -2573,7 +2598,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(const ComponentID compID, 
         const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
         
         const int classIdx = bandIdx * edgeNum + edgeIdx;
+#if JVET_AJ0237_INTERNAL_12BIT
+        dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
         dst[x] = dst[x] + offset[classIdx];
+#endif
 #else
         const Pel *colY = srcY + x;
         const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
@@ -2640,7 +2669,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(const ComponentID compID, 
           const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
         
           const int classIdx = bandIdx * edgeNum + edgeIdx;
+#if JVET_AJ0237_INTERNAL_12BIT
+          dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
           dst[x] = dst[x] + offset[classIdx];
+#endif
 #else
           const Pel *colY = srcY + x;
           const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
@@ -2708,7 +2741,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(const ComponentID compID, 
         const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
         
         const int classIdx = bandIdx * edgeNum + edgeIdx;
+#if JVET_AJ0237_INTERNAL_12BIT
+        dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
         dst[x] = dst[x] + offset[classIdx];
+#endif
 #else
         const Pel *colY = srcY + x;
         const Pel *colA = srcY + x + srcStrideY * candPosYYA + candPosYXA;
@@ -2788,7 +2825,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(const ComponentID compID, 
           const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
           
           const int classIdx = bandIdx * edgeNum + edgeIdx;
+#if JVET_AJ0237_INTERNAL_12BIT
+          dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
           dst[x] = dst[x] + offset[classIdx];
+#endif
 #else
           const Pel *colY = srcY + (x << chromaScaleX);
           const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
@@ -2868,7 +2909,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(const ComponentID compID, 
           const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
           
           const int classIdx = bandIdx * edgeNum + edgeIdx;
+#if JVET_AJ0237_INTERNAL_12BIT
+          dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
           dst[x] = dst[x] + offset[classIdx];
+#endif
 #else
           const Pel *colY = srcY + (x << chromaScaleX);
           const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
@@ -2943,7 +2988,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(const ComponentID compID, 
         const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
         
         const int classIdx = bandIdx * edgeNum + edgeIdx;
+#if JVET_AJ0237_INTERNAL_12BIT
+        dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
         dst[x] = dst[x] + offset[classIdx];
+#endif
 #else
         const Pel *colY = srcY + (x << chromaScaleX);
         const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
@@ -3011,7 +3060,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(const ComponentID compID, 
           const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
           
           const int classIdx = bandIdx * edgeNum + edgeIdx;
+#if JVET_AJ0237_INTERNAL_12BIT
+          dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
           dst[x] = dst[x] + offset[classIdx];
+#endif
 #else
           const Pel *colY = srcY + (x << chromaScaleX);
           const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
@@ -3080,7 +3133,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(const ComponentID compID, 
         const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
         
         const int classIdx = bandIdx * edgeNum + edgeIdx;
+#if JVET_AJ0237_INTERNAL_12BIT
+        dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
         dst[x] = dst[x] + offset[classIdx];
+#endif
 #else
         const Pel *colY = srcY + (x << chromaScaleX);
         const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
@@ -3150,7 +3207,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(const ComponentID compID, 
         const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
         
         const int classIdx = bandIdx * edgeNum + edgeIdx;
+#if JVET_AJ0237_INTERNAL_12BIT
+        dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
         dst[x] = dst[x] + offset[classIdx];
+#endif
 #else
         const Pel *colY = srcY + (x << chromaScaleX);
         const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
@@ -3218,7 +3279,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(const ComponentID compID, 
           const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
           
           const int classIdx = bandIdx * edgeNum + edgeIdx;
+#if JVET_AJ0237_INTERNAL_12BIT
+          dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
           dst[x] = dst[x] + offset[classIdx];
+#endif
 #else
           const Pel *colY = srcY + (x << chromaScaleX);
           const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
@@ -3287,7 +3352,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClipEdge(const ComponentID compID, 
         const int bandIdx  = (*col[bandCmp] * bandNum) >> bitDepth;
         
         const int classIdx = bandIdx * edgeNum + edgeIdx;
+#if JVET_AJ0237_INTERNAL_12BIT
+        dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
         dst[x] = dst[x] + offset[classIdx];
+#endif
 #else
         const Pel *colY = srcY + (x << chromaScaleX);
         const Pel *colA = srcY + (x << chromaScaleX) + srcStrideY * candPosYYA + candPosYXA;
@@ -3538,7 +3607,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           const int classIdx = bandIdx;
 
           // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+#if JVET_AJ0237_INTERNAL_12BIT
+          dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
           dst[x] = dst[x] + offset[classIdx];
+#endif
         }
         srcY += srcStrideY;
         srcU += srcStrideU * chromaScaleYM1;
@@ -3565,7 +3638,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
             const int classIdx = bandIdx;
 
             // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+#if JVET_AJ0237_INTERNAL_12BIT
+            dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
             dst[x] = dst[x] + offset[classIdx];
+#endif
           }
           srcY += srcStrideY;
           srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
@@ -3604,7 +3681,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           const int classIdx = bandIdx;
 
           // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+#if JVET_AJ0237_INTERNAL_12BIT
+          dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
           dst[x] = dst[x] + offset[classIdx];
+#endif
         }
 
         srcY += srcStrideY;
@@ -3638,7 +3719,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
         const int classIdx = bandIdx;
 
         // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+#if JVET_AJ0237_INTERNAL_12BIT
+        dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
         dst[x] = dst[x] + offset[classIdx];
+#endif
       }
 
       srcY += srcStrideY;
@@ -3666,7 +3751,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           const int classIdx = bandIdx;
 
           // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+#if JVET_AJ0237_INTERNAL_12BIT
+          dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
           dst[x] = dst[x] + offset[classIdx];
+#endif
         }
 
         srcY += srcStrideY;
@@ -3700,7 +3789,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           const int classIdx = bandIdx;
 
           // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+#if JVET_AJ0237_INTERNAL_12BIT
+          dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
           dst[x] = dst[x] + offset[classIdx];
+#endif
         }
         srcY += srcStrideY;
         srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
@@ -3727,7 +3820,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           const int classIdx = bandIdx;
 
           // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+#if JVET_AJ0237_INTERNAL_12BIT
+          dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
           dst[x] = dst[x] + offset[classIdx];
+#endif
         }
         srcY += srcStrideY;
         srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
@@ -3760,7 +3857,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           const int classIdx = bandIdx;
 
           // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+#if JVET_AJ0237_INTERNAL_12BIT
+          dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
           dst[x] = dst[x] + offset[classIdx];
+#endif
         }
         srcY += srcStrideY;
         srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
@@ -3793,7 +3894,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           const int classIdx = bandIdx;
 
           // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+#if JVET_AJ0237_INTERNAL_12BIT
+          dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
           dst[x] = dst[x] + offset[classIdx];
+#endif
         }
         srcY += srcStrideY;
         srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
@@ -3822,7 +3927,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
         const int classIdx = bandIdx;
 
         // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+#if JVET_AJ0237_INTERNAL_12BIT
+        dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
         dst[x] = dst[x] + offset[classIdx];
+#endif
       }
       break;
     }
@@ -3850,7 +3959,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           const int classIdx = bandIdx;
 
           // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+#if JVET_AJ0237_INTERNAL_12BIT
+          dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
           dst[x] = dst[x] + offset[classIdx];
+#endif
         }
         srcY += srcStrideY;
         srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
@@ -3883,7 +3996,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           const int classIdx = bandIdx;
 
           // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+#if JVET_AJ0237_INTERNAL_12BIT
+          dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
           dst[x] = dst[x] + offset[classIdx];
+#endif
         }
         srcY += srcStrideY;
         srcU += srcStrideU * ((y & 0x1) | chromaScaleYM1);
@@ -3911,7 +4028,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
         const int classIdx = bandIdx;
 
         // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+#if JVET_AJ0237_INTERNAL_12BIT
+        dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
         dst[x] = dst[x] + offset[classIdx];
+#endif
       }
       break;
     }
@@ -3950,7 +4071,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           const int classIdx = bandIdx;
 
           // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+#if JVET_AJ0237_INTERNAL_12BIT
+          dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
           dst[x] = dst[x] + offset[classIdx];
+#endif
         }
         srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
@@ -3977,7 +4102,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
             const int classIdx = bandIdx;
 
             // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+#if JVET_AJ0237_INTERNAL_12BIT
+            dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
             dst[x] = dst[x] + offset[classIdx];
+#endif
           }
           srcY += srcStrideY << chromaScaleY;
           srcU += srcStrideU;
@@ -4016,7 +4145,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           const int classIdx = bandIdx;
 
           // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+#if JVET_AJ0237_INTERNAL_12BIT
+          dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
           dst[x] = dst[x] + offset[classIdx];
+#endif
         }
 
         srcY += srcStrideY << chromaScaleY;
@@ -4050,7 +4183,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
         const int classIdx = bandIdx;
 
         // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+#if JVET_AJ0237_INTERNAL_12BIT
+        dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
         dst[x] = dst[x] + offset[classIdx];
+#endif
       }
 
       srcY += srcStrideY << chromaScaleY;
@@ -4078,7 +4215,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           const int classIdx = bandIdx;
 
           // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+#if JVET_AJ0237_INTERNAL_12BIT
+          dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
           dst[x] = dst[x] + offset[classIdx];
+#endif
         }
 
         srcY += srcStrideY << chromaScaleY;
@@ -4112,7 +4253,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           const int classIdx = bandIdx;
 
           // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+#if JVET_AJ0237_INTERNAL_12BIT
+          dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
           dst[x] = dst[x] + offset[classIdx];
+#endif
         }
         srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
@@ -4139,7 +4284,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           const int classIdx = bandIdx;
 
           // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+#if JVET_AJ0237_INTERNAL_12BIT
+          dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
           dst[x] = dst[x] + offset[classIdx];
+#endif
         }
         srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
@@ -4172,7 +4321,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           const int classIdx = bandIdx;
 
           // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+#if JVET_AJ0237_INTERNAL_12BIT
+          dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
           dst[x] = dst[x] + offset[classIdx];
+#endif
         }
         srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
@@ -4205,7 +4358,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           const int classIdx = bandIdx;
 
           // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+#if JVET_AJ0237_INTERNAL_12BIT
+          dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
           dst[x] = dst[x] + offset[classIdx];
+#endif
         }
         srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
@@ -4234,7 +4391,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
         const int classIdx = bandIdx;
 
         // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+#if JVET_AJ0237_INTERNAL_12BIT
+        dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
         dst[x] = dst[x] + offset[classIdx];
+#endif
       }
       break;
     }
@@ -4262,7 +4423,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           const int classIdx = bandIdx;
 
           // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+#if JVET_AJ0237_INTERNAL_12BIT
+          dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
           dst[x] = dst[x] + offset[classIdx];
+#endif
         }
         srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
@@ -4295,7 +4460,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
           const int classIdx = bandIdx;
 
           // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+#if JVET_AJ0237_INTERNAL_12BIT
+          dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
           dst[x] = dst[x] + offset[classIdx];
+#endif
         }
         srcY += srcStrideY << chromaScaleY;
         srcU += srcStrideU;
@@ -4322,7 +4491,11 @@ void SampleAdaptiveOffset::offsetBlockCcSaoNoClip(const ComponentID compID, cons
         const int classIdx = bandIdx;
 
         // dst[x] = ClipPel<int>(dst[x] + offset[classIdx], clpRng);
+#if JVET_AJ0237_INTERNAL_12BIT
+        dst[x] = dst[x] + (offset[classIdx] << m_offsetStepLog2[compID]);
+#else
         dst[x] = dst[x] + offset[classIdx];
+#endif
       }
     }
     break;

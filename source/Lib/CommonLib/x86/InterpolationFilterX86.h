@@ -79,6 +79,11 @@ static void fullPelCopySSE( const ClpRng& clpRng, const void*_src, int srcStride
 #endif
   int headroom_offset = 1 << ( headroom - 1 );
   int offset   = IF_INTERNAL_OFFS;
+
+#if JVET_AJ0237_INTERNAL_12BIT
+  int dmvrHeadRoom = IF_INTERNAL_PREC_BILINEAR(clpRng.bd) - clpRng.bd; // in the current setup, dmvr headroom should either be 0 or negative
+#endif
+
   __m128i voffset  = _mm_set1_epi16( offset );
   __m128i voffset_headroom  = _mm_set1_epi16( headroom_offset );
 
@@ -106,7 +111,29 @@ static void fullPelCopySSE( const ClpRng& clpRng, const void*_src, int srcStride
 #if MCIF_SIMD_NEW
         if (biMCForDMVR)
         {
+#if JVET_AJ0237_INTERNAL_12BIT
+          if ((isFirst == isLast) || (isFirst && dmvrHeadRoom == 0))
+          {
+            vsum = vsrc;
+          }
+          else if (isFirst)
+          {
+            if (dmvrHeadRoom > 0)
+            {
+              vsum = _mm_slli_epi16(vsrc, dmvrHeadRoom);
+            }
+            else
+            {
+              vsum = _mm_srai_epi16(vsrc, -dmvrHeadRoom);
+            }
+          }
+          else
+          {
+            CHECK(1, "Impossible to have isFirst being false and isLast being true, when biMCForDMVR is true");
+          }
+#else
           vsum = _mm_min_epi16(vibdimax, _mm_max_epi16(vibdimin, vsrc));
+#endif
         }
         else if (isFirst == isLast)
         {
@@ -152,6 +179,10 @@ static void fullPelCopyVerSSE(const ClpRng& clpRng, const void*_src, int srcStri
   int headroom = IF_INTERNAL_PREC - clpRng.bd;
   int headroom_offset = 1 << (headroom - 1);
   int offset = IF_INTERNAL_OFFS;
+#if JVET_AJ0237_INTERNAL_12BIT
+  int dmvrHeadRoom = IF_INTERNAL_PREC_BILINEAR(clpRng.bd) - clpRng.bd; // in the current setup, dmvr headroom should either be 0 or negative
+#endif
+
   __m128i voffset = _mm_set1_epi16(offset);
   __m128i voffset_headroom = _mm_set1_epi16(headroom_offset);
 
@@ -176,7 +207,29 @@ static void fullPelCopyVerSSE(const ClpRng& clpRng, const void*_src, int srcStri
         }
         if (biMCForDMVR)
         {
+#if JVET_AJ0237_INTERNAL_12BIT
+          if ((isFirst == isLast) || (isFirst && dmvrHeadRoom == 0))
+          {
+            vsum = vsrc;
+          }
+          else if (isFirst)
+          {
+            if (dmvrHeadRoom > 0)
+            {
+              vsum = _mm_slli_epi16(vsrc, dmvrHeadRoom);
+            }
+            else
+            {
+              vsum = _mm_srai_epi16(vsrc, -dmvrHeadRoom);
+            }
+          }
+          else
+          {
+            CHECK(1, "Impossible to have isFirst being false and isLast being true, when biMCForDMVR is true");
+          }
+#else
           vsum = _mm_min_epi16(vibdimax, _mm_max_epi16(vibdimin, vsrc));
+#endif
         }
         else if (isFirst == isLast)
         {
@@ -218,6 +271,10 @@ static void fullPelCopySSE_M4(const ClpRng& clpRng, const void*_src, ptrdiff_t s
   int headroom = IF_INTERNAL_PREC - clpRng.bd;
   int headroom_offset = 1 << (headroom - 1);
   int offset = IF_INTERNAL_OFFS;
+#if JVET_AJ0237_INTERNAL_12BIT
+  int dmvrHeadRoom = IF_INTERNAL_PREC_BILINEAR(clpRng.bd) - clpRng.bd; // in the current setup, dmvr headroom should either be 0 or negative
+#endif
+
   __m128i voffset = _mm_set1_epi16(offset);
   __m128i voffset_headroom = _mm_set1_epi16(headroom_offset);
   __m128i vibdimin = _mm_set1_epi16(clpRng.min);
@@ -243,7 +300,29 @@ static void fullPelCopySSE_M4(const ClpRng& clpRng, const void*_src, ptrdiff_t s
       }
       if (biMCForDMVR)
       {
+#if JVET_AJ0237_INTERNAL_12BIT
+        if ((isFirst == isLast) || (isFirst && dmvrHeadRoom == 0))
+        {
+          vsum = vsrc;
+        }
+        else if (isFirst)
+        {
+          if (dmvrHeadRoom > 0)
+          {
+            vsum = _mm_slli_epi16(vsrc, dmvrHeadRoom);
+          }
+          else
+          {
+            vsum = _mm_srai_epi16(vsrc, -dmvrHeadRoom);
+          }
+        }
+        else
+        {
+          CHECK(1, "Impossible to have isFirst being false and isLast being true, when biMCForDMVR is true");
+        }
+#else
         vsum = _mm_min_epi16(vibdimax, _mm_max_epi16(vibdimin, vsrc));
+#endif
       }
       else if (isFirst == isLast)
       {
@@ -280,6 +359,10 @@ static void fullPelCopyVerSSE_M4(const ClpRng& clpRng, const void*_src, ptrdiff_
   int headroom = IF_INTERNAL_PREC - clpRng.bd;
   int headroom_offset = 1 << (headroom - 1);
   int offset = IF_INTERNAL_OFFS;
+#if JVET_AJ0237_INTERNAL_12BIT
+  int dmvrHeadRoom = IF_INTERNAL_PREC_BILINEAR(clpRng.bd) - clpRng.bd; // in the current setup, dmvr headroom should either be 0 or negative
+#endif
+
   __m128i voffset = _mm_set1_epi16(offset);
   __m128i voffset_headroom = _mm_set1_epi16(headroom_offset);
   __m128i vibdimin = _mm_set1_epi16(clpRng.min);
@@ -301,7 +384,29 @@ static void fullPelCopyVerSSE_M4(const ClpRng& clpRng, const void*_src, ptrdiff_
       }
       if (biMCForDMVR)
       {
+#if JVET_AJ0237_INTERNAL_12BIT
+        if ((isFirst == isLast) || (isFirst && dmvrHeadRoom == 0))
+        {
+          vsum = vsrc;
+        }
+        else if (isFirst)
+        {
+          if (dmvrHeadRoom > 0)
+          {
+            vsum = _mm_slli_epi16(vsrc, dmvrHeadRoom);
+          }
+          else
+          {
+            vsum = _mm_srai_epi16(vsrc, -dmvrHeadRoom);
+          }
+        }
+        else
+        {
+          CHECK(1, "Impossible to have isFirst being false and isLast being true, when biMCForDMVR is true");
+        }
+#else
         vsum = _mm_min_epi16(vibdimax, _mm_max_epi16(vibdimin, vsrc));
+#endif
       }
       else if (isFirst == isLast)
       {
@@ -355,6 +460,9 @@ static void fullPelCopyAVX2( const ClpRng& clpRng, const void*_src, int srcStrid
   __m256i vibdimax = _mm256_set1_epi16( clpRng.max );
   __m256i vsrc, vsum;
 
+#if JVET_AJ0237_INTERNAL_12BIT
+  int dmvrHeadRoom = IF_INTERNAL_PREC_BILINEAR(clpRng.bd) - clpRng.bd; // in the current setup, dmvr headroom should either be 0 or negative
+#endif
 
   for( int row = 0; row < height; row++ )
   {
@@ -376,7 +484,29 @@ static void fullPelCopyAVX2( const ClpRng& clpRng, const void*_src, int srcStrid
 #if MCIF_SIMD_NEW
         if (biMCForDMVR)
         {
+#if JVET_AJ0237_INTERNAL_12BIT
+          if ((isFirst == isLast) || (isFirst && dmvrHeadRoom == 0))
+          {
+            vsum = vsrc;
+          }
+          else if (isFirst)
+          {
+            if (dmvrHeadRoom > 0)
+            {
+              vsum = _mm256_slli_epi16(vsrc, dmvrHeadRoom);
+            }
+            else
+            {
+              vsum = _mm256_srai_epi16(vsrc, -dmvrHeadRoom);
+            }
+          }
+          else
+          {
+            CHECK(1, "Impossible to have isFirst being false and isLast being true, when biMCForDMVR is true");
+          }
+#else
           vsum = _mm256_min_epi16(vibdimax, _mm256_max_epi16(vibdimin, vsrc));
+#endif
         }
         else if (isFirst == isLast)
         {
@@ -426,6 +556,10 @@ static void fullPelCopyVerAVX2(const ClpRng& clpRng, const void*_src, int srcStr
   int offset = 1 << (headroom - 1);
   int internal_offset = IF_INTERNAL_OFFS;
 
+#if JVET_AJ0237_INTERNAL_12BIT
+  int dmvrHeadRoom = IF_INTERNAL_PREC_BILINEAR(clpRng.bd) - clpRng.bd; // in the current setup, dmvr headroom should either be 0 or negative
+#endif
+
   __m256i vinternal_offset = _mm256_set1_epi16(internal_offset);
   __m256i vheadroom_offset = _mm256_set1_epi16(offset);
 
@@ -452,7 +586,29 @@ static void fullPelCopyVerAVX2(const ClpRng& clpRng, const void*_src, int srcStr
         }
         if (biMCForDMVR)
         {
+#if JVET_AJ0237_INTERNAL_12BIT
+          if ((isFirst == isLast) || (isFirst && dmvrHeadRoom == 0))
+          {
+            vsum = vsrc;
+          }
+          else if (isFirst)
+          {
+            if (dmvrHeadRoom > 0)
+            {
+              vsum = _mm256_slli_epi16(vsrc, dmvrHeadRoom);
+            }
+            else
+            {
+              vsum = _mm256_srai_epi16(vsrc, -dmvrHeadRoom);
+            }
+          }
+          else
+          {
+            CHECK(1, "Impossible to have isFirst being false and isLast being true, when biMCForDMVR is true");
+          }
+#else
           vsum = _mm256_min_epi16(vibdimax, _mm256_max_epi16(vibdimin, vsrc));
+#endif
         }
         else if (isFirst == isLast)
         {
@@ -3262,7 +3418,11 @@ static void simdFilter( const ClpRng& clpRng, Pel const *src, int srcStride, Pel
   {
     if( isFirst )
     {
+#if JVET_AJ0237_INTERNAL_12BIT
+      shift = IF_FILTER_PREC_BILINEAR - (IF_INTERNAL_PREC_BILINEAR(clpRng.bd) - clpRng.bd);
+#else
       shift = IF_FILTER_PREC_BILINEAR - (IF_INTERNAL_PREC_BILINEAR - clpRng.bd);
+#endif
       offset = 1 << (shift - 1);
     }
     else

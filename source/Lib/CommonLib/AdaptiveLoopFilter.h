@@ -173,10 +173,18 @@ public:
   void deriveFixedFilterResultsBlk( AlfClassifier*** classifier, const CPelBuf& srcLuma, const CPelBuf& srcLumaBeforeDb, const Area& blkDst, const Area& blk, const int bits, CodingStructure &cs, const ClpRng &clpRng, const Pel clippingValues[4], int qp, int winIdx, int fixedFilterSetIdx );
   void deriveFixedFilterResults( AlfClassifier*** classifier, const CPelBuf& srcLuma, const CPelBuf& srcLumaBeforeDb, const Area& blkDst, const Area& blk, CodingStructure &cs, int winIdx, int fixedFilterSetIdx );
   static void calcClass0Var( AlfClassifier **classifier, const Area &blkDst, const Area &cu, int dirWindSize, int classDir, int noDir, int noAct, int bitDepth, int subBlkSize, int mappingDir[NUM_DIR_FIX][NUM_DIR_FIX], uint32_t **laplacian[NUM_DIRECTIONS] );
+#if JVET_AJ0237_INTERNAL_12BIT
+  static void deriveVariance(const CPelBuf& srcLuma, const Area& blkDst, const Area& blk, uint32_t ***laplacian, int bd);
+#else
   static void deriveVariance( const CPelBuf &srcLuma, const Area &blkDst, const Area &blk, uint32_t ***laplacian );
+#endif
   void deriveFixedFilterResultsCtuBoundary( AlfClassifier ***classifier, Pel ***fixedFilterResults, const CPelBuf &srcLuma, const CPelBuf &srcLumaBeforeDb, const Area &blkDst, const int bits, CodingStructure& cs, const ClpRng &clpRng, const Pel clippingValues[4], int qp, int fixedFilterSetIdx, int mappingDir[NUM_DIR_FIX][NUM_DIR_FIX], uint32_t **laplacian[NUM_DIRECTIONS], uint8_t* ctuEnableFlagLuma, uint8_t* ctuEnableOnlineLuma, int ctuIdx, int classifierIdx );
   void deriveFixedFilterResultsPerBlk( AlfClassifier ***classifier, Pel ***fixedFilterResults, const CPelBuf &srcLuma, const CPelBuf &srcLumaBeforeDb, const Area &blkCur, const int bits, CodingStructure& cs, const ClpRng &clpRng, const Pel clippingValues[4], int qp, int fixedFilterSetIdx, int mappingDir[NUM_DIR_FIX][NUM_DIR_FIX], uint32_t **laplacian[NUM_DIRECTIONS], const int classifierIdx );
+#if JVET_AJ0237_INTERNAL_12BIT
+  void(*m_deriveVariance)(const CPelBuf& srcLuma, const Area& blkDst, const Area& blk, uint32_t ***variance, int bd);
+#else
   void(*m_deriveVariance)(const CPelBuf &srcLuma, const Area &blkDst, const Area &blk, uint32_t ***variance);
+#endif
 #if JVET_AG0157_ALF_CHROMA_FIXED_FILTER
   void deriveFixedFilterResultsCtuBoundaryChroma(AlfClassifier ***classifier, Pel ***fixedFilterResults, const CPelBuf &src, const CPelBuf &srcBeforeDb, const Area &blkDst, const int bits, CodingStructure& cs, const ClpRng &clpRng, const Pel clippingValues[4], int qp, int fixedFilterSetIdx, int mappingDir[NUM_DIR_FIX][NUM_DIR_FIX], uint32_t **laplacian[NUM_DIRECTIONS], uint8_t* ctuEnableFlag, int ctuIdx);
   void deriveFixedFilterResultsPerBlkChroma(AlfClassifier ***classifier, Pel ***fixedFilterResults, const CPelBuf &src, const CPelBuf &srcBeforeDb, const Area &blk, const int bits, CodingStructure& cs, const ClpRng &clpRng, const Pel clippingValues[4], int qp, int fixedFilterSetIdx, int mappingDir[NUM_DIR_FIX][NUM_DIR_FIX], uint32_t **laplacian[NUM_DIRECTIONS]);

@@ -62,6 +62,9 @@ BilateralFilter::BilateralFilter()
   initBilateralFilterX86();
 #endif
 #endif
+#if JVET_AJ0237_INTERNAL_12BIT
+  internalBitDepth = 10;
+#endif
 }
 
 BilateralFilter::~BilateralFilter()
@@ -100,6 +103,12 @@ const char* BilateralFilter::getFilterLutParameters(int16_t* block, const int st
   int w = floorLog2(width);
   int h = floorLog2(height);
   int mad = m_calcMAD(block, stride, width, height, w + h);
+
+#if JVET_AJ0237_INTERNAL_12BIT
+  int bdShift = std::max(0, internalBitDepth - 10);
+  int offset = (bdShift == 0) ? 0 : (1 << (bdShift - 1));
+  mad = (mad + offset) >> bdShift;
+#endif
 
   w = std::min(w, 7);
   h = std::min(h, 7);
@@ -163,7 +172,11 @@ const char* BilateralFilter::getFilterLutParameters(int16_t* block, const int st
 }
 #endif
 
+#if JVET_AJ0237_INTERNAL_12BIT
+inline void bifApplyLut(int diff, int& res, int cutBitsNum, int bitsRound, int bitsRound2, int shift, const char* lutRowPtr, int lutShift, int bdShift)
+#else
 inline void bifApplyLut(int diff, int& res, int cutBitsNum, int bitsRound, int bitsRound2, int shift, const char* lutRowPtr, int lutShift)
+#endif
 {
   int sg0 = diff >> shift;
   int v0 = (diff + sg0) ^ sg0;
@@ -178,12 +191,24 @@ inline void bifApplyLut(int diff, int& res, int cutBitsNum, int bitsRound, int b
   idx = 15 + ((idx - 15) & ((idx - 15) >> shift));
   int w0 = lutRowPtr[idx] >> lutShift;
 #endif
+#if JVET_AJ0237_INTERNAL_12BIT
+  w0 = (w0 << bdShift);
+#endif
   res = (w0 + sg0) ^ sg0;
 }
 
+#if JVET_AJ0237_INTERNAL_12BIT
+void BilateralFilter::blockBilateralFilterDiamond5x5(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bifRoundAdd, int bifRoundShift, bool isRDO, const char* lutRowPtr, bool noClip, int cutBitsNum, int bdShift)
+#else
 void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bifRoundAdd, int bifRoundShift, bool isRDO, const char* lutRowPtr, bool noClip, int cutBitsNum)
+#endif
 {
   int pad = NUMBER_PADDED_SAMPLES;
+
+#if JVET_AJ0237_INTERNAL_12BIT
+  cutBitsNum += bdShift;
+#endif
+
 
   int padwidth = iWidthExtSIMD;
   int downbuffer[128];
@@ -204,13 +229,25 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
   {
     int pixel = block[(-1 + pad)*padwidth + x + pad];
     int below = block[(-1 + pad + 1)*padwidth + x + pad];
+#if JVET_AJ0237_INTERNAL_12BIT
+    bifApplyLut(below - pixel, downbuffer[x], cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift1, bdShift);
+#else
     bifApplyLut(below - pixel, downbuffer[x], cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift1);
+#endif
 
     int belowright = block[(-1 + pad + 1)*padwidth + x + pad + 1];
+#if JVET_AJ0237_INTERNAL_12BIT
+    bifApplyLut(belowright - pixel, downrightbuffer[1][x + 1], cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift2, bdShift);
+#else
     bifApplyLut(belowright - pixel, downrightbuffer[1][x + 1], cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift2);
+#endif
 
     int belowleft = block[(-1 + pad + 1)*padwidth + x + pad - 1];
+#if JVET_AJ0237_INTERNAL_12BIT
+    bifApplyLut(belowleft - pixel, downleftbuffer[x], cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift2, bdShift);
+#else
     bifApplyLut(belowleft - pixel, downleftbuffer[x], cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift2);
+#endif
   }
   int width = uiWidth;
   for( int y = 0; y < uiHeight; y++ )
@@ -220,15 +257,27 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
     int pixel = rowStart[-1];
 
     int right = rowStart[0], rightmod = 0;
+#if JVET_AJ0237_INTERNAL_12BIT
+    bifApplyLut(right - pixel, rightmod, cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift1, bdShift);
+#else
     bifApplyLut(right - pixel, rightmod, cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift1);
+#endif
 
     pixel = rowStart[-padwidth - 1];
     int belowright = right;
+#if JVET_AJ0237_INTERNAL_12BIT
+    bifApplyLut(belowright - pixel, downrightbuffer[(y + 1) % 2][0], cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift2, bdShift);
+#else
     bifApplyLut(belowright - pixel, downrightbuffer[(y + 1) % 2][0], cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift2);
+#endif
 
     pixel = rowStart[-padwidth + width];
     int belowleft = rowStart[width - 1];
+#if JVET_AJ0237_INTERNAL_12BIT
+    bifApplyLut(belowleft - pixel, downleftbuffer[width], cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift2, bdShift);
+#else
     bifApplyLut(belowleft - pixel, downleftbuffer[width], cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift2);
+#endif
 
     for( int x = 0; x < uiWidth; x++ )
     {
@@ -242,12 +291,20 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
       modsum += leftmod;
 
       right = rowStart[x + 1];
+#if JVET_AJ0237_INTERNAL_12BIT
+      bifApplyLut(right - pixel, mod, cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift1, bdShift);
+#else
       bifApplyLut(right - pixel, mod, cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift1);
+#endif
       modsum += mod;
       rightmod = mod;
 
       int below = rowStart[x + padwidth];
+#if JVET_AJ0237_INTERNAL_12BIT
+      bifApplyLut(below - pixel, mod, cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift1, bdShift);
+#else
       bifApplyLut(below - pixel, mod, cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift1);
+#endif
       modsum += mod;
       downbuffer[x] = mod;
 
@@ -258,12 +315,20 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
       modsum += aboveleftmod;
 
       int belowleft = rowStart[x + padwidth - 1];
+#if JVET_AJ0237_INTERNAL_12BIT
+      bifApplyLut(belowleft - pixel, mod, cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift2, bdShift);
+#else
       bifApplyLut(belowleft - pixel, mod, cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift2);
+#endif
       modsum += mod;
       downleftbuffer[x] = mod;
 
       int belowright = rowStart[x + padwidth + 1];
+#if JVET_AJ0237_INTERNAL_12BIT
+      bifApplyLut(belowright - pixel, mod, cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift2, bdShift);
+#else
       bifApplyLut(belowright - pixel, mod, cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift2);
+#endif
       modsum += mod;
       downrightbuffer[y % 2][x + 1] = mod;
 
@@ -272,23 +337,43 @@ void BilateralFilter::blockBilateralFilterDiamond5x5( uint32_t uiWidth, uint32_t
       // speed when SIMD is turned off.
 
       int above = rowStart[x - 2 * padwidth];
+#if JVET_AJ0237_INTERNAL_12BIT
+      bifApplyLut(above - pixel, mod, cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift3, bdShift);
+#else
       bifApplyLut(above - pixel, mod, cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift3);
+#endif
       modsum += mod;
 
       below = rowStart[x + 2 * padwidth];
+#if JVET_AJ0237_INTERNAL_12BIT
+      bifApplyLut(below - pixel, mod, cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift3, bdShift);
+#else
       bifApplyLut(below - pixel, mod, cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift3);
+#endif
       modsum += mod;
 
       int left = rowStart[x - 2];
+#if JVET_AJ0237_INTERNAL_12BIT
+      bifApplyLut(left - pixel, mod, cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift3, bdShift);
+#else
       bifApplyLut(left - pixel, mod, cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift3);
+#endif
       modsum += mod;
 
       right = rowStart[x + 2];
+#if JVET_AJ0237_INTERNAL_12BIT
+      bifApplyLut(right - pixel, mod, cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift3, bdShift);
+#else
       bifApplyLut(right - pixel, mod, cutBitsNum, bitsRound, bitsRound2, shift, lutRowPtr, lutShift3);
+#endif
       modsum += mod;
 
 #if JVET_AF0112_BIF_DYNAMIC_SCALING
+#if JVET_AJ0237_INTERNAL_12BIT
+      blkFilt[(y + pad) * padwidth + x + pad] = ((int16_t)((modsum * bfac + (bifRoundAdd << 3)) >> (bifRoundShift + 3)));
+#else
       blkFilt[(y + pad) * padwidth + x + pad] = ((int16_t)((uint16_t)((modsum * bfac + (bifRoundAdd << 3)) >> (bifRoundShift + 3))));
+#endif
 #else
       blkFilt[(y + pad) * padwidth + x + pad] = (( int16_t ) (( uint16_t ) ((modsum*bfac + bifRoundAdd) >> bifRoundShift)));
 #endif
@@ -592,7 +677,12 @@ void BilateralFilter::bilateralFilterRDOdiamond5x5(const ComponentID compID, Pel
     CHECK(doReshape, "Reshape domain is not used for chroma");
 #endif
   }
+#if JVET_AJ0237_INTERNAL_12BIT
+  int bdShift = std::max(0, internalBitDepth - 10);
+  m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, piReco, uiRecStride, iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, true, lutRowPtr, false, cutBitsNum, bdShift);
+#else
   m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, piReco, uiRecStride, iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, true, lutRowPtr, false, cutBitsNum);
+#endif
 
   if( !useReco )
   {
@@ -619,6 +709,9 @@ void BilateralFilter::bilateralFilterDiamond5x5( const ComponentID compID, const
 #endif
 )
 {
+#if JVET_AJ0237_INTERNAL_12BIT
+  int bdShift = std::max(0, internalBitDepth - 10);
+#endif
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
   const int scaleX = getChannelTypeScaleX( toChannelType( compID ), currTU.cu->cs->pcv->chrFormat );
   const int scaleY = getChannelTypeScaleY( toChannelType( compID ), currTU.cu->cs->pcv->chrFormat );
@@ -902,7 +995,11 @@ void BilateralFilter::bilateralFilterDiamond5x5( const ComponentID compID, const
         int bifRoundAdd = BIF_ROUND_ADD >> currTU.cs->pps->getBIFStrength();
         int bifRoundShift = BIF_ROUND_SHIFT - currTU.cs->pps->getBIFStrength();
 
+#if JVET_AJ0237_INTERNAL_12BIT
+        m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, false, lutRowPtr, false, cutBitsNum, bdShift);
+#else
         m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, false, lutRowPtr, false, cutBitsNum);
+#endif
 
         xStart = xEnd;
       }
@@ -1168,8 +1265,11 @@ void BilateralFilter::bilateralFilterDiamond5x5( const ComponentID compID, const
 
     int bifRoundAdd = BIF_ROUND_ADD >> currTU.cs->pps->getBIFStrength();
     int bifRoundShift = BIF_ROUND_SHIFT - currTU.cs->pps->getBIFStrength();
-
+#if JVET_AJ0237_INTERNAL_12BIT
+    m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, false, lutRowPtr, noClip, cutBitsNum, bdShift);
+#else
     m_bilateralFilterDiamond5x5(uiWidth, uiHeight, tempblock, tempblockFiltered, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, false, lutRowPtr, noClip, cutBitsNum);
+#endif
   }
 }
 void BilateralFilter::clipNotBilaterallyFilteredBlocks(const ComponentID compID, const CPelUnitBuf& src, PelUnitBuf& rec, const ClpRng& clpRng, TransformUnit & currTU)
@@ -1595,6 +1695,11 @@ const char* BilateralFilter::getFilterLutParametersChroma(int16_t* block, const 
   int h = floorLog2(heightForStrength);
 
   int mad = m_calcMAD(block, stride, width, height, floorLog2(width) + floorLog2(height));
+#if JVET_AJ0237_INTERNAL_12BIT
+  int bdShift = std::max(0, internalBitDepth - 10);
+  int offset = (bdShift == 0) ? 0 : (1 << (bdShift - 1));
+  mad = (mad + offset) >> bdShift;
+#endif
 
   w = std::min(w, 7);
   h = std::min(h, 7);
