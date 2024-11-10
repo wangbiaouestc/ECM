@@ -65,7 +65,6 @@
 #define ALF_SAO_TRUE_ORG                                  1 // using true original samples for SAO and ALF optimization
 #define REMOVE_PCM                                        1 // Remove PCM related code for memory reduction and speedup
 #define JVET_Y0152_TT_ENC_SPEEDUP                         1 // TT encoding speedup
-#define JVET_AE0057_MTT_ET                                1 // JVET-AE0057: MTT early termination of 64x64 luma CU based on no-split RD cost 
 #define JVET_AF0177_ALF_COV_FLOAT                         1 // JVET-AF0177: Use float for ALF and CCALF covariance matrix
 
 
@@ -95,6 +94,7 @@
 #define LMCS_CHROMA_CALC_CU                               1 // Derive chroma LMCS parameter based on neighbor CUs. Needed by VPDU removal and 128x128 transform.
 #endif
 #define JVET_AI0087_BTCUS_RESTRICTION                     1 // JVET-AI0087: Restriction on BT CUs from applying QT like partitioning structure
+#define JVET_AJ0226_MTT_SKIP                              1 // JVET-AJ0226: MTT early termination applied to 64x64 & 32x32 luma CUs  
 
 //-- intra
 #define INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS             1 // Enable 2xN and Nx2 block by removing SCIPU constraints

@@ -1727,12 +1727,11 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
 #if JVET_AI0087_BTCUS_RESTRICTION
   bool disableBTV = false;
   bool disableBTH = false;
-  
+  if (EncModeCtrl::isLumaNonBoundaryCu(partitioner, cs.picture->lwidth(), cs.picture->lheight()) 
 #if JVET_AI0136_ADAPTIVE_DUAL_TREE
-  if (EncModeCtrl::isLumaNonBoundaryCu(partitioner, cs.picture->lwidth(), cs.picture->lheight()) && (!(cs.slice->getProcessingIntraRegion() && cs.slice->getProcessingSeparateTrees()) || cs.slice->isIntra()) )
-#else
-  if (EncModeCtrl::isLumaNonBoundaryCu(partitioner, cs.picture->lwidth(), cs.picture->lheight()) )
+    && (!(cs.slice->getProcessingIntraRegion() && cs.slice->getProcessingSeparateTrees()) || cs.slice->isIntra()) 
 #endif
+    )
   {
     if ((partitioner.currBtDepth == 1) && (partitioner.currPartIdx() == 1))
     {
@@ -2541,25 +2540,39 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
   ComprCUCtx& cuECtx = m_ComprCUCtxList[EncModeCtrl::m_treeIdx].back();
 #else
   ComprCUCtx& cuECtx = m_ComprCUCtxList.back();
-#endif
-  // MTT modes early termination for 64x64 luma CU based on nosplit intra cost
-#if JVET_AE0057_MTT_ET
-  if (m_pcEncCfg->getUseMttSkip() && partitioner.currQtDepth == (cs.sps->getCTUSize() == 256 ? 2 : 1)
-      && partitioner.currBtDepth == 0
-      && partitioner.currArea().lwidth() == 64 && partitioner.currArea().lheight() == 64
-#if JVET_AI0136_ADAPTIVE_DUAL_TREE
-      && !(cs.slice->getSeparateTreeEnabled() && cs.sps->getInterSliceSeparateTreeEnabled())
-#endif
-    )
+#endif     
+
+#if JVET_AJ0226_MTT_SKIP   
+  if (m_pcEncCfg->getUseMttSkip() && partitioner.currBtDepth == 0 && (partitioner.currArea().lwidth() == partitioner.currArea().lheight()) &&
+      (partitioner.currArea().lwidth() == 64 || partitioner.currArea().lwidth() == 32 ))
   {
-    if (((partitioner.currArea().Y().x + 63 < cs.picture->lwidth())
-         && (partitioner.currArea().Y().y + 63 < cs.picture->lheight()))
-        && (encTestmode.type == ETM_SPLIT_BT_H || encTestmode.type == ETM_SPLIT_BT_V
-            || encTestmode.type == ETM_SPLIT_TT_H || encTestmode.type == ETM_SPLIT_TT_V)
-        && partitioner.chType == CHANNEL_TYPE_LUMA)
+    if (((partitioner.currArea().Y().x + partitioner.currArea().lwidth()-1  < cs.picture->lwidth())
+      && (partitioner.currArea().Y().y + partitioner.currArea().lwidth()-1  < cs.picture->lheight()))
+      && (encTestmode.type == ETM_SPLIT_BT_H || encTestmode.type == ETM_SPLIT_BT_V
+        || encTestmode.type == ETM_SPLIT_TT_H || encTestmode.type == ETM_SPLIT_TT_V)
+      && partitioner.chType == CHANNEL_TYPE_LUMA 
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+      && (!(cs.slice->getProcessingIntraRegion() && cs.slice->getProcessingSeparateTrees()) || cs.slice->isIntra())
+#endif
+      )
     {
-      int thresholdMTT = Clip3(0, MAX_INT, (120 - ((m_pcEncCfg->getBaseQP() - 22) * 3)) * 1000000);
-      if (m_noSplitIntraRdCost > thresholdMTT)
+      double splitSignalCostScaling = Clip3(0.0, 4.0, (4.0 * pow(0.5, (m_pcEncCfg->getBaseQP() - 22.0) / 5)));
+      int modeCabacCost = 0;
+
+      if (encTestmode.type == ETM_SPLIT_TT_H)
+        modeCabacCost = partitioner.currArea().lwidth() == 64 ? m_cabacBitsforTTH[2]  : partitioner.currArea().lwidth() == 32 ? m_cabacBitsforTTH[3] :  0;
+      else if (encTestmode.type == ETM_SPLIT_TT_V)
+        modeCabacCost = partitioner.currArea().lwidth() == 64 ? m_cabacBitsforTTV[2]  : partitioner.currArea().lwidth() == 32 ? m_cabacBitsforTTV[3] :  0;
+      else if (encTestmode.type == ETM_SPLIT_BT_H)
+        modeCabacCost =  partitioner.currArea().lwidth() == 64 ? m_cabacBitsforBTH[2]  : partitioner.currArea().lwidth() == 32 ? m_cabacBitsforBTH[3] : 0;
+      else if (encTestmode.type == ETM_SPLIT_BT_V)
+        modeCabacCost =  partitioner.currArea().lwidth() == 64 ? m_cabacBitsforBTV[2]  : partitioner.currArea().lwidth() == 32 ? m_cabacBitsforBTV[3] :  0;
+
+      int thresholdMTT = Clip3(0, MAX_INT, (140 - ((cs.slice->getSliceQp() - 22) * 3)) * (1000000 - (int)(modeCabacCost * splitSignalCostScaling) ));
+
+      double noSplitCost = partitioner.currArea().lwidth() == 64 ? m_noSplitIntraRdCost64CU : partitioner.currArea().lwidth() == 32 ? m_noSplitIntraRdCost32CU :  0;
+
+      if (noSplitCost > thresholdMTT)
       {
         const PartSplit split = getPartSplit(encTestmode);
 
@@ -2570,6 +2583,14 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
         if (split == CU_VERT_SPLIT)
         {
           cuECtx.set(DID_VERT_SPLIT, false);
+        }
+        if (split == CU_TRIH_SPLIT)
+        {
+          cuECtx.set(DO_TRIH_SPLIT, false);
+        }
+        if (split == CU_TRIV_SPLIT)
+        {
+          cuECtx.set(DO_TRIV_SPLIT, false);
         }
         return false;
       }
