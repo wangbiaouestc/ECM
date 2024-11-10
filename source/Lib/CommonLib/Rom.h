@@ -65,7 +65,6 @@ void         destroyROM();
 extern const int g_sizeData[PDP_NUM_SIZES][11];
 extern std::unordered_map<int, int> g_size;
 
-extern const int g_modeGroup[PDP_NUM_MODES];
 extern int16_t*** g_pdpFilters[PDP_NUM_GROUPS][PDP_NUM_SIZES];
 extern int g_validSize[PDP_NUM_SIZES];
 void createPdpFilters();

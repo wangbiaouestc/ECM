@@ -1478,11 +1478,10 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
       && !pu.cu->plIdx && !pu.cu->sgpm
       && !pu.cu->timd && !pu.cu->tmrlFlag && !pu.multiRefIdx)
     {
-      auto modeIdx = g_modeGroup[uiDirMode];
 #if JVET_AI0208_PDP_MIP
-      if ((pu.cu->mipFlag ? ( pu.mipTransposedFlag ? g_pdpFiltersMip[modeIdx+16][sizeIdx] : g_pdpFiltersMip[modeIdx][sizeIdx]) : g_pdpFilters[modeIdx][sizeIdx]) && ( pu.cu->mipFlag || !(modeIdx > 1 && (modeIdx % 2))) )
+      if ((pu.cu->mipFlag ? ( pu.mipTransposedFlag ? g_pdpFiltersMip[uiDirMode+16][sizeIdx] : g_pdpFiltersMip[uiDirMode][sizeIdx]) : g_pdpFilters[uiDirMode][sizeIdx]) && ( pu.cu->mipFlag || !(uiDirMode > 1 && (uiDirMode % 2))) )
 #else
-      if (g_pdpFilters[modeIdx][sizeIdx] && !(modeIdx > 1 && (modeIdx % 2)))
+      if (g_pdpFilters[uiDirMode][sizeIdx] && !(uiDirMode > 1 && (uiDirMode % 2)))
 #endif
       {
         if (pu.cu->cs->pcv->isEncoder && m_pdpIntraPredReady[uiDirMode])
@@ -1495,7 +1494,7 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
           }
           pdpWasApplied = true;
         }
-        else if (m_xPredIntraOpt(piPred, pu, g_modeGroup[uiDirMode], clpRng, m_ref, m_refShort))
+        else if (m_xPredIntraOpt(piPred, pu, uiDirMode, clpRng, m_ref, m_refShort))
         {
           if (!pu.cu->dimd)
           {
@@ -1645,7 +1644,7 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
 #if JVET_AH0209_PDP
         const int sizeKey = (width << 8) + height;
         const int sizeIdx = g_size.find( sizeKey ) != g_size.end() ? g_size[sizeKey] : -1;
-        auto modeIdx = g_modeGroup[puTmp.intraDir[0]];
+        auto modeIdx = puTmp.intraDir[0];
         if (pu.cu->cs->pcv->isEncoder && m_pdpIntraPredReady[puTmp.intraDir[0]])
         {
           PelBuf predBuf(m_pdpIntraPredBufIP[puTmp.intraDir[0]], pu.Y());
