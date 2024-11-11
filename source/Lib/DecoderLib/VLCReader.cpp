@@ -2183,6 +2183,16 @@ void HLSyntaxReader::parseSPS(SPS* pcSPS)
     pcSPS->setAlfPrecisionFlag( false );
   }
 #endif
+#if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+  if( pcSPS->getALFEnabledFlag() )
+  {
+    READ_FLAG( uiCode, "sps_alf_luma_fixed_filter_adjust" );         pcSPS->setAlfLumaFixedFilterAdjust( uiCode ? true : false );
+  }
+  else
+  {
+    pcSPS->setAlfLumaFixedFilterAdjust( false );
+  }
+#endif
   if (pcSPS->getALFEnabledFlag() && pcSPS->getChromaFormatIdc() != CHROMA_400)
   {
     READ_FLAG( uiCode, "sps_ccalf_enabled_flag" );                      pcSPS->setCCALFEnabledFlag ( uiCode ? true : false );

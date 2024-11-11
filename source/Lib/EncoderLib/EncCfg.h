@@ -713,6 +713,9 @@ protected:
 #if JVET_AH0057_CCALF_COEFF_PRECISION
   bool      m_ccalfPrecision;
 #endif
+#if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+  bool      m_alfLumaFixedFilterAdjust;
+#endif
   bool      m_bTestSAODisableAtPictureLevel;
   double    m_saoEncodingRate;       // When non-0 SAO early picture termination is enabled for luma and chroma
   double    m_saoEncodingRateChroma; // The SAO early picture termination rate to use for chroma (when m_SaoEncodingRate is >0). If <=0, use results for luma.
@@ -2386,6 +2389,10 @@ public:
 #if JVET_AH0057_CCALF_COEFF_PRECISION
   void      setUseCCALFPrecision(bool b)                             { m_ccalfPrecision = b; }
   bool      getUseCCALFPrecision()                             const { return m_ccalfPrecision; }
+#endif
+#if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+  void      setAlfLumaFixedFilterAdjust(bool b)                      { m_alfLumaFixedFilterAdjust = b; }
+  bool      getAlfLumaFixedFilterAdjust()                      const { return m_alfLumaFixedFilterAdjust; }
 #endif
   void  setTestSAODisableAtPictureLevel (bool bVal)                  { m_bTestSAODisableAtPictureLevel = bVal; }
   bool  getTestSAODisableAtPictureLevel ( ) const                    { return m_bTestSAODisableAtPictureLevel; }

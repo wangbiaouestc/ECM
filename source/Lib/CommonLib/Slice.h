@@ -1775,6 +1775,9 @@ private:
 
   bool              m_alfEnabledFlag;
   bool              m_ccalfEnabledFlag;
+#if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+  bool              m_alfLumaFixedFilterAdjust;
+#endif
   bool              m_wrapAroundEnabledFlag;
   unsigned          m_IBCFlag;
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
@@ -2232,6 +2235,10 @@ public:
   void                    setALFEnabledFlag( bool b )                                                     { m_alfEnabledFlag = b; }
 bool                    getCCALFEnabledFlag() const                                                       { return m_ccalfEnabledFlag; }
 void                    setCCALFEnabledFlag( bool b )                                                     { m_ccalfEnabledFlag = b; }
+#if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+  bool                    getAlfLumaFixedFilterAdjust() const                                             { return m_alfLumaFixedFilterAdjust; }
+  void                    setAlfLumaFixedFilterAdjust( bool b )                                           { m_alfLumaFixedFilterAdjust = b; }
+#endif
   void                    setJointCbCrEnabledFlag(bool bVal)                                              { m_JointCbCrEnabledFlag = bVal; }
   bool                    getJointCbCrEnabledFlag() const                                                 { return m_JointCbCrEnabledFlag; }
 

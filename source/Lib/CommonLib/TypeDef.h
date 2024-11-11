@@ -475,6 +475,7 @@
 #define JVET_AI0084_ALF_RESIDUALS_SCALING                 1 // JVET_AI0084: non-fixed ALF residuals scaling
 #define JVET_AI0058_ALF_RELAXED_RDO_LUMA                  1 // JVET-AI0058: Relaxed ALF Luma RDO
 #define JVET_AI0166_CCALF_CHROMA_SAO_INPUT                1 // JVET-AI0166: CCALF with Chroma inputs
+#define JVET_AJ0188_CODING_INFO_CLASSIFICATION            1 // JVET-AJ0188: Coding Information based Classification for ALF
 
 // SIMD optimizations
 #if IF_12TAP

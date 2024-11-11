@@ -1345,6 +1345,12 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
 #endif
   }
 #endif
+#if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+  if( pcSPS->getALFEnabledFlag() )
+  {
+    WRITE_FLAG( pcSPS->getAlfLumaFixedFilterAdjust(),                                 "sps_alf_luma_fixed_filter_adjust" );
+  }
+#endif
   if (pcSPS->getALFEnabledFlag() && pcSPS->getChromaFormatIdc() != CHROMA_400)
   {
     WRITE_FLAG( pcSPS->getCCALFEnabledFlag(),                                            "sps_ccalf_enabled_flag" );

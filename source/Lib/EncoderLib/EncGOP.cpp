@@ -3771,7 +3771,9 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
         m_pcALF->copyResiData(cs);
       }
 #endif
-
+#if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+      m_pcALF->callCodingInfoBuf( cs ).fill( 0 );
+#endif
       // create SAO object based on the picture size
       if( pcSlice->getSPS()->getSAOEnabledFlag()
 #if JVET_W0066_CCSAO
@@ -3862,7 +3864,12 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
       }
 #endif
 
+#if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+      PelUnitBuf codingInfoBuf = m_pcALF->callCodingInfoBuf( cs );
+      m_pcLoopFilter->loopFilterPic( cs, codingInfoBuf, true );
+#else
       m_pcLoopFilter->loopFilterPic( cs );
+#endif
 
 #if !MULTI_PASS_DMVR
       CS::setRefinedMotionField(cs);
@@ -5124,7 +5131,12 @@ uint64_t EncGOP::preLoopFilterPicAndCalcDist( Picture* pcPic )
   } 
 #endif
 
+#if JVET_AJ0188_CODING_INFO_CLASSIFICATION
+  PelUnitBuf codingInfoBuf = m_pcALF->callCodingInfoBuf( cs );
+  m_pcLoopFilter->loopFilterPic( cs, codingInfoBuf, false );
+#else
   m_pcLoopFilter->loopFilterPic( cs );
+#endif
 
   const CPelUnitBuf picOrg = pcPic->getRecoBuf();
   const CPelUnitBuf picRec = cs.getRecoBuf();
