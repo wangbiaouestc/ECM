@@ -1873,6 +1873,9 @@ private:
   bool              m_ciipAffine;
 #endif
   bool              m_Geo;
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+  bool              m_GeoShapeAdapt;
+#endif
 #if JVET_AI0082_GPM_WITH_INTER_IBC
   bool              m_geoInterIbc;
 #endif
@@ -2639,6 +2642,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #endif
   void      setUseGeo             ( bool b )                                        { m_Geo = b; }
   bool      getUseGeo             ()                                      const     { return m_Geo; }
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+  void      setUseGeoShapeAdapt   ( bool b )                                        { m_GeoShapeAdapt = b; }
+  bool      getUseGeoShapeAdapt   ()                                      const     { return m_GeoShapeAdapt; }
+#endif
 #if JVET_AI0082_GPM_WITH_INTER_IBC
   void      setUseGeoInterIbc     ( bool b )                                        { m_geoInterIbc = b; }
   bool      getUseGeoInterIbc     ()                                      const     { return m_geoInterIbc; }

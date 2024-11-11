@@ -531,7 +531,11 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
 #if JVET_AI0050_INTER_MTSS
       intraMode = tu.cu->dimdDerivedIntraDir;
 #else
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+      intraMode = g_geoAngle2IntraAng[g_geoParams[g_gpmSplitDir[whIdx][tu.cu->firstPU->geoSplitDir]][0]];
+#else
       intraMode = g_geoAngle2IntraAng[g_geoParams[tu.cu->firstPU->geoSplitDir][0]];
+#endif
 #endif
     }
 #endif
@@ -544,7 +548,12 @@ void TrQuant::xInvLfnst( const TransformUnit &tu, const ComponentID compID )
 #if JVET_AB0155_SGPM
     if (PU::isSgpm(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
     {
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+      CHECK(tu.cu->sgpmSplitDir >= SGPM_TOTAL_NUM_PARTITIONS, "Invalid splitDir for SGPM");
+      intraMode = g_geoAngle2IntraAng[g_geoParams[g_sgpmSplitDir[tu.cu->sgpmSplitDir]][0]];
+#else
       intraMode = g_geoAngle2IntraAng[g_geoParams[tu.cu->sgpmSplitDir][0]];
+#endif
     }
 #endif
 #if JVET_V0130_INTRA_TMP
@@ -857,7 +866,11 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
 #if JVET_AI0050_INTER_MTSS
       intraMode = tu.cu->dimdDerivedIntraDir;
 #else
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+      intraMode = g_geoAngle2IntraAng[g_geoParams[g_gpmSplitDir[whIdx][tu.cu->firstPU->geoSplitDir]][0]];
+#else
       intraMode = g_geoAngle2IntraAng[g_geoParams[tu.cu->firstPU->geoSplitDir][0]];
+#endif
 #endif
     }
 #endif
@@ -870,7 +883,12 @@ void TrQuant::xFwdLfnst( const TransformUnit &tu, const ComponentID compID, cons
 #if JVET_AB0155_SGPM
     if (PU::isSgpm(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
     {
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+      CHECK(tu.cu->sgpmSplitDir >= SGPM_TOTAL_NUM_PARTITIONS, "Invalid splitDir for SGPM");
+      intraMode = g_geoAngle2IntraAng[g_geoParams[g_sgpmSplitDir[tu.cu->sgpmSplitDir]][0]];
+#else
       intraMode = g_geoAngle2IntraAng[g_geoParams[tu.cu->sgpmSplitDir][0]];
+#endif
     }
 #endif
 #if JVET_W0123_TIMD_FUSION
@@ -1342,7 +1360,12 @@ void TrQuant::getTrTypes(const TransformUnit tu, const ComponentID compID, int &
 #if JVET_AB0155_SGPM
       if (tu.cu->sgpm)
       {
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+        CHECK(tu.cu->sgpmSplitDir >= SGPM_TOTAL_NUM_PARTITIONS, "Invalid splitDir for SGPM");
+        predMode = g_geoAngle2IntraAng[g_geoParams[g_sgpmSplitDir[tu.cu->sgpmSplitDir]][0]];
+#else
         predMode = g_geoAngle2IntraAng[g_geoParams[tu.cu->sgpmSplitDir][0]];
+#endif
       }
 #endif
 
@@ -2889,7 +2912,12 @@ int TrQuant::getLfnstIdx(const TransformUnit &tu, ComponentID compID)
 #if JVET_AB0155_SGPM
   if (PU::isSgpm(*tu.cs->getPU(area.pos(), toChannelType(compID)), toChannelType(compID)))
   {
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+    CHECK(tu.cu->sgpmSplitDir >= SGPM_TOTAL_NUM_PARTITIONS, "Invalid splitDir for SGPM");
+    intraMode = g_geoAngle2IntraAng[g_geoParams[g_sgpmSplitDir[tu.cu->sgpmSplitDir]][0]];
+#else
     intraMode = g_geoAngle2IntraAng[g_geoParams[tu.cu->sgpmSplitDir][0]];
+#endif
   }
 #endif
 #if JVET_W0123_TIMD_FUSION

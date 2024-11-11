@@ -615,8 +615,13 @@ protected:
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
   bool   m_tplWeightTblInitialized;
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+  Pel*   m_tplWeightTblDict[GEO_NUM_CU_SIZE][GEO_NUM_CU_SIZE][GEO_TOTAL_NUM_PARTITION_MODE];
+  Pel    m_tplColWeightTblDict[GEO_NUM_CU_SIZE][GEO_NUM_CU_SIZE][GEO_TOTAL_NUM_PARTITION_MODE][GEO_MAX_CU_SIZE * GEO_MODE_SEL_TM_SIZE];
+#else
   Pel*   m_tplWeightTblDict[GEO_NUM_CU_SIZE][GEO_NUM_CU_SIZE][GEO_NUM_PARTITION_MODE];
   Pel    m_tplColWeightTblDict[GEO_NUM_CU_SIZE][GEO_NUM_CU_SIZE][GEO_NUM_PARTITION_MODE][GEO_MAX_CU_SIZE * GEO_MODE_SEL_TM_SIZE];
+#endif
   Pel**  m_tplWeightTbl;
   Pel    (*m_tplColWeightTbl)[GEO_MAX_CU_SIZE * GEO_MODE_SEL_TM_SIZE];
 #endif

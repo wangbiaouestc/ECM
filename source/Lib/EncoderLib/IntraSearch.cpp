@@ -2642,7 +2642,11 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
                 PelBuf src0(m_intraPredBuf[sgpmMode0], tmpArea);
                 PelBuf src1(m_intraPredBuf[sgpmMode1], tmpArea);
 
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+                m_if.m_weightedSgpm(pu, width, height, COMPONENT_Y, g_sgpmSplitDir[sgpmInfoList[sgpmIdx].sgpmSplitDir], piPred, src0, src1);
+#else
                 m_if.m_weightedSgpm(pu, width, height, COMPONENT_Y, sgpmInfoList[sgpmIdx].sgpmSplitDir, piPred, src0, src1);
+#endif
 
                 PelBuf predBuf(m_sgpmPredBuf[sgpmIdx], tmpArea);
                 predBuf.copyFrom(piPred);

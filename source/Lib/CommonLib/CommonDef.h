@@ -1493,10 +1493,21 @@ static const int GEO_MAX_CU_LOG2 =                                  6;
 static const int GEO_MIN_CU_SIZE =               1 << GEO_MIN_CU_LOG2;
 static const int GEO_MAX_CU_SIZE =               1 << GEO_MAX_CU_LOG2;
 static const int GEO_NUM_CU_SIZE = ( GEO_MAX_CU_LOG2 - GEO_MIN_CU_LOG2 ) + 1;
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+static const int GEO_NUM_CU_SHAPES =                                7;
+static const int GEO_SQUARE_IDX    =                                3; // Index to use for square blocks or when not using GPM shape adaptive 
+static const int GEO_TOTAL_NUM_PARTITION_MODE =                   112; // All partitions
+static const int GEO_NUM_PARTITION_MODE =                          64; // Allowed partitions on a given CU
+#else
 static const int GEO_NUM_PARTITION_MODE =                          64;
+#endif
 static const int GEO_NUM_ANGLES =                                  32;
 static const int GEO_NUM_DISTANCES =                                4;
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+static const int GEO_NUM_PRESTORED_MASK =                           9;
+#else
 static const int GEO_NUM_PRESTORED_MASK =                           6;
+#endif
 static const int GEO_WEIGHT_MASK_SIZE = 3 * (GEO_MAX_CU_SIZE >> 3) * 2 + GEO_MAX_CU_SIZE;
 
 #if JVET_AB0155_SGPM
@@ -1509,6 +1520,9 @@ static const int GEO_NUM_CU_SIZE_EX         = (GEO_MAX_CU_LOG2_EX - GEO_MIN_CU_L
 static const int SGPM_MIN_PIX = 32;
 static const int SGPM_NUM_MPM = 3;
 static const int SGPM_TEMPLATE_SIZE = 1;
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+static const int SGPM_TOTAL_NUM_PARTITIONS = 26;
+#endif
 #endif
 
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_AB0155_SGPM

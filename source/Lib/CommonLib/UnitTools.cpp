@@ -2465,15 +2465,27 @@ void PU::getGeoIntraMPMs(const PredictionUnit &pu, uint8_t* mpm, uint8_t splitDi
   {
     if (doInitAL)
     {
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+      PU::getGeoIntraMPMs(pu, partialMPMsAll[0], GEO_TOTAL_NUM_PARTITION_MODE, GEO_TM_SHAPE_AL);
+#else
       PU::getGeoIntraMPMs(pu, partialMPMsAll[0], GEO_NUM_PARTITION_MODE, GEO_TM_SHAPE_AL);
+#endif
     }
     if (doInitA)
     {
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+      PU::getGeoIntraMPMs(pu, partialMPMsAll[1], GEO_TOTAL_NUM_PARTITION_MODE, GEO_TM_SHAPE_A);
+#else
       PU::getGeoIntraMPMs(pu, partialMPMsAll[1], GEO_NUM_PARTITION_MODE, GEO_TM_SHAPE_A);
+#endif
     }
     if (doInitL)
     {
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+      PU::getGeoIntraMPMs(pu, partialMPMsAll[2], GEO_TOTAL_NUM_PARTITION_MODE, GEO_TM_SHAPE_L);
+#else
       PU::getGeoIntraMPMs(pu, partialMPMsAll[2], GEO_NUM_PARTITION_MODE, GEO_TM_SHAPE_L);
+#endif
     }
   }
 
@@ -2523,7 +2535,11 @@ void PU::getGeoIntraMPMs( const PredictionUnit &pu, uint8_t* mpm, uint8_t splitD
 
   int numValidMPM = 0;
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+  bool outputFullMPMs = splitDir < GEO_TOTAL_NUM_PARTITION_MODE;
+#else
   bool outputFullMPMs = splitDir < GEO_NUM_PARTITION_MODE;
+#endif
   if(outputFullMPMs)
   {
 #endif
@@ -27861,7 +27877,11 @@ void PU::spanIpmInfoSgpm(PredictionUnit &pu)
     sgpmMode1 = 0;
   }
 #endif
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+  int splitDir  = g_sgpmSplitDir[pu.cu->sgpmSplitDir];
+#else
   int splitDir  = pu.cu->sgpmSplitDir;
+#endif
 
   int16_t angle = g_geoParams[splitDir][0];
   int tpmMask = 0;
@@ -29139,11 +29159,20 @@ void PU::spanGeoMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const uint8
   }
 #endif
 
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+  int whIdx = !pu.cs->slice->getSPS()->getUseGeoShapeAdapt() ? GEO_SQUARE_IDX : Clip3(0, GEO_NUM_CU_SHAPES-1, floorLog2(pu.lwidth()) - floorLog2(pu.lheight()) + GEO_SQUARE_IDX);
+  int16_t angle = g_geoParams[g_gpmSplitDir[whIdx][splitDir]][0];
+#else
   int16_t angle = g_geoParams[splitDir][0];
+#endif
   int tpmMask = 0;
   int lookUpY = 0, motionIdx = 0;
   bool isFlip = angle >= 13 && angle <= 27;
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+  int distanceIdx = g_geoParams[g_gpmSplitDir[whIdx][splitDir]][1];
+#else
   int distanceIdx = g_geoParams[splitDir][1];
+#endif
   int distanceX = angle;
   int distanceY = (distanceX + (GEO_NUM_ANGLES >> 2)) % GEO_NUM_ANGLES;
   int offsetX = (-(int)pu.lwidth()) >> 1;
@@ -29458,7 +29487,11 @@ void PU::spanGeoIBCMotionInfo(PredictionUnit &pu, MergeCtx &geoMrgCtx)
   bool    isIntra0  = mergeIdx0 >= GEO_MAX_NUM_UNI_CANDS;
   bool    isIntra1  = mergeIdx1 >= GEO_MAX_NUM_UNI_CANDS;
 
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+  uint8_t   splitDir = g_ibcGpmSplitDir[pu.ibcGpmSplitDir];
+#else
   uint8_t   splitDir = pu.ibcGpmSplitDir;
+#endif
   MotionBuf mb       = pu.getMotionBuf();
 
   uint32_t sliceIdx = pu.cs->slice->getIndependentSliceIdx();
@@ -30136,11 +30169,20 @@ void PU::spanGeoMMVDMotionInfo( PredictionUnit &pu, MergeCtx &geoMrgCtx, const u
 #endif
 #endif
 
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+  int whIdx = !pu.cs->slice->getSPS()->getUseGeoShapeAdapt() ? GEO_SQUARE_IDX : Clip3(0, GEO_NUM_CU_SHAPES-1, floorLog2(pu.lwidth()) - floorLog2(pu.lheight()) + GEO_SQUARE_IDX);
+  int16_t angle = g_geoParams[g_gpmSplitDir[whIdx][splitDir]][0];
+#else
   int16_t angle = g_geoParams[splitDir][0];
+#endif
   int tpmMask = 0;
   int lookUpY = 0, motionIdx = 0;
   bool isFlip = angle >= 13 && angle <= 27;
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+  int distanceIdx = g_geoParams[g_gpmSplitDir[whIdx][splitDir]][1];
+#else
   int distanceIdx = g_geoParams[splitDir][1];
+#endif
   int distanceX = angle;
   int distanceY = (distanceX + (GEO_NUM_ANGLES >> 2)) % GEO_NUM_ANGLES;
   int offsetX = (-(int)pu.lwidth()) >> 1;
@@ -32572,7 +32614,11 @@ uint32_t PU::getFinalIntraModeForTransform( const TransformUnit &tu, const Compo
 #if JVET_AB0155_SGPM
   if( PU::isSgpm( *tu.cs->getPU( area.pos(), toChannelType( compID ) ), toChannelType( compID ) ) )
   {
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+    intraMode = g_geoAngle2IntraAng[g_geoParams[g_sgpmSplitDir[tu.cu->sgpmSplitDir]][0]];
+#else
     intraMode = g_geoAngle2IntraAng[g_geoParams[tu.cu->sgpmSplitDir][0]];
+#endif
   }
 #endif
 #if JVET_W0123_TIMD_FUSION
@@ -32708,6 +32754,9 @@ int getSpatialIpm(const PredictionUnit& pu, uint8_t* spatialIpm, const int maxCa
   const Position topLeft = area.topLeft();
   int numCand = 0;
   const ChannelType channelType = CHANNEL_TYPE_LUMA;
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+  int whIdx = !pu.cs->slice->getSPS()->getUseGeoShapeAdapt() ? GEO_SQUARE_IDX : Clip3(0, GEO_NUM_CU_SHAPES-1, floorLog2(pu.lwidth()) - floorLog2(pu.lheight()) + GEO_SQUARE_IDX);
+#endif
   auto getIpm = [&](Position pos) -> void
   {
     if (numCand >= maxCands)
@@ -32723,7 +32772,11 @@ int getSpatialIpm(const PredictionUnit& pu, uint8_t* spatialIpm, const int maxCa
         auto neighborMode = PU::getIntraDirLuma(*neighborPu);
         if (neighborPu->cu->sgpm)
         {
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+          neighborMode = g_geoAngle2IntraAng[g_geoParams[g_sgpmSplitDir[neighborPu->cu->sgpmSplitDir]][0]];
+#else
           neighborMode = g_geoAngle2IntraAng[g_geoParams[neighborPu->cu->sgpmSplitDir][0]];;
+#endif
         }
 #if JVET_AD0085_TMRL_EXTENSION
         if (extPrecision)
@@ -32744,7 +32797,11 @@ int getSpatialIpm(const PredictionUnit& pu, uint8_t* spatialIpm, const int maxCa
         spatialIpm[numCand] = neighborPu->getIpmInfo(pos);
         if (neighborPu->cu->geoFlag)
         {
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+          spatialIpm[numCand] = g_geoAngle2IntraAng[g_geoParams[g_gpmSplitDir[whIdx][neighborPu->geoSplitDir]][0]];
+#else
           spatialIpm[numCand] = g_geoAngle2IntraAng[g_geoParams[neighborPu->geoSplitDir][0]];
+#endif
         }
 #if JVET_AD0085_TMRL_EXTENSION
         if (extPrecision)

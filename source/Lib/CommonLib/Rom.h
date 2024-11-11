@@ -429,14 +429,30 @@ extern Pel*      g_geoEncSadMask[GEO_NUM_PRESTORED_MASK];
 #else
 extern int16_t*  g_geoEncSadMask[GEO_NUM_PRESTORED_MASK];
 #endif
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+extern int16_t   g_weightOffset       [GEO_TOTAL_NUM_PARTITION_MODE][GEO_NUM_CU_SIZE][GEO_NUM_CU_SIZE][2];
+#else
 extern int16_t   g_weightOffset       [GEO_NUM_PARTITION_MODE][GEO_NUM_CU_SIZE][GEO_NUM_CU_SIZE][2];
+#endif
 extern int8_t    g_angle2mask         [GEO_NUM_ANGLES];
 extern int8_t    g_dis[GEO_NUM_ANGLES];
 extern int8_t    g_angle2mirror[GEO_NUM_ANGLES];
 
+
 #if JVET_AB0155_SGPM
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+extern int16_t   g_weightOffsetEx[GEO_TOTAL_NUM_PARTITION_MODE][GEO_NUM_CU_SIZE_EX][GEO_NUM_CU_SIZE_EX][2];
+#else
 extern int16_t   g_weightOffsetEx[GEO_NUM_PARTITION_MODE][GEO_NUM_CU_SIZE_EX][GEO_NUM_CU_SIZE_EX][2];
 extern int8_t    g_sgpmSplitDir[GEO_NUM_PARTITION_MODE];
+#endif
+#endif
+#if JVET_AJ0107_GPM_SHAPE_ADAPT
+extern int8_t    g_gpmSplitDir[GEO_NUM_CU_SHAPES][GEO_NUM_PARTITION_MODE];
+
+extern int8_t    g_sgpmSplitDir[SGPM_TOTAL_NUM_PARTITIONS];
+extern int8_t    g_ibcGpmSplitDir[IBC_GPM_MAX_SPLIT_DIR_FIRST_SET_NUM + IBC_GPM_MAX_SPLIT_DIR_SECOND_SET_NUM];
+extern int8_t    g_ibcGpmSplitDirFirstSetRank[IBC_GPM_MAX_SPLIT_DIR_FIRST_SET_NUM + IBC_GPM_MAX_SPLIT_DIR_SECOND_SET_NUM];
 #endif
 #if JVET_Y0065_GPM_INTRA
 extern int8_t    g_geoAngle2IntraAng  [GEO_NUM_ANGLES];
@@ -477,9 +493,11 @@ extern int g_rmvfMultApproxTbl[3 << sizeof(int64_t)];
 extern const int8_t g_glmPattern[NUM_GLM_PATTERN][6];
 #endif
 #if JVET_AC0112_IBC_GPM
+#if !JVET_AJ0107_GPM_SHAPE_ADAPT
 extern const int8_t g_ibcGpmFirstSetSplitDirToIdx[GEO_NUM_PARTITION_MODE];
 extern const int8_t g_ibcGpmFirstSetSplitDir[IBC_GPM_MAX_SPLIT_DIR_FIRST_SET_NUM];
 extern const int8_t g_ibcGpmSecondSetSplitDir[GEO_NUM_PARTITION_MODE];
+#endif
 #endif
 #if JVET_AE0169_IBC_MBVD_LIST_DERIVATION
 extern int g_ibcMbvdCandOffsets[IBC_MBVD_AD_STEP_NUM];
