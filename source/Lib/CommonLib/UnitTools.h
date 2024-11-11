@@ -792,6 +792,13 @@ namespace PU
 #if JVET_AG0067_DMVR_EXTENSIONS
   bool isBiPredFromDifferentDirGenDistPoc(const PredictionUnit &pu);
 #endif
+
+#if JVET_AJ0097_BDOF_LDB
+  bool isBiPredFromSameDirUnEqDistPoc(const PredictionUnit& pu);
+  bool isBiPredFromSameDirUnEqDistPoc(const PredictionUnit& pu, int refIdx0, int refIdx1);
+  bool isMergeIndexBDOFCondition(const PredictionUnit& pu);
+#endif
+
   void restrictBiPredMergeCandsOne    (PredictionUnit &pu);
 #if ENABLE_OBMC
   unsigned int getSameNeigMotion(PredictionUnit &pu, MotionInfo& mi, Position off, int  iDir, int& iLength, int iMaxLength);

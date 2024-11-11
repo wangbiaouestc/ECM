@@ -1027,6 +1027,22 @@ void InterPrediction::xSubPuMC( PredictionUnit& pu, PelUnitBuf& predBuf, const R
 #if MULTI_PASS_DMVR
     m_bdofMvRefined = false;
     xPredInterBi(subPu, subPredBuf, luma, chroma);
+#if JVET_AJ0097_BDOF_LDB
+    bool bdofCond = pu.cs->sps->getBDOFEnabledFlag() && (!pu.cs->picHeader->getDisBdofFlag());
+    if (!bdofCond)
+    {
+      int bioSubPuIdx = 0;
+      for (int mbBufPosY = mbBufPosYStart; mbBufPosY < mbBufPosYEnd; mbBufPosY++)
+      {
+        for (int mbBufPosX = mbBufPosXStart; mbBufPosX < mbBufPosXEnd; mbBufPosX++)
+        {
+          m_bdofSubPuMvOffset[bioSubPuIdx].setZero();
+          bioSubPuIdx++;
+        }
+        bioSubPuIdx += bioSubPuIdxInc;
+      }
+    }
+#endif
     if (m_bdofMvRefined)
     {
       xPredInterBiSubPuBDOF(subPu, subPredBuf, luma, chroma);  // do not change the predBufWOBIO
@@ -1358,9 +1374,22 @@ bool InterPrediction::xGetSubPuGroupAreaStartPos(PredictionUnit& pu, Position& s
           const bool ref1IsScaled = tmpMi.refIdx[1] < 0 || tmpMi.refIdx[1] >= MAX_NUM_REF
             ? false
             : isResamplingPossible && pu.cu->slice->getRefPic( REF_PIC_LIST_1, tmpMi.refIdx[1] )->isRefScaled( pu.cs->pps );
+
+#if JVET_AJ0097_BDOF_LDB
+          bool bioLDB = false;
+          if (PU::isBiPredFromSameDirUnEqDistPoc(pu, tmpMi.refIdx[0], tmpMi.refIdx[1]) && !pu.cu->geoFlag)
+          {
+            bioLDB = true;
+          }
+#endif
+
           if (tmpMi.refIdx[0] >= 0 && tmpMi.refIdx[1] >= 0
-              && pu.cu->slice->getPairEqualPocDist(tmpMi.refIdx[0], tmpMi.refIdx[1])
-              && !WPScalingParam::isWeighted( wp0 ) && !WPScalingParam::isWeighted( wp1 ) && !ref0IsScaled && !ref1IsScaled)
+#if JVET_AJ0097_BDOF_LDB
+            && (pu.cu->slice->getPairEqualPocDist(tmpMi.refIdx[0], tmpMi.refIdx[1]) || bioLDB)
+#else
+            && pu.cu->slice->getPairEqualPocDist(tmpMi.refIdx[0], tmpMi.refIdx[1])
+#endif
+            && !WPScalingParam::isWeighted( wp0 ) && !WPScalingParam::isWeighted( wp1 ) && !ref0IsScaled && !ref1IsScaled)
           {
             return true;
           }
@@ -1407,9 +1436,22 @@ bool InterPrediction::xGetSubPuGroupAreaStartPos(PredictionUnit& pu, Position& s
           const bool ref1IsScaled = tmpMi.refIdx[1] < 0 || tmpMi.refIdx[1] >= MAX_NUM_REF
             ? false
             : isResamplingPossible && pu.cu->slice->getRefPic( REF_PIC_LIST_1, tmpMi.refIdx[1] )->isRefScaled( pu.cs->pps );
+
+#if JVET_AJ0097_BDOF_LDB
+          bool bioLDB = false;
+          if (PU::isBiPredFromSameDirUnEqDistPoc(pu, tmpMi.refIdx[0], tmpMi.refIdx[1]) && !pu.cu->geoFlag)
+          {
+            bioLDB = true;
+          }
+#endif
+
           if (tmpMi.refIdx[0] >= 0 && tmpMi.refIdx[1] >= 0
-              && pu.cu->slice->getPairEqualPocDist(tmpMi.refIdx[0], tmpMi.refIdx[1])
-              && !WPScalingParam::isWeighted( wp0 ) && !WPScalingParam::isWeighted( wp1 ) && !ref0IsScaled && !ref1IsScaled)
+#if JVET_AJ0097_BDOF_LDB
+            && (pu.cu->slice->getPairEqualPocDist(tmpMi.refIdx[0], tmpMi.refIdx[1]) || bioLDB)
+#else
+            && pu.cu->slice->getPairEqualPocDist(tmpMi.refIdx[0], tmpMi.refIdx[1])
+#endif
+            && !WPScalingParam::isWeighted(wp0) && !WPScalingParam::isWeighted(wp1) && !ref0IsScaled && !ref1IsScaled)
           {
             return true;
           }
@@ -2070,9 +2112,18 @@ void InterPrediction::xPredInterBiBDMVR(PredictionUnit &pu, PelUnitBuf &pcYuvPre
       const bool biocheck0 =
         !((WPScalingParam::isWeighted(wp0) || WPScalingParam::isWeighted(wp1)) && slice.getSliceType() == B_SLICE);
       const bool biocheck1 = !(pps.getUseWP() && slice.getSliceType() == P_SLICE);
+
+#if JVET_AJ0097_BDOF_LDB
+      const bool bioLDB = (PU::isBiPredFromSameDirUnEqDistPoc(pu) && !pu.cu->geoFlag);
+#endif
+
       if (biocheck0
         && biocheck1
+#if JVET_AJ0097_BDOF_LDB
+        && (PU::isBiPredFromDifferentDirEqDistPoc(pu) || bioLDB)
+#else
         && PU::isBiPredFromDifferentDirEqDistPoc(pu)
+#endif
 #if !BDOF_RM_CONSTRAINTS
         && (pu.Y().height >= 8)
         && (pu.Y().width >= 8)
@@ -2683,9 +2734,18 @@ void InterPrediction::xPredInterBiBDMVR2(PredictionUnit &pu, PelUnitBuf &pcYuvPr
         const bool biocheck0 =
         !((WPScalingParam::isWeighted(wp0) || WPScalingParam::isWeighted(wp1)) && slice.getSliceType() == B_SLICE);
         const bool biocheck1 = !(pps.getUseWP() && slice.getSliceType() == P_SLICE);
+
+#if JVET_AJ0097_BDOF_LDB
+        const bool bioLDB = (PU::isBiPredFromSameDirUnEqDistPoc(pu) && !pu.cu->geoFlag);
+#endif
+
         if (biocheck0
             && biocheck1
-            && PU::isBiPredFromDifferentDirEqDistPoc(pu)
+#if JVET_AJ0097_BDOF_LDB
+          && (PU::isBiPredFromDifferentDirEqDistPoc(pu) || bioLDB)
+#else
+          && PU::isBiPredFromDifferentDirEqDistPoc(pu)
+#endif
 #if !BDOF_RM_CONSTRAINTS
             && (pu.Y().height >= 8)
             && (pu.Y().width >= 8)
@@ -3164,9 +3224,17 @@ void InterPrediction::xPredInterBi(PredictionUnit &pu, PelUnitBuf &pcYuvPred, co
       const bool biocheck0 = !((WPScalingParam::isWeighted(wp0) || WPScalingParam::isWeighted(wp1)) && slice.getSliceType() == B_SLICE);
       const bool biocheck1 = !(pps.getUseWP() && slice.getSliceType() == P_SLICE);
 
+#if JVET_AJ0097_BDOF_LDB
+      const bool bioLDB = (PU::isBiPredFromSameDirUnEqDistPoc(pu) && !pu.cu->geoFlag && PU::isMergeIndexBDOFCondition(pu));
+#endif
+
       if (biocheck0
         && biocheck1
+#if JVET_AJ0097_BDOF_LDB
+        && (PU::isBiPredFromDifferentDirEqDistPoc(pu) || bioLDB)
+#else
         && PU::isBiPredFromDifferentDirEqDistPoc(pu)
+#endif
 #if !BDOF_RM_CONSTRAINTS
         && (pu.Y().height >= 8)
         && (pu.Y().width >= 8)
@@ -8098,6 +8166,23 @@ void InterPrediction::motionCompensation( PredictionUnit &pu, PelUnitBuf &predBu
         }
 #endif
         xPredInterBi(pu, predBuf, luma, chroma, predBufWOBIO);
+#if JVET_AJ0097_BDOF_LDB
+        bool bdofCond = pu.cs->sps->getBDOFEnabledFlag() && (!pu.cs->picHeader->getDisBdofFlag());
+        if (!bdofCond)
+        {
+          int bioSubPuIdx = 0;
+          const int bioSubPuStrideIncr = BDOF_SUBPU_STRIDE - std::max(1, (int)(pu.lumaSize().width >> BDOF_SUBPU_DIM_LOG2));
+          for (int yy = 0; yy < pu.lheight(); yy += 4)
+          {
+            for (int xx = 0; xx < pu.lwidth(); xx += 4)
+            {
+              m_bdofSubPuMvOffset[bioSubPuIdx].setZero();
+              bioSubPuIdx++;
+            }
+            bioSubPuIdx += bioSubPuStrideIncr;
+          }
+        }
+#endif
         if (m_bdofMvRefined)
         {
           xPredInterBiSubPuBDOF(pu, predBuf, luma, chroma);  // do not change the predBufWOBIO
@@ -14141,7 +14226,12 @@ void InterPrediction::adjustMergeCandidatesBcwIdx(PredictionUnit& pu, MergeCtx& 
     uiBestCost = MAX_UINT64;
     uiCost = 0;
     const int origWeight = getBcwWeight(origBcwIdx, REF_PIC_LIST_0);
+#if JVET_AJ0097_BDOF_LDB
+    bool bioLDB = (PU::isBiPredFromSameDirUnEqDistPoc(pu) && !pu.cu->geoFlag && PU::isMergeIndexBDOFCondition(pu));
+    bool bioApplied = pu.cs->sps->getBDOFEnabledFlag() && !pu.cs->picHeader->getDisBdofFlag() && (PU::isBiPredFromDifferentDirEqDistPoc(pu) || bioLDB) ? true : false;
+#else
     bool bioApplied = pu.cs->sps->getBDOFEnabledFlag() && !pu.cs->picHeader->getDisBdofFlag() && PU::isBiPredFromDifferentDirEqDistPoc(pu) ? true : false;
+#endif
 #if JVET_AG0276_NLIC
     if (pu.cu->altLMFlag)
     {

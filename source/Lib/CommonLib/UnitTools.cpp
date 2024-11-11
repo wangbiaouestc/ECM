@@ -472,8 +472,16 @@ bool CU::isPredRefined(const CodingUnit &cu)
 
         const bool biocheck0 = !((WPScalingParam::isWeighted(wp0) || WPScalingParam::isWeighted(wp1)) && cu.cs->slice->getSliceType() == B_SLICE);
         const bool biocheck1 = !(cu.cs->pps->getUseWP() && cu.cs->slice->getSliceType() == P_SLICE);
+#if JVET_AJ0097_BDOF_LDB
+        const bool bioLDB = (PU::isBiPredFromSameDirUnEqDistPoc(*pu) && !pu->cu->geoFlag && PU::isMergeIndexBDOFCondition(*pu));
+#endif
+
         if (biocheck0 && biocheck1
+#if JVET_AJ0097_BDOF_LDB
+          && (PU::isBiPredFromDifferentDirEqDistPoc(*pu) || bioLDB)
+#else
           && PU::isBiPredFromDifferentDirEqDistPoc(*pu)
+#endif
 #if !BDOF_RM_CONSTRAINTS
           && (cu.Y().height >= 8)
           && (cu.Y().width >= 8)
@@ -26767,7 +26775,12 @@ bool PU::checkDoAffineBdofRefine(const PredictionUnit &pu, InterPrediction *inte
   {
     if (pu.interDir == 3)
     {
+#if JVET_AJ0097_BDOF_LDB
+      bool bioLDB = (PU::isBiPredFromSameDirUnEqDistPoc(pu) && !pu.cu->geoFlag);
+      return (pu.cu->slice->getPairEqualPocDist(pu.refIdx[0], pu.refIdx[1]) == true || bioLDB);
+#else
       return (pu.cu->slice->getPairEqualPocDist(pu.refIdx[0], pu.refIdx[1]) == true);
+#endif
     }
     return false;
   }
@@ -26775,7 +26788,12 @@ bool PU::checkDoAffineBdofRefine(const PredictionUnit &pu, InterPrediction *inte
   {
     return false;
   }
+#if JVET_AJ0097_BDOF_LDB
+  bool bioLDB = (PU::isBiPredFromSameDirUnEqDistPoc(pu) && !pu.cu->geoFlag && PU::isMergeIndexBDOFCondition(pu));
+  return (pu.cu->slice->getPairEqualPocDist(pu.refIdx[0], pu.refIdx[1]) == true || bioLDB);
+#else
   return (pu.cu->slice->getPairEqualPocDist(pu.refIdx[0], pu.refIdx[1]) == true);
+#endif
 }
 #endif
 
@@ -28449,6 +28467,129 @@ bool PU::isBiPredFromDifferentDirGenDistPoc(const PredictionUnit& pu)
   }
   return false;
 }
+#endif
+
+#if JVET_AJ0097_BDOF_LDB
+bool PU::isMergeIndexBDOFCondition(const PredictionUnit& pu)
+{
+  if (pu.cu->cs->sps->getUseAltCost() == false)
+  {
+    return true;
+  }
+
+  if (pu.mergeFlag)
+  {
+    if (pu.mergeIdx % 2 == 0)
+    {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool PU::isBiPredFromSameDirUnEqDistPoc(const PredictionUnit& pu)
+{
+
+  if (pu.cs->picHeader->getDisBdofFlag())
+  {
+    return false;
+  }
+
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  if (CU::isIBC(*pu.cu))
+  {
+    return false;
+  }
+#endif
+  if (pu.refIdx[0] >= 0 && pu.refIdx[1] >= 0)
+  {
+    if (pu.cu->slice->getRefPic(REF_PIC_LIST_0, pu.refIdx[0])->longTerm
+      || pu.cu->slice->getRefPic(REF_PIC_LIST_1, pu.refIdx[1])->longTerm)
+    {
+      return false;
+  }
+#if JVET_Y0128_NON_CTC
+    if (PU::isBiRefScaled(*pu.cs, pu.refIdx[0], pu.refIdx[1]))
+    {
+      return false;
+    }
+#endif
+
+    const int poc0 = pu.cu->slice->getRefPOC(REF_PIC_LIST_0, pu.refIdx[0]);
+    const int poc1 = pu.cu->slice->getRefPOC(REF_PIC_LIST_1, pu.refIdx[1]);
+    const int poc = pu.cu->slice->getPOC();
+    if ((poc - poc0) * (poc - poc1) < 0)
+    {
+      return false;
+    }
+    else
+    {
+      const int poc0 = pu.cu->slice->getRefPOC(REF_PIC_LIST_0, pu.refIdx[0]);
+      const int poc1 = pu.cu->slice->getRefPOC(REF_PIC_LIST_1, pu.refIdx[1]);
+      if (poc0 == poc1)
+      {
+        return false;
+      }
+      else
+      {
+        return true;
+      }
+      }
+
+    }
+  return false;
+}
+
+bool PU::isBiPredFromSameDirUnEqDistPoc(const PredictionUnit& pu, int refIdx0, int refIdx1)
+{
+
+  if (pu.cs->picHeader->getDisBdofFlag())
+  {
+    return false;
+  }
+
+#if JVET_AE0169_BIPREDICTIVE_IBC
+  if (CU::isIBC(*pu.cu))
+  {
+    return false;
+  }
+#endif
+
+  if (refIdx0 >= 0 && refIdx1 >= 0)
+  {
+    if (pu.cu->slice->getRefPic(REF_PIC_LIST_0, refIdx0)->longTerm
+      || pu.cu->slice->getRefPic(REF_PIC_LIST_1, refIdx1)->longTerm)
+    {
+      return false;
+    }
+#if JVET_Y0128_NON_CTC
+    if (PU::isBiRefScaled(*pu.cs, refIdx0, refIdx1))
+    {
+      return false;
+    }
+#endif
+    const int poc0 = pu.cu->slice->getRefPOC(REF_PIC_LIST_0, refIdx0);
+    const int poc1 = pu.cu->slice->getRefPOC(REF_PIC_LIST_1, refIdx1);
+    const int poc = pu.cu->slice->getPOC();
+    if ((poc - poc0) * (poc - poc1) < 0)
+    {
+      return false;
+    }
+    else
+    {
+      if (poc0 == poc1)
+      {
+        return false;
+      }
+      else
+      {
+        return true;
+      }
+    }
+    }
+  return false;
+  }
 #endif
 
 void PU::restrictBiPredMergeCandsOne(PredictionUnit &pu)

@@ -361,6 +361,7 @@
 #define JVET_AI0094_SHARP_MC_FILTER_FOR_BIPRED            1 // JVET-AI0094: Sharp motion compensation filter for bi-prediction
 #define JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE           1 // JVET-AI0185 adaptive cost function selection in merge mode
 #define JVET_AI0183_MVP_EXTENSION                         1 // JVET-AI0183 MVP extension
+#define JVET_AJ0097_BDOF_LDB                              1 // JVET-AJ0097 BDOF for low-delay pictures
 // Inter template matching tools
 #define JVET_AJ0096_SATD_REORDER_INTER                    1 // JVET-AJ0096: SATD-based reordering for inter coding
 #define ENABLE_INTER_TEMPLATE_MATCHING                    1 // It controls whether template matching is enabled for inter prediction
