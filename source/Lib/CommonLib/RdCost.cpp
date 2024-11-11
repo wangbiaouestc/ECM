@@ -2346,6 +2346,196 @@ Distortion RdCost::xCalcHADs1xN(const Pel* piOrg, const Pel* piCur, int iStrideO
   return satd;
 }
 #endif
+
+#if JVET_AJ0096_SATD_REORDER_INTRA || JVET_AJ0096_SATD_REORDER_INTER
+Distortion RdCost::xCalcHADs1x16( const Pel *piOrg, const Pel *piCur, int iStrideOrg, int iStrideCur, int iRows, int iCols)
+{
+  int j, sad = 0;
+  int diff[16], m1[16], m2[16];
+  if (iRows == 1)
+  {
+    diff[0] = piOrg[0] - piCur[0];
+    diff[1] = piOrg[1] - piCur[1];
+    diff[2] = piOrg[2] - piCur[2];
+    diff[3] = piOrg[3] - piCur[3];
+    diff[4] = piOrg[4] - piCur[4];
+    diff[5] = piOrg[5] - piCur[5];
+    diff[6] = piOrg[6] - piCur[6];
+    diff[7] = piOrg[7] - piCur[7];
+
+    diff[8] = piOrg[8] - piCur[8];
+    diff[9] = piOrg[9] - piCur[9];
+    diff[10] = piOrg[10] - piCur[10];
+    diff[11] = piOrg[11] - piCur[11];
+    diff[12] = piOrg[12] - piCur[12];
+    diff[13] = piOrg[13] - piCur[13];
+    diff[14] = piOrg[14] - piCur[14];
+    diff[15] = piOrg[15] - piCur[15];
+  }
+  else if (iCols == 1)
+  {
+    diff[0] = piOrg[0] - piCur[0];
+    diff[1] = piOrg[1 * iStrideOrg] - piCur[1 * iStrideCur];
+    diff[2] = piOrg[2 * iStrideOrg] - piCur[2 * iStrideCur];
+    diff[3] = piOrg[3 * iStrideOrg] - piCur[3 * iStrideCur];
+    diff[4] = piOrg[4 * iStrideOrg] - piCur[4 * iStrideCur];
+    diff[5] = piOrg[5 * iStrideOrg] - piCur[5 * iStrideCur];
+    diff[6] = piOrg[6 * iStrideOrg] - piCur[6 * iStrideCur];
+    diff[7] = piOrg[7 * iStrideOrg] - piCur[7 * iStrideCur];
+
+    diff[8] = piOrg[8 * iStrideOrg] - piCur[8 * iStrideCur];
+    diff[9] = piOrg[9 * iStrideOrg] - piCur[9 * iStrideCur];
+    diff[10] = piOrg[10 * iStrideOrg] - piCur[10 * iStrideCur];
+    diff[11] = piOrg[11 * iStrideOrg] - piCur[11 * iStrideCur];
+    diff[12] = piOrg[12 * iStrideOrg] - piCur[12 * iStrideCur];
+    diff[13] = piOrg[13 * iStrideOrg] - piCur[13 * iStrideCur];
+    diff[14] = piOrg[14 * iStrideOrg] - piCur[14 * iStrideCur];
+    diff[15] = piOrg[15 * iStrideOrg] - piCur[15 * iStrideCur];
+  }
+  else
+  {
+    CHECK(1, "shall not be here");
+  }
+
+  m2[0] = diff[0] + diff[8];
+  m2[1] = diff[1] + diff[9];
+  m2[2] = diff[2] + diff[10];
+  m2[3] = diff[3] + diff[11];
+  m2[4] = diff[4] + diff[12];
+  m2[5] = diff[5] + diff[13];
+  m2[6] = diff[6] + diff[14];
+  m2[7] = diff[7] + diff[15];
+  m2[8] = diff[0] - diff[8];
+  m2[9] = diff[1] - diff[9];
+  m2[10] = diff[2] - diff[10];
+  m2[11] = diff[3] - diff[11];
+  m2[12] = diff[4] - diff[12];
+  m2[13] = diff[5] - diff[13];
+  m2[14] = diff[6] - diff[14];
+  m2[15] = diff[7] - diff[15];
+
+  m1[0] = m2[0] + m2[4];
+  m1[1] = m2[1] + m2[5];
+  m1[2] = m2[2] + m2[6];
+  m1[3] = m2[3] + m2[7];
+  m1[4] = m2[0] - m2[4];
+  m1[5] = m2[1] - m2[5];
+  m1[6] = m2[2] - m2[6];
+  m1[7] = m2[3] - m2[7];
+  m1[8] = m2[8] + m2[12];
+  m1[9] = m2[9] + m2[13];
+  m1[10] = m2[10] + m2[14];
+  m1[11] = m2[11] + m2[15];
+  m1[12] = m2[8] - m2[12];
+  m1[13] = m2[9] - m2[13];
+  m1[14] = m2[10] - m2[14];
+  m1[15] = m2[11] - m2[15];
+
+  m2[0] = m1[0] + m1[2];
+  m2[1] = m1[1] + m1[3];
+  m2[2] = m1[0] - m1[2];
+  m2[3] = m1[1] - m1[3];
+  m2[4] = m1[4] + m1[6];
+  m2[5] = m1[5] + m1[7];
+  m2[6] = m1[4] - m1[6];
+  m2[7] = m1[5] - m1[7];
+  m2[8] = m1[8] + m1[10];
+  m2[9] = m1[9] + m1[11];
+  m2[10] = m1[8] - m1[10];
+  m2[11] = m1[9] - m1[11];
+  m2[12] = m1[12] + m1[14];
+  m2[13] = m1[13] + m1[15];
+  m2[14] = m1[12] - m1[14];
+  m2[15] = m1[13] - m1[15];
+
+  for( j = 0; j < 16; j++ )
+  {
+    sad += abs( m2[j] );
+  }
+
+#if JVET_R0164_MEAN_SCALED_SATD
+  sad -= abs(m2[0]);
+  sad += abs(m2[0]) >> 2;
+#endif
+  sad  = ( int ) ( sad / sqrt( 16.0 * 1 ) * 2 );
+
+  return sad;
+}
+
+Distortion RdCost::xCalcHADs1x8( const Pel *piOrg, const Pel *piCur, int iStrideOrg, int iStrideCur, int iRows, int iCols)
+{
+  int j;
+  Distortion sad = 0;
+  int diff[8], m1[8], m2[8];
+  if (iRows == 1)
+  {
+    diff[0] = piOrg[0] - piCur[0];
+    diff[1] = piOrg[1] - piCur[1];
+    diff[2] = piOrg[2] - piCur[2];
+    diff[3] = piOrg[3] - piCur[3];
+    diff[4] = piOrg[4] - piCur[4];
+    diff[5] = piOrg[5] - piCur[5];
+    diff[6] = piOrg[6] - piCur[6];
+    diff[7] = piOrg[7] - piCur[7];
+  }
+  else if (iCols == 1)
+  {
+    diff[0] = piOrg[0] - piCur[0];
+    diff[1] = piOrg[1 * iStrideOrg] - piCur[1 * iStrideCur];
+    diff[2] = piOrg[2 * iStrideOrg] - piCur[2 * iStrideCur];
+    diff[3] = piOrg[3 * iStrideOrg] - piCur[3 * iStrideCur];
+    diff[4] = piOrg[4 * iStrideOrg] - piCur[4 * iStrideCur];
+    diff[5] = piOrg[5 * iStrideOrg] - piCur[5 * iStrideCur];
+    diff[6] = piOrg[6 * iStrideOrg] - piCur[6 * iStrideCur];
+    diff[7] = piOrg[7 * iStrideOrg] - piCur[7 * iStrideCur];
+  }
+  else
+  {
+    CHECK(1, "shall not be here");
+  }
+
+  m2[0] = diff[0] + diff[4];
+  m2[1] = diff[1] + diff[5];
+  m2[2] = diff[2] + diff[6];
+  m2[3] = diff[3] + diff[7];
+  m2[4] = diff[0] - diff[4];
+  m2[5] = diff[1] - diff[5];
+  m2[6] = diff[2] - diff[6];
+  m2[7] = diff[3] - diff[7];
+
+  m1[0] = m2[0] + m2[2];
+  m1[1] = m2[1] + m2[3];
+  m1[2] = m2[0] - m2[2];
+  m1[3] = m2[1] - m2[3];
+  m1[4] = m2[4] + m2[6];
+  m1[5] = m2[5] + m2[7];
+  m1[6] = m2[4] - m2[6];
+  m1[7] = m2[5] - m2[7];
+
+  m2[0] = m1[0] + m1[1];
+  m2[1] = m1[0] - m1[1];
+  m2[2] = m1[2] + m1[3];
+  m2[3] = m1[2] - m1[3];
+  m2[4] = m1[4] + m1[5];
+  m2[5] = m1[4] - m1[5];
+  m2[6] = m1[6] + m1[7];
+  m2[7] = m1[6] - m1[7];
+
+  for (j = 0; j < 8; j++)
+  {
+    sad += abs(m2[j]);
+  }
+
+#if JVET_R0164_MEAN_SCALED_SATD
+  sad -= abs(m2[0]);
+  sad += abs(m2[0]) >> 2;
+#endif
+  sad  = ( int )( sad / sqrt( 8.0 * 1 ) * 2 );
+
+  return sad;
+}
+#endif
+
 Distortion RdCost::xCalcHADs2x2( const Pel *piOrg, const Pel *piCur, int iStrideOrg, int iStrideCur, int iStep )
 {
   Distortion satd = 0;
@@ -3134,6 +3324,40 @@ Distortion RdCost::xGetHADs( const DistParam &rcDtParam )
       piCur += iOffsetCur;
     }
   }
+#if JVET_AJ0096_SATD_REORDER_INTRA || JVET_AJ0096_SATD_REORDER_INTER
+  else if (iRows == 1 && iCols % 16 == 0)
+  {
+    for( x = 0; x < iCols; x += 16 )
+    {
+      uiSum += xCalcHADs1x16(&piOrg[x], &piCur[x], iStrideOrg, iStrideCur, iRows, 16);
+    }
+  }
+  else if (iCols == 1 && iRows % 16 == 0)
+  {
+    for( y = 0; y < iRows; y += 16 )
+    {
+      uiSum += xCalcHADs1x16( &piOrg[0], &piCur[0], iStrideOrg, iStrideCur, 16, iCols );
+      piOrg += (iStrideOrg << 4);
+      piCur += (iStrideCur << 4);
+    }
+  }
+  else if (iRows == 1 && iCols % 8 == 0)
+  {
+    for( x = 0; x < iCols; x += 8 )
+    {
+      uiSum += xCalcHADs1x8(&piOrg[x], &piCur[x], iStrideOrg, iStrideCur, iRows, 8);
+    }
+  }
+  else if (iCols == 1 && iRows % 8 == 0)
+  {
+    for( y = 0; y < iRows; y += 8 )
+    {
+      uiSum += xCalcHADs1x8(&piOrg[0], &piCur[0], iStrideOrg, iStrideCur, 8, iCols);
+      piOrg += (iStrideOrg << 3);
+      piCur += (iStrideCur << 3);
+    }
+  }
+#endif
 #if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
   else if (iRows == 1 || iCols == 1)
   {

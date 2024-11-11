@@ -11437,13 +11437,21 @@ void  InterPrediction::sortIbcAdaptiveMergeMbvdCandidates(PredictionUnit &pu, Me
 
       if (m_bAMLTemplateAvailabe[0])
       {
+#if JVET_AJ0096_SATD_REORDER_INTRA
+        m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
         m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
         uiCost += cDistParam.distFunc(cDistParam);
       }
 
       if (uiCost < m_mbvdCandCostList[endEncIdx - 1] && m_bAMLTemplateAvailabe[1])
       {
+#if JVET_AJ0096_SATD_REORDER_INTRA
+        m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
         m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
         uiCost += cDistParam.distFunc(cDistParam);
       }
 
@@ -11591,14 +11599,22 @@ void  InterPrediction::sortIbcMergeMbvdCandidates(PredictionUnit &pu, MergeCtx& 
 
     if (m_bAMLTemplateAvailabe[0])
     {
+#if JVET_AJ0096_SATD_REORDER_INTRA
+      m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
       m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
 
       uiCost += cDistParam.distFunc(cDistParam);
     }
 
     if (m_bAMLTemplateAvailabe[1])
     {
+#if JVET_AJ0096_SATD_REORDER_INTRA
+      m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
       m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
 
       uiCost += cDistParam.distFunc(cDistParam);
     }
@@ -12519,14 +12535,22 @@ void  InterPrediction::sortInterMergeMMVDCandidates(PredictionUnit &pu, MergeCtx
       }
       if (m_bAMLTemplateAvailabe[0])
       {
+#if JVET_AJ0096_SATD_REORDER_INTER
+        m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
         m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
         uiCost += cDistParam.distFunc(cDistParam);
         
       }
 
       if (m_bAMLTemplateAvailabe[1])
       {
+#if JVET_AJ0096_SATD_REORDER_INTER
+        m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
         m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
         uiCost += cDistParam.distFunc(cDistParam);
       }
       
@@ -17191,14 +17215,22 @@ void  InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMer
 
       if (m_bAMLTemplateAvailabe[0])
       {
+#if JVET_AJ0096_SATD_REORDER_INTER
+        m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
         m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
 
         uiCost += cDistParam.distFunc(cDistParam);
       }
 
       if (m_bAMLTemplateAvailabe[1])
       {
+#if JVET_AJ0096_SATD_REORDER_INTER
+        m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
         m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
 
         uiCost += cDistParam.distFunc(cDistParam);
       }
@@ -17673,13 +17705,21 @@ void InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMerg
 
           if (m_bAMLTemplateAvailabe[0])
           {
+#if JVET_AJ0096_SATD_REORDER_INTER
+            m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
             m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
 
             uiCost += cDistParam.distFunc(cDistParam);
           }
           if (m_bAMLTemplateAvailabe[1])
           {
+#if JVET_AJ0096_SATD_REORDER_INTER
+            m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
             m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
 
             uiCost += cDistParam.distFunc(cDistParam);
           }
@@ -17780,13 +17820,21 @@ void InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMerg
           );
           if (m_bAMLTemplateAvailabe[0])
           {
+#if JVET_AJ0096_SATD_REORDER_INTER
+            m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
             m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
 
             uiCost += cDistParam.distFunc(cDistParam);
           }
           if (m_bAMLTemplateAvailabe[1])
           {
+#if JVET_AJ0096_SATD_REORDER_INTER
+            m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
             m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
 
             uiCost += cDistParam.distFunc(cDistParam);
           }
@@ -17885,13 +17933,21 @@ void InterPrediction::adjustAffineMergeCandidates(PredictionUnit &pu, AffineMerg
           );
           if (m_bAMLTemplateAvailabe[0])
           {
+#if JVET_AJ0096_SATD_REORDER_INTER
+            m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
             m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
 
             uiCost += cDistParam.distFunc(cDistParam);
           }
           if (m_bAMLTemplateAvailabe[1])
           {
+#if JVET_AJ0096_SATD_REORDER_INTER
+            m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
             m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
 
             uiCost += cDistParam.distFunc(cDistParam);
           }
@@ -19641,14 +19697,22 @@ void  InterPrediction::adjustIBCMergeCandidates(PredictionUnit &pu, MergeCtx& mr
 
     if (m_bAMLTemplateAvailabe[0])
     {
+#if JVET_AJ0096_SATD_REORDER_INTRA
+      m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop, pcBufPredRefTop, pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
       m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop, pcBufPredRefTop, pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
 
       uiCost += cDistParam.distFunc(cDistParam);
     }
 
     if (m_bAMLTemplateAvailabe[1])
     {
+#if JVET_AJ0096_SATD_REORDER_INTRA
+      m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft, pcBufPredRefLeft, pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
       m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft, pcBufPredRefLeft, pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
 
       uiCost += cDistParam.distFunc(cDistParam);
     }
@@ -19825,14 +19889,22 @@ void  InterPrediction::adjustIBCMergeCandidates(PredictionUnit &pu, MergeCtx& mr
 
     if (m_bAMLTemplateAvailabe[0])
     {
+#if JVET_AJ0096_SATD_REORDER_INTRA
+      m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop, pcBufPredRefTop, pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
       m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop, pcBufPredRefTop, pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
 
       uiCost += cDistParam.distFunc(cDistParam);
     }
 
     if (m_bAMLTemplateAvailabe[1])
     {
+#if JVET_AJ0096_SATD_REORDER_INTRA
+      m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft, pcBufPredRefLeft, pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
       m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft, pcBufPredRefLeft, pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
 
       uiCost += cDistParam.distFunc(cDistParam);
     }
@@ -19950,14 +20022,22 @@ void  InterPrediction::adjustAffineMergeCandidatesOneGroup(PredictionUnit &pu, A
         );
         if (m_bAMLTemplateAvailabe[0])
         {
+#if JVET_AJ0096_SATD_REORDER_INTER
+          m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
           m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
 
           uiCost += cDistParam.distFunc(cDistParam);
         }
 
         if (m_bAMLTemplateAvailabe[1])
         {
+#if JVET_AJ0096_SATD_REORDER_INTER
+          m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
           m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
 
           uiCost += cDistParam.distFunc(cDistParam);
         }
@@ -20140,7 +20220,11 @@ Distortion InterPrediction::getTempCost(const PredictionUnit &pu, const PelBuf &
   Distortion uiCost;
   DistParam  cDistParam;
   cDistParam.applyWeight = false;
+#if JVET_AJ0096_SATD_REORDER_INTRA
+  m_pcRdCost->setDistParam(cDistParam, cur, org, pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
   m_pcRdCost->setDistParam(cDistParam, cur, org, pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
   uiCost = cDistParam.distFunc(cDistParam);
   return uiCost;
 }
@@ -31955,7 +32039,11 @@ void InterPrediction::deriveAffineMVDCandVecFromMotionInforPred(const Prediction
               const bool res = getAffAMLRefTemplateMvdPredUni<1>(tmpPU, pcBufPredRefTop, pcBufPredRefLeft, pu.cs->sps->getUseFastSubTmvp(), tmp);
               if (res)
               {
+#if JVET_AJ0096_SATD_REORDER_INTER
+                m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
                 m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
                 uiCost += cDistParam.distFunc(cDistParam);
               }
               else
@@ -31994,7 +32082,11 @@ void InterPrediction::deriveAffineMVDCandVecFromMotionInforPred(const Prediction
               const bool res = getAffAMLRefTemplateMvdPredUni<2>(tmpPU, pcBufPredRefTop, pcBufPredRefLeft, pu.cs->sps->getUseFastSubTmvp(), tmp);
               if (res)
               {
+#if JVET_AJ0096_SATD_REORDER_INTER
+                m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
                 m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
                 uiCost += cDistParam.distFunc(cDistParam);
               }
               else
@@ -32270,7 +32362,11 @@ void InterPrediction::reorderRefCombList(PredictionUnit &pu, std::vector<RefList
               }
               if (res)
               {
+#if JVET_AJ0096_SATD_REORDER_INTER
+                m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
                 m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
                 uiCost += cDistParam.distFunc(cDistParam);
               }
               else
@@ -32289,7 +32385,11 @@ void InterPrediction::reorderRefCombList(PredictionUnit &pu, std::vector<RefList
               }
               if (res)
               {
+#if JVET_AJ0096_SATD_REORDER_INTER
+                m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
                 m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
                 uiCost += cDistParam.distFunc(cDistParam);
               }
               else
@@ -32426,14 +32526,22 @@ void InterPrediction::reorderRefCombList(PredictionUnit &pu, std::vector<RefList
           {
             if (m_bAMLTemplateAvailabe[0])
             {
+#if JVET_AJ0096_SATD_REORDER_INTER
+              m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
               m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
 
               uiCost += cDistParam.distFunc(cDistParam);
             }
 
             if (m_bAMLTemplateAvailabe[1])
             {
+#if JVET_AJ0096_SATD_REORDER_INTER
+              m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
               m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
 
               uiCost += cDistParam.distFunc(cDistParam);
             }
@@ -33351,9 +33459,17 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
           if (m_bAMLTemplateAvailabe[0])
           {
 #if JVET_AD0140_MVD_PREDICTION
+#if JVET_AJ0096_SATD_REORDER_INTER
+            m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), ((identicalMotion && !tmpPU.cu->licFlag)? pcBufPredRefTopIdMotion:pcBufPredRefTop).Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
             m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), ((identicalMotion && !tmpPU.cu->licFlag)? pcBufPredRefTopIdMotion:pcBufPredRefTop).Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
+#else
+#if JVET_AJ0096_SATD_REORDER_INTER
+            m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
 #else
             m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
 #endif
 
             uiCost += cDistParam.distFunc(cDistParam);
@@ -33362,9 +33478,17 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
           if (m_bAMLTemplateAvailabe[1])
           {
 #if JVET_AD0140_MVD_PREDICTION
+#if JVET_AJ0096_SATD_REORDER_INTER
+            m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), ((identicalMotion && !tmpPU.cu->licFlag) ? pcBufPredRefLeftIdMotion : pcBufPredRefLeft).Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
             m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), ((identicalMotion && !tmpPU.cu->licFlag) ? pcBufPredRefLeftIdMotion : pcBufPredRefLeft).Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
+#else
+#if JVET_AJ0096_SATD_REORDER_INTER
+            m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
 #else
             m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
 #endif
 
             uiCost += cDistParam.distFunc(cDistParam);
@@ -33721,7 +33845,11 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
           }
 #endif
 
+#if JVET_AJ0096_SATD_REORDER_INTER
+          m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
           m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
 
           uiCost += cDistParam.distFunc(cDistParam);
         }
@@ -33774,7 +33902,11 @@ void InterPrediction::reorderRefPairList(PredictionUnit &pu, std::vector<RefPicP
           }
 #endif
 
+#if JVET_AJ0096_SATD_REORDER_INTER
+          m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
           m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
           uiCost += cDistParam.distFunc(cDistParam);
         }
 #if JVET_AD0140_MVD_PREDICTION
@@ -35666,14 +35798,22 @@ void InterPrediction::defineSignHypMatchAffine(PredictionUnit& pu, const RefPicL
       uiCost = 0;
       if (m_bAMLTemplateAvailabe[0])
       {
+#if JVET_AJ0096_SATD_REORDER_INTER
+        m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
         m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
 
         uiCost += cDistParam.distFunc(cDistParam);
       }
 
       if (m_bAMLTemplateAvailabe[1])
       {
+#if JVET_AJ0096_SATD_REORDER_INTER
+        m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
         m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
 
         uiCost += cDistParam.distFunc(cDistParam);
       }
@@ -36463,12 +36603,20 @@ void InterPrediction::defineSignHypMatchAffine(PredictionUnit& pu, const RefPicL
 
       if (numTemplate[0])
       {
+#if JVET_AJ0096_SATD_REORDER_INTER
+        m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
         m_pcRdCost->setDistParam(cDistParam, pcBufPredCurTop.Y(), pcBufPredRefTop.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
         uiCost += cDistParam.distFunc(cDistParam);
       }
       if (numTemplate[1])
       {
+#if JVET_AJ0096_SATD_REORDER_INTER
+        m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, true);
+#else
         m_pcRdCost->setDistParam(cDistParam, pcBufPredCurLeft.Y(), pcBufPredRefLeft.Y(), pu.cs->sps->getBitDepth(CHANNEL_TYPE_LUMA), COMPONENT_Y, false);
+#endif
         uiCost += cDistParam.distFunc(cDistParam);
       }
 #endif

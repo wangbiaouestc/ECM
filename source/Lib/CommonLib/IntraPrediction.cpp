@@ -3025,13 +3025,21 @@ Mv IntraPrediction::refineChromaBv(const ComponentID compId, const PredictionUni
     if (topCanUse)
     {
       PelBuf tempRef = PelBuf(refPix + 1, uiWidth, Size(uiWidth, DBV_TEMPLATE_SIZE));
+#if JVET_AJ0096_SATD_REORDER_INTRA
+      m_dbvSadCost->setDistParam(cDistParam, tempCurTop, tempRef, pu.cs->sps->getBitDepth(CHANNEL_TYPE_CHROMA), compId, uiWidth >= 4 && uiHeight >= 4 ? true : false);
+#else
       m_dbvSadCost->setDistParam(cDistParam, tempCurTop, tempRef, pu.cs->sps->getBitDepth(CHANNEL_TYPE_CHROMA), compId, false);
+#endif
       uiCost += cDistParam.distFunc(cDistParam);
     }
     if (leftCanUse)
     {
       PelBuf tempRef = PelBuf(refPix + 1 + stride, uiHeight, Size(uiHeight, DBV_TEMPLATE_SIZE));
+#if JVET_AJ0096_SATD_REORDER_INTRA
+      m_dbvSadCost->setDistParam(cDistParam, tempCurLeft, tempRef, pu.cs->sps->getBitDepth(CHANNEL_TYPE_CHROMA), compId, uiWidth >= 4 && uiHeight >= 4 ? true : false);
+#else
       m_dbvSadCost->setDistParam(cDistParam, tempCurLeft, tempRef, pu.cs->sps->getBitDepth(CHANNEL_TYPE_CHROMA), compId, false);
+#endif
       uiCost += cDistParam.distFunc(cDistParam);
     }
     aBvCostVec.push_back(std::pair<Mv, Distortion>(*it, uiCost));
@@ -4793,7 +4801,11 @@ void IntraPrediction::geneChromaFusionPred(const ComponentID compId, PelBuf &piP
     if (numSample > 0)
     {
       int bestSAD = cccmSAD < cclmSAD ? cccmSAD : cclmSAD;
+#if JVET_AJ0096_SATD_REORDER_INTRA
+      if (bestSAD > 144 * numSample)
+#else
       if (bestSAD > 64 * numSample)
+#endif
       {
         w0 = 3;
         w1 = 1;
@@ -7906,21 +7918,39 @@ void IntraPrediction::deriveMPMSorted(const PredictionUnit& pu, uint8_t* mpm, in
   distParamSad[1].useMR = false;
   if (eTempType == LEFT_ABOVE_NEIGHBOR)
   {
+#if JVET_AJ0096_SATD_REORDER_INTRA
+    m_timdSatdCost->setTimdDistParam(distParamSad[0], piOrg + iTempWidth, piPred + iTempWidth, iOrgStride,
+      uiPredStride, channelBitDepth, COMPONENT_Y, uiWidth, iTempHeight, 0, 1, true);
+    m_timdSatdCost->setTimdDistParam(distParamSad[1], piOrg + iTempHeight * iOrgStride,
+      piPred + iTempHeight * uiPredStride, iOrgStride, uiPredStride, channelBitDepth,
+      COMPONENT_Y, iTempWidth, uiHeight, 0, 1, true);
+#else
     m_timdSatdCost->setTimdDistParam(distParamSad[0], piOrg + iTempWidth, piPred + iTempWidth, iOrgStride,
       uiPredStride, channelBitDepth, COMPONENT_Y, uiWidth, iTempHeight, 0, 1, false);   // Use HAD (SATD) cost
     m_timdSatdCost->setTimdDistParam(distParamSad[1], piOrg + iTempHeight * iOrgStride,
       piPred + iTempHeight * uiPredStride, iOrgStride, uiPredStride, channelBitDepth,
       COMPONENT_Y, iTempWidth, uiHeight, 0, 1, false);
+#endif
   }
   else if (eTempType == LEFT_NEIGHBOR)
   {
+#if JVET_AJ0096_SATD_REORDER_INTRA
+    m_timdSatdCost->setTimdDistParam(distParamSad[1], piOrg, piPred, iOrgStride, uiPredStride, channelBitDepth,
+      COMPONENT_Y, iTempWidth, uiHeight, 0, 1, true);
+#else
     m_timdSatdCost->setTimdDistParam(distParamSad[1], piOrg, piPred, iOrgStride, uiPredStride, channelBitDepth,
       COMPONENT_Y, iTempWidth, uiHeight, 0, 1, false);
+#endif
   }
   else if (eTempType == ABOVE_NEIGHBOR)
   {
+#if JVET_AJ0096_SATD_REORDER_INTRA
+    m_timdSatdCost->setTimdDistParam(distParamSad[0], piOrg, piPred, iOrgStride, uiPredStride, channelBitDepth,
+      COMPONENT_Y, uiWidth, iTempHeight, 0, 1, true);
+#else
     m_timdSatdCost->setTimdDistParam(distParamSad[0], piOrg, piPred, iOrgStride, uiPredStride, channelBitDepth,
       COMPONENT_Y, uiWidth, iTempHeight, 0, 1, false);
+#endif
   }
   initTimdIntraPatternLuma(*pu.cu, area, eTempType != ABOVE_NEIGHBOR ? iTempWidth : 0,
     eTempType != LEFT_NEIGHBOR ? iTempHeight : 0, uiRefWidth, uiRefHeight);
@@ -21746,6 +21776,19 @@ uint32_t IntraPrediction::xCalculateCCLMcost(const PredictionUnit &pu, const Com
 
   const SizeType cWidth  = chromaArea.width;
   const SizeType cHeight = chromaArea.height;
+#if JVET_AJ0096_SATD_REORDER_INTRA
+  const ChannelType chType = toChannelType(compID);
+  DistParam cDistParam;
+  cDistParam.applyWeight = false;
+  static Pel predChromaA[MAX_CU_SIZE];
+  static Pel predChromaL[MAX_CU_SIZE];
+  PelBuf predTop(predChromaA, cWidth, 1);
+  PelBuf predLeft(predChromaL, 1, cHeight);
+  static Pel reconChromaA[MAX_CU_SIZE];
+  static Pel reconChromaL[MAX_CU_SIZE];
+  PelBuf reconTop(reconChromaA, cWidth, 1);
+  PelBuf reconLeft(reconChromaL, 1, cHeight);
+#endif
 
   CodingStructure  &cs = *(pu.cs);
   const CodingUnit &cu = *(pu.cu);
@@ -21780,8 +21823,17 @@ uint32_t IntraPrediction::xCalculateCCLMcost(const PredictionUnit &pu, const Com
         {
           predChroma = ClipPel(rightShift(cclmModel.a2 * src[pos], cclmModel.shift2) + cclmModel.b2, pu.cs->slice->clpRng(compID));
         }
+#if JVET_AJ0096_SATD_REORDER_INTRA
+        predTop.at(pos, 0) = predChroma;
+        reconTop.at(pos, 0) = curChroma0[pos];
+#else
         totalSAD += abs(predChroma - curChroma0[pos]);
+#endif
       }
+#if JVET_AJ0096_SATD_REORDER_INTRA
+      m_dbvSadCost->setDistParam(cDistParam, predTop, reconTop, pu.cs->sps->getBitDepth(chType), compID, cWidth >= 4 && cHeight >= 4 ? true : false);
+      totalSAD += (int)cDistParam.distFunc(cDistParam);
+#endif
     }
     else
 #endif
@@ -21789,8 +21841,17 @@ uint32_t IntraPrediction::xCalculateCCLMcost(const PredictionUnit &pu, const Com
       for (int pos = 0; pos < cWidth; pos++)
       {
         Pel predChroma = ClipPel(rightShift(cclmModel.a * src[pos], cclmModel.shift) + cclmModel.b, pu.cs->slice->clpRng(compID));
+#if JVET_AJ0096_SATD_REORDER_INTRA
+        predTop.at(pos, 0) = predChroma;
+        reconTop.at(pos, 0) = curChroma0[pos];
+#else
         totalSAD += abs(predChroma - curChroma0[pos]);
+#endif
       }
+#if JVET_AJ0096_SATD_REORDER_INTRA
+      m_dbvSadCost->setDistParam(cDistParam, predTop, reconTop, pu.cs->sps->getBitDepth(chType), compID, cWidth >= 4 && cHeight >= 4 ? true : false);
+      totalSAD += (int)cDistParam.distFunc(cDistParam);
+#endif
     }
   }
 
@@ -21814,8 +21875,17 @@ uint32_t IntraPrediction::xCalculateCCLMcost(const PredictionUnit &pu, const Com
         {
           predChroma = ClipPel(rightShift(cclmModel.a2 * src[pos * srcStride], cclmModel.shift2) + cclmModel.b2, pu.cs->slice->clpRng(compID));
         }
+#if JVET_AJ0096_SATD_REORDER_INTRA
+        predLeft.at(0, pos) = predChroma;
+        reconLeft.at(0, pos) = curChroma0[pos * curStride];
+#else
         totalSAD += abs(predChroma - curChroma0[pos * curStride]);
+#endif
       }
+#if JVET_AJ0096_SATD_REORDER_INTRA
+      m_dbvSadCost->setDistParam(cDistParam, predLeft, reconLeft, pu.cs->sps->getBitDepth(chType), compID, cWidth >= 4 && cHeight >= 4 ? true : false);
+      totalSAD += (int)cDistParam.distFunc(cDistParam);
+#endif
     }
     else
 #endif
@@ -21823,8 +21893,17 @@ uint32_t IntraPrediction::xCalculateCCLMcost(const PredictionUnit &pu, const Com
       for (int pos = 0; pos < cHeight; pos++)
       {
         Pel predChroma = ClipPel(rightShift(cclmModel.a * src[pos * srcStride], cclmModel.shift) + cclmModel.b, pu.cs->slice->clpRng(compID));
+#if JVET_AJ0096_SATD_REORDER_INTRA
+        predLeft.at(0, pos) = predChroma;
+        reconLeft.at(0, pos) = curChroma0[pos * curStride];
+#else
         totalSAD += abs(predChroma - curChroma0[pos * curStride]);
+#endif
       }
+#if JVET_AJ0096_SATD_REORDER_INTRA
+      m_dbvSadCost->setDistParam(cDistParam, predLeft, reconLeft, pu.cs->sps->getBitDepth(chType), compID, cWidth >= 4 && cHeight >= 4 ? true : false);
+      totalSAD += (int)cDistParam.distFunc(cDistParam);
+#endif
     }
   }
 
@@ -21902,6 +21981,19 @@ uint32_t IntraPrediction::xCalculateCCCMcost(const PredictionUnit &pu, const Com
 
   const SizeType cWidth  = chromaArea.width;
   const SizeType cHeight = chromaArea.height;
+#if JVET_AJ0096_SATD_REORDER_INTRA
+  const ChannelType chType = toChannelType(compID);
+  DistParam cDistParam;
+  cDistParam.applyWeight = false;
+  static Pel predChromaA[MAX_CU_SIZE];
+  static Pel predChromaL[MAX_CU_SIZE];
+  PelBuf predTop(predChromaA, cWidth, 1);
+  PelBuf predLeft(predChromaL, 1, cHeight);
+  static Pel reconChromaA[MAX_CU_SIZE];
+  static Pel reconChromaL[MAX_CU_SIZE];
+  PelBuf reconTop(reconChromaA, cWidth, 1);
+  PelBuf reconLeft(reconChromaL, 1, cHeight);
+#endif
 
   CodingStructure  &cs = *(pu.cs);
   const CodingUnit &cu = *(pu.cu);
@@ -21953,8 +22045,17 @@ uint32_t IntraPrediction::xCalculateCCCMcost(const PredictionUnit &pu, const Com
 #endif
         predChroma = ClipPel<Pel>(cccmModel[0].convolve(samples), clpRng);
 
+#if JVET_AJ0096_SATD_REORDER_INTRA
+      predTop.at(pos, 0) = predChroma;
+      reconTop.at(pos, 0) = curChroma0[pos];
+#else
       totalSAD += abs(predChroma - curChroma0[pos]);
+#endif
     }
+#if JVET_AJ0096_SATD_REORDER_INTRA
+    m_dbvSadCost->setDistParam(cDistParam, predTop, reconTop, pu.cs->sps->getBitDepth(chType), compID, cWidth >= 4 && cHeight >= 4 ? true : false);
+    totalSAD += (int)cDistParam.distFunc(cDistParam);
+#endif
   }
 
   if (checkLeft)
@@ -21989,8 +22090,17 @@ uint32_t IntraPrediction::xCalculateCCCMcost(const PredictionUnit &pu, const Com
       else
 #endif
         predChroma = ClipPel<Pel>(cccmModel[0].convolve(samples), clpRng);
+#if JVET_AJ0096_SATD_REORDER_INTRA
+      predLeft.at(0, pos) = predChroma;
+      reconLeft.at(0, pos) = curChroma0[pos * curStride];
+#else
       totalSAD += abs(predChroma - curChroma0[pos * curStride]);
+#endif
     }
+#if JVET_AJ0096_SATD_REORDER_INTRA
+    m_dbvSadCost->setDistParam(cDistParam, predLeft, reconLeft, pu.cs->sps->getBitDepth(chType), compID, cWidth >= 4 && cHeight >= 4 ? true : false);
+    totalSAD += (int)cDistParam.distFunc(cDistParam);
+#endif
   }
 
   return totalSAD;
@@ -27274,12 +27384,22 @@ void IntraPrediction::getTmrlList(CodingUnit& cu)
   distParamSad[1].applyWeight = false;
   distParamSad[1].useMR = false;
 
+#if JVET_AJ0096_SATD_REORDER_INTRA
+  m_timdSatdCost->setTimdDistParam(distParamSad[0], piOrg + tmrlInfo.uiTemplateLeft, piPred + tmrlInfo.uiTemplateLeft, iOrgStride, uiPredStride,
+    channelBitDepth, COMPONENT_Y, uiWidth, tmrlInfo.uiTemplateAbove, 0, 1, true);
+#else
   m_timdSatdCost->setTimdDistParam(distParamSad[0], piOrg + tmrlInfo.uiTemplateLeft, piPred + tmrlInfo.uiTemplateLeft, iOrgStride, uiPredStride,
     channelBitDepth, COMPONENT_Y, uiWidth, tmrlInfo.uiTemplateAbove, 0, 1, false);
+#endif
   if (cu.lx())
   {
+#if JVET_AJ0096_SATD_REORDER_INTRA
+    m_timdSatdCost->setTimdDistParam(distParamSad[1], piOrg + tmrlInfo.uiTemplateAbove * iOrgStride, piPred + tmrlInfo.uiTemplateAbove * uiPredStride,
+      iOrgStride, uiPredStride, channelBitDepth, COMPONENT_Y, tmrlInfo.uiTemplateLeft, uiHeight, 0, 1, true);
+#else
     m_timdSatdCost->setTimdDistParam(distParamSad[1], piOrg + tmrlInfo.uiTemplateAbove * iOrgStride, piPred + tmrlInfo.uiTemplateAbove * uiPredStride,
       iOrgStride, uiPredStride, channelBitDepth, COMPONENT_Y, tmrlInfo.uiTemplateLeft, uiHeight, 0, 1, false);
+#endif
   }
 
   // step-2. define search range.
@@ -28253,7 +28373,11 @@ void IntraPrediction::reorderEipCands(const PredictionUnit& pu, static_vector<Ei
         predTop.at(w, h) = ClipPel(cand.convolve(inputs), clipRng);
       }
     }
+#if JVET_AJ0096_SATD_REORDER_INTRA
+    m_dbvSadCost->setDistParam(cDistParam, predTop, recoTop, pu.cs->sps->getBitDepth(chType), compId, true);
+#else
     m_dbvSadCost->setDistParam(cDistParam, predTop, recoTop, pu.cs->sps->getBitDepth(chType), compId, false);
+#endif
     uiCost += cDistParam.distFunc(cDistParam);
 
     for (int h = 0; h < blockHeight; h++)
@@ -28264,7 +28388,11 @@ void IntraPrediction::reorderEipCands(const PredictionUnit& pu, static_vector<Ei
         predLeft.at(w, h) = ClipPel(cand.convolve(inputs), clipRng);
       }
     }
+#if JVET_AJ0096_SATD_REORDER_INTRA
+    m_dbvSadCost->setDistParam(cDistParam, predLeft, recoLeft, pu.cs->sps->getBitDepth(chType), compId, true);
+#else
     m_dbvSadCost->setDistParam(cDistParam, predLeft, recoLeft, pu.cs->sps->getBitDepth(chType), compId, false);
+#endif
     uiCost += cDistParam.distFunc(cDistParam);
 
     updateCandList(model, uiCost, tmpCandList, candCostList, NUM_EIP_MERGE_SIGNAL);

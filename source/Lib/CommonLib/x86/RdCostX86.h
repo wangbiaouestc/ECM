@@ -2102,6 +2102,146 @@ static uint32_t xCalcHAD16x8_AVX2( const Torg *piOrg, const Tcur *piCur, const i
   return (sad);
 }
 
+#if JVET_AJ0096_SATD_REORDER_INTRA || JVET_AJ0096_SATD_REORDER_INTER
+static uint32_t xCalcHADs1x16_SSE(const Torg* piOrg, const Tcur* piCur, int iStrideOrg, int iStrideCur, int iRows, int iCols)
+{
+  __m128i diff[4], m1[4], m2[4];
+
+  if (iRows == 1)
+  {
+    __m128i org0 = _mm_loadu_si128((__m128i*)&piOrg[0]);
+    __m128i cur0 = _mm_loadu_si128((__m128i*)&piCur[0]);
+    diff[0] = _mm_sub_epi16(org0, cur0);
+    diff[1] = _mm_cvtepi16_epi32( _mm_srli_si128( diff[0], 8 ) );
+    diff[0] = _mm_cvtepi16_epi32( diff[0] );
+
+    org0 = _mm_loadu_si128((__m128i*)&piOrg[8]);
+    cur0 = _mm_loadu_si128((__m128i*)&piCur[8]);
+    diff[2] = _mm_sub_epi16(org0, cur0);
+    diff[3] = _mm_cvtepi16_epi32( _mm_srli_si128( diff[2], 8 ) );
+    diff[2] = _mm_cvtepi16_epi32( diff[2] );
+  }
+  else if (iCols == 1)
+  {
+    Pel diffI[16];
+    for (int i = 0; i < 16; i++)
+    {
+      diffI[i] = piOrg[0] - piCur[0];
+      piOrg += iStrideOrg;
+      piCur += iStrideCur;
+    }
+    diff[0] = _mm_loadu_si128((__m128i*)&diffI[0]);
+    diff[1] = _mm_cvtepi16_epi32( _mm_srli_si128( diff[0], 8 ) );
+    diff[0] = _mm_cvtepi16_epi32( diff[0] );
+    diff[2] = _mm_loadu_si128((__m128i*)&diffI[8]);
+    diff[3] = _mm_cvtepi16_epi32( _mm_srli_si128( diff[2], 8 ) );
+    diff[2] = _mm_cvtepi16_epi32( diff[2] );
+  }
+  else
+  {
+    std::cerr << "shall not be here" << std::endl;
+    return -1;
+  }
+
+  m2[0] = _mm_add_epi32(diff[0], diff[2]);
+  m2[1] = _mm_add_epi32(diff[1], diff[3]);
+  m2[2] = _mm_sub_epi32(diff[0], diff[2]);
+  m2[3] = _mm_sub_epi32(diff[1], diff[3]);
+
+  m1[0] = _mm_add_epi32(m2[0], m2[1]);
+  m1[1] = _mm_sub_epi32(m2[0], m2[1]);
+  m1[2] = _mm_add_epi32(m2[2], m2[3]);
+  m1[3] = _mm_sub_epi32(m2[2], m2[3]);
+
+  m2[0] = _mm_unpacklo_epi32(m1[0], m1[1]);
+  m2[1] = _mm_unpackhi_epi32(m1[0], m1[1]);
+  m2[2] = _mm_abs_epi32(_mm_add_epi32(m2[0], m2[1]));
+#if JVET_R0164_MEAN_SCALED_SATD
+  uint32_t absDc = _mm_cvtsi128_si32(m2[2]);
+#endif
+  m2[3] = _mm_abs_epi32(_mm_sub_epi32(m2[0], m2[1]));
+  __m128i iSum = _mm_add_epi32(m2[2], m2[3]);
+  m2[0] = _mm_unpacklo_epi32(m1[2], m1[3]);
+  m2[1] = _mm_unpackhi_epi32(m1[2], m1[3]);
+  m2[2] = _mm_abs_epi32(_mm_add_epi32(m2[0], m2[1]));
+  m2[3] = _mm_abs_epi32(_mm_sub_epi32(m2[0], m2[1]));
+  iSum = _mm_add_epi32(iSum, m2[2]);
+  iSum = _mm_add_epi32(iSum, m2[3]);
+  iSum = _mm_add_epi32(iSum, _mm_shuffle_epi32(iSum, 0x4e));   // 01001110
+  iSum = _mm_add_epi32(iSum, _mm_shuffle_epi32(iSum, 0xb1));   // 10110001
+  uint32_t sad = _mm_cvtsi128_si32( iSum );
+
+#if JVET_R0164_MEAN_SCALED_SATD
+  sad -= absDc;
+  sad += absDc >> 2;
+#endif
+  sad = sad >> 1;
+
+  return sad;
+}
+
+static uint32_t xCalcHADs1x8_SSE(const Torg* piOrg, const Tcur* piCur, int iStrideOrg, int iStrideCur, int iRows, int iCols)
+{
+  __m128i diff[2], m1[2], m2[2];
+
+  if (iRows == 1)
+  {
+    __m128i org0 = _mm_loadu_si128((__m128i*)&piOrg[0]);
+    __m128i cur0 = _mm_loadu_si128((__m128i*)&piCur[0]);
+    diff[0] = _mm_sub_epi16(org0, cur0);
+    diff[1] = _mm_cvtepi16_epi32( _mm_srli_si128( diff[0], 8 ) );
+    diff[0] = _mm_cvtepi16_epi32( diff[0] );
+  }
+  else if (iCols == 1)
+  {
+    Pel diffI[8];
+    for (int i = 0; i < 8; i++)
+    {
+      diffI[i] = piOrg[0] - piCur[0];
+      piOrg += iStrideOrg;
+      piCur += iStrideCur;
+    }
+    diff[0] = _mm_loadu_si128((__m128i*)&diffI[0]);
+    diff[1] = _mm_cvtepi16_epi32( _mm_srli_si128( diff[0], 8 ) );
+    diff[0] = _mm_cvtepi16_epi32( diff[0] );
+  }
+  else
+  {
+    std::cerr << "shall not be here" << std::endl;
+    return -1;
+  }
+
+  m2[0] = _mm_add_epi32(diff[0], diff[1]);
+  m2[1] = _mm_sub_epi32(diff[0], diff[1]);
+
+  m1[0] = _mm_unpacklo_epi32(m2[0], m2[1]);
+  m1[1] = _mm_unpackhi_epi32(m2[0], m2[1]);
+  m2[0] = _mm_add_epi32(m1[0], m1[1]);
+  m2[1] = _mm_sub_epi32(m1[0], m1[1]);
+
+  m1[0] = _mm_unpacklo_epi32(m2[0], m2[1]);
+  m1[1] = _mm_unpackhi_epi32(m2[0], m2[1]);
+  m2[0] = _mm_abs_epi32(_mm_add_epi32(m1[0], m1[1]));
+#if JVET_R0164_MEAN_SCALED_SATD
+  uint32_t absDc = _mm_cvtsi128_si32(m2[0]);
+#endif
+  m2[1] = _mm_abs_epi32(_mm_sub_epi32(m1[0], m1[1]));
+
+  __m128i iSum = _mm_add_epi32(m2[0], m2[1]);
+  iSum = _mm_add_epi32(iSum, _mm_shuffle_epi32(iSum, 0x4e));   // 01001110
+  iSum = _mm_add_epi32(iSum, _mm_shuffle_epi32(iSum, 0xb1));   // 10110001
+  uint32_t sad = _mm_cvtsi128_si32( iSum );
+
+#if JVET_R0164_MEAN_SCALED_SATD
+  sad -= absDc;
+  sad += absDc >> 2;
+#endif
+  sad  = ( int ) ( sad / sqrt( 8.0 * 1 ) * 2 );
+
+  return sad;
+}
+#endif
+
 
 static uint32_t xCalcHAD8x16_AVX2( const Pel* piOrg, const Pel* piCur, const int iStrideOrg, const int iStrideCur, const int iBitDepth )
 {
@@ -2570,6 +2710,40 @@ Distortion RdCost::xGetHADs_SIMD( const DistParam &rcDtParam )
       piCur += iOffsetCur;
     }
   }
+#if JVET_AJ0096_SATD_REORDER_INTRA || JVET_AJ0096_SATD_REORDER_INTER
+  else if (iRows == 1 && iCols % 16 == 0)
+  {
+    for( x = 0; x < iCols; x += 16 )
+    {
+      uiSum += xCalcHADs1x16_SSE(&piOrg[x], &piCur[x], iStrideOrg, iStrideCur, iRows, 16);
+    }
+  }
+  else if (iCols == 1 && iRows % 16 == 0)
+  {
+    for( y = 0; y < iRows; y += 16 )
+    {
+      uiSum += xCalcHADs1x16_SSE( &piOrg[0], &piCur[0], iStrideOrg, iStrideCur, 16, iCols );
+      piOrg += (iStrideOrg << 4);
+      piCur += (iStrideCur << 4);
+    }
+  }
+  else if (iRows == 1 && iCols % 8 == 0)
+  {
+    for( x = 0; x < iCols; x += 8 )
+    {
+      uiSum += xCalcHADs1x8_SSE(&piOrg[x], &piCur[x], iStrideOrg, iStrideCur, iRows, 8);
+    }
+  }
+  else if (iCols == 1 && iRows % 8 == 0)
+  {
+    for( y = 0; y < iRows; y += 8 )
+    {
+      uiSum += xCalcHADs1x8_SSE(&piOrg[0], &piCur[0], iStrideOrg, iStrideCur, 8, iCols);
+      piOrg += (iStrideOrg << 3);
+      piCur += (iStrideCur << 3);
+    }
+  }
+#endif
 #if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
   else if (iRows == 1 || iCols == 1)
   {

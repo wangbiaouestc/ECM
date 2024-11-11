@@ -1098,6 +1098,10 @@ private:
 #if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
   static Distortion xCalcHADs1xN      ( const Pel* piOrg, const Pel* piCurr, int iStrideOrg, int iStrideCur, int iRows, int iCols);
 #endif
+#if JVET_AJ0096_SATD_REORDER_INTRA || JVET_AJ0096_SATD_REORDER_INTER
+  static Distortion xCalcHADs1x16     ( const Pel *piOrg, const Pel *piCur, int iStrideOrg, int iStrideCur, int iRows, int iCols);
+  static Distortion xCalcHADs1x8      ( const Pel *piOrg, const Pel *piCur, int iStrideOrg, int iStrideCur, int iRows, int iCols);
+#endif
   static Distortion xCalcHADs2x2      ( const Pel *piOrg, const Pel *piCurr, int iStrideOrg, int iStrideCur, int iStep );
   static Distortion xCalcHADs4x4      ( const Pel *piOrg, const Pel *piCurr, int iStrideOrg, int iStrideCur, int iStep );
   static Distortion xCalcHADs8x8      ( const Pel *piOrg, const Pel *piCurr, int iStrideOrg, int iStrideCur, int iStep );
