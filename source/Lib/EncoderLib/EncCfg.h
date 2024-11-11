@@ -511,6 +511,9 @@ protected:
 #endif
 #if JVET_W0123_TIMD_FUSION
   bool      m_timd;
+#if JVET_AJ0061_TIMD_MERGE
+  bool      m_timdMrg;
+#endif
 #endif
 #if JVET_AB0155_SGPM
   bool      m_sgpm;
@@ -1797,6 +1800,10 @@ public:
 #if JVET_W0123_TIMD_FUSION
   void      setUseTimd                   ( bool b )       { m_timd = b; }
   bool      getUseTimd                   () const         { return m_timd; }
+#if JVET_AJ0061_TIMD_MERGE
+  void      setUseTimdMrg                ( bool b )       { m_timdMrg = b; }
+  bool      getUseTimdMrg                () const         { return m_timdMrg; }
+#endif
 #endif
 #if JVET_AB0155_SGPM
   void      setUseSgpm                   (bool b)         { m_sgpm = b; }

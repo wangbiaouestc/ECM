@@ -365,6 +365,29 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
 #if JVET_W0123_TIMD_FUSION
         else if (currCU.timd)
         {
+#if JVET_AJ0061_TIMD_MERGE
+          PredictionUnit *pu = currCU.firstPU;
+          const CompArea &area = currCU.Y();
+          if (currCU.timdMrg)
+          {
+            m_pcIntraPred->deriveTimdMergeModes(currCU.cs->picture->getRecoBuf(area), area, currCU);
+            CHECK(currCU.timdMrgList[currCU.timdMrg - 1][0] < 0, "Wrong timd-merge mode!");
+            pu->intraDir[0] = currCU.timdMrgList[currCU.timdMrg - 1][0];
+            currCU.timdMode = currCU.timdMrgList[currCU.timdMrg - 1][0]; // temporary
+          }
+          else
+          {
+#if SECONDARY_MPM
+          IntraPrediction::deriveDimdMode(currCU.cs->picture->getRecoBuf(area), area, currCU);
+#endif
+          currCU.timdMode = m_pcIntraPred->deriveTimdMode(currCU.cs->picture->getRecoBuf(area), area, currCU);
+          pu->intraDir[0] = currCU.timdMode;
+          }
+          if (!currCU.timdMrg && !currCU.lfnstIdx)
+          {
+            m_pcTrQuant->getTrTypes(*currCU.firstTU, COMPONENT_Y, currCU.timdmTrType[NUM_TIMD_MERGE_MODES][0], currCU.timdmTrType[NUM_TIMD_MERGE_MODES][1]);
+          }
+#else
           PredictionUnit *pu = currCU.firstPU;
           const CompArea &area = currCU.Y();
 #if SECONDARY_MPM
@@ -372,6 +395,7 @@ void DecCu::decompressCtu( CodingStructure& cs, const UnitArea& ctuArea )
 #endif
           currCU.timdMode = m_pcIntraPred->deriveTimdMode(currCU.cs->picture->getRecoBuf(area), area, currCU);
           pu->intraDir[0] = currCU.timdMode;
+#endif
         }
 #endif
 

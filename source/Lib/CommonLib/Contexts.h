@@ -739,6 +739,9 @@ public:
 #endif
 #if JVET_W0123_TIMD_FUSION
   static const CtxSet   TimdFlag;
+#if JVET_AJ0061_TIMD_MERGE
+  static const CtxSet   TimdMrgFlag;
+#endif
 #endif
 #if JVET_AB0155_SGPM
   static const CtxSet   SgpmFlag;

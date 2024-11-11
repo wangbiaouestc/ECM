@@ -507,6 +507,9 @@ protected:
 #endif
 #if JVET_W0123_TIMD_FUSION
   bool      m_timd;
+#if JVET_AJ0061_TIMD_MERGE
+  bool      m_timdMrg;
+#endif
 #endif
 #if JVET_AB0155_SGPM
   bool      m_sgpm;

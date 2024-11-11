@@ -1524,6 +1524,12 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
       int weightMode = ((pu.cu->timd && pu.cu->timdIsBlended) || !applyFusion) ? 4 : 3;
 #else
       int weightMode = ((pu.cu->timd && pu.cu->timdIsBlended) || !applyFusion || (PU::isSgpm(pu, CHANNEL_TYPE_LUMA))) ? 4 : 3;
+#if JVET_AJ0061_TIMD_MERGE
+      if (pu.cu->timd && pu.cu->timdMrg && isLuma(compID))
+      {
+        weightMode = ((pu.cu->timd && pu.cu->timdMrgIsBlended[pu.cu->timdMrg - 1]) || !applyFusion || (PU::isSgpm(pu, CHANNEL_TYPE_LUMA))) ? 4 : 3;
+      }
+#endif
 #endif
 #if JVET_AC0112_IBC_CIIP
       if (pu.ibcCiipFlag)
@@ -2140,7 +2146,11 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
   }
 #endif
 #if JVET_W0123_TIMD_FUSION
+#if JVET_AJ0061_TIMD_MERGE
+  if (((pu.cu->timd && !pu.cu->timdMrg && pu.cu->timdIsBlended) || (pu.cu->timdMrg && pu.cu->timdMrgIsBlended[pu.cu->timdMrg - 1])) && isLuma(compID))
+#else
   if (pu.cu->timd && pu.cu->timdIsBlended && isLuma(compID))
+#endif
   {
     int width = piPred.width;
     int height = piPred.height;
@@ -2148,16 +2158,30 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
     CPelBuf srcBuf3rd;
 #if JVET_AG0092_ENHANCED_TIMD_FUSION
     PelBuf nonAngBuffer = m_tempBuffer[0].getBuf( localUnitArea.Y() );
+#if JVET_AJ0061_TIMD_MERGE
+    int nonAngFusionWeight = pu.cu->timdMrg ? pu.cu->timdMrgFusionWeight[pu.cu->timdMrg - 1][2] : pu.cu->timdFusionWeight[2];
+    if (nonAngFusionWeight > 0)
+#else
     if( pu.cu->timdFusionWeight[2] > 0 )
+#endif
     {
       PredictionUnit pu3 = pu;
+#if JVET_AJ0061_TIMD_MERGE
+      int timdModeNonAng = pu.cu->timdMrg ? pu.cu->timdMrgList[pu.cu->timdMrg - 1][2] : pu.cu->timdModeNonAng;
+      pu3.intraDir[0] = timdModeNonAng;
+#else
       pu3.intraDir[0] = pu.cu->timdModeNonAng;
+#endif
       int tmpTimdMode = pu3.cu->timdMode;
       pu3.cu->timdMode = INVALID_TIMD_IDX;
       initPredIntraParams(pu3, pu.Y(), *(pu.cs->sps));
       srcBuf3rd = CPelBuf(getPredictorPtr(compID), srcStride, srcHStride);
       pu3.cu->timdMode = tmpTimdMode;
+#if JVET_AJ0061_TIMD_MERGE
+      switch (timdModeNonAng)
+#else
       switch (pu.cu->timdModeNonAng)
+#endif
       {
 #if JVET_AC0105_DIRECTIONAL_PLANAR
       case (PLANAR_IDX): xPredIntraPlanar(srcBuf3rd, nonAngBuffer, 0); break;
@@ -2169,7 +2193,11 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
       }
 #if JVET_X0148_TIMD_PDPC
 #if CIIP_PDPC
+#if JVET_AJ0061_TIMD_MERGE
+      if( (m_ipaParam.applyPDPC || pu.ciipPDPC) && ( timdModeNonAng == PLANAR_IDX ||  timdModeNonAng == DC_IDX) )
+#else
       if( (m_ipaParam.applyPDPC || pu.ciipPDPC) && ( pu.cu->timdModeNonAng == PLANAR_IDX ||  pu.cu->timdModeNonAng == DC_IDX) )
+#endif
       {
         xIntraPredPlanarDcPdpc( srcBuf3rd, m_tempBuffer[0].getBuf( localUnitArea.Y() ).buf, m_tempBuffer[0].getBuf( localUnitArea.Y() ).stride, iWidth, iHeight, pu.ciipPDPC );
       }
@@ -2188,7 +2216,12 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
     const bool applyPdpc = m_ipaParam.applyPDPC;
     PredictionUnit pu2 = pu;
 #if JVET_AC0094_REF_SAMPLES_OPT
+#if JVET_AJ0061_TIMD_MERGE
+    int timdModeSecondary = pu.cu->timdMrg ? pu.cu->timdMrgList[pu.cu->timdMrg - 1][1] : pu.cu->timdModeSecondary;
+    pu2.intraDir[0]  = timdModeSecondary;
+#else
     pu2.intraDir[0]  = pu.cu->timdModeSecondary;
+#endif
     int tmpTimdMode  = pu2.cu->timdMode;
     pu2.cu->timdMode = INVALID_TIMD_IDX;
 #else
@@ -2203,7 +2236,11 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
 #else
     srcBuf3rd = srcBuf;
 #endif
+#if JVET_AJ0061_TIMD_MERGE
+    switch (timdModeSecondary)
+#else
     switch (pu.cu->timdModeSecondary)
+#endif
     {
 #if JVET_AC0105_DIRECTIONAL_PLANAR
     case (PLANAR_IDX): xPredIntraPlanar(srcBuf3rd, predFusion, 0); break;
@@ -2220,7 +2257,11 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
 
 #if JVET_X0148_TIMD_PDPC
 #if CIIP_PDPC
+#if JVET_AJ0061_TIMD_MERGE
+    if( (m_ipaParam.applyPDPC || pu.ciipPDPC) && (timdModeSecondary == PLANAR_IDX || timdModeSecondary == DC_IDX) )
+#else
     if( (m_ipaParam.applyPDPC || pu.ciipPDPC) && (pu.cu->timdModeSecondary == PLANAR_IDX || pu.cu->timdModeSecondary == DC_IDX) )
+#endif
     {
       xIntraPredPlanarDcPdpc( srcBuf3rd, m_tempBuffer[1].getBuf( localUnitArea.Y() ).buf, m_tempBuffer[1].getBuf( localUnitArea.Y() ).stride, iWidth, iHeight, pu.ciipPDPC );
     }
@@ -2262,7 +2303,12 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
 #else
     Pel *pelPred = piPred.buf;
     Pel *pelPredFusion = predFusion.buf;
+#if JVET_AJ0061_TIMD_MERGE
+    int timdFusionWeight = pu.cu->timdMrg ? pu.cu->timdMrgFusionWeight[pu.cu->timdMrg - 1][2] : pu.cu->timdFusionWeight[2];
+    Pel *pelPredNonAng = timdFusionWeight > 0 ? nonAngBuffer.buf : nullptr;
+#else
     Pel *pelPredNonAng = pu.cu->timdFusionWeight[2] > 0 ? nonAngBuffer.buf : nullptr;
+#endif
 #if JVET_AG0092_ENHANCED_TIMD_FUSION
     PelBuf predAngNonLocDep = m_tempBuffer[4].getBuf( localUnitArea.Y() );
     PelBuf predAngVer       = m_tempBuffer[2].getBuf( localUnitArea.Y() );
@@ -2277,6 +2323,10 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
 
     bool useLocDepBlending = false;
     int weightVer = 0, weightHor = 0, weightNonLocDep = 0;
+#if JVET_AJ0061_TIMD_MERGE
+    if (!pu.cu->timdMrg)
+    {
+#endif
     for (int i = 0; i < TIMD_FUSION_NUM; i++)
     {
       if (pu.cu->timdLocDep[i] == 1)
@@ -2292,6 +2342,27 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
         weightNonLocDep += pu.cu->timdFusionWeight[i];
       }
     }
+#if JVET_AJ0061_TIMD_MERGE
+    }
+    else
+    {
+      for (int i = 0; i < TIMD_FUSION_NUM; i++)
+      {
+        if (pu.cu->timdMrgLocDep[pu.cu->timdMrg - 1][i] == 1)
+        {
+          weightVer += pu.cu->timdMrgFusionWeight[pu.cu->timdMrg - 1][i];
+        }
+        else if (pu.cu->timdMrgLocDep[pu.cu->timdMrg - 1][i] == 2)
+        {
+          weightHor += pu.cu->timdMrgFusionWeight[pu.cu->timdMrg - 1][i];
+        }
+        else
+        {
+          weightNonLocDep += pu.cu->timdMrgFusionWeight[pu.cu->timdMrg - 1][i];
+        }
+      }
+    }
+#endif
 
     if(weightHor || weightVer)
     {
@@ -2313,10 +2384,24 @@ void IntraPrediction::predIntraAng( const ComponentID compId, PelBuf &piPred, co
       }
 
       int weights[TIMD_FUSION_NUM] = {0};
+#if JVET_AJ0061_TIMD_MERGE
+      if (!pu.cu->timdMrg)
+      {
+#endif
       for (int i = 0; i < TIMD_FUSION_NUM ; i++)
       {
         weights[i] = (pu.cu->timdLocDep[i] == locDep) ? pu.cu->timdFusionWeight[i] : 0;
       }
+#if JVET_AJ0061_TIMD_MERGE
+      }
+      else
+      {
+        for (int i = 0; i < TIMD_FUSION_NUM ; i++)
+        {
+          weights[i] = (pu.cu->timdMrgLocDep[pu.cu->timdMrg - 1][i] == locDep) ? pu.cu->timdMrgFusionWeight[pu.cu->timdMrg - 1][i] : 0;
+        }
+      }
+#endif
      
       int num2blend = 0;
       int blendIndexes[3] = {0};
@@ -3555,7 +3640,12 @@ void IntraPrediction::initPredIntraParams(const PredictionUnit & pu, const CompA
 #if JVET_AC0094_REF_SAMPLES_OPT
 #if JVET_AD0085_TMRL_EXTENSION
   bool checkWideAngle = !bExtIntraDir ? true : (pu.cu->timdMode != INVALID_TIMD_IDX ? pu.cu->timdModeCheckWA : pu.cu->timdModeSecondaryCheckWA);
-
+#if JVET_AJ0061_TIMD_MERGE
+  if (pu.cu->timd && pu.cu->timdMrg)
+  {
+    checkWideAngle = !bExtIntraDir ? true : (pu.cu->timdMode != INVALID_TIMD_IDX ? pu.cu->timdMrgModeCheckWA[pu.cu->timdMrg - 1][0] : pu.cu->timdMrgModeCheckWA[pu.cu->timdMrg - 1][1]);
+  }
+#endif
   int predMode = checkWideAngle ? (bExtIntraDir ? getWideAngleExt(blockSize.width, blockSize.height, dirMode) : getModifiedWideAngle(blockSize.width, blockSize.height, dirMode))
     : (bExtIntraDir ? getTimdWideAngleExt(blockSize.width, blockSize.height, dirMode) : getTimdWideAngle(blockSize.width, blockSize.height, dirMode));
   if (pu.cu->tmrlFlag && isLuma(chType))
@@ -3708,7 +3798,11 @@ void IntraPrediction::initPredIntraParams(const PredictionUnit & pu, const CompA
 
 #if JVET_AB0157_INTRA_FUSION
 #if JVET_AG0128_REF_LINE_OPT_TIMD_FUSION
+#if JVET_AJ0061_TIMD_MERGE
+  if (pu.cu->timd && pu.cu->timdIsBlended && !pu.cu->timdMrg)
+#else
   if (pu.cu->timd && pu.cu->timdIsBlended)
+#endif
   {
     if (pu.cu->timdMode != INVALID_TIMD_IDX)
     {
@@ -3731,6 +3825,27 @@ void IntraPrediction::initPredIntraParams(const PredictionUnit & pu, const CompA
       }
     }
   }
+#if JVET_AJ0061_TIMD_MERGE
+  else if (pu.cu->timd && pu.cu->timdMrg)
+  {
+    m_ipaParam.applyFusion = false;
+    if (pu.cu->timdMode != INVALID_TIMD_IDX && pu.cu->timdMrgIsBlended[pu.cu->timdMrg - 1])
+    {
+      m_ipaParam.fetchRef2nd = true;
+      m_ipaParam.applyFusion = true;
+    }
+    else if (m_ipaParam.fetchRef2nd)
+    {
+      bool isAngularMode = !(dirMode == PLANAR_IDX || dirMode == DC_IDX);
+#if JVET_W0123_TIMD_FUSION
+      const bool isIntSlope       =  bExtIntraDir ? isIntegerSlopeExt(absAng) : isIntegerSlope(absAng);
+#else
+      const bool isIntSlope       =  isIntegerSlope(absAng);
+#endif
+      m_ipaParam.applyFusion = isAngularMode && !isIntSlope && !useISP;
+    }
+  }
+#endif
   else
   {
 #endif
@@ -7988,6 +8103,9 @@ void IntraPrediction::deriveMPMSorted(const PredictionUnit& pu, uint8_t* mpm, in
       assert(0);
     }
 
+#if JVET_AJ0061_TIMD_MERGE
+    g_timdMrgCost[iMode] = uiCost;
+#endif    
     if (uiCostList.size() < iBestN || (uiCostList.size() >= iBestN && uiCost < uiCostList.back()))
     {
       updateCandList(mpm[i], uiCost, uiModeList, uiCostList, iBestN);
@@ -8160,6 +8278,446 @@ int IntraPrediction::getBestNonAnglularMode(const CPelBuf& recoBuf, const CompAr
 }
 #endif
   
+#if JVET_AJ0061_TIMD_MERGE
+void IntraPrediction::searchTimdMrgCus(const CodingUnit &cu, static_vector<const CodingUnit*, NUM_TIMD_MERGE_CUS> &cuNeighbours)
+{
+  /* -----------------------------------------------------------------
+   ----------- Collect adjacent neighbour cands ----------------------
+   ----------------------------------------------------------------- */
+  const int numCUs = NUM_TIMD_MERGE_CUS;
+  const int step = 4;
+  const CodingUnit *cuLeft = NULL;
+  for (int i = 0; i <= cu.lheight(); i += step)
+  {
+    cuLeft = cu.cs->getCURestricted(cu.lumaPos().offset(-1, i), cu, CH_L);
+    if (cuLeft && CU::isIntra(*cuLeft) && cuLeft->timd && cuNeighbours.size() < numCUs - 1)
+    {
+      cuNeighbours.push_back(cuLeft);
+    }
+  }
+  const CodingUnit *cuTop = NULL;
+  for (int i = 0; i <= cu.lwidth(); i += step)
+  {
+    cuTop = cu.cs->getCURestricted(cu.lumaPos().offset(i, -1), cu, CH_L);
+    if (cuTop && CU::isIntra(*cuTop) && cuTop->timd && cuNeighbours.size() < numCUs - 1)
+    {
+      cuNeighbours.push_back(cuTop);
+    }
+  }
+  const CodingUnit* cuNeighbour = cu.cs->getCURestricted(cu.lumaPos().offset(-1, -1), cu, CH_L);
+  if (cuNeighbour && CU::isIntra(*cuNeighbour) && cuNeighbour->timd && cuNeighbours.size() < numCUs - 1)
+  {
+    cuNeighbours.push_back(cuNeighbour);
+  }
+  const CodingUnit *cuLeft2 = cuLeft ? cu.cs->getCURestricted(cuLeft->lumaPos().offset(cuLeft->lwidth() - 1, cuLeft->lheight()), cu, CH_L) : NULL;
+  const CodingUnit *cuTop2 = cuTop ? cu.cs->getCURestricted(cuTop->lumaPos().offset(cuTop->lwidth(), cuTop->lheight() - 1), cu, CH_L) : NULL;
+  cuNeighbour = cuLeft2;
+  if (cuNeighbour && CU::isIntra(*cuNeighbour) && cuNeighbour->timd && cuNeighbours.size() < numCUs - 1)
+  {
+    cuNeighbours.push_back(cuNeighbour);
+  }
+  cuNeighbour = cuTop2;
+  if (cuNeighbour && CU::isIntra(*cuNeighbour) && cuNeighbour->timd && cuNeighbours.size() < numCUs - 1)
+  {
+    cuNeighbours.push_back(cuNeighbour);
+  }
+  cuNeighbour = cuLeft2 ? cu.cs->getCURestricted(cuLeft2->lumaPos().offset(cuLeft2->lwidth() - 1, cuLeft2->lheight()), cu, CH_L) : NULL;
+  if (cuNeighbour && CU::isIntra(*cuNeighbour) && cuNeighbour->timd && cuNeighbours.size() < numCUs - 1)
+  {
+    cuNeighbours.push_back(cuNeighbour);
+  }
+  cuNeighbour = cuTop2 ? cu.cs->getCURestricted(cuTop2->lumaPos().offset(cuTop2->lwidth(), cuTop2->lheight() - 1), cu, CH_L) : NULL;
+  if (cuNeighbour && CU::isIntra(*cuNeighbour) && cuNeighbour->timd && cuNeighbours.size() < numCUs - 1)
+  {
+    cuNeighbours.push_back(cuNeighbour);
+  }
+
+  /* -----------------------------------------------------------------
+   ---------- Collect non-adjacent neighbour cands-------------
+   ----------------------------------------------------------------- */
+  for (const CodingUnit *nonAdjacentNeighbour : PU::timdMergeNonAdjacentNeighbours(*cu.firstPU))
+  {
+    if (nonAdjacentNeighbour && CU::isIntra(*nonAdjacentNeighbour) && nonAdjacentNeighbour->timd && cuNeighbours.size() < numCUs)
+    {
+      cuNeighbours.push_back(nonAdjacentNeighbour);
+    }
+  }
+
+  // Deduplicate candidates
+  static_vector<const CodingUnit *, numCUs> cuNeighboursFiltered;
+  for (int i = 0; i < cuNeighbours.size(); i++)
+  {
+    bool useNeighbour = true;
+    for (int j = i-1; j >= 0; j--)
+    {
+      if (cuNeighbours[i]->lx() == cuNeighbours[j]->lx() && cuNeighbours[i]->ly() == cuNeighbours[j]->ly())
+      {
+        useNeighbour = false;
+        break;
+      }
+    }
+    if (useNeighbour)
+      cuNeighboursFiltered.push_back(cuNeighbours[i]);
+  }
+  cuNeighbours = std::move(cuNeighboursFiltered);
+
+  /* -----------------------------------------------------------------
+  ---------------- Sort neighbours by distance -----------------------
+  ----------------------------------------------------------------- */
+  size_t limitMaxNeigh = 5;
+  static_vector<size_t, numCUs> neighboursInDistOrder;
+  // Calculate the distance to each neighbour and store in dists.
+  static_vector<int, numCUs> dists;
+  for (size_t i = 0; i < cuNeighbours.size(); i++)
+  {
+    const int dx = abs((int)(cu.lx()) - (int)(cuNeighbours[i]->lx()));
+    const int dy = abs((int)(cu.ly()) - (int)(cuNeighbours[i]->ly()));
+    const int d = dx + dy;
+    dists.push_back(d);
+  }
+  
+  // Sort neighbours in ascending order of distance.
+  auto neighbourComp = [&](size_t a, size_t b)
+  {
+    return dists[a] < dists[b]
+    || (dists[a] == dists[b] && a < b);
+  };
+  for (size_t i = 0; i < cuNeighbours.size(); i++)
+  {
+    neighboursInDistOrder.push_back(i);
+  }
+  std::sort(neighboursInDistOrder.begin(), neighboursInDistOrder.end(), neighbourComp);
+  CHECK(cuNeighbours.size() != neighboursInDistOrder.size(),
+        "cuNeighbours and neighboursInDistOrder not correctly associated");
+
+  // Discard all but the nearest limitMaxNeigh neighbours.
+  cuNeighboursFiltered.clear();
+  const size_t numToMix = std::min(cuNeighbours.size(), limitMaxNeigh);
+  for (int i = 0; i < cuNeighbours.size() && cuNeighboursFiltered.size() < numToMix; i++)
+  {
+    for (int j = 0; j < numToMix; j++)
+    {
+      if (neighboursInDistOrder[j] == i)
+      {
+        cuNeighboursFiltered.push_back(cuNeighbours[i]);
+      }
+    }
+  }
+  cuNeighbours = std::move(cuNeighboursFiltered);
+  
+  return;
+}
+
+template<typename T, size_t N>
+void IntraPrediction::calcTimdMrgCandCosts(
+    const CodingUnit &cu,
+    static_vector<TimdMergeInfo, NUM_TIMD_MERGE_CUS> &timdMrgList,
+    static_vector<T, N>& uiModeList,
+    static_vector<uint64_t, N>& candCostList)
+{
+  const CompArea &area = cu.Y();
+  SizeType uiWidth         = cu.lwidth();
+  SizeType uiHeight        = cu.lheight();
+  int      iCurX = cu.lx();
+  int      iCurY = cu.ly();
+  int      iRefX = -1, iRefY = -1;
+  uint32_t uiRefWidth = 0, uiRefHeight = 0;
+  int      iTempWidth = 1, iTempHeight = 1;
+  TemplateType eTempType = CU::deriveTimdRefType(iCurX, iCurY, uiWidth, uiHeight, iTempWidth, iTempHeight, iRefX,
+                                                 iRefY, uiRefWidth, uiRefHeight);
+  
+  int      channelBitDepth = cu.slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA);
+  auto &   pu      = *cu.firstPU;
+  uint32_t uiRealW = uiRefWidth + (eTempType == LEFT_NEIGHBOR ? iTempWidth : 0);
+  uint32_t uiRealH = uiRefHeight + (eTempType == ABOVE_NEIGHBOR ? iTempHeight : 0);
+  uint32_t      uiRealW2   = uiRefWidth + (eTempType == LEFT_NEIGHBOR ? iTempWidth : 0);
+  uint32_t      uiRealH2   = uiRefHeight + (eTempType == ABOVE_NEIGHBOR ? iTempHeight : 0);
+  const UnitArea localUnitArea(pu.chromaFormat, Area(0, 0, uiRealW2, uiRealH2));
+  uint32_t       uiPredStride = m_intraPredBuffer[0].getBuf(localUnitArea.Y()).stride;
+  Pel *piPred = m_intraPredBuffer[0].getBuf(localUnitArea.Y()).buf;
+  const CodingStructure &cs = *cu.cs;
+  m_ipaParam.multiRefIndex  = iTempWidth;
+  Pel *piOrg                = cs.picture->getRecoBuf(area).buf;
+  int  iOrgStride           = cs.picture->getRecoBuf(area).stride;
+  piOrg += (iRefY - iCurY) * iOrgStride + (iRefX - iCurX);
+  DistParam distParamSad[2];   // above, left
+  distParamSad[0].applyWeight = false;
+  distParamSad[0].useMR       = false;
+  distParamSad[1].applyWeight = false;
+  distParamSad[1].useMR       = false;
+  if (eTempType == LEFT_ABOVE_NEIGHBOR)
+  {
+    m_timdSatdCost->setTimdDistParam(distParamSad[0], piOrg + iTempWidth, piPred + iTempWidth, iOrgStride,
+                                     uiPredStride, channelBitDepth, COMPONENT_Y, uiWidth, iTempHeight, 0, 1,
+                                     false);   // Use HAD (SATD) cost
+    m_timdSatdCost->setTimdDistParam(distParamSad[1], piOrg + iTempHeight * iOrgStride,
+                                     piPred + iTempHeight * uiPredStride, iOrgStride, uiPredStride, channelBitDepth,
+                                     COMPONENT_Y, iTempWidth, uiHeight, 0, 1, false);   // Use HAD (SATD) cost
+  }
+  else if (eTempType == LEFT_NEIGHBOR)
+  {
+    m_timdSatdCost->setTimdDistParam(distParamSad[1], piOrg, piPred, iOrgStride, uiPredStride, channelBitDepth,
+                                     COMPONENT_Y, iTempWidth, uiHeight, 0, 1, false);
+  }
+  else if (eTempType == ABOVE_NEIGHBOR)
+  {
+    m_timdSatdCost->setTimdDistParam(distParamSad[0], piOrg, piPred, iOrgStride, uiPredStride, channelBitDepth,
+                                     COMPONENT_Y, uiWidth, iTempHeight, 0, 1, false);
+  }
+  initTimdIntraPatternLuma(cu, area, eTempType != ABOVE_NEIGHBOR ? iTempWidth : 0,
+                           eTempType != LEFT_NEIGHBOR ? iTempHeight : 0, uiRefWidth, uiRefHeight);
+  
+  int iNum = (int)timdMrgList.size();
+
+  // create and store all predictions
+  std::array<bool, EXT_VDIA_IDX + 1> predDone;
+  predDone.fill(false);
+  std::array<uint64_t, EXT_VDIA_IDX + 1> predCost;
+  predCost.fill(MAX_UINT64);
+
+  auto calculateCost = [&](int mode)
+  {
+    uint64_t uiCostTmp;
+    initPredTimdIntraParams(pu, area, mode);
+    predTimdIntraAng(COMPONENT_Y, pu, mode, piPred, uiPredStride, uiRealW, uiRealH, eTempType,
+                     (eTempType == ABOVE_NEIGHBOR) ? 0 : iTempWidth,
+                     (eTempType == LEFT_NEIGHBOR) ? 0 : iTempHeight);
+    if (eTempType == LEFT_ABOVE_NEIGHBOR)
+    {
+      uiCostTmp = distParamSad[0].distFunc(distParamSad[0])
+                + distParamSad[1].distFunc(distParamSad[1]);
+    }
+    else if (eTempType == LEFT_NEIGHBOR)
+    {
+      uiCostTmp = distParamSad[1].distFunc(distParamSad[1]);
+    }
+    else if (eTempType == ABOVE_NEIGHBOR)
+    {
+      uiCostTmp = distParamSad[0].distFunc(distParamSad[0]);
+    }
+    else
+    {
+#ifdef __GNUC__
+      __builtin_unreachable();
+#else
+      assert(0);
+#endif
+    }
+    return uiCostTmp;
+  };
+
+  const bool isEncoder = cu.cs->pcv->isEncoder;
+  auto getCost = [&](int mode)
+  {
+    uint64_t cost;
+    if (isEncoder && g_timdMrgCost[mode] != MAX_UINT64)
+    {
+      cost = g_timdMrgCost[mode];
+    }
+    else
+    {
+      cost = calculateCost(mode);
+    }
+
+    predCost[mode] = cost;
+    predDone[mode] = true;
+  };
+
+  for (int iMode = 0; iMode < iNum; iMode++)
+  {
+    const int (&modes)[TIMD_FUSION_NUM] = timdMrgList[iMode].timdMode;
+    if (!predDone[modes[0]])
+    {
+      getCost(modes[0]);
+    }
+  }
+
+  /* -----------------------------------------------------------------
+   ----------- Sort neighbour cands by weighted sum -----------
+   ------------- of their individual modes' template cost -------------
+   ----------------------------------------------------------------- */
+  for (int iMode = 0; iMode < iNum; iMode++)
+  {
+    int mode1 = timdMrgList[iMode].timdMode[0];
+    const uint64_t uiCost = predCost[mode1];
+    updateCandList(iMode, uiCost, uiModeList, candCostList, NUM_TIMD_MERGE_MODES + 1);
+  }
+  if (uiModeList.size() > 1 && candCostList.size() > 1 && uiModeList[0] >= 0 && uiModeList[1] >= 0 && candCostList[1] < 1.1 * candCostList[0])
+  {
+    std::swap(uiModeList[0], uiModeList[1]);
+    std::swap(candCostList[0], candCostList[1]);
+  }
+  return;
+}
+void IntraPrediction::genTimdMrgList(
+    const CodingUnit &cu,
+    const static_vector<const CodingUnit*, NUM_TIMD_MERGE_CUS> &cuNeighbours,
+    static_vector<TimdMergeInfo, NUM_TIMD_MERGE_CUS> &timdMrgList)
+{
+  /* -----------------------------------------------------------------
+   ------------------- Build Timd-Merge list     ------------------
+   --------------------- from remaining neighbours --------------------
+   ----------------------------------------------------------------- */
+  for (int i = 0; i < cuNeighbours.size(); i++)
+  {
+    if (cuNeighbours[i]->timdMrg)
+    {
+      for (int k = 0; k < NUM_TIMD_MERGE_MODES; k++)
+      {
+        bool isThere = false;
+        for (int idx = 0; idx < timdMrgList.size(); idx++)
+        {
+          if (timdMrgList[idx].timdMode[0] == cuNeighbours[i]->timdMrgList[k][0] && timdMrgList[idx].timdMode[1] == cuNeighbours[i]->timdMrgList[k][1])
+          {
+            isThere = true;
+            break;
+          }
+        }
+        if (!isThere && cuNeighbours[i]->timdMrgList[k][0] != INVALID_TIMD_IDX)
+        {
+          TimdMergeInfo m = TimdMergeInfo();
+          m.timdMode[0] = cuNeighbours[i]->timdMrgList[k][0];
+          m.timdMode[1] = cuNeighbours[i]->timdMrgList[k][1];
+          m.timdMode[2] = cuNeighbours[i]->timdMrgList[k][2];
+          m.timdFusionWeight[0] = cuNeighbours[i]->timdMrgFusionWeight[k][0];
+          m.timdFusionWeight[1] = cuNeighbours[i]->timdMrgFusionWeight[k][1];
+          m.timdFusionWeight[2] = cuNeighbours[i]->timdMrgFusionWeight[k][2];
+          m.timdModeCheckWA[0] = true;
+          m.timdModeCheckWA[1] = true;
+          m.timdModeCheckWA[2] = true;
+          m.timdIsBlended = cuNeighbours[i]->timdMrgIsBlended[k];
+          m.timdLocDep[0] = cuNeighbours[i]->timdMrgLocDep[k][0];
+          m.timdLocDep[1] = cuNeighbours[i]->timdMrgLocDep[k][1];
+          m.timdLocDep[2] = cuNeighbours[i]->timdMrgLocDep[k][2];
+          m.timdmTrType[0] = !CS::isDualITree(*cu.cs) ? TransType::DCT2 : cuNeighbours[i]->timdmTrType[k][0];
+          m.timdmTrType[1] = !CS::isDualITree(*cu.cs) ? TransType::DCT2 : cuNeighbours[i]->timdmTrType[k][1];
+          timdMrgList.push_back(m);
+        }
+      }
+    }
+    else
+    {
+      bool isThere = false;
+      for (int idx = 0; idx < timdMrgList.size(); idx++)
+      {
+        if (timdMrgList[idx].timdMode[0] == cuNeighbours[i]->timdMode && timdMrgList[idx].timdMode[1] == cuNeighbours[i]->timdModeSecondary)
+        {
+          isThere = true;
+          break;
+        }
+      }
+      if (!isThere)
+      {
+        TimdMergeInfo m = TimdMergeInfo();
+        m.timdMode[0] = cuNeighbours[i]->timdMode;
+        m.timdMode[1] = cuNeighbours[i]->timdModeSecondary;
+        m.timdMode[2] = cuNeighbours[i]->timdModeNonAng;
+        m.timdFusionWeight[0] = cuNeighbours[i]->timdFusionWeight[0];
+        m.timdFusionWeight[1] = cuNeighbours[i]->timdFusionWeight[1];
+        m.timdFusionWeight[2] = cuNeighbours[i]->timdFusionWeight[2];
+        m.timdModeCheckWA[0] = true;
+        m.timdModeCheckWA[1] = true;
+        m.timdModeCheckWA[2] = true;
+        m.timdLocDep[0] = cuNeighbours[i]->timdLocDep[0];
+        m.timdLocDep[1] = cuNeighbours[i]->timdLocDep[1];
+        m.timdLocDep[2] = cuNeighbours[i]->timdLocDep[2];
+        m.timdIsBlended = cuNeighbours[i]->timdIsBlended;
+        m.timdmTrType[0] = !CS::isDualITree(*cu.cs) ? TransType::DCT2 : cuNeighbours[i]->timdmTrType[NUM_TIMD_MERGE_MODES][0];
+        m.timdmTrType[1] = !CS::isDualITree(*cu.cs) ? TransType::DCT2 : cuNeighbours[i]->timdmTrType[NUM_TIMD_MERGE_MODES][1];
+        timdMrgList.push_back(m);
+      }
+    }
+  }
+  return;
+}
+void IntraPrediction::deriveTimdMergeModes(const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu)
+{
+  /* -----------------------------------------------------------------------------------
+  Step 1: Collect adjacent neighbour cands
+  Step 2: Collect non-adjacent neighbour cands
+  Step 3: Sort neighbours by distance
+  Step 4: Build Timd-Merge list from remaining neighbours
+  Step 5: Compute template cost of individual modes in the merge list
+  Step 6: Sort neighbour cands by weighted sum of their individual modes' template cost
+  Step 7: Store best neighbour cands in CU
+  ------------------------------------------------------------------------------------ */
+  cu.timdMrgCand = 0;
+  for (int i = 0; i < NUM_TIMD_MERGE_MODES; i++)
+  {
+    cu.timdMrgIsBlended[i] = false;
+    for (int j = 0; j < TIMD_FUSION_NUM; j++)
+    {
+      cu.timdMrgList[i][j] = INVALID_TIMD_IDX;
+      cu.timdMrgFusionWeight[i][j] = -1;
+      cu.timdMrgModeCheckWA[i][j] = true;
+      cu.timdMrgLocDep[i][j] = 0;
+    }
+  }
+  if (!cu.slice->getSPS()->getUseTimd())
+  {
+    return;
+  }
+  
+  SizeType uiWidth         = cu.lwidth();
+  SizeType uiHeight        = cu.lheight();
+  int      iCurX = cu.lx();
+  int      iCurY = cu.ly();
+  int      iRefX = -1, iRefY = -1;
+  uint32_t uiRefWidth = 0, uiRefHeight = 0;
+  int      iTempWidth = 1, iTempHeight = 1;
+  TemplateType eTempType = CU::deriveTimdRefType(iCurX, iCurY, uiWidth, uiHeight, iTempWidth, iTempHeight, iRefX,
+                                                                 iRefY, uiRefWidth, uiRefHeight);
+  if (eTempType == NO_NEIGHBOR)
+  {
+    return;
+  }
+  static_vector<const CodingUnit*, NUM_TIMD_MERGE_CUS> cuNeighbours;
+  static_vector<TimdMergeInfo, NUM_TIMD_MERGE_CUS> timdMrgList;
+  searchTimdMrgCus(cu, cuNeighbours);
+  cu.timdMrgCand = (int)cuNeighbours.size();
+  genTimdMrgList(cu, cuNeighbours, timdMrgList);
+
+  if (!timdMrgList.size())
+  {
+    return;
+  }
+  if (timdMrgList.size() == 1)
+  {
+    std::memcpy(cu.timdMrgList[0], timdMrgList[0].timdMode, TIMD_FUSION_NUM * sizeof(int));
+    std::memcpy(cu.timdMrgFusionWeight[0], timdMrgList[0].timdFusionWeight, TIMD_FUSION_NUM * sizeof(int));
+    std::memcpy(cu.timdMrgLocDep[0], timdMrgList[0].timdLocDep, TIMD_FUSION_NUM * sizeof(int8_t));
+    std::memcpy(cu.timdmTrType[0], timdMrgList[0].timdmTrType, 2 * sizeof(int));
+    std::memcpy(cu.timdMrgModeCheckWA[0], timdMrgList[0].timdModeCheckWA, TIMD_FUSION_NUM * sizeof(bool));
+    cu.timdMrgIsBlended[0] = timdMrgList[0].timdIsBlended;
+    return;
+  }
+  /* -----------------------------------------------------------------
+  ------------------- Compute template cost  -----------------
+  ----------------- individual modes in the merge list ---------------
+  ----------------------------------------------------------------- */
+  static_vector<int, NUM_TIMD_MERGE_MODES + 1> uiModeList;
+  static_vector<uint64_t, NUM_TIMD_MERGE_MODES + 1> uiCostList;
+  calcTimdMrgCandCosts(cu, timdMrgList, uiModeList, uiCostList);
+  
+  /* -----------------------------------------------------------------
+  -------------- Store best neighbour cands in CU ------------
+  ----------------------------------------------------------------- */
+  for (int i = 0; i < NUM_TIMD_MERGE_MODES; i++)
+  {
+    if (uiModeList[i] < 0)
+    {
+      break;
+    }
+    std::memcpy(cu.timdMrgList[i], timdMrgList[uiModeList[i]].timdMode, TIMD_FUSION_NUM * sizeof(int));
+    std::memcpy(cu.timdMrgFusionWeight[i], timdMrgList[uiModeList[i]].timdFusionWeight, TIMD_FUSION_NUM * sizeof(int));
+    std::memcpy(cu.timdMrgLocDep[i], timdMrgList[uiModeList[i]].timdLocDep, TIMD_FUSION_NUM * sizeof(int8_t));
+    std::memcpy(cu.timdmTrType[i], timdMrgList[uiModeList[i]].timdmTrType, 2 * sizeof(int));
+    std::memcpy(cu.timdMrgModeCheckWA[i], timdMrgList[uiModeList[i]].timdModeCheckWA, TIMD_FUSION_NUM * sizeof(bool));
+    cu.timdMrgIsBlended[i] = timdMrgList[uiModeList[i]].timdIsBlended;
+  }
+}
+#endif
+
 #if JVET_AH0076_OBIC
   void IntraPrediction::deriveObicMode( const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu )
   {
@@ -8355,7 +8913,11 @@ int IntraPrediction::getBestNonAnglularMode(const CPelBuf& recoBuf, const CompAr
         continue;
       }
       int numSamples = cuNeighbours[i]->lumaSize().width * cuNeighbours[i]->lumaSize().height;
+#if JVET_AJ0061_TIMD_MERGE
+      if (cuNeighbours[i]->timd && !cuNeighbours[i]->timdMrg)
+#else
       if (cuNeighbours[i]->timd)
+#endif
       {
         int m = MAP131TO67(cuNeighbours[i]->timdMode);
         histogram[m] += numSamples;
@@ -8370,6 +8932,23 @@ int IntraPrediction::getBestNonAnglularMode(const CPelBuf& recoBuf, const CompAr
           }
         }
       }
+#if JVET_AJ0061_TIMD_MERGE
+      else if (cuNeighbours[i]->timd && cuNeighbours[i]->timdMrg)
+      {
+        int m = MAP131TO67(cuNeighbours[i]->timdMrgList[cuNeighbours[i]->timdMrg - 1][0]);
+        histogram[m] += numSamples;
+        if (cuNeighbours[i]->timdMrgIsBlended[cuNeighbours[i]->timdMrg - 1] && cuNeighbours[i]->timdMrgFusionWeight[cuNeighbours[i]->timdMrg - 1][1] > 0)
+        {
+          int m = MAP131TO67(cuNeighbours[i]->timdMrgList[cuNeighbours[i]->timdMrg - 1][1]);
+          histogram[m] += numSamples;
+          if (cuNeighbours[i]->timdMrgFusionWeight[cuNeighbours[i]->timdMrg - 1][2] > 0)
+          {
+            int m = MAP131TO67(cuNeighbours[i]->timdMrgList[cuNeighbours[i]->timdMrg - 1][2]);
+            histogram[m] += numSamples;
+          }
+        }
+      }
+#endif
       else if (cuNeighbours[i]->dimd && !cuNeighbours[i]->obicFlag)
       {
         int m = cuNeighbours[i]->dimdMode;

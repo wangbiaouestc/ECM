@@ -2478,6 +2478,12 @@ void CABACReader::intra_luma_pred_modes( CodingUnit &cu )
   }
 #if JVET_W0123_TIMD_FUSION
   cu_timd_flag(cu);
+#if JVET_AJ0061_TIMD_MERGE
+  if (cu.timdMrg)
+  {
+    return;
+  }
+#endif
 #endif
 #if JVET_AG0058_EIP
   cu_eip_flag(cu);
@@ -2817,7 +2823,27 @@ void CABACReader::cu_timd_flag( CodingUnit& cu )
   unsigned ctxId = DeriveCtx::CtxTimdFlag( cu );
   cu.timd = m_BinDecoder.decodeBin( Ctx::TimdFlag(ctxId) );
   DTRACE(g_trace_ctx, D_SYNTAX, "cu_timd_flag() ctx=%d pos=(%d,%d) timd=%d\n", ctxId, cu.lumaPos().x, cu.lumaPos().y, cu.timd);
+#if JVET_AJ0061_TIMD_MERGE
+  cu_timd_merge_flag(cu);
+#endif
 }
+
+#if JVET_AJ0061_TIMD_MERGE
+void CABACReader::cu_timd_merge_flag( CodingUnit& cu)
+{
+  cu.timdMrg = 0;
+  if (!cu.timd || cu.dimd)
+  {
+    return;
+  }
+  if (!PU::canTimdMerge(*cu.firstPU))
+  {
+    return;
+  }
+  int ctxId = cu.lwidth() * cu.lheight() >= 64 ? 0 : 1;
+  cu.timdMrg = m_BinDecoder.decodeBin( Ctx::TimdMrgFlag(ctxId) ) ? 1 : 0;  
+}
+#endif
 #endif
 
 #if JVET_AB0155_SGPM

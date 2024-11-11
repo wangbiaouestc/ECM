@@ -637,6 +637,26 @@ static const int NUM_EXT_LUMA_MODE =                               30;
 static const int NUM_EXT_LUMA_MODE =                               28;
 #endif
 
+#if JVET_AJ0061_TIMD_MERGE
+static const int TIMDM_IDX =                                       251; // index for intra TIMD merge mode
+static const int NUM_TIMD_MERGE_CUS   =                            99 + 13;
+static const int NUM_TIMD_MERGE_MODES =                            1;
+static const int NUM_TIMD_MRL_MODES =                              2;
+static const size_t TIMD_MERGE_MAX_NONADJACENT =                   42;
+enum TimdMode
+{
+  Timd        = 0,
+  TimdMrg     = 1,
+  TimdMrl1    = 2,
+  TimdMrl3    = 3,
+  NumTimdMode = 4
+};
+static inline TimdMode getTimdMode(bool timdm, int refIdx)
+{
+  return (timdm ? TimdMrg : (refIdx == 0 ? Timd : (refIdx == 1 ? TimdMrl1 : TimdMrl3)));
+}
+#endif
+
 static const int NUM_DIR =           (((NUM_LUMA_MODE - 3) >> 2) + 1);
 static const int PLANAR_IDX =                                       0; ///< index for intra PLANAR mode
 static const int DC_IDX =                                           1; ///< index for intra DC     mode

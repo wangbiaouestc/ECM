@@ -2061,6 +2061,12 @@ void CABACWriter::intra_luma_pred_modes( const CodingUnit& cu )
   }
 #if JVET_W0123_TIMD_FUSION
   cu_timd_flag(cu);
+#if JVET_AJ0061_TIMD_MERGE
+  if (cu.timdMrg)
+  {
+    return;
+  }
+#endif
 #endif
 #if JVET_AG0058_EIP
   cu_eip_flag(cu);
@@ -2287,6 +2293,12 @@ void CABACWriter::intra_luma_pred_mode( const PredictionUnit& pu )
   }
 #if JVET_W0123_TIMD_FUSION
   cu_timd_flag(*pu.cu);
+#if JVET_AJ0061_TIMD_MERGE
+  if (pu.cu->timdMrg)
+  {
+    return;
+  }
+#endif
 #endif
 #if JVET_AG0058_EIP
   cu_eip_flag(*pu.cu);
@@ -2507,7 +2519,26 @@ void CABACWriter::cu_timd_flag( const CodingUnit& cu )
   unsigned ctxId = DeriveCtx::CtxTimdFlag(cu);
   m_BinEncoder.encodeBin(cu.timd, Ctx::TimdFlag(ctxId));
   DTRACE(g_trace_ctx, D_SYNTAX, "cu_timd_flag() ctx=%d pos=(%d,%d) timd=%d\n", ctxId, cu.lumaPos().x, cu.lumaPos().y, cu.timd);
+#if JVET_AJ0061_TIMD_MERGE
+  cu_timd_merge_flag(cu);
+#endif
 }
+
+#if JVET_AJ0061_TIMD_MERGE
+void CABACWriter::cu_timd_merge_flag( const CodingUnit& cu )
+{
+  if (!cu.timd || cu.dimd)
+  {
+    return;
+  }
+  if (!PU::canTimdMerge(*cu.firstPU))
+  {
+    return;
+  }
+  int ctxId = cu.lwidth() * cu.lheight() >= 64 ? 0 : 1;
+  m_BinEncoder.encodeBin(cu.timdMrg ? 1 : 0, Ctx::TimdMrgFlag(ctxId));  
+}
+#endif
 #endif
 
 #if JVET_AB0155_SGPM

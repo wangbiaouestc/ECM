@@ -3407,6 +3407,31 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
   int8_t dimdChromaMode = -1;
   int8_t dimdChromaModeSecond = -1;
 #endif
+#if JVET_AJ0061_TIMD_MERGE
+  int timdmTrTypes[NUM_TIMD_MERGE_MODES + 1][2];
+  int timdMrgCand = -1;
+  int timdMrgList[NUM_TIMD_MERGE_MODES][TIMD_FUSION_NUM];
+  bool timdMrgIsBlended[NUM_TIMD_MERGE_MODES];
+  int timdMrgFusionWeight[NUM_TIMD_MERGE_MODES][TIMD_FUSION_NUM];
+  bool timdMrgModeCheckWA[NUM_TIMD_MERGE_MODES][TIMD_FUSION_NUM];
+  int8_t timdMrgLocDep[NUM_TIMD_MERGE_MODES][TIMD_FUSION_NUM];
+  for (int i = 0; i <= NUM_TIMD_MERGE_MODES; i++)
+  {
+    timdmTrTypes[i][0] = TransType::DCT2;
+    timdmTrTypes[i][1] = TransType::DCT2;
+  }
+  for (int i = 0; i < NUM_TIMD_MERGE_MODES; i++)
+  {
+    timdMrgIsBlended[i] = false;
+    for (int j = 0; j < TIMD_FUSION_NUM; j++)
+    {
+      timdMrgList[i][j] = INVALID_TIMD_IDX;
+      timdMrgFusionWeight[i][j] = -1;
+      timdMrgModeCheckWA[i][j] = true;
+      timdMrgLocDep[i][j] = 0;
+    }
+  }
+#endif
 #if JVET_AH0136_CHROMA_REORDERING
   int8_t dimdBlendModeChroma[DIMD_FUSION_NUM - 1] = { 0 };
   int chromaList[7] = { -1 };
@@ -3471,6 +3496,12 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
       dimdRelWeight[2] = cu.dimdRelWeight[2];
 #endif
     }
+#if JVET_AJ0061_TIMD_MERGE
+    for (int i = 0; i <= EXT_VDIA_IDX; i++)
+    {
+      g_timdMrgCost[i] = MAX_UINT64;
+    }
+#endif
 
 #if SECONDARY_MPM
 #if JVET_AD0085_MPM_SORTING
@@ -3560,6 +3591,20 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
 #endif
 #if JVET_W0123_TIMD_FUSION
   bool timdDerived = false;
+#if JVET_AJ0061_TIMD_MERGE
+  bool timdMrgDerived = false;
+  m_pcIntraSearch->m_skipTimdMrgLfnstMtsPass = false;
+  m_pcIntraSearch->m_skipObicMode = false;
+  m_pcIntraSearch->m_skipDimdMode = false;
+  m_pcIntraSearch->m_satdCostOBIC = MAX_UINT64;
+  m_pcIntraSearch->m_satdCostDIMD = MAX_UINT64;
+  for (int i = 0; i < NumTimdMode; i++)
+  {
+    m_pcIntraSearch->m_skipTimdMode[i] = false;
+    m_pcIntraSearch->m_satdCostTIMD[i][0] = MAX_UINT64;
+    m_pcIntraSearch->m_satdCostTIMD[i][1] = MAX_UINT64;
+  }
+#endif
 #endif
 #if TMP_FAST_ENC
   bool tmpDerived = 0;
@@ -3839,6 +3884,55 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
               cu.timdHor = timdHorMode;
               cu.timdVer = timdVerMode;
 #endif
+            }
+          }
+#endif
+#if JVET_AJ0061_TIMD_MERGE
+          cu.timdMrg = 0;
+          if (PU::canTimdMerge(*cu.firstPU))
+          {
+            if (!timdMrgDerived)
+            {
+              const CompArea &area = cu.Y();
+              m_pcIntraSearch->deriveTimdMergeModes(bestCS->picture->getRecoBuf(area), area, cu);
+              for (int i = 0; i <= NUM_TIMD_MERGE_MODES; i++)
+              {
+                timdmTrTypes[i][0] = cu.timdmTrType[i][0];
+                timdmTrTypes[i][1] = cu.timdmTrType[i][1];
+              }
+              for (int i = 0; i < NUM_TIMD_MERGE_MODES; i++)
+              {
+                timdMrgIsBlended[i] = cu.timdMrgIsBlended[i];
+                for (int j = 0; j < TIMD_FUSION_NUM; j++)
+                {
+                  timdMrgList[i][j] = cu.timdMrgList[i][j];
+                  timdMrgFusionWeight[i][j] = cu.timdMrgFusionWeight[i][j];
+                  timdMrgModeCheckWA[i][j] = cu.timdMrgModeCheckWA[i][j];
+                  timdMrgLocDep[i][j] = cu.timdMrgLocDep[i][j];
+                }
+              }
+              timdMrgCand = cu.timdMrgCand;
+              timdMrgDerived = true;
+            }
+            else
+            {
+              for (int i = 0; i <= NUM_TIMD_MERGE_MODES; i++)
+              {
+                cu.timdmTrType[i][0] = timdmTrTypes[i][0];
+                cu.timdmTrType[i][1] = timdmTrTypes[i][1];
+              }
+              for (int i = 0; i < NUM_TIMD_MERGE_MODES; i++)
+              {
+                cu.timdMrgIsBlended[i] = timdMrgIsBlended[i];
+                for (int j = 0; j < TIMD_FUSION_NUM; j++)
+                {
+                  cu.timdMrgList[i][j] = timdMrgList[i][j];
+                  cu.timdMrgFusionWeight[i][j] = timdMrgFusionWeight[i][j];
+                  cu.timdMrgModeCheckWA[i][j] = timdMrgModeCheckWA[i][j];
+                  cu.timdMrgLocDep[i][j] = timdMrgLocDep[i][j];
+                }
+              }
+              cu.timdMrgCand = timdMrgCand;
             }
           }
 #endif
@@ -23999,7 +24093,11 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
           pu->intraDir[0] = cu.dimdMode;
         }
       }
+#if JVET_AJ0061_TIMD_MERGE
+      if(cu.timd && !cu.timdMrg)
+#else
       if(cu.timd)
+#endif
       {
         PredictionUnit *pu = cu.firstPU;
         const CompArea &area = cu.Y();
