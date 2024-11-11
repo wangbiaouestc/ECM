@@ -2458,6 +2458,14 @@ void MergeCtx::setGeoMrgDuplicate( const PredictionUnit& pu )
   {
     int mrgList        = mvFieldNeighbours[(mergeCand << 1) + 0].refIdx == -1 ? 1 : 0;
     int mrgRefIdx      = mvFieldNeighbours[(mergeCand << 1) + mrgList].refIdx;
+#if JVET_AJ0274_REGRESSION_GPM_TM
+    if (mrgRefIdx < 0 || mrgRefIdx > MAX_NUM_REF)
+    {
+      mrgDuplicated[mergeCand] = true;
+      pocMrg[mergeCand] = -1;
+      continue;
+    }
+#endif
     pocMrg[mergeCand]  = slice->getRefPic((RefPicList)mrgList, mrgRefIdx)->getPOC();
     mrgMv[mergeCand]   = mvFieldNeighbours[(mergeCand << 1) + mrgList].mv;
     mrgDuplicated[mergeCand] = false;

@@ -1460,6 +1460,9 @@ static const int GEO_MAX_NUM_UNI_AFF_CANDS                          = 11;
 static const int GEO_MAX_ALL_INTER_UNI_CANDS = GEO_MAX_NUM_UNI_CANDS + GEO_MAX_NUM_UNI_AFF_CANDS;
 
 static const int GEO_MAX_NUM_UNI_AFF_CANDS_ARMC                     = 22;
+#if JVET_AJ0274_GPM_AFFINE_TM
+static const int GEO_AFF_TM_MAX_AFF_CANDS                           = 6;
+#endif
 #endif
 
 #if JVET_Y0065_GPM_INTRA
@@ -1541,7 +1544,11 @@ static const int GEO_MAX_TRY_WEIGHTED_SAD =                       140;
 static const int GEO_MAX_TRY_WEIGHTED_SAD =                        70;
 #endif
 #if TM_MRG
+#if JVET_AJ0274_GPM_AFFINE_TM
+static const int GEO_TM_MAX_NUM_CANDS = GEO_MAX_NUM_UNI_CANDS * (GEO_NUM_TM_MV_CAND - 1) + GEO_MAX_NUM_UNI_AFF_CANDS;
+#else
 static const int GEO_TM_MAX_NUM_CANDS = GEO_MAX_NUM_UNI_CANDS * (GEO_NUM_TM_MV_CAND - 1);
+#endif
 #endif
 #else
 static const int GEO_MAX_TRY_WEIGHTED_SAD =                        60;

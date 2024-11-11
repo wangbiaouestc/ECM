@@ -1510,6 +1510,9 @@ void InterPrediction::xSubPuBio(PredictionUnit& pu, PelUnitBuf& predBuf, const R
 #if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
   subPu.tmMergeFlag = pu.tmMergeFlag;
 #endif
+#if JVET_AJ0274_REGRESSION_GPM_TM
+  subPu.geoBlendTmFlag = pu.geoBlendTmFlag;
+#endif
   subPu.refIdx[0] = pu.refIdx[0];
   subPu.refIdx[1] = pu.refIdx[1];
   int  fstStart = puPos.y;
@@ -8248,6 +8251,9 @@ void InterPrediction::subBlockOBMC(PredictionUnit  &pu, PelUnitBuf* pDst)
 #if TM_MRG || (JVET_Z0084_IBC_TM && IBC_TM_MRG)
   subPu.tmMergeFlag = false;
 #endif
+#if JVET_AJ0274_REGRESSION_GPM_TM
+  subPu.geoBlendTmFlag = false;
+#endif
 #if MULTI_PASS_DMVR
   subPu.bdmvrRefine = false;
 #endif
@@ -9084,10 +9090,17 @@ void InterPrediction::deriveGpmSplitMode(PredictionUnit& pu, MergeCtx &geoMrgCtx
       Pel* pRefLeftPart0[GEO_NUM_TM_MV_CAND] = {nullptr, m_acYuvRefAMLTemplatePart0[1], m_acYuvRefAMLTemplatePart0[3], nullptr                      }; // For mergeCtx[GEO_TM_SHAPE_AL] and mergeCtx[GEO_TM_SHAPE_A]
       Pel* pRefTopPart1 [GEO_NUM_TM_MV_CAND] = {nullptr, m_acYuvRefAMLTemplatePart1[0], nullptr,                       m_acYuvRefAMLTemplatePart1[2]}; // For mergeCtx[GEO_TM_SHAPE_AL] and mergeCtx[GEO_TM_SHAPE_L]
       Pel* pRefLeftPart1[GEO_NUM_TM_MV_CAND] = {nullptr, m_acYuvRefAMLTemplatePart1[1], nullptr,                       m_acYuvRefAMLTemplatePart1[3]}; // For mergeCtx[GEO_TM_SHAPE_AL] and mergeCtx[GEO_TM_SHAPE_L]
+#if JVET_AJ0274_GPM_AFFINE_TM
+      fillPartGPMRefTemplate<0, false>(pu, geoTmMrgCtx[GEO_TM_SHAPE_AL], pu.geoMergeIdx0, -1, pRefTopPart0[GEO_TM_SHAPE_AL], pRefLeftPart0[GEO_TM_SHAPE_AL], &affGeoMrgCtx);
+      fillPartGPMRefTemplate<0, false>(pu, geoTmMrgCtx[GEO_TM_SHAPE_A ], pu.geoMergeIdx0, -1, pRefTopPart0[GEO_TM_SHAPE_A ], pRefLeftPart0[GEO_TM_SHAPE_A ], &affGeoMrgCtx);
+      fillPartGPMRefTemplate<1, false>(pu, geoTmMrgCtx[GEO_TM_SHAPE_AL], pu.geoMergeIdx1, -1, pRefTopPart1[GEO_TM_SHAPE_AL], pRefLeftPart1[GEO_TM_SHAPE_AL], &affGeoMrgCtx);
+      fillPartGPMRefTemplate<1, false>(pu, geoTmMrgCtx[GEO_TM_SHAPE_L ], pu.geoMergeIdx1, -1, pRefTopPart1[GEO_TM_SHAPE_L ], pRefLeftPart1[GEO_TM_SHAPE_L ], &affGeoMrgCtx);
+#else
       fillPartGPMRefTemplate<0, false>(pu, geoTmMrgCtx[GEO_TM_SHAPE_AL], pu.geoMergeIdx0, -1, pRefTopPart0[GEO_TM_SHAPE_AL], pRefLeftPart0[GEO_TM_SHAPE_AL]);
       fillPartGPMRefTemplate<0, false>(pu, geoTmMrgCtx[GEO_TM_SHAPE_A ], pu.geoMergeIdx0, -1, pRefTopPart0[GEO_TM_SHAPE_A ], pRefLeftPart0[GEO_TM_SHAPE_A ]);
       fillPartGPMRefTemplate<1, false>(pu, geoTmMrgCtx[GEO_TM_SHAPE_AL], pu.geoMergeIdx1, -1, pRefTopPart1[GEO_TM_SHAPE_AL], pRefLeftPart1[GEO_TM_SHAPE_AL]);
       fillPartGPMRefTemplate<1, false>(pu, geoTmMrgCtx[GEO_TM_SHAPE_L ], pu.geoMergeIdx1, -1, pRefTopPart1[GEO_TM_SHAPE_L ], pRefLeftPart1[GEO_TM_SHAPE_L ]);
+#endif
 
       // Update split mode
       getBestGeoTMModeList(pu, numValidInList, modeList, pRefTopPart0, pRefLeftPart0, pRefTopPart1, pRefLeftPart1);
@@ -9467,14 +9480,126 @@ void InterPrediction::motionCompensationGeoBlend( CodingUnit& cu, MergeCtx& geoM
 #endif
   )
 {
+#if JVET_AJ0274_REGRESSION_GPM_TM
+  MergeCtx geoBlendTmCtx;
+
+  uint8_t maxNumBlendTmMrgCand = geoMrgCtx.numValidMergeCand;
+  geoBlendTmCtx.numValidMergeCand = maxNumBlendTmMrgCand;
+
+  bool mrgDuplicated[GEO_MAX_ALL_INTER_UNI_CANDS];
+  int  pocMrg[GEO_MAX_ALL_INTER_UNI_CANDS];
+  Mv   mrgMv[GEO_MAX_ALL_INTER_UNI_CANDS];
+
+  for (uint8_t mergeCand = 0; mergeCand < maxNumBlendTmMrgCand; mergeCand++)
+  {
+    if (!cu.firstPU->geoBlendTmFlag)
+    {
+      break;
+    }
+    int mrgList = geoMrgCtx.mvFieldNeighbours[(mergeCand << 1) + 0].refIdx == -1 ? 1 : 0;
+    int mrgRefIdx = geoMrgCtx.mvFieldNeighbours[(mergeCand << 1) + mrgList].refIdx;
+
+    pocMrg[mergeCand] = cu.slice->getRefPic((RefPicList)mrgList, mrgRefIdx)->getPOC();
+
+    mrgMv[mergeCand] = geoMrgCtx.mvFieldNeighbours[(mergeCand << 1) + mrgList].mv;
+
+    mrgDuplicated[mergeCand] = false;
+    if (mergeCand)
+    {
+      for (int i = 0; i < mergeCand; i++)
+      {
+        if (pocMrg[mergeCand] == pocMrg[i] && mrgMv[mergeCand] == mrgMv[i])
+        {
+          mrgDuplicated[mergeCand] = true;
+          break;
+        }
+      }
+    }
+  }
+
+  for (int idx = 0; idx < maxNumBlendTmMrgCand; idx++)
+  {
+    if (!cu.firstPU->geoBlendTmFlag)
+    {
+      break;
+    }
+    if (mrgDuplicated[idx])
+    {
+      continue;
+    }
+    geoBlendTmCtx.bcwIdx[idx] = BCW_DEFAULT;
+    geoBlendTmCtx.useAltHpelIf[idx] = false;
+#if JVET_AG0276_NLIC
+    geoBlendTmCtx.altLMFlag[idx] = false;
+    geoBlendTmCtx.altLMParaNeighbours[idx].resetAltLinearModel();
+#endif
+#if INTER_LIC
+    geoBlendTmCtx.licFlags[idx] = geoMrgCtx.licFlags[idx];
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+    geoBlendTmCtx.copyLICParamFromCtx(idx, geoMrgCtx, idx);
+#else
+    geoBlendTmCtx.setDefaultLICParamToCtx(idx);
+#endif
+#endif
+    geoBlendTmCtx.interDirNeighbours[idx] = geoMrgCtx.interDirNeighbours[idx];
+    geoBlendTmCtx.mvFieldNeighbours[(idx << 1)].mv = geoMrgCtx.mvFieldNeighbours[(idx << 1)].mv;
+    geoBlendTmCtx.mvFieldNeighbours[(idx << 1) + 1].mv = geoMrgCtx.mvFieldNeighbours[(idx << 1) + 1].mv;
+    geoBlendTmCtx.mvFieldNeighbours[(idx << 1)].refIdx = geoMrgCtx.mvFieldNeighbours[(idx << 1)].refIdx;
+    geoBlendTmCtx.mvFieldNeighbours[(idx << 1) + 1].refIdx = geoMrgCtx.mvFieldNeighbours[(idx << 1) + 1].refIdx;
+  }
+
+  for (auto& pu : CU::traversePUs(cu))
+  {
+    if (!pu.geoBlendTmFlag)
+    {
+      break;
+    }
+
+    pu.geoTmType = GEO_TM_SHAPE_AL;
+    pu.tmMergeFlag = true;
+    for (uint8_t mrgIdx = 0; mrgIdx < maxNumBlendTmMrgCand; mrgIdx++)
+    {
+      if (mrgDuplicated[mrgIdx])
+      {
+        continue;
+      }
+      geoBlendTmCtx.setMergeInfo(pu, mrgIdx);
+
+#if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
+      deriveTMMv(pu, NULL, mrgIdx);
+#else
+      deriveTMMv(pu);
+#endif
+
+#if JVET_AE0046_BI_GPM
+      geoBlendTmCtx.interDirNeighbours[mrgIdx] = pu.interDir;
+      geoBlendTmCtx.bcwIdx[mrgIdx] = (pu.interDir != 3) ? BCW_DEFAULT : geoBlendTmCtx.bcwIdx[mrgIdx];
+      geoBlendTmCtx.mvFieldNeighbours[(mrgIdx << 1)].refIdx = pu.refIdx[0];
+      geoBlendTmCtx.mvFieldNeighbours[(mrgIdx << 1) + 1].refIdx = pu.refIdx[1];
+#endif
+      geoBlendTmCtx.mvFieldNeighbours[(mrgIdx << 1)].mv = pu.mv[0];
+      geoBlendTmCtx.mvFieldNeighbours[(mrgIdx << 1) + 1].mv = pu.mv[1];
+    }
+    pu.tmMergeFlag = false;
+  }
+#endif
   const int mergeIdx = cu.firstPU->geoMergeIdx0;
 
   GeoBlendInfo  geoBI;
+#if JVET_AJ0274_REGRESSION_GPM_TM
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
+  cu.licFlag = false;
+  cu.firstPU->geoBlendTmFlag ? geoBlendTmCtx.setLICParamToPu(*cu.firstPU, NOT_VALID, false) : geoMrgCtx.setLICParamToPu(*cu.firstPU, NOT_VALID, false);
+#endif
+  bool  bFoundGeoBlendCand;
+  bFoundGeoBlendCand = cu.firstPU->geoBlendTmFlag ? getGeoBlendCand(cu, geoBlendTmCtx, mergeIdx, geoBI) : getGeoBlendCand(cu, geoMrgCtx, mergeIdx, geoBI);
+#else
 #if JVET_AH0314_LIC_INHERITANCE_FOR_MRG
   cu.licFlag = false;
   geoMrgCtx.setLICParamToPu(*cu.firstPU, NOT_VALID, false);
 #endif
   bool  bFoundGeoBlendCand = getGeoBlendCand( cu, geoMrgCtx, mergeIdx, geoBI );
+#endif
   if ( !bFoundGeoBlendCand ) 
   {
     printf("getGeoBlendCand( mergeIdx=%d ) failed.\n", mergeIdx );
@@ -9494,7 +9619,18 @@ void InterPrediction::motionCompensationGeoBlend( CodingUnit& cu, MergeCtx& geoM
     bool  refinePossible0 = false;
     bool  refinePossible1 = false;
     {
+#if JVET_AJ0274_REGRESSION_GPM_TM
+      if (pu.geoBlendTmFlag)
+      {
+        geoBlendTmCtx.setMergeInfo( pu, geoBI.mergeCand[0] );
+      }
+      else
+      {
+        geoMrgCtx.setMergeInfo( pu, geoBI.mergeCand[0] );
+      }
+#else
       geoMrgCtx.setMergeInfo( pu, geoBI.mergeCand[0] );
+#endif
 
 #if JVET_AE0046_BI_GPM
       refinePossible0 = PU::checkBDMVRCondition(pu, true);
@@ -9517,7 +9653,18 @@ void InterPrediction::motionCompensationGeoBlend( CodingUnit& cu, MergeCtx& geoM
     }
 
     {
+#if JVET_AJ0274_REGRESSION_GPM_TM
+      if (pu.geoBlendTmFlag)
+      {
+        geoBlendTmCtx.setMergeInfo(pu, geoBI.mergeCand[1]);
+      }
+      else
+      {
+        geoMrgCtx.setMergeInfo( pu, geoBI.mergeCand[1] );
+      }
+#else
       geoMrgCtx.setMergeInfo( pu, geoBI.mergeCand[1] );
+#endif
 
 #if JVET_AE0046_BI_GPM
       refinePossible1 = PU::checkBDMVRCondition(pu, true);
@@ -9562,13 +9709,42 @@ void InterPrediction::motionCompensationGeoBlend( CodingUnit& cu, MergeCtx& geoM
 #if JVET_AG0164_AFFINE_GPM
     AffineMergeCtx  dummyAffineMergeCtx;
 #if JVET_AI0082_GPM_WITH_INTER_IBC
-    PU::spanGeoMMVDMotionInfo( pu, geoMrgCtx
-      , dummyAffineMergeCtx
-      , geoMrgCtx, geoMrgCtx, 0, geoMergeIdx0, geoMergeIdx1, pu.geoTmFlag0, pu.geoMMVDFlag0, pu.geoMMVDIdx0, pu.geoTmFlag1, pu.geoMMVDFlag1, pu.geoMMVDIdx1, 0, intraMPM, nullptr
-      , pu.gpmDmvrRefinePart0, pu.gpmDmvrRefinePart1, subBdofBuf[geoMergeIdx0], subBdofBuf[geoMergeIdx1] );
+#if JVET_AJ0274_REGRESSION_GPM_TM
+    if (pu.geoBlendTmFlag)
+    {
+      PU::spanGeoMMVDMotionInfo(pu, geoBlendTmCtx
+        , dummyAffineMergeCtx
+#if JVET_AJ0274_GPM_AFFINE_TM
+        , dummyAffineMergeCtx
+#endif
+        , geoBlendTmCtx, geoBlendTmCtx, 0, geoMergeIdx0, geoMergeIdx1, pu.geoTmFlag0, pu.geoMMVDFlag0, pu.geoMMVDIdx0, pu.geoTmFlag1, pu.geoMMVDFlag1, pu.geoMMVDIdx1, 0, intraMPM, nullptr
+        , pu.gpmDmvrRefinePart0, pu.gpmDmvrRefinePart1, subBdofBuf[geoMergeIdx0], subBdofBuf[geoMergeIdx1]);
+    }
+    else
+    {
+      PU::spanGeoMMVDMotionInfo(pu, geoMrgCtx
+        , dummyAffineMergeCtx
+#if JVET_AJ0274_GPM_AFFINE_TM
+        , dummyAffineMergeCtx
+#endif
+        , geoMrgCtx, geoMrgCtx, 0, geoMergeIdx0, geoMergeIdx1, pu.geoTmFlag0, pu.geoMMVDFlag0, pu.geoMMVDIdx0, pu.geoTmFlag1, pu.geoMMVDFlag1, pu.geoMMVDIdx1, 0, intraMPM, nullptr
+        , pu.gpmDmvrRefinePart0, pu.gpmDmvrRefinePart1, subBdofBuf[geoMergeIdx0], subBdofBuf[geoMergeIdx1]);
+    }
 #else
     PU::spanGeoMMVDMotionInfo( pu, geoMrgCtx
       , dummyAffineMergeCtx
+#if JVET_AJ0274_GPM_AFFINE_TM
+      , dummyAffineMergeCtx
+#endif
+      , geoMrgCtx, geoMrgCtx, 0, geoMergeIdx0, geoMergeIdx1, pu.geoTmFlag0, pu.geoMMVDFlag0, pu.geoMMVDIdx0, pu.geoTmFlag1, pu.geoMMVDFlag1, pu.geoMMVDIdx1, 0, intraMPM, nullptr
+      , pu.gpmDmvrRefinePart0, pu.gpmDmvrRefinePart1, subBdofBuf[geoMergeIdx0], subBdofBuf[geoMergeIdx1] );
+#endif
+#else
+    PU::spanGeoMMVDMotionInfo( pu, geoMrgCtx
+      , dummyAffineMergeCtx
+#if JVET_AJ0274_GPM_AFFINE_TM
+      , dummyAffineMergeCtx
+#endif
       , geoMrgCtx, geoMrgCtx, 0, geoMergeIdx0, geoMergeIdx1, pu.geoTmFlag0, pu.geoMMVDFlag0, pu.geoMMVDIdx0, pu.geoTmFlag1, pu.geoMMVDFlag1, pu.geoMMVDIdx1, 0, intraMPM
       , pu.gpmDmvrRefinePart0, pu.gpmDmvrRefinePart1, subBdofBuf[geoMergeIdx0], subBdofBuf[geoMergeIdx1] );
 #endif
@@ -9600,6 +9776,9 @@ void InterPrediction::motionCompensationGeo( CodingUnit &cu, MergeCtx &geoMrgCtx
 #endif
 #if JVET_AG0164_AFFINE_GPM
                                            , AffineMergeCtx& gpmAffMrgCtx
+#if JVET_AJ0274_GPM_AFFINE_TM
+                                           , AffineMergeCtx &gpmAffTmMrgCtx
+#endif
 #endif
 #if JVET_AE0046_BI_GPM
                                           , Mv(&subMvBuf)[MRG_MAX_NUM_CANDS << 1][MAX_NUM_SUBCU_DMVR]
@@ -9668,7 +9847,11 @@ void InterPrediction::motionCompensationGeo( CodingUnit &cu, MergeCtx &geoMrgCtx
                    , geoTmMrgCtx
 #endif
 #if JVET_AG0164_AFFINE_GPM
+#if JVET_AJ0274_GPM_AFFINE_TM
+                    , (cu.firstPU->geoTmFlag0 && (cu.firstPU->affineGPM[0] || cu.firstPU->affineGPM[1])) ? gpmAffTmMrgCtx : gpmAffMrgCtx
+#else
                    , gpmAffMrgCtx
+#endif
 #endif
 #if JVET_Y0065_GPM_INTRA
                    , pcIntraPred
@@ -9791,6 +9974,21 @@ void InterPrediction::motionCompensationGeo( CodingUnit &cu, MergeCtx &geoMrgCtx
 #if TM_MRG
     if (geoTmFlag0)
     {
+#if JVET_AJ0274_GPM_AFFINE_TM
+      if (pu.affineGPM[0])
+      {
+        gpmAffTmMrgCtx.setAffMergeInfo(pu, candIdx0, geoMMVDFlag0 ? geoMMVDIdx0 : -1);
+        if (pu.refIdx[0] >= 0)// Prepare MV for chroma
+        {
+          PU::setAllAffineMv(pu, pu.mvAffi[0][0], pu.mvAffi[0][1], pu.mvAffi[0][2], REF_PIC_LIST_0);
+        }
+        if (pu.refIdx[1] >= 0)
+        {
+          PU::setAllAffineMv(pu, pu.mvAffi[1][0], pu.mvAffi[1][1], pu.mvAffi[1][2], REF_PIC_LIST_1);
+        }
+      }
+      else
+#endif
       geoTmMrgCtx0.setMergeInfo(pu, candIdx0);
     }
     else
@@ -9888,9 +10086,16 @@ void InterPrediction::motionCompensationGeo( CodingUnit &cu, MergeCtx &geoMrgCtx
 #else
         PU::spanMotionInfo(pu);
 #endif
+#if JVET_AJ0274_GPM_AFFINE_TM
+      if (!geoTmFlag0)
+      {
+#endif
       cu.isobmcMC = true;
       subBlockOBMC(pu, &tmpGeoBuf0);
       cu.isobmcMC = false;
+#if JVET_AJ0274_GPM_AFFINE_TM
+      }
+#endif
 #if JVET_AG0164_AFFINE_GPM
       if (pu.affineGPM[0])
       {
@@ -9962,6 +10167,21 @@ void InterPrediction::motionCompensationGeo( CodingUnit &cu, MergeCtx &geoMrgCtx
 #if TM_MRG
     if (geoTmFlag1)
     {
+#if JVET_AJ0274_GPM_AFFINE_TM
+      if (pu.affineGPM[1])
+      {
+        gpmAffTmMrgCtx.setAffMergeInfo(pu, candIdx1, geoMMVDFlag1? geoMMVDIdx1: -1);
+        if (pu.refIdx[0] >= 0)
+        {
+          PU::setAllAffineMv(pu, pu.mvAffi[0][0], pu.mvAffi[0][1], pu.mvAffi[0][2], REF_PIC_LIST_0);
+        }
+        if (pu.refIdx[1] >= 0)
+        {
+          PU::setAllAffineMv(pu, pu.mvAffi[1][0], pu.mvAffi[1][1], pu.mvAffi[1][2], REF_PIC_LIST_1);
+        }
+      }
+      else
+#endif
       geoTmMrgCtx1.setMergeInfo(pu, candIdx1);
     }
     else
@@ -10057,9 +10277,16 @@ void InterPrediction::motionCompensationGeo( CodingUnit &cu, MergeCtx &geoMrgCtx
 #else
         PU::spanMotionInfo(pu);
 #endif
+#if JVET_AJ0274_GPM_AFFINE_TM
+      if (!geoTmFlag1)
+      {
+#endif
       cu.isobmcMC = true;
       subBlockOBMC(pu, &tmpGeoBuf1);
       cu.isobmcMC = false;
+#if JVET_AJ0274_GPM_AFFINE_TM
+      }
+#endif
 #if JVET_AG0164_AFFINE_GPM
       if (pu.affineGPM[1])
       {
@@ -13755,9 +13982,13 @@ Distortion InterPrediction::deriveBcwBlending( PredictionUnit& pu, bool bUniDir[
       for (int x = 0; x < width; x++)
       {
         int posX = x - (iTemp ? AML_MERGE_TEMPLATE_SIZE : 0);
-
+#if JVET_AJ0274_REGRESSION_GPM_TM
+        const Pel P0 = bUniDir0 ? ClipPel( (Pel)rightShift((p0[x] + offset), shiftNum), clpRng ) : p0[x];
+        const Pel P1 = bUniDir1 ? ClipPel( (Pel)rightShift((p1[x] + offset), shiftNum), clpRng ) : p1[x];
+#else
         const Pel P0 = ClipPel( (Pel)rightShift((p0[x] + offset), shiftNum), clpRng );
         const Pel P1 = ClipPel( (Pel)rightShift((p1[x] + offset), shiftNum), clpRng );
+#endif
 
         int iWeight = blendModel.compute( posX, posY );
 
@@ -19309,6 +19540,17 @@ void InterPrediction::getAffAndSbtmvpRefTemplate(PredictionUnit& pu, PelUnitBuf&
         Pel *recLeftTemplate = m_acYuvCurAMLTemplate[1][0];
         Pel *recAboveTemplate = m_acYuvCurAMLTemplate[0][0];
         xGetLICParamGeneral(*pu.cu, COMPONENT_Y, numTemplate, refLeftTemplate, refAboveTemplate, recLeftTemplate, recAboveTemplate, LICshift[refList], scale[refList], offset[refList]);
+#if JVET_AH0314_LIC_INHERITANCE_FOR_MRG && JVET_AJ0274_GPM_AFFINE_TM
+        if (pu.cu->licInheritPara && pu.cu->geoFlag && pu.cs->sps->getMaxNumGpmAffTmCand() > 0)
+        {
+          LICshift[0] = m_LICShift;
+          scale[0] = pu.cu->licScale[0][0];
+          offset[0] = pu.cu->licOffset[0][0];
+          LICshift[1] = m_LICShift;
+          scale[1] = pu.cu->licScale[1][0];
+          offset[1] = pu.cu->licOffset[1][0];
+        }
+#endif
       }
 #endif
     }
@@ -23843,7 +24085,11 @@ void InterPrediction::deriveTMMv(PredictionUnit& pu, Distortion* tmCost)
 void InterPrediction::deriveTMMv(PredictionUnit& pu)
 #endif
 {
+#if JVET_AJ0274_REGRESSION_GPM_TM
+  if (!pu.tmMergeFlag && !pu.geoBlendTmFlag)
+#else
   if( !pu.tmMergeFlag )
+#endif
   {
     return;
   }
@@ -27738,7 +27984,11 @@ bool InterPrediction::processTM4Affine(PredictionUnit& pu, AffineMergeCtx &affin
     }
   }
 #endif
+#if JVET_AJ0274_GPM_AFFINE_TM
+  if (uiCostBest < REFINE_THRESHOLD_AFFINE_MERGE * uiCostOri && !pu.cu->geoFlag)
+#else
   if (uiCostBest < REFINE_THRESHOLD_AFFINE_MERGE * uiCostOri)
+#endif
   {
     if (!isEncoder && uiAffMergeCand > -1)
     {

@@ -968,6 +968,9 @@ protected:
   uint32_t      m_maxNumGeoCand;
 #if JVET_AG0164_AFFINE_GPM
   uint32_t      m_maxNumGpmAffCand;
+#if JVET_AJ0274_GPM_AFFINE_TM
+  uint32_t      m_maxNumGpmAffTmCand;
+#endif
 #endif
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
   uint32_t      m_maxNumMHPCand;
@@ -2675,6 +2678,10 @@ public:
 #if JVET_AG0164_AFFINE_GPM
   void         setMaxNumGpmAffCand(uint32_t u)                       { m_maxNumGpmAffCand = u; }
   uint32_t     getMaxNumGpmAffCand()                                 { return m_maxNumGpmAffCand; }
+#if JVET_AJ0274_GPM_AFFINE_TM
+  void         setMaxNumGpmAffTmCand(uint32_t u)                     { m_maxNumGpmAffTmCand = u; }
+  uint32_t     getMaxNumGpmAffTmCand()                               { return m_maxNumGpmAffTmCand; }
+#endif
 #endif
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
   void         setMaxNumMHPCand                  ( uint32_t u )      { m_maxNumMHPCand = u;    }

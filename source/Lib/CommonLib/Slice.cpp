@@ -4417,6 +4417,9 @@ SPS::SPS()
 , m_maxNumGeoCand(0)
 #if JVET_AG0164_AFFINE_GPM
 , m_maxNumGpmAffCand(0)
+#if JVET_AJ0274_GPM_AFFINE_TM
+, m_maxNumGpmAffTmCand(0)
+#endif
 #endif
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
 , m_maxNumMHPCand(0)

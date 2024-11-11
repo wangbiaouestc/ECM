@@ -1963,6 +1963,9 @@ private:
   uint32_t          m_maxNumGeoCand;
 #if JVET_AG0164_AFFINE_GPM
   uint32_t          m_maxNumGpmAffCand;
+#if JVET_AJ0274_GPM_AFFINE_TM
+  uint32_t          m_maxNumGpmAffTmCand;
+#endif
 #endif
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
   uint32_t          m_maxNumMHPCand;
@@ -2431,6 +2434,10 @@ void                    setCCALFEnabledFlag( bool b )                           
 #if JVET_AG0164_AFFINE_GPM
   uint32_t                getMaxNumGpmAffCand() const                                                     { CHECK(m_maxNumGpmAffCand > GEO_MAX_NUM_UNI_AFF_CANDS, "Number of GPM Affine candidates exceed GEO_MAX_NUM_UNI_AFF_CANDS"); return m_maxNumGpmAffCand; }
   void                    setMaxNumGpmAffCand(uint32_t u)                                                 { CHECK(m_maxNumGpmAffCand > GEO_MAX_NUM_UNI_AFF_CANDS, "Number of GPM Affine  candidates exceed GEO_MAX_NUM_UNI_AFF_CANDS"); m_maxNumGpmAffCand = u; }
+#if JVET_AJ0274_GPM_AFFINE_TM
+  uint32_t                getMaxNumGpmAffTmCand() const                                                   { return m_maxNumGpmAffTmCand; }
+  void                    setMaxNumGpmAffTmCand(uint32_t u)                                               { m_maxNumGpmAffTmCand = u; }
+#endif
 #endif
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
   uint32_t                getMaxNumMHPCand() const                                                        { CHECK( m_maxNumMHPCand >= GEO_MAX_NUM_UNI_CANDS, "Number of MHP candidates exceed GEO_MAX_NUM_CANDS" ); return m_maxNumMHPCand; }

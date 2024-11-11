@@ -1879,7 +1879,12 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setMaxNumIBCMergeCand(getMaxNumIBCMergeCand());
   sps.setMaxNumGeoCand(getMaxNumGeoCand());
 #if JVET_AG0164_AFFINE_GPM
+#if JVET_AJ0274_GPM_AFFINE_TM
+  sps.setMaxNumGpmAffCand      (getMaxNumGpmAffCand());
+  sps.setMaxNumGpmAffTmCand    (m_intraPeriod == -1 ? (m_sourceWidth * m_sourceHeight >= 1920 * 1080 ? 0 : getMaxNumGpmAffTmCand() - 2) : getMaxNumGpmAffTmCand());
+#else
   sps.setMaxNumGpmAffCand      (((m_sourceWidth * m_sourceHeight) > (m_intraPeriod == -1 ? 1280 * 720 : 0)) ? getMaxNumGpmAffCand() : 0);
+#endif
 #endif
 #if JVET_Z0127_SPS_MHP_MAX_MRG_CAND
   sps.setMaxNumMHPCand(getMaxNumMHPCand());

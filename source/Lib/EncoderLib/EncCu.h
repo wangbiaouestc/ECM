@@ -371,6 +371,9 @@ private:
 #endif
   FastGeoMMVDCostList   m_geoMMVDCostList;
   bool                  m_fastGpmMmvdSearch;
+#if JVET_AJ0274_GPM_AFFINE_TM
+  int                  m_fastGpmAffSearch;
+#endif
   bool                  m_fastGpmMmvdRelatedCU;
   bool                  m_includeMoreMMVDCandFirstPass;
   int                   m_maxNumGPMDirFirstPass;
@@ -379,6 +382,9 @@ private:
   PelStorage            m_acGeoMergeTmpBuffer[GEO_TM_MAX_NUM_CANDS];
   PelStorage            m_acGeoSADTmpBuffer[GEO_TM_MAX_NUM_CANDS];
 #endif
+#endif
+#if JVET_AJ0274_REGRESSION_GPM_TM
+  PelStorage            m_acGeoBlendTMBuffer[GEO_TM_MAX_NUM_CANDS];
 #endif
   double                m_AFFBestSATDCost;
   double                m_mergeBestSATDCost;
@@ -405,6 +411,9 @@ private:
 #endif
   Mv                    m_mvBufEncBDOF[MRG_MAX_NUM_CANDS][BDOF_SUBPU_MAX_NUM];
   Mv                    m_mvBufEncBDOF4TM[MRG_MAX_NUM_CANDS][BDOF_SUBPU_MAX_NUM];
+#if JVET_AJ0274_REGRESSION_GPM_TM
+  Mv                    m_mvBufEncBDOF4TMBlend[MRG_MAX_NUM_CANDS][BDOF_SUBPU_MAX_NUM];
+#endif
 #if JVET_X0049_ADAPT_DMVR
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   Mv                    m_mvBufBDMVR4BM[(BM_MRG_MAX_NUM_INIT_CANDS << 1)<<1][MAX_NUM_SUBCU_DMVR];

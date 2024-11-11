@@ -343,8 +343,12 @@
 #define JVET_AF0159_AFFINE_SUBPU_BDOF_REFINEMENT          1 // JVET-AF0159: Affine subblock BDOF refinement
 #define JVET_AF0057                                       1 // JVET-AF0057: Encoder only. DMVR with robust MV derivation.
 #define JVET_AG0112_REGRESSION_BASED_GPM_BLENDING         1 // JVET-AG0112: Regression-based GPM blending
+#define JVET_AJ0274_REGRESSION_GPM_TM                     1 // JVET-AJ0274: Regression-based GPM with TM extension
 #define JVET_AG0135_AFFINE_CIIP                           1 // JVET-AG0135: CIIP with affine prediction 
 #define JVET_AG0164_AFFINE_GPM                            1 // JVET-AG0164: GPM with affine prediction
+#if JVET_AG0164_AFFINE_GPM
+#define JVET_AJ0274_GPM_AFFINE_TM                         1 // JVET-AJ0274: GPM-affine with TM
+#endif
 #define JVET_AG0098_AMVP_WITH_SBTMVP                      1 // JVET-AG0098: AMVP with SbTMVP mode
 #define JVET_AG0067_DMVR_EXTENSIONS                       1 // JVET-AG0067: On DMVR Extensions
 #define JVET_AH0069_CMVP                                  1 // JVET-AH0069: Chained motion vector prediction

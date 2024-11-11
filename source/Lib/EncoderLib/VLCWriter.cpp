@@ -1708,6 +1708,12 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
       {
         WRITE_UVLC(pcSPS->getMaxNumAffineMergeCand() - pcSPS->getMaxNumGpmAffCand(), "max_num_aff_merge_cand_minus_max_num_gpm_aff_cand");
       }
+#if JVET_AJ0274_GPM_AFFINE_TM
+      if (pcSPS->getMaxNumGpmAffCand() > 0)
+      {
+        WRITE_UVLC(pcSPS->getMaxNumGpmAffTmCand(), "max_num_gpm_aff_tm_cand");
+      }
+#endif
 #endif
 
 #if JVET_AA0132_CONFIGURABLE_TM_TOOLS && JVET_W0097_GPM_MMVD_TM && TM_MRG
