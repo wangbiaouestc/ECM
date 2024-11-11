@@ -192,6 +192,7 @@
 #if JVET_AB0157_TMRL
 #define JVET_AD0082_TMRL_CONFIG                           1 // JVET-AD0082: a configuration option for TMRL
 #define JVET_AD0085_TMRL_EXTENSION                        1 // JVET-AD0085: TMRL angular extension and intra candidate list modifications
+#define JVET_AJ0081_CHROMA_TMRL                           1 // JVET-AJ0081: Chroma TMRL
 #endif
 #define JVET_AB0157_INTRA_FUSION                          1 // JVET-AB0157: Intra prediction fusion
 #define JVET_AC0094_REF_SAMPLES_OPT                       1 // JVET-AC0094: Optimizing the use of reference samples

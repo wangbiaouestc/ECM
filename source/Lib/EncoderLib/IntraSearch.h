@@ -674,6 +674,10 @@ private:
   PelStorage      m_fusionStorage[6];
 #endif
 
+#if JVET_AJ0081_CHROMA_TMRL
+  PelStorage     m_chromaMrlStorage[CHROMA_TMRL_LIST_SIZE];
+#endif
+
 #if JVET_AD0120_LBCCP
   PelStorage      m_lmPredFiltStorage[LBCCP_FILTER_MMLMNUM];
   struct lmPredFiltModeInfo

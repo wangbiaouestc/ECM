@@ -3752,6 +3752,23 @@ bool PU::hasCCPMergeFusionFlag(const PredictionUnit& pu)
 }
 #endif
 
+#if JVET_AJ0081_CHROMA_TMRL
+bool PU::hasChromaTmrl(const PredictionUnit& pu)
+{
+  if (CS::isDualITree(*pu.cs))
+  {
+    bool hasChromaTmrl = true;
+    int aboveLines = pu.block(COMPONENT_Cb).y;
+    if (aboveLines < 4)
+    {
+      hasChromaTmrl = false;
+    }
+    return hasChromaTmrl;
+  }
+  return false;
+}
+#endif
+
 #if JVET_AC0071_DBV
 bool PU::hasChromaBvFlag(const PredictionUnit &pu)
 {

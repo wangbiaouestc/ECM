@@ -3363,6 +3363,19 @@ void CABACReader::intraChromaFusionMode(PredictionUnit& pu)
 }
 #endif
 
+#if JVET_AJ0081_CHROMA_TMRL
+void CABACReader::intraChromaTmrl(PredictionUnit& pu)
+{
+  pu.chromaTmrlIdx = 0;
+  pu.chromaTmrlFlag = bool(m_BinDecoder.decodeBin(Ctx::ChromaTmrlFlag()));
+  if (pu.chromaTmrlFlag)
+  {
+    pu.chromaTmrlIdx = unary_max_eqprob(CHROMA_TMRL_LIST_SIZE - 1);
+  }
+  DTRACE(g_trace_ctx, D_SYNTAX, "intraChromaTmrl() ctx=%d pos=(%d,%d) chromaTmrlFlag=%d chromaTmrlIdx=%d\n", 0, pu.blocks[CHANNEL_TYPE_CHROMA].x, pu.blocks[CHANNEL_TYPE_CHROMA].y, pu.chromaTmrlFlag ? 1 : 0, pu.chromaTmrlIdx);
+}
+#endif
+
 void CABACReader::intra_chroma_pred_mode(PredictionUnit& pu)
 {
   RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET_SIZE2(STATS__CABAC_BITS__INTRA_DIR_ANG, pu.cu->blocks[pu.chType].lumaSize(), CHANNEL_TYPE_CHROMA);
@@ -3388,6 +3401,18 @@ void CABACReader::intra_chroma_pred_mode(PredictionUnit& pu)
       return;
     }
   }
+
+#if JVET_AJ0081_CHROMA_TMRL
+  if (PU::hasChromaTmrl(pu) && pu.cs->sps->getUseTmrl())
+  {
+    intraChromaTmrl(pu);
+    if (pu.chromaTmrlFlag)
+    {
+      CHECK(pu.chromaTmrlIdx >= CHROMA_TMRL_LIST_SIZE, "Chroma tmrl index out of bounds");
+      return;
+    }
+  }
+#endif
 
 #if JVET_AC0071_DBV
   if (PU::hasChromaBvFlag(pu))
