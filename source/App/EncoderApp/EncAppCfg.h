@@ -704,7 +704,7 @@ protected:
   unsigned  m_uiMaxCUWidth;                                   ///< max. CU width in pixel
   unsigned  m_uiMaxCUHeight;                                  ///< max. CU height in pixel
   unsigned m_log2MinCuSize;                                   ///< min. CU size log2
-#if JVET_AE0057_MTT_ET
+#if JVET_AJ0226_MTT_SKIP
   bool m_useMttSkip;
 #endif
 

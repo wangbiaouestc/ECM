@@ -993,6 +993,137 @@ bool EncCu::xStoreRDcostandPredMode(CodingStructure *&tempCS, CodingStructure *&
   return true;
 }
 #endif
+#if JVET_AJ0226_MTT_SKIP
+void EncCu::xStoreMttSplitFlagCabacBits(CodingStructure *&tempCS, Partitioner &partitioner, int mttSplitFlagCabacBits)
+{
+  // TTH Split flag CABAC bits
+  m_CABACEstimator->resetBits();
+  m_CABACEstimator->split_cu_mode(PartSplit::CU_TRIH_SPLIT, *tempCS, partitioner
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  , nullptr
+#endif
+    , 0);
+
+  if (partitioner.currArea().lheight() == 256)
+  {
+    m_modeCtrl->setTthCabacBits(mttSplitFlagCabacBits + (int) m_CABACEstimator->getEstFracBits(), 0);
+  }
+  else if (partitioner.currArea().lheight() == 128)
+  {
+    m_modeCtrl->setTthCabacBits(mttSplitFlagCabacBits + (int) m_CABACEstimator->getEstFracBits(), 1);
+  }
+  else if (partitioner.currArea().lheight() == 64)
+  {
+    m_modeCtrl->setTthCabacBits(mttSplitFlagCabacBits + (int) m_CABACEstimator->getEstFracBits(), 2);
+  }
+  else if (partitioner.currArea().lheight() == 32)
+  {
+    m_modeCtrl->setTthCabacBits(mttSplitFlagCabacBits + (int) m_CABACEstimator->getEstFracBits(), 3);
+  }
+  m_CABACEstimator->getCtx() = (m_CurrCtx->start);
+
+  // TTV Split flag CABAC bits
+  m_CABACEstimator->resetBits();
+  m_CABACEstimator->split_cu_mode(PartSplit::CU_TRIV_SPLIT, *tempCS, partitioner
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+  , nullptr
+#endif
+    , 0);
+  if (partitioner.currArea().lheight() == 256)
+  {
+    m_modeCtrl->setTtvCabacBits(mttSplitFlagCabacBits + (int) m_CABACEstimator->getEstFracBits(), 0);
+  }
+  else if (partitioner.currArea().lheight() == 128)
+  {
+    m_modeCtrl->setTtvCabacBits(mttSplitFlagCabacBits + (int) m_CABACEstimator->getEstFracBits(), 1);
+  }
+  else if (partitioner.currArea().lheight() == 64)
+  {
+    m_modeCtrl->setTtvCabacBits(mttSplitFlagCabacBits + (int) m_CABACEstimator->getEstFracBits(), 2);
+  }
+  else if (partitioner.currArea().lheight() == 32)
+  {
+    m_modeCtrl->setTtvCabacBits(mttSplitFlagCabacBits + (int) m_CABACEstimator->getEstFracBits(), 3);
+  }
+  m_CABACEstimator->getCtx() = (m_CurrCtx->start);
+
+  // BTH Split flag CABAC bits
+  m_CABACEstimator->resetBits();
+  m_CABACEstimator->split_cu_mode(PartSplit::CU_HORZ_SPLIT, *tempCS, partitioner
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+ , nullptr
+#endif
+    , 0);
+  if (partitioner.currArea().lheight() == 256)
+  {
+    m_modeCtrl->setBthCabacBits(mttSplitFlagCabacBits + (int) m_CABACEstimator->getEstFracBits(), 0);
+  }
+  else if (partitioner.currArea().lheight() == 128)
+  {
+    m_modeCtrl->setBthCabacBits(mttSplitFlagCabacBits + (int) m_CABACEstimator->getEstFracBits(), 1);
+  }
+  else if (partitioner.currArea().lheight() == 64)
+  {
+    m_modeCtrl->setBthCabacBits(mttSplitFlagCabacBits + (int) m_CABACEstimator->getEstFracBits(), 2);
+  }
+  else if (partitioner.currArea().lheight() == 32)
+  {
+    m_modeCtrl->setBthCabacBits(mttSplitFlagCabacBits + (int) m_CABACEstimator->getEstFracBits(), 3);
+  }
+  m_CABACEstimator->getCtx() = (m_CurrCtx->start);
+
+  // BTV Split flag CABAC bits
+  m_CABACEstimator->resetBits();
+  m_CABACEstimator->split_cu_mode(PartSplit::CU_VERT_SPLIT, *tempCS, partitioner
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+ , nullptr
+#endif
+    , 0);
+  if (partitioner.currArea().lheight() == 256)
+  {
+    m_modeCtrl->setBtvCabacBits(mttSplitFlagCabacBits + (int) m_CABACEstimator->getEstFracBits(), 0);
+  }
+  else if (partitioner.currArea().lheight() == 128)
+  {
+    m_modeCtrl->setBtvCabacBits(mttSplitFlagCabacBits + (int) m_CABACEstimator->getEstFracBits(), 1);
+  }
+  else if (partitioner.currArea().lheight() == 64)
+  {
+    m_modeCtrl->setBtvCabacBits(mttSplitFlagCabacBits + (int) m_CABACEstimator->getEstFracBits(), 2);
+  }
+  else if (partitioner.currArea().lheight() == 32)
+  {
+    m_modeCtrl->setBtvCabacBits(mttSplitFlagCabacBits + (int) m_CABACEstimator->getEstFracBits(), 3);
+  }
+  m_CABACEstimator->getCtx() = (m_CurrCtx->start);
+
+  // QT Split flag CABAC bits
+  m_CABACEstimator->resetBits();
+  m_CABACEstimator->split_cu_mode(PartSplit::CU_QUAD_SPLIT, *tempCS, partitioner
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+ , nullptr
+#endif
+    , 0);
+
+  if (partitioner.currArea().lheight() == 256)
+  {
+    m_modeCtrl->setQtCabacBits(mttSplitFlagCabacBits + (int) m_CABACEstimator->getEstFracBits(), 0);
+  }
+  else if (partitioner.currArea().lheight() == 128)
+  {
+    m_modeCtrl->setQtCabacBits(mttSplitFlagCabacBits + (int) m_CABACEstimator->getEstFracBits(), 1);
+  }
+  else if (partitioner.currArea().lheight() == 64)
+  {
+    m_modeCtrl->setQtCabacBits(mttSplitFlagCabacBits + (int) m_CABACEstimator->getEstFracBits(), 2);
+  }
+  else if (partitioner.currArea().lheight() == 32)
+  {
+    m_modeCtrl->setQtCabacBits(mttSplitFlagCabacBits + (int) m_CABACEstimator->getEstFracBits(), 2);
+  }
+  m_CABACEstimator->getCtx() = (m_CurrCtx->start);
+}
+#endif
 
 bool EncCu::xCheckBestMode( CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &partitioner, const EncTestMode& encTestMode )
 {
@@ -1038,7 +1169,11 @@ bool EncCu::xCheckBestMode( CodingStructure *&tempCS, CodingStructure *&bestCS, 
 
 }
 
-void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Partitioner& partitioner, double maxCostAllowed )
+void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Partitioner& partitioner, double maxCostAllowed 
+#if JVET_AJ0226_MTT_SKIP  
+  , int mttSplitFlagCabacBits
+#endif
+)
 {
   CHECK(maxCostAllowed < 0, "Wrong value of maxCostAllowed!");
 #if JVET_AA0133_INTER_MTS_OPT
@@ -1302,6 +1437,16 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
 #endif
   m_CurrCtx->start = m_CABACEstimator->getCtx();
 
+#if JVET_AJ0226_MTT_SKIP  
+  if (partitioner.currBtDepth == 0  && (partitioner.currArea().lwidth() == partitioner.currArea().lheight())  && ( partitioner.currArea().lwidth() == 32 || partitioner.currArea().lwidth() == 64 || partitioner.currArea().lwidth() == 128  || partitioner.currArea().lwidth() == 256)
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+    && (!(bestCS->slice->getProcessingIntraRegion() && bestCS->slice->getProcessingSeparateTrees()) || bestCS->slice->isIntra())
+#endif
+    )
+  {   
+    EncCu::xStoreMttSplitFlagCabacBits(tempCS, partitioner,mttSplitFlagCabacBits);
+  }
+#endif
   m_cuChromaQpOffsetIdxPlus1 = 0;
 
   if( slice.getUseChromaQpAdj() )
@@ -1693,16 +1838,25 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
       {
         xCheckRDCostIntra(tempCS, bestCS, partitioner, currTestMode, false);
       }
-#if JVET_AE0057_MTT_ET
-      if (partitioner.currQtDepth == (tempCS->sps->getCTUSize() == 256 ? 2 : 1) && partitioner.currBtDepth == 0
-          && partitioner.currArea().lwidth() == 64 && partitioner.currArea().lheight() == 64)
-      {
-        if ((partitioner.chType == CHANNEL_TYPE_LUMA)
-            && ((partitioner.currArea().Y().x + 63 < bestCS->picture->lwidth())
-                && (partitioner.currArea().Y().y + 63 < bestCS->picture->lheight())))
-
+#if JVET_AJ0226_MTT_SKIP
+      if ((partitioner.chType == CHANNEL_TYPE_LUMA) && partitioner.currBtDepth == 0
+        && (partitioner.currArea().lwidth() == partitioner.currArea().lheight())
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        && (!(bestCS->slice->getProcessingIntraRegion() && bestCS->slice->getProcessingSeparateTrees()) || bestCS->slice->isIntra())
+#endif
+        )
+      {       
+        if (( partitioner.currArea().Y().x + partitioner.currArea().lheight() - 1 < bestCS->picture->lwidth())
+          && (partitioner.currArea().Y().y + partitioner.currArea().lheight() - 1 < bestCS->picture->lheight()))
         {
-          m_modeCtrl->setNoSplitIntraCost(bestCS->cost);
+          if (partitioner.currArea().lheight() == 64)
+          {
+            m_modeCtrl->setNoSplitIntraCost64CU(bestCS->cost);
+          }
+          if (partitioner.currArea().lheight() == 32)
+          {
+            m_modeCtrl->setNoSplitIntraCost32CU(bestCS->cost);
+          }
         }
       }
 #endif
@@ -1867,7 +2021,19 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
 #endif
 #else
 #if JVET_Y0152_TT_ENC_SPEEDUP
+#if JVET_AJ0226_MTT_SKIP      
+      if (partitioner.currBtDepth == 0 && (currTestMode.type == ETM_SPLIT_QT)  && (partitioner.currArea().lwidth() == partitioner.currArea().lheight()) && partitioner.chType == CHANNEL_TYPE_LUMA
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        && (!(bestCS->slice->getProcessingIntraRegion() && bestCS->slice->getProcessingSeparateTrees()) || bestCS->slice->isIntra())
+#endif
+       )
+      {
+       mttSplitFlagCabacBits = (partitioner.currArea().lwidth() == 128 ? m_modeCtrl->getQtCabacBits(0) : partitioner.currArea().lwidth() == 64 ? m_modeCtrl->getQtCabacBits(1): partitioner.currArea().lwidth() == 32 ? m_modeCtrl->getQtCabacBits(2) : 0 );
+      }      
+      xCheckModeSplit(tempCS, bestCS, partitioner, currTestMode, splitRdCostBest, mttSplitFlagCabacBits);
+#else
       xCheckModeSplit(tempCS, bestCS, partitioner, currTestMode, splitRdCostBest);
+#endif
       tempCS->splitRdCostBest = splitRdCostBest;
 #else
       xCheckModeSplit(tempCS, bestCS, partitioner, currTestMode);
@@ -2459,7 +2625,11 @@ void EncCu::copyState( EncCu* other, Partitioner& partitioner, const UnitArea& c
 #endif
 #if INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
 #if JVET_Y0152_TT_ENC_SPEEDUP
-void EncCu::xCheckModeSplit(CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &partitioner, const EncTestMode& encTestMode, double *splitRdCostBest)
+void EncCu::xCheckModeSplit(CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &partitioner, const EncTestMode& encTestMode, double *splitRdCostBest
+#if JVET_AJ0226_MTT_SKIP  
+  , int mttSplitFlagCabacBits
+#endif
+)
 #else
 void EncCu::xCheckModeSplit(CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &partitioner, const EncTestMode& encTestMode )
 #endif
@@ -2591,15 +2761,25 @@ void EncCu::xCheckModeSplit(CodingStructure *&tempCS, CodingStructure *&bestCS, 
       CodingStructure *tempSubCS = m_pTempCS[wIdx][hIdx];
       CodingStructure *bestSubCS = m_pBestCS[wIdx][hIdx];
 
-#if JVET_AE0057_MTT_ET
-      if (partitioner.currQtDepth == (tempCS->sps->getCTUSize() == 256 ? 2 : 1) && partitioner.currBtDepth == 0
-          && partitioner.currArea().lwidth() == 64 && partitioner.currArea().lheight() == 64)
+#if JVET_AJ0226_MTT_SKIP
+      if ((partitioner.chType == CHANNEL_TYPE_LUMA) && partitioner.currBtDepth == 0
+        && (partitioner.currArea().lwidth() == partitioner.currArea().lheight())
+#if JVET_AI0136_ADAPTIVE_DUAL_TREE
+        && (!(bestCS->slice->getProcessingIntraRegion() && bestCS->slice->getProcessingSeparateTrees()) || bestCS->slice->isIntra())
+#endif
+      )
       {
-        if ((partitioner.chType == CHANNEL_TYPE_LUMA)
-            && ((partitioner.currArea().Y().x + 63 < bestCS->picture->lwidth())
-                && (partitioner.currArea().Y().y + 63 < bestCS->picture->lheight())))
+        if ((( partitioner.currArea().Y().x + partitioner.currArea().lheight() - 1) < bestCS->picture->lwidth())
+          && ((partitioner.currArea().Y().y + partitioner.currArea().lheight() - 1) < bestCS->picture->lheight()))
         {
-          m_modeCtrl->setNoSplitIntraCost(0.0);
+          if (partitioner.currArea().lheight() == 64)
+          {
+            m_modeCtrl->setNoSplitIntraCost64CU(0.0);
+          }
+          if (partitioner.currArea().lheight() == 32)
+          {
+            m_modeCtrl->setNoSplitIntraCost32CU(0.0);
+          }
         }
       }
 #endif 
@@ -2671,7 +2851,11 @@ void EncCu::xCheckModeSplit(CodingStructure *&tempCS, CodingStructure *&bestCS, 
       tempSubCS->bestParent = bestSubCS->bestParent = bestCS;
       double newMaxCostAllowed = isLuma(partitioner.chType) ? std::min(encTestMode.maxCostAllowed, bestCS->cost - m_pcRdCost->calcRdCost(tempCS->fracBits, tempCS->dist)) : MAX_DOUBLE;
       newMaxCostAllowed = std::max(0.0, newMaxCostAllowed);
-      xCompressCU(tempSubCS, bestSubCS, partitioner, newMaxCostAllowed);
+      xCompressCU(tempSubCS, bestSubCS, partitioner, newMaxCostAllowed
+#if JVET_AJ0226_MTT_SKIP  
+        , mttSplitFlagCabacBits
+#endif
+      );
       tempSubCS->bestParent = bestSubCS->bestParent = nullptr;
 
       if( bestSubCS->cost == MAX_DOUBLE )

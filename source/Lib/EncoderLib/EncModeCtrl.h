@@ -356,8 +356,14 @@ protected:
   InterSearch*          m_pcInterSearch;
 
   bool                  m_doPlt;
-#if JVET_AE0057_MTT_ET
-  double                m_noSplitIntraRdCost;   
+#if JVET_AJ0226_MTT_SKIP
+  double                m_noSplitIntraRdCost64CU;
+  double                m_noSplitIntraRdCost32CU;
+  int                   m_cabacBitsforBTH[4];
+  int                   m_cabacBitsforBTV[4];
+  int                   m_cabacBitsforTTH[4];
+  int                   m_cabacBitsforTTV[4];
+  int                   m_cabacBitsforQT[4];
 #endif
 
 #if JVET_AI0136_ADAPTIVE_DUAL_TREE
@@ -410,8 +416,23 @@ public:
 #if JVET_AI0087_BTCUS_RESTRICTION
   bool         isLumaNonBoundaryCu(const Partitioner& partitioner, SizeType picWidth, SizeType picHeight);
 #endif
-#if JVET_AE0057_MTT_ET
-  void         setNoSplitIntraCost  (double cost) { m_noSplitIntraRdCost = cost; }
+#if JVET_AJ0226_MTT_SKIP
+  void         setNoSplitIntraCost64CU(double cost) { m_noSplitIntraRdCost64CU = cost; }
+  void         setNoSplitIntraCost32CU  (double cost) { m_noSplitIntraRdCost32CU = cost;}
+
+  void         setBthCabacBits(int bitsCabac, int pos) { m_cabacBitsforBTH[pos]  = bitsCabac; }
+  void         setBtvCabacBits(int bitsCabac, int pos) { m_cabacBitsforBTV[pos]  = bitsCabac; }
+  void         setTthCabacBits(int bitsCabac, int pos) { m_cabacBitsforTTH[pos] = bitsCabac; }
+  void         setTtvCabacBits(int bitsCabac, int pos) { m_cabacBitsforTTV[pos] = bitsCabac; }
+  void         setQtCabacBits (int bitsCabac, int pos) { m_cabacBitsforQT[pos] = bitsCabac; }
+
+
+  int         getBthCabacBits(int pos) { return m_cabacBitsforBTH[pos] ; }
+  int         getBtvCabacBits(int pos) { return m_cabacBitsforBTV[pos] ; }
+  int         getTthCabacBits(int pos) { return m_cabacBitsforTTH[pos] ; }
+  int         getTtvCabacBits(int pos) { return m_cabacBitsforTTV[pos] ; }
+  int         getQtCabacBits (int pos)  { return m_cabacBitsforQT[pos]  ; }
+
 #endif
 #if JVET_AI0136_ADAPTIVE_DUAL_TREE
   ComprCUCtx&       getComprCUCtx    ()                      { CHECK( m_ComprCUCtxList[m_treeIdx].empty(), "Accessing empty list!"); return m_ComprCUCtxList[m_treeIdx].back(); }
@@ -516,6 +537,18 @@ public:
   bool   getStopNonDCT2Transforms     ()                  const { return m_ComprCUCtxList.back().stopNonDCT2Transforms; }
   void   setStopNonDCT2Transforms     ( bool val )              { m_ComprCUCtxList.back().stopNonDCT2Transforms = val; }
 #endif 
+
+
+#if JVET_AJ0226_MTT_SKIP 
+  void resetSplitSignalCostParams()
+  {
+    std::memset(m_cabacBitsforTTH, 0, sizeof(m_cabacBitsforTTH));
+    std::memset(m_cabacBitsforTTV, 0, sizeof(m_cabacBitsforTTV));
+    std::memset(m_cabacBitsforBTH, 0, sizeof(m_cabacBitsforBTH));
+    std::memset(m_cabacBitsforBTV, 0, sizeof(m_cabacBitsforBTV));
+    std::memset(m_cabacBitsforQT, 0, sizeof(m_cabacBitsforQT));
+  }
+#endif
 
   void setInterSearch                 (InterSearch* pcInterSearch)   { m_pcInterSearch = pcInterSearch; }
   void   setPltEnc                    ( bool b )                { m_doPlt = b; }
