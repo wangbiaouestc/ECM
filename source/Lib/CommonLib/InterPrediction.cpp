@@ -344,6 +344,9 @@ InterPrediction::InterPrediction()
 #if JVET_AG0276_NLIC
   m_skipDoLic = false;
 #endif
+#if JVET_AJ0237_INTERNAL_12BIT
+  m_dmvrCostLambda = 1;
+#endif
 }
 
 InterPrediction::~InterPrediction()
@@ -559,7 +562,11 @@ void InterPrediction::destroy()
 
 #if INTER_LIC || (TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING || JVET_Z0061_TM_OBMC
 #if JVET_Z0153_IBC_EXT_REF
+#if JVET_AJ0237_INTERNAL_12BIT
+void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, const int ctuSize, Reshape* reshape, const int picWidth, const int bitDepth)
+#else
 void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, const int ctuSize, Reshape* reshape, const int picWidth )
+#endif
 #else
 void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, const int ctuSize, Reshape* reshape )
 #endif
@@ -579,6 +586,10 @@ void InterPrediction::init( RdCost* pcRdCost, ChromaFormat chromaFormatIDC, cons
   }
 
   m_currChromaFormat = chromaFormatIDC;
+#if JVET_AJ0237_INTERNAL_12BIT
+  m_dmvrCostLambda = 1 << std::max(0, std::min(14, bitDepth) - 10); // 14 is the maximum possible DMVR internal precision value, 10 is the baseline
+#endif
+
   if( m_acYuvPred[REF_PIC_LIST_0][COMPONENT_Y] == nullptr ) // check if first is null (in which case, nothing initialised yet)
   {
 #if JVET_AF0057
@@ -13694,7 +13705,11 @@ Distortion InterPrediction::deriveBcwBlending( PredictionUnit& pu, bool bUniDir[
   blendModel.params[1] = (int)((bcwModel.params[1] + offsetA) >> shiftA);
   blendModel.params[2] = (int)((bcwModel.params[2] + offsetA) >> shiftA);
 
+#if JVET_AJ0237_INTERNAL_12BIT
+  blendModel.shift = bcwModel.decimBits - shiftA - bcwBlendingLog2WeightBase;
+#else
   blendModel.shift = CCCM_DECIM_BITS - shiftA - bcwBlendingLog2WeightBase;
+#endif
   blendModel.offset = blendModel.shift ? (1 << (blendModel.shift - 1)) : 0;
   if (blendModel.shift < 0)
   {
@@ -25556,7 +25571,11 @@ bool InterPrediction::processBDMVRPU2Dir(PredictionUnit& pu, bool subPURefine[2]
 #else
   Distortion initCost = xBDMVRGetMatchingError(pu, mvInitial_PU, bUseMR, false);
 #endif
+#if JVET_AJ0237_INTERNAL_12BIT
+  if (initCost < lumaArea * m_dmvrCostLambda)
+#else
   if (initCost < lumaArea)
+#endif
   {
     subPURefine[0] = false;
     subPURefine[1] = false;
@@ -25574,7 +25593,11 @@ bool InterPrediction::processBDMVRPU2Dir(PredictionUnit& pu, bool subPURefine[2]
 #else
   minCost = xBDMVRMvOneTemplateHPelSquareSearch<1>(mvFinal, initCost, pu, mvInitial_PU, 2, MV_FRACTIONAL_BITS_INTERNAL - 1, bUseMR, false);
 #endif
+#if JVET_AJ0237_INTERNAL_12BIT
+  subPURefine[0] = minCost >= lumaArea * m_dmvrCostLambda;
+#else
   subPURefine[0] = minCost >= lumaArea;
+#endif
   finalMvDir[0] = mvFinal[0];
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   }
@@ -25591,7 +25614,11 @@ bool InterPrediction::processBDMVRPU2Dir(PredictionUnit& pu, bool subPURefine[2]
 #else
   minCost = xBDMVRMvOneTemplateHPelSquareSearch<2>(mvFinal, initCost, pu, mvInitial_PU, 2, MV_FRACTIONAL_BITS_INTERNAL - 1, bUseMR, false);
 #endif
+#if JVET_AJ0237_INTERNAL_12BIT
+  subPURefine[1] = minCost >= lumaArea * m_dmvrCostLambda;
+#else
   subPURefine[1] = minCost >= lumaArea;
+#endif
   finalMvDir[1] = mvFinal[1];
 #if JVET_AA0093_REFINED_MOTION_FOR_ARMC
   }
@@ -25645,7 +25672,11 @@ void InterPrediction::processBDMVRSubPU(PredictionUnit& pu, bool subPURefine)
   Mv         mvFinal[2] = { pu.mv[0], pu.mv[1] };
   Mv         mvOffset;
 
+#if JVET_AJ0237_INTERNAL_12BIT
+  const Distortion earlyTerminateTh = dx * dy * m_dmvrCostLambda;
+#else
   const Distortion earlyTerminateTh = dx * dy;
+#endif
   const int adaptiveSearchRangeHor = (dx >> 1) < BDMVR_INTME_RANGE ? (dx >> 1) : BDMVR_INTME_RANGE;
   const int adaptiveSearchRangeVer = (dy >> 1) < BDMVR_INTME_RANGE ? (dy >> 1) : BDMVR_INTME_RANGE;
   const bool adaptRange = (adaptiveSearchRangeHor != BDMVR_INTME_RANGE || adaptiveSearchRangeVer != BDMVR_INTME_RANGE);
@@ -26067,7 +26098,11 @@ void InterPrediction::bmAdaptiveAffineIntSearch(const PredictionUnit &pu, Mv(&mv
   }
   else
   {
+#if JVET_AJ0237_INTERNAL_12BIT
+    bmCostShift = bitDepth > 8 ? 2 : 0;
+#else
     bmCostShift = bitDepth > 8 ? bitDepth - 8 : 0;
+#endif
   }
 #else
   bmCostShift = 0;
@@ -26498,7 +26533,11 @@ void InterPrediction::bmAffineIntSearch(const PredictionUnit &pu, Mv(&mvOffset)[
   }
   else
   {
+#if JVET_AJ0237_INTERNAL_12BIT
+    bmCostShift = bitDepth > 8 ? 2 : 0;
+#else
     bmCostShift = bitDepth > 8 ? bitDepth - 8 : 0;
+#endif
   }
 #else
   bmCostShift = 0;
@@ -26715,7 +26754,11 @@ void InterPrediction::xInitBilateralMatching(const int width, const int height, 
   }
   else
   {
+#if JVET_AJ0237_INTERNAL_12BIT
+    m_bmCostShift = bitDepth > 8 ? 2 : 0;
+#else
     m_bmCostShift = bitDepth > 8 ? bitDepth - 8 : 0;
+#endif
   }
 #else
   m_bmCostShift = 0;
@@ -27186,7 +27229,11 @@ bool InterPrediction::processBDMVR4Affine(PredictionUnit& pu
         minCost = xGetBilateralMatchingErrorAffine(pu, pu.mvAffi, true);
       }
       const int  lumaArea = pu.lumaSize().area();
+#if JVET_AJ0237_INTERNAL_12BIT
+      const bool isTooSmallDist = minCost < lumaArea * m_dmvrCostLambda;
+#else
       const bool isTooSmallDist = minCost < lumaArea;
+#endif
       if (!isTooSmallDist)
       {
         minCost = xBDMVRMv6ParameterSearchAffine(minCost, pu);
@@ -28314,7 +28361,11 @@ bool InterPrediction::processBDMVR4AdaptiveAffine(PredictionUnit& pu, Mv(&mvAffi
 #else
   bmAdaptiveAffineIntSearch(pu, mvFinalPUL0, minCostL0, mvFinalPUL1, minCostL1);
 #endif
+#if JVET_AJ0237_INTERNAL_12BIT
+  const int lumaArea = pu.lumaSize().area() * m_dmvrCostLambda;
+#else
   const int lumaArea = pu.lumaSize().area();
+#endif
 
   //  sub-pel search for L0
   if (minCostL0 > lumaArea)
@@ -28424,7 +28475,11 @@ bool InterPrediction::processBDMVR4AdaptiveAffine(PredictionUnit& pu, Mv(&mvAffi
           {
             minCostL0 = xGetBilateralMatchingErrorAffine(pu, pu.mvAffi, true);
           }
+#if JVET_AJ0237_INTERNAL_12BIT
+          const int  lumaArea = pu.lumaSize().area() * m_dmvrCostLambda;
+#else
           const int  lumaArea = pu.lumaSize().area();
+#endif
           const bool isTooSmallDist = minCostL0 < lumaArea;
           if (!isTooSmallDist)
           {
@@ -28490,7 +28545,11 @@ bool InterPrediction::processBDMVR4AdaptiveAffine(PredictionUnit& pu, Mv(&mvAffi
           {
             minCostL1 = xGetBilateralMatchingErrorAffine(pu, pu.mvAffi, true);
           }
+#if JVET_AJ0237_INTERNAL_12BIT
+          const int  lumaArea = pu.lumaSize().area() * m_dmvrCostLambda;
+#else
           const int  lumaArea = pu.lumaSize().area();
+#endif
           const bool isTooSmallDist = minCostL1 < lumaArea;
           if (!isTooSmallDist)
           {
@@ -28562,7 +28621,11 @@ bool InterPrediction::processBDMVR4AdaptiveAffine(PredictionUnit& pu, Mv(&mvAffi
           {
             minCost = xGetBilateralMatchingErrorAffine(pu, pu.mvAffi, true);
           }
+#if JVET_AJ0237_INTERNAL_12BIT
+          const int  lumaArea = pu.lumaSize().area() * m_dmvrCostLambda;
+#else
           const int  lumaArea = pu.lumaSize().area();
+#endif
           const bool isTooSmallDist = minCost < lumaArea;
           if (!isTooSmallDist)
           {
@@ -28648,7 +28711,11 @@ bool InterPrediction::processBDMVR(PredictionUnit& pu)
 #else
       minCost = xBDMVRGetMatchingError(pu, mvInitial_PU, bUseMR, false);
 #endif
+#if JVET_AJ0237_INTERNAL_12BIT
+      if (minCost >= lumaArea * m_dmvrCostLambda)
+#else
       if (minCost >= lumaArea)
+#endif
       {
 #if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
         minCost = xBDMVRMvOneTemplateHPelSquareSearch<1>(mvFinal_PU, minCost, pu, mvInitial_PU, 2, MV_FRACTIONAL_BITS_INTERNAL - 1, bUseMR, useHadmard);
@@ -28664,7 +28731,11 @@ bool InterPrediction::processBDMVR(PredictionUnit& pu)
 #else
       minCost = xBDMVRGetMatchingError(pu, mvInitial_PU, bUseMR, false);
 #endif
+#if JVET_AJ0237_INTERNAL_12BIT
+      if (minCost >= lumaArea * m_dmvrCostLambda)
+#else
       if (minCost >= lumaArea)
+#endif
       {
 #if JVET_AI0185_ADAPTIVE_COST_IN_MERGE_MODE
         minCost = xBDMVRMvOneTemplateHPelSquareSearch<2>(mvFinal_PU, minCost, pu, mvInitial_PU, 2, MV_FRACTIONAL_BITS_INTERNAL - 1, bUseMR, useHadmard);
@@ -28820,7 +28891,11 @@ bool InterPrediction::processBDMVR(PredictionUnit& pu)
     minCost = xBDMVRMvSquareSearch( mvFinal_PU, minCost, pu, mvInitial_PU, 2, MV_FRACTIONAL_BITS_INTERNAL - 1,     bUseMR, false );
 #endif
 
+#if JVET_AJ0237_INTERNAL_12BIT
+    subPURefine = minCost >= (lumaArea * m_dmvrCostLambda);
+#else
     subPURefine = minCost >= lumaArea;
+#endif
 #if JVET_AG0067_DMVR_EXTENSIONS
     pu.mv[REF_PIC_LIST_0] = (mvFinal_PU[0] - puOrgMv[0]).scaleMv(scale0) + puOrgMv[0];
     pu.mv[REF_PIC_LIST_1] = (mvFinal_PU[1] - puOrgMv[1]).scaleMv(scale1) + puOrgMv[1];
@@ -28902,7 +28977,11 @@ bool InterPrediction::processBDMVR(PredictionUnit& pu)
   Mv         mvFinal[2] = { pu.mv[0], pu.mv[1] };
   Mv         mvOffset;
 
+#if JVET_AJ0237_INTERNAL_12BIT
+  const Distortion earlyTerminateTh = dx * dy * m_dmvrCostLambda;
+#else
   const Distortion earlyTerminateTh = dx * dy;
+#endif
   const int adaptiveSearchRangeHor = (dx >> 1) < BDMVR_INTME_RANGE ? (dx >> 1) : BDMVR_INTME_RANGE;
   const int adaptiveSearchRangeVer = (dy >> 1) < BDMVR_INTME_RANGE ? (dy >> 1) : BDMVR_INTME_RANGE;
   const bool adaptRange = (adaptiveSearchRangeHor != BDMVR_INTME_RANGE || adaptiveSearchRangeVer != BDMVR_INTME_RANGE);
@@ -29791,7 +29870,11 @@ Distortion InterPrediction::xBDMVRMvIntPelFullSearch(Mv&mvOffset, Distortion cur
   }
   else
   {
+#if JVET_AJ0237_INTERNAL_12BIT
+    int32_t precisionAdj = cDistParam.bitDepth > 8 ? 2 : 0;
+#else
     int32_t precisionAdj = cDistParam.bitDepth > 8 ? cDistParam.bitDepth - 8 : 0;
+#endif
     curBestCost = cDistParam.distFunc(cDistParam) >> precisionAdj;
   }
 #else
@@ -29838,7 +29921,11 @@ Distortion InterPrediction::xBDMVRMvIntPelFullSearch(Mv&mvOffset, Distortion cur
       }
       else
       {
+#if JVET_AJ0237_INTERNAL_12BIT
+        int32_t precisionAdj = cDistParam.bitDepth > 8 ? 2 : 0;
+#else
         int32_t precisionAdj = cDistParam.bitDepth > 8 ? cDistParam.bitDepth - 8 : 0;
+#endif
         m_sadEnlargeArrayBilMrg[searchOffsetIdx] = cDistParam.distFunc(cDistParam) >> precisionAdj;
       }
 #else
@@ -30807,7 +30894,11 @@ Distortion InterPrediction::xBDMVRGetMatchingError(const PredictionUnit& pu, con
   }
   else
   {
+#if JVET_AJ0237_INTERNAL_12BIT
+    int32_t precisionAdj = cDistParam.bitDepth > 8 ? 2 : 0;
+#else
     int32_t precisionAdj = cDistParam.bitDepth > 8 ? cDistParam.bitDepth - 8 : 0;
+#endif
     return cDistParam.distFunc(cDistParam) >> precisionAdj;
   }
 #else
@@ -30973,7 +31064,11 @@ Distortion InterPrediction::xBDMVRGetMatchingError(const PredictionUnit& pu, con
   }
   else
   {
+#if JVET_AJ0237_INTERNAL_12BIT
+    int32_t precisionAdj = cDistParam.bitDepth > 8 ? 2 : 0;
+#else
     int32_t precisionAdj = cDistParam.bitDepth > 8 ? cDistParam.bitDepth - 8 : 0;
+#endif
     return cDistParam.distFunc( cDistParam ) >> precisionAdj;
   }
 #else
@@ -39203,6 +39298,10 @@ std::vector<Mv> InterPrediction::deriveMVDFromMVSDIdxAffineSI(PredictionUnit& pu
             {
               const ComponentID ch = ComponentID(chan);
 
+#if JVET_AJ0237_INTERNAL_12BIT
+              const int maxValue = (1 << slice.getSPS()->getBitDepth(toChannelType(ch))) - 1;
+#endif
+
               Pel *piTxtBuff =
                 pPadBuffYUV->getBuf(blkUnitAreaBuff)
                   .bufs[ch]
@@ -39220,7 +39319,11 @@ std::vector<Mv> InterPrediction::deriveMVDFromMVSDIdxAffineSI(PredictionUnit& pu
                   piTxtBuff[idx] += CompDiff[chan];
 
                   piTxtBuff[idx] = (piTxtBuff[idx] < 0) ? 0 : piTxtBuff[idx];
+#if JVET_AJ0237_INTERNAL_12BIT
+                  piTxtBuff[idx] = (piTxtBuff[idx] > maxValue) ? maxValue : piTxtBuff[idx];
+#else
                   piTxtBuff[idx] = (piTxtBuff[idx] > 1023) ? 1023 : piTxtBuff[idx];
+#endif
                 }
                 piTxtBuff += iStrideBuff;
                 piTmpBuff += iStrideTmp;

@@ -4667,7 +4667,11 @@ void HLSyntaxReader::parseScaleAlf( Slice* pcSlice, SPS* sps, ParameterSetManage
     {
       ScaleAlf& curScaleAlfParam = pcSlice->getAlfScale( i , j );
 
+#if JVET_AJ0237_INTERNAL_12BIT
+      curScaleAlfParam.init(apsIdx, j, alfParam.lumaClassifierIdx[j], sps->getBitDepth(CHANNEL_TYPE_LUMA));
+#else
       curScaleAlfParam.init( apsIdx, j, alfParam.lumaClassifierIdx[j] );
+#endif
       curScaleAlfParam.apsIdx = apsIdx;
 
       if ( !bReadUseAlfScale ) 
@@ -5764,7 +5768,11 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
     if (index != -1)
     {
       lambdaCanBePredicted = true;
+#if JVET_AJ0237_INTERNAL_12BIT
+      pcSlice->setCostForARMC(sps->getLambdaVal((int)index), sps->getBitDepth(CHANNEL_TYPE_LUMA));
+#else
       pcSlice->setCostForARMC(sps->getLambdaVal((int) index));
+#endif
     }
     if (!lambdaCanBePredicted)
     {
@@ -5773,7 +5781,11 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
 #else
       READ_CODE(9, uiCode, "Lambda");
 #endif
+#if JVET_AJ0237_INTERNAL_12BIT
+      pcSlice->setCostForARMC((uint32_t)uiCode, sps->getBitDepth(CHANNEL_TYPE_LUMA));
+#else
       pcSlice->setCostForARMC((uint32_t)uiCode);
+#endif
     }
   }
 #endif
@@ -5818,6 +5830,9 @@ void HLSyntaxReader::parseSliceHeader (Slice* pcSlice, PicHeader* picHeader, Par
   {
     clipDeltaShift = ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_0;
   }
+#if JVET_AJ0237_INTERNAL_12BIT
+  clipDeltaShift += std::max(0, sps->getBitDepth(toChannelType(COMPONENT_Y)) - 10);
+#endif
   if (pcSlice->getSliceType() == I_SLICE)
   {
     READ_SVLC(iCode, "clip_luma_pel_max");

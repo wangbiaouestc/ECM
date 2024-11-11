@@ -50,7 +50,11 @@ template<X86_VEXT vext >
 Distortion RdCost::xGetSSE_SIMD( const DistParam &rcDtParam )
 {
 #if DIST_SSE_ENABLE
+#if JVET_AJ0237_INTERNAL_12BIT
+  if (rcDtParam.org.width < 4 || rcDtParam.bitDepth > 12 || rcDtParam.applyWeight)
+#else
   if (rcDtParam.org.width < 4 || rcDtParam.bitDepth > 10 || rcDtParam.applyWeight)
+#endif
 #else
   if( rcDtParam.bitDepth > 10 )
 #endif
@@ -179,7 +183,11 @@ Distortion RdCost::xGetSSE_SIMD( const DistParam &rcDtParam )
 template<int iWidth, X86_VEXT vext >
 Distortion RdCost::xGetSSE_NxN_SIMD( const DistParam &rcDtParam )
 {
+#if JVET_AJ0237_INTERNAL_12BIT
+  if (rcDtParam.bitDepth > 12 || rcDtParam.applyWeight)
+#else
   if( rcDtParam.bitDepth > 10 || rcDtParam.applyWeight )
+#endif
     return RdCost::xGetSSE( rcDtParam );
 
   const Torg* pSrc1     = (const Torg*)rcDtParam.org.buf;
@@ -354,7 +362,11 @@ Distortion RdCost::xGetSSE_NxN_SIMD( const DistParam &rcDtParam )
 template<X86_VEXT vext> 
 Distortion RdCost::xGetSSE_NxN_SIMD(const DistParam &rcDtParam)
 {
+#if JVET_AJ0237_INTERNAL_12BIT
+  if (rcDtParam.bitDepth > 12 || rcDtParam.applyWeight)
+#else
   if (rcDtParam.bitDepth > 10 || rcDtParam.applyWeight)
+#endif
     return RdCost::xGetSSE(rcDtParam);
 
   const Torg *pSrc1       = (const Torg *) rcDtParam.org.buf;
@@ -500,7 +512,11 @@ Distortion RdCost::xGetSSE_NxN_SIMD(const DistParam &rcDtParam)
 template< X86_VEXT vext >
 Distortion RdCost::xGetSAD_SIMD( const DistParam &rcDtParam )
 {
+#if JVET_AJ0237_INTERNAL_12BIT
+  if (rcDtParam.org.width < 4 || rcDtParam.bitDepth > 12 || rcDtParam.applyWeight)
+#else
   if( rcDtParam.org.width < 4 || rcDtParam.bitDepth > 10 || rcDtParam.applyWeight )
+#endif
     return RdCost::xGetSAD( rcDtParam );
 
   const short* pSrc1   = (const short*)rcDtParam.org.buf;
@@ -593,7 +609,11 @@ Distortion RdCost::xGetSAD_SIMD( const DistParam &rcDtParam )
 template< X86_VEXT vext >
 Distortion RdCost::xGetSAD_IBD_SIMD(const DistParam &rcDtParam)
 {
+#if JVET_AJ0237_INTERNAL_12BIT
+  if (rcDtParam.org.width < 4 || rcDtParam.bitDepth > 12 || rcDtParam.applyWeight)
+#else
   if (rcDtParam.org.width < 4 || rcDtParam.bitDepth > 10 || rcDtParam.applyWeight)
+#endif
     return RdCost::xGetSAD(rcDtParam);
 
   const short* src0 = (const short*)rcDtParam.org.buf;
@@ -631,7 +651,11 @@ Distortion RdCost::xGetSAD_IBD_SIMD(const DistParam &rcDtParam)
 template< int iWidth, X86_VEXT vext >
 Distortion RdCost::xGetSAD_NxN_SIMD( const DistParam &rcDtParam )
 {
+#if JVET_AJ0237_INTERNAL_12BIT
+  if (rcDtParam.bitDepth > 12 || rcDtParam.applyWeight)
+#else
   if( rcDtParam.bitDepth > 10 || rcDtParam.applyWeight )
+#endif
     return RdCost::xGetSAD( rcDtParam );
 
   //  assert( rcDtParam.iCols == iWidth);
@@ -2493,7 +2517,11 @@ static uint32_t xCalcHAD8x16_AVX2( const Pel* piOrg, const Pel* piCur, const int
 template< X86_VEXT vext >
 Distortion RdCost::xGetSADwMask_SIMD( const DistParam &rcDtParam )
 {
+#if JVET_AJ0237_INTERNAL_12BIT
+  if (rcDtParam.org.width < 4 || rcDtParam.bitDepth > 12 || rcDtParam.applyWeight)
+#else
   if (rcDtParam.org.width < 4  || rcDtParam.bitDepth > 10 || rcDtParam.applyWeight)
+#endif
     return RdCost::xGetSADwMask( rcDtParam );
 
   const short* src1   = (const short*)rcDtParam.org.buf;
@@ -2583,7 +2611,11 @@ Distortion RdCost::xGetSADwMask_SIMD( const DistParam &rcDtParam )
 template<X86_VEXT vext>
 Distortion RdCost::xGetHADs_SIMD( const DistParam &rcDtParam )
 {
+#if JVET_AJ0237_INTERNAL_12BIT
+  if (rcDtParam.bitDepth > 12 || rcDtParam.applyWeight)
+#else
   if( rcDtParam.bitDepth > 10 || rcDtParam.applyWeight )
+#endif
   {
     return RdCost::xGetHADs( rcDtParam );
   }
@@ -2842,7 +2874,11 @@ Distortion RdCost::xGetMRSAD_SIMD(const DistParam &rcDtParam)
 {
   int width = rcDtParam.org.width;
 
+#if JVET_AJ0237_INTERNAL_12BIT
+  if (width < 4 || rcDtParam.bitDepth > 12 || rcDtParam.applyWeight)
+#else
   if (width < 4 || rcDtParam.bitDepth > 10 || rcDtParam.applyWeight)
+#endif
   {
     return RdCost::xGetMRSAD(rcDtParam);
   }
@@ -3056,7 +3092,11 @@ Distortion RdCost::xGetTMErrorFull_SIMD(const DistParam& rcDtParam)
 {
   if ( rcDtParam.org.width < 4
     || ( trueAfalseL && (rcDtParam.org.width & 15) ) // (Above template) multiple of 16
+#if JVET_AJ0237_INTERNAL_12BIT
+    || rcDtParam.bitDepth > 12
+#else
     || rcDtParam.bitDepth > 10
+#endif
     || rcDtParam.applyWeight
   )
   {

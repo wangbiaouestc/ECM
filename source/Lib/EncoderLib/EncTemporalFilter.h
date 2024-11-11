@@ -50,14 +50,26 @@
 struct MotionVector
 {
   int x, y;
+#if JVET_AJ0237_INTERNAL_12BIT
+  int64_t error;
+#else
   int error;
+#endif
 #if JVET_V0056
   int noise;
+#if JVET_AJ0237_INTERNAL_12BIT
+  MotionVector() : x(0), y(0), error(INT_LEAST64_MAX), noise(0) {}
+#else
   MotionVector() : x(0), y(0), error(INT_LEAST32_MAX), noise(0) {}
+#endif
 #else
   MotionVector() : x(0), y(0), error(INT_LEAST32_MAX) {}
 #endif
+#if JVET_AJ0237_INTERNAL_12BIT
+  void set(int vectorX, int vectorY, int64_t errorValue) { x = vectorX; y = vectorY; error = errorValue; }
+#else
   void set(int vectorX, int vectorY, int errorValue) { x = vectorX; y = vectorY; error = errorValue; }
+#endif
 };
 
 template <class T>
@@ -169,7 +181,11 @@ private:
 
   // Private functions
   void subsampleLuma(const PelStorage &input, PelStorage &output, const int factor = 2) const;
+#if JVET_AJ0237_INTERNAL_12BIT
+  int64_t motionErrorLuma(const PelStorage& orig, const PelStorage& buffer, const int x, const int y, int dx, int dy, const int bs, const int64_t besterror) const;
+#else
   int motionErrorLuma(const PelStorage &orig, const PelStorage &buffer, const int x, const int y, int dx, int dy, const int bs, const int besterror) const;
+#endif
   void motionEstimationLuma(Array2D<MotionVector> &mvs, const PelStorage &orig, const PelStorage &buffer, const int bs,
     const Array2D<MotionVector> *previous=0, const int factor = 1, const bool doubleRes = false) const;
   void motionEstimation(Array2D<MotionVector> &mvs, const PelStorage &orgPic, const PelStorage &buffer, const PelStorage &origSubsampled2, const PelStorage &origSubsampled4) const;

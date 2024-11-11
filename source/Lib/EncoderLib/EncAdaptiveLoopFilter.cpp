@@ -7026,7 +7026,11 @@ void EncAdaptiveLoopFilter::alfCorrection( CodingStructure& cs, const PelUnitBuf
           {
             curScaleAlfEncParam.reset();
 
+#if JVET_AJ0237_INTERNAL_12BIT
+            curScaleAlfParam.init(filterSetIndex, alt_num, classifierIdx, cs.slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA));
+#else
             curScaleAlfParam.init( filterSetIndex, alt_num, classifierIdx );
+#endif
             curScaleAlfParam.setMinMax( cs.slice->getLumaPelMin(), cs.slice->getLumaPelMax() );
 
             const int apsIdx = cs.slice->getTileGroupApsIdLuma()[filterSetIndex - NUM_FIXED_FILTER_SETS];
@@ -7036,7 +7040,11 @@ void EncAdaptiveLoopFilter::alfCorrection( CodingStructure& cs, const PelUnitBuf
           CHECK( curScaleAlfParam.classifierIdx != classifierIdx || curScaleAlfParam.filterSetIndex != filterSetIndex || curScaleAlfParam.alt_num != alt_num, "alfCorrection() failed.");
 
           char coeffBits = m_coeffBitsApsLuma[filterSetIndex - NUM_FIXED_FILTER_SETS][alt_num];
+#if JVET_AJ0237_INTERNAL_12BIT
+          const Pel currBase = 1 << (curScaleAlfParam.bitDepth - 1);
+#else
           const Pel currBase = 512; // 10-bits
+#endif
 
           if ( !bModeAnalysis )
           {
@@ -9438,7 +9446,11 @@ void EncAdaptiveLoopFilter::countLumaSwingGreaterThanThreshold(const Pel* luma, 
 void EncAdaptiveLoopFilter::countChromaSampleValueNearMidPoint(const Pel* chroma, int chromaStride, int height, int width, int log2BlockWidth, int log2BlockHeight, uint64_t* chromaSampleCountNearMidPoint, int chromaSampleCountNearMidPointStride)
 {
   const int midPoint  = (1 << m_inputBitDepth[CH_C]) >> 1;
+#if JVET_AJ0237_INTERNAL_12BIT
+  const int threshold = 16 << std::max(0, m_inputBitDepth[CH_C] - 10);
+#else
   const int threshold = 16;
+#endif
 
   for (int y = 0; y < height; y += (1 << log2BlockHeight))
   {

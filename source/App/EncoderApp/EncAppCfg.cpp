@@ -3560,6 +3560,13 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   }
 #endif
 
+#if JVET_AJ0237_INTERNAL_12BIT
+  if ((m_internalBitDepth[CHANNEL_TYPE_LUMA] > 10) && m_CCSAO && (m_iQP >= 37) && (m_sourceWidth * m_sourceHeight > 1920 * 1080))
+  {
+    m_CCSAO = false;
+  }
+#endif
+
   // check validity of input parameters
   if( xCheckParameter() )
   {

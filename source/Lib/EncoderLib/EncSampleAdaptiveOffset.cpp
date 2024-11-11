@@ -413,6 +413,9 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
     if(!cs.sps->getSAOEnabledFlag() && (cs.pps->getUseBIF() || cs.pps->getUseChromaBIF()))
     {
       bilateralFilter.create();
+#if JVET_AJ0237_INTERNAL_12BIT
+      bilateralFilter.setInternalBitDepth(cs.sps->getBitDepth(CHANNEL_TYPE_LUMA));
+#endif
       if( cs.pps->getUseBIF() )
       {
         bilateralFilter.bilateralFilterPicRDOperCTU( COMPONENT_Y, cs, src, bifCABACEstimator ); // Filters from src to res
@@ -468,6 +471,9 @@ void EncSampleAdaptiveOffset::SAOProcess( CodingStructure& cs, bool* sliceEnable
   if( cs.pps->getUseBIF() || cs.pps->getUseChromaBIF() )
   {
     bilateralFilter.create();
+#if JVET_AJ0237_INTERNAL_12BIT
+    bilateralFilter.setInternalBitDepth(cs.sps->getBitDepth(CHANNEL_TYPE_LUMA));
+#endif
     if( cs.pps->getUseBIF() )
     {
       bilateralFilter.bilateralFilterPicRDOperCTU( COMPONENT_Y, cs, src, bifCABACEstimator ); // Filters from src to res'
@@ -774,9 +780,18 @@ int64_t EncSampleAdaptiveOffset::getDistortion(const int channelBitDepth, int ty
   return dist;
 }
 
+#if JVET_AJ0237_INTERNAL_12BIT
+inline int64_t EncSampleAdaptiveOffset::estSaoDist(int64_t count, int64_t offset, int64_t diffSum, int shift, int bdShift)
+#else
 inline int64_t EncSampleAdaptiveOffset::estSaoDist(int64_t count, int64_t offset, int64_t diffSum, int shift)
+#endif
 {
+#if JVET_AJ0237_INTERNAL_12BIT
+  int64_t tmpOffset = offset << bdShift;
+  return ((count * tmpOffset * tmpOffset - diffSum * tmpOffset * 2) >> shift);
+#else
   return (( count*offset*offset-diffSum*offset*2 ) >> shift);
+#endif
 }
 
 
@@ -1154,6 +1169,9 @@ void EncSampleAdaptiveOffset::decideBlkParams(CodingStructure& cs, bool* sliceEn
 #if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
   BilateralFilter bilateralFilter;
   bilateralFilter.create();
+#if JVET_AJ0237_INTERNAL_12BIT
+  bilateralFilter.setInternalBitDepth(cs.sps->getBitDepth(CHANNEL_TYPE_LUMA));
+#endif
 #endif
   
   const TempCtx ctxPicStart ( m_ctxCache, SAOCtx( m_CABACEstimator->getCtx() ) );
@@ -3011,6 +3029,19 @@ void EncSampleAdaptiveOffset::CCSAOProcess(CodingStructure& cs, const double* la
   }
 #endif
 
+#if JVET_AJ0237_INTERNAL_12BIT
+  if (!cs.slice->isIntra() && !cs.slice->getCheckLDC() && (cs.slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA) > 10) && (cs.slice->getSliceQp() > 45) && (m_picWidth * m_picHeight <= 1920 * 1080))
+  {
+    for (int compIdx = COMPONENT_Y; compIdx < MAX_NUM_COMPONENT; compIdx++)
+    {
+      ComponentID compID = (ComponentID)compIdx;
+      m_ccSaoComParam.reset(compID);
+      memset(m_ccSaoControl[compID], 0, sizeof(uint8_t) * m_numCTUsInPic);
+    }
+    return;
+  }
+#endif
+
   PelUnitBuf orgYuv = cs.getOrgBuf(); 
   PelUnitBuf dstYuv = cs.getRecoBuf();
   PelUnitBuf srcYuv = m_ccSaoBuf.getBuf( cs.area );
@@ -3413,6 +3444,10 @@ void EncSampleAdaptiveOffset::setupInitCcSaoParam(CodingStructure& cs, const Com
   initCcSaoParam.reset();
   memset(initCcSaoControl, 0, sizeof(uint8_t) * m_numCTUsInPic);
 
+#if JVET_AJ0237_INTERNAL_12BIT
+  const int shift = 2 * DISTORTION_PRECISION_ADJUSTMENT(cs.sps->getBitDepth(CHANNEL_TYPE_LUMA));
+#endif
+
   if (setNum == 1)
   {
     std::fill_n(initCcSaoControl, m_numCTUsInPic, 1);
@@ -3432,7 +3467,11 @@ void EncSampleAdaptiveOffset::setupInitCcSaoParam(CodingStructure& cs, const Com
 #if JVET_AE0151_CCSAO_HISTORY_OFFSETS_AND_EXT_EO
       getCcSaoDistortion(compID, setIdx
                        , bestCcSaoParam.setType[setIdx] == CCSAO_SET_TYPE_BAND ? blkStats : blkStatsEdge
+#if JVET_AJ0237_INTERNAL_12BIT
+                       , bestCcSaoParam.offset, trainingDistortion, shift);
+#else
                        , bestCcSaoParam.offset, trainingDistortion);
+#endif
 #else
       if (bestCcSaoParam.setType[setIdx] == 0) /* band */
       {
@@ -3941,6 +3980,10 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(const ComponentID compID, 
   const int srcStrideTab[MAX_NUM_COMPONENT] = { srcStrideY, srcStrideU, srcStrideU };
 #endif
 
+#if JVET_AJ0237_INTERNAL_12BIT
+  const int bdShift = std::max(0, bitDepth - 10);
+#endif
+
 #if JVET_Z0105_LOOP_FILTER_VIRTUAL_BOUNDARY
   int x, y, startX, startY, endX, endY;
   int firstLineStartX, firstLineEndX;
@@ -3997,7 +4040,11 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(const ComponentID compID, 
                 const int edgeNumUni = g_ccSaoEdgeNum[edgeIdc][1];
                 for (int edgeThr = 0; edgeThr < MAX_CCSAO_EDGE_THR; edgeThr++)
                 {
+#if JVET_AJ0237_INTERNAL_12BIT
+                  const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr] << bdShift;
+#else
                   const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr];
+#endif
                   const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
                   const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
                   const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
@@ -4067,7 +4114,11 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(const ComponentID compID, 
                 const int edgeNumUni = g_ccSaoEdgeNum[edgeIdc][1];
                 for (int edgeThr = 0; edgeThr < MAX_CCSAO_EDGE_THR; edgeThr++)
                 {
+#if JVET_AJ0237_INTERNAL_12BIT
+                  const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr] << bdShift;
+#else
                   const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr];
+#endif
                   const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
                   const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
                   const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
@@ -4131,7 +4182,11 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(const ComponentID compID, 
               const int edgeNumUni = g_ccSaoEdgeNum[edgeIdc][1];
               for (int edgeThr = 0; edgeThr < MAX_CCSAO_EDGE_THR; edgeThr++)
               {
+#if JVET_AJ0237_INTERNAL_12BIT
+                const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr] << bdShift;
+#else
                 const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr];
+#endif
                 const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
                 const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
                 const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
@@ -4188,7 +4243,11 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(const ComponentID compID, 
                 const int edgeNumUni = g_ccSaoEdgeNum[edgeIdc][1];
                 for (int edgeThr = 0; edgeThr < MAX_CCSAO_EDGE_THR; edgeThr++)
                 {
+#if JVET_AJ0237_INTERNAL_12BIT
+                  const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr] << bdShift;
+#else
                   const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr];
+#endif
                   const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
                   const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
                   const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
@@ -4252,7 +4311,11 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(const ComponentID compID, 
               const int edgeNumUni = g_ccSaoEdgeNum[edgeIdc][1];
               for (int edgeThr = 0; edgeThr < MAX_CCSAO_EDGE_THR; edgeThr++)
               {
+#if JVET_AJ0237_INTERNAL_12BIT
+                const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr] << bdShift;
+#else
                 const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr];
+#endif
                 const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
                 const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
                 const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
@@ -4309,7 +4372,11 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(const ComponentID compID, 
                 const int edgeNumUni = g_ccSaoEdgeNum[edgeIdc][1];
                 for (int edgeThr = 0; edgeThr < MAX_CCSAO_EDGE_THR; edgeThr++)
                 {
+#if JVET_AJ0237_INTERNAL_12BIT
+                  const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr] << bdShift;
+#else
                   const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr];
+#endif
                   const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
                   const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
                   const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
@@ -4779,7 +4846,11 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(const ComponentID compID, 
                 const int edgeNumUni = g_ccSaoEdgeNum[edgeIdc][1];
                 for (int edgeThr = 0; edgeThr < MAX_CCSAO_EDGE_THR; edgeThr++)
                 {
+#if JVET_AJ0237_INTERNAL_12BIT
+                  const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr] << bdShift;
+#else
                   const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr];
+#endif
                   const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
                   const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
                   const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
@@ -4849,7 +4920,11 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(const ComponentID compID, 
                 const int edgeNumUni = g_ccSaoEdgeNum[edgeIdc][1];
                 for (int edgeThr = 0; edgeThr < MAX_CCSAO_EDGE_THR; edgeThr++)
                 {
+#if JVET_AJ0237_INTERNAL_12BIT
+                  const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr] << bdShift;
+#else
                   const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr];
+#endif
                   const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
                   const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
                   const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
@@ -4913,7 +4988,11 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(const ComponentID compID, 
               const int edgeNumUni = g_ccSaoEdgeNum[edgeIdc][1];
               for (int edgeThr = 0; edgeThr < MAX_CCSAO_EDGE_THR; edgeThr++)
               {
+#if JVET_AJ0237_INTERNAL_12BIT
+                const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr] << bdShift;
+#else
                 const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr];
+#endif
                 const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
                 const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
                 const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
@@ -4970,7 +5049,11 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(const ComponentID compID, 
                 const int edgeNumUni = g_ccSaoEdgeNum[edgeIdc][1];
                 for (int edgeThr = 0; edgeThr < MAX_CCSAO_EDGE_THR; edgeThr++)
                 {
+#if JVET_AJ0237_INTERNAL_12BIT
+                  const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr] << bdShift;
+#else
                   const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr];
+#endif
                   const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
                   const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
                   const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
@@ -5034,7 +5117,11 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(const ComponentID compID, 
               const int edgeNumUni = g_ccSaoEdgeNum[edgeIdc][1];
               for (int edgeThr = 0; edgeThr < MAX_CCSAO_EDGE_THR; edgeThr++)
               {
+#if JVET_AJ0237_INTERNAL_12BIT
+                const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr] << bdShift;
+#else
                 const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr];
+#endif
                 const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
                 const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
                 const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
@@ -5091,7 +5178,11 @@ void EncSampleAdaptiveOffset::getCcSaoBlkStatsEdgeNew(const ComponentID compID, 
                 const int edgeNumUni = g_ccSaoEdgeNum[edgeIdc][1];
                 for (int edgeThr = 0; edgeThr < MAX_CCSAO_EDGE_THR; edgeThr++)
                 {
+#if JVET_AJ0237_INTERNAL_12BIT
+                  const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr] << bdShift;
+#else
                   const int edgeThrVal = g_ccSaoEdgeThr[edgeIdc][edgeThr];
+#endif
                   const int edgeIdxA = getCcSaoEdgeIdx(*colE, *colA, edgeThrVal, edgeIdc);
                   const int edgeIdxB = getCcSaoEdgeIdx(*colE, *colB, edgeThrVal, edgeIdc);
                   const int edgeIdx  = edgeIdxA * edgeNumUni + edgeIdxB;
@@ -6726,14 +6817,23 @@ void EncSampleAdaptiveOffset::deriveCcSaoOffsets(const ComponentID compID, const
 {
   int quantOffsets[MAX_CCSAO_CLASS_NUM] = { 0 };
 
+#if JVET_AJ0237_INTERNAL_12BIT
+  int shift = 2 * DISTORTION_PRECISION_ADJUSTMENT(bitDepth);
+#endif
+
   for(int k = 0; k < MAX_CCSAO_CLASS_NUM; k++)
   {
     if(frameStats[setIdx].count[k] == 0)
       continue;
 
     quantOffsets[k] =
+#if JVET_AJ0237_INTERNAL_12BIT
+      (int) xRoundIbdi(bitDepth, (double)(frameStats[setIdx].diff [k] << DISTORTION_PRECISION_ADJUSTMENT(bitDepth))
+                               / (double)((int64_t)frameStats[setIdx].count[k] << m_offsetStepLog2[compID]));
+#else
       (int) xRoundIbdi(bitDepth, (double)(frameStats[setIdx].diff [k] << DISTORTION_PRECISION_ADJUSTMENT(bitDepth))
                                / (double)(frameStats[setIdx].count[k]));
+#endif
     quantOffsets[k] = Clip3(-MAX_CCSAO_OFFSET_THR, MAX_CCSAO_OFFSET_THR, quantOffsets[k]);
   }
 
@@ -6744,7 +6844,11 @@ void EncSampleAdaptiveOffset::deriveCcSaoOffsets(const ComponentID compID, const
     cost[k] = m_lambda[compID];
     if (quantOffsets[k] != 0)
     {
+#if JVET_AJ0237_INTERNAL_12BIT
+      quantOffsets[k] = estCcSaoIterOffset(m_lambda[compID], quantOffsets[k], frameStats[setIdx].count[k], frameStats[setIdx].diff[k], shift, m_offsetStepLog2[compID], dist[k], cost[k], MAX_CCSAO_OFFSET_THR);
+#else
       quantOffsets[k] = estCcSaoIterOffset(m_lambda[compID], quantOffsets[k], frameStats[setIdx].count[k], frameStats[setIdx].diff[k], 0, 0, dist[k], cost[k], MAX_CCSAO_OFFSET_THR);
+#endif
     }
   }
 
@@ -6757,7 +6861,11 @@ void EncSampleAdaptiveOffset::deriveCcSaoOffsets(const ComponentID compID, const
 
 void EncSampleAdaptiveOffset::getCcSaoDistortion(const ComponentID compID, const int setIdx, CcSaoStatData* blkStats[MAX_CCSAO_SET_NUM]
                                                , short offset[MAX_CCSAO_SET_NUM][MAX_CCSAO_CLASS_NUM]
+#if JVET_AJ0237_INTERNAL_12BIT
+                                               , int64_t* trainingDistortion[MAX_CCSAO_SET_NUM], const int shift)
+#else
                                                , int64_t* trainingDistortion[MAX_CCSAO_SET_NUM])
+#endif
 {
   ::memset(trainingDistortion[setIdx], 0, sizeof(int64_t) * m_numCTUsInPic);
 
@@ -6766,7 +6874,11 @@ void EncSampleAdaptiveOffset::getCcSaoDistortion(const ComponentID compID, const
     for (int k = 0; k < MAX_CCSAO_CLASS_NUM; k++)
     {
       trainingDistortion[setIdx][ctbIdx]
+#if JVET_AJ0237_INTERNAL_12BIT
+        += estSaoDist(blkStats[setIdx][ctbIdx].count[k], offset[setIdx][k], blkStats[setIdx][ctbIdx].diff[k], shift, m_offsetStepLog2[toChannelType(compID)]);
+#else
         += estSaoDist(blkStats[setIdx][ctbIdx].count[k], offset[setIdx][k], blkStats[setIdx][ctbIdx].diff[k], 0);
+#endif
     }
   }
 }
@@ -7064,6 +7176,10 @@ void EncSampleAdaptiveOffset::deriveCcSaoRDO(CodingStructure& cs, const Componen
 
   const TempCtx ctxStartCcSaoControlFlag  ( m_ctxCache, SubCtx( Ctx::CcSaoControlIdc, m_CABACEstimator->getCtx() ) );
 
+#if JVET_AJ0237_INTERNAL_12BIT
+  const int shift = 2 * DISTORTION_PRECISION_ADJUSTMENT(cs.sps->getBitDepth(toChannelType(compID)));
+#endif
+
   int    trainingIter = 0;
   bool   keepTraining = true;
   bool   improved = false;
@@ -7081,7 +7197,11 @@ void EncSampleAdaptiveOffset::deriveCcSaoRDO(CodingStructure& cs, const Componen
         {
           getCcSaoDistortion(compID, setIdx
                            , tempCcSaoParam.setType[setIdx] == CCSAO_SET_TYPE_BAND ? blkStats : blkStatsEdge
+#if JVET_AJ0237_INTERNAL_12BIT
+                           , tempCcSaoParam.offset, trainingDistortion, shift);
+#else
                            , tempCcSaoParam.offset, trainingDistortion);
+#endif
         }
         else
         {
@@ -7099,12 +7219,20 @@ void EncSampleAdaptiveOffset::deriveCcSaoRDO(CodingStructure& cs, const Componen
 #endif
         {
           deriveCcSaoOffsets(compID, cs.sps->getBitDepth(toChannelType(compID)), setIdx, frameStats, tempCcSaoParam.offset);
+#if JVET_AJ0237_INTERNAL_12BIT
+          getCcSaoDistortion(compID, setIdx, blkStats, tempCcSaoParam.offset, trainingDistortion, shift);
+#else
           getCcSaoDistortion(compID, setIdx, blkStats, tempCcSaoParam.offset, trainingDistortion);
+#endif
         }
         else
         {
           deriveCcSaoOffsets(compID, cs.sps->getBitDepth(toChannelType(compID)), setIdx, frameStatsEdge, tempCcSaoParam.offset);
+#if JVET_AJ0237_INTERNAL_12BIT
+          getCcSaoDistortion(compID, setIdx, blkStatsEdge, tempCcSaoParam.offset, trainingDistortion, shift);
+#else
           getCcSaoDistortion(compID, setIdx, blkStatsEdge, tempCcSaoParam.offset, trainingDistortion);
+#endif
         }
 #else
         deriveCcSaoOffsets(compID, cs.sps->getBitDepth(toChannelType(compID)), setIdx, frameStats,

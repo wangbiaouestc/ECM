@@ -2707,11 +2707,19 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
       if (index != -1)
       {
         const SPS* sps = pcSlice->getSPS();
+#if JVET_AJ0237_INTERNAL_12BIT
+        pcSlice->setCostForARMC(sps->getLambdaVal(index), sps->getBitDepth(CHANNEL_TYPE_LUMA));
+#else
         pcSlice->setCostForARMC(sps->getLambdaVal(index));
+#endif
       }
       else
       {
+#if JVET_AJ0237_INTERNAL_12BIT
+        pcSlice->setCostForARMC((uint32_t)LAMBDA_DEC_SIDE[min(max(pcSlice->getSliceQp(), 0), MAX_QP)], pcSlice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA));
+#else
         pcSlice->setCostForARMC((uint32_t) LAMBDA_DEC_SIDE[min(max(pcSlice->getSliceQp(), 0), MAX_QP)]);
+#endif
       }
 
       if (pcSlice->getCheckLDC())
@@ -2738,12 +2746,20 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
         }
         if (mindist != 1 )
         {
+#if JVET_AJ0237_INTERNAL_12BIT
+          pcSlice->setCostForARMC((uint32_t)LAMBDA_DEC_SIDE[min(max(pcSlice->getSliceQp() - 4, 0), MAX_QP)], pcSlice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA));
+#else
           pcSlice->setCostForARMC((uint32_t) LAMBDA_DEC_SIDE[min(max(pcSlice->getSliceQp() - 4, 0), MAX_QP)]);
+#endif
         }
       }
       else
       {
+#if JVET_AJ0237_INTERNAL_12BIT
+        pcSlice->setCostForARMC((uint32_t)LAMBDA_DEC_SIDE[min(max(pcSlice->getSliceQp() - 4, 0), MAX_QP)], pcSlice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA));
+#else
         pcSlice->setCostForARMC((uint32_t) LAMBDA_DEC_SIDE[min(max(pcSlice->getSliceQp() - 4, 0), MAX_QP)]);
+#endif
       }
     }
 #endif
@@ -3795,6 +3811,9 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
         if ( saoSize.width != picWidth || saoSize.height != picHeight ) 
         {
           m_pcSAO->create(picWidth, picHeight, chromaFormatIDC, maxCUWidth, maxCUHeight, maxTotalCUDepth, log2SaoOffsetScaleLuma, log2SaoOffsetScaleChroma);
+#if JVET_AJ0237_INTERNAL_12BIT
+          m_pcSAO->m_bilateralFilter.setInternalBitDepth(pcSlice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA));
+#endif
           m_pcSAO->setReshaper(m_pcReshaper);
         }
 
@@ -4837,8 +4856,13 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
 #endif
     pcPic->cs->destroyTemporaryCsData();
 #if JVET_AA0096_MC_BOUNDARY_PADDING
+#if JVET_AJ0237_INTERNAL_12BIT
+    m_pcFrameMcPadPrediction->init(m_pcEncLib->getRdCost(), pcSlice->getSPS()->getChromaFormatIdc(),
+                                   pcSlice->getSPS()->getMaxCUHeight(), NULL, pcPic->getPicWidthInLumaSamples(), pcSlice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA));
+#else
     m_pcFrameMcPadPrediction->init(m_pcEncLib->getRdCost(), pcSlice->getSPS()->getChromaFormatIdc(),
                                    pcSlice->getSPS()->getMaxCUHeight(), NULL, pcPic->getPicWidthInLumaSamples());
+#endif
     m_pcFrameMcPadPrediction->mcFramePad(pcPic, *(pcPic->slices[0]));
     m_pcFrameMcPadPrediction->destroy();
 #endif

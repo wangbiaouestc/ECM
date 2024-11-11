@@ -3569,7 +3569,11 @@ void HLSWriter::codeSliceHeader         ( Slice* pcSlice )
     bool lambdaCanBePredicted = false;
     if (index !=-1)
     {
+#if JVET_AJ0237_INTERNAL_12BIT
+      if (pcSlice->getSPS()->getLambdaVal(index) == pcSlice->getCostForARMC(pcSlice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)))
+#else
       if(pcSlice->getSPS()->getLambdaVal(index) == pcSlice->getCostForARMC())
+#endif
       {
         lambdaCanBePredicted = true;
       }
@@ -3577,7 +3581,11 @@ void HLSWriter::codeSliceHeader         ( Slice* pcSlice )
     if (!lambdaCanBePredicted)
     {
 #if JVET_AB0082
+#if JVET_AJ0237_INTERNAL_12BIT
+      WRITE_CODE(pcSlice->getCostForARMC(pcSlice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)), 10, "Lambda");
+#else
       WRITE_CODE(pcSlice->getCostForARMC(), 10, "Lambda");
+#endif
 #else
       WRITE_CODE(pcSlice->getCostForARMC(), 9, "Lambda");
 #endif
@@ -3613,6 +3621,9 @@ void HLSWriter::codeSliceHeader         ( Slice* pcSlice )
   {
     clipDeltaShift = ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_0;
   }
+#if JVET_AJ0237_INTERNAL_12BIT
+  clipDeltaShift += std::max(0, pcSlice->getSPS()->getBitDepth(toChannelType(COMPONENT_Y)) - 10);
+#endif
   if (pcSlice->getSliceType() == I_SLICE)
   {
 #if JVET_AI0096_ADAPTIVE_CLIPPING_BIT_DEPTH_FIX

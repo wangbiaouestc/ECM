@@ -3907,7 +3907,11 @@ void getAbsoluteDifferencePerSample_SSE(Pel* dst, int dstStride, const Pel* src0
 template <X86_VEXT vext, uint8_t maskType>
 int64_t getMaskedSampleSum_SSE(Pel* src, int srcStride, int width, int height, int bitDepth, short* weightMask, int maskStepX, int maskStride, int maskStride2)
 {
+#if JVET_AJ0237_INTERNAL_12BIT
+  if ((width & 7) != 0 || bitDepth > 12)
+#else
   if ((width & 7) != 0  || bitDepth > 10)
+#endif
   {
     return getMaskedSampleSumCore<maskType>(src, srcStride, width, height, bitDepth, weightMask, maskStepX, maskStride, maskStride2);
   }

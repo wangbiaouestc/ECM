@@ -494,7 +494,11 @@ void InterSearch::init( EncCfg*        pcEncCfg,
   const ChromaFormat cform = pcEncCfg->getChromaFormatIdc();
 #if INTER_LIC || (TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM) || JVET_W0090_ARMC_TM || JVET_Z0056_GPM_SPLIT_MODE_REORDERING
 #if JVET_Z0153_IBC_EXT_REF
+#if JVET_AJ0237_INTERNAL_12BIT
+  InterPrediction::init(pcRdCost, cform, maxCUHeight, m_pcReshape, curPicWidthY, pcEncCfg->getBitDepth(CHANNEL_TYPE_LUMA));
+#else
   InterPrediction::init( pcRdCost, cform, maxCUHeight, m_pcReshape, curPicWidthY );
+#endif
 #else
   InterPrediction::init( pcRdCost, cform, maxCUHeight, m_pcReshape );
 #endif

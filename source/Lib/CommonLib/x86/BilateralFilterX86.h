@@ -48,7 +48,11 @@
 #if USE_AVX2
 
 #if JVET_AF0112_BIF_DYNAMIC_SCALING
+#if JVET_AJ0237_INTERNAL_12BIT
+inline void simdBifApplyLut(__m256i& val, __m256i& acc, int cutBitsNum, __m256i& bitsRound, __m256i& bitsRound2, __m256i& lut, int bdShift)
+#else
 inline void simdBifApplyLut(__m256i& val, __m256i& acc, int cutBitsNum, __m256i& bitsRound, __m256i& bitsRound2, __m256i& lut)
+#endif
 #else
 inline void simdBifApplyLut(__m256i& val, __m256i& acc, __m256i& lut, int lutShift)
 #endif
@@ -75,21 +79,38 @@ inline void simdBifApplyLut(__m256i& val, __m256i& acc, __m256i& lut, int lutShi
   diffabs = _mm256_cvtepi8_epi16(_mm256_castsi256_si128(diffabs)); /* back to 16-bit */
   diffabs = _mm256_srai_epi16(diffabs, lutShift); /* diagonal shift! */
 #endif
+#if JVET_AJ0237_INTERNAL_12BIT
+  diffabs = _mm256_slli_epi16(diffabs, bdShift);
+#endif
   diffabs = _mm256_sign_epi16(diffabs, val); /* add original sign */
   acc = _mm256_add_epi16(diffabs, acc); /* add to acc */
 }
 
+#if JVET_AJ0237_INTERNAL_12BIT
+template<X86_VEXT vext>
+void BilateralFilter::simdFilterDiamond5x5(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bifRoundAdd, int bifRoundShift, bool isRDO, const char* lutRowPtr, bool noClip, int cutBitsNum, int bdShift)
+#else
 template<X86_VEXT vext>
 void BilateralFilter::simdFilterDiamond5x5(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bifRoundAdd, int bifRoundShift, bool isRDO, const char* lutRowPtr, bool noClip, int cutBitsNum)
+#endif
 {
   //if( uiWidth < 4 || ( uiWidth < 8 && isRDO ) )
   if (uiWidth < 4)
   {
+#if JVET_AJ0237_INTERNAL_12BIT
+    return blockBilateralFilterDiamond5x5(uiWidth, uiHeight, block, blkFilt, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, isRDO, lutRowPtr, noClip, cutBitsNum, bdShift);
+#else
     return blockBilateralFilterDiamond5x5(uiWidth, uiHeight, block, blkFilt, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, isRDO, lutRowPtr, noClip, cutBitsNum);
+#endif
   }
 
   int pad = 2;
   int padwidth = iWidthExtSIMD;
+
+#if JVET_AJ0237_INTERNAL_12BIT
+  cutBitsNum += bdShift;
+#endif
+
 
   __m256i center, left, right, up, down, lu, ld, ru, rd, acc, roundAdd, clipmin, clipmax, inputVals;
   __m256i ll, rr, uu, dd;
@@ -106,7 +127,11 @@ void BilateralFilter::simdFilterDiamond5x5(uint32_t uiWidth, uint32_t uiHeight, 
   __m256i lut2 = _mm256_set_m128i(lutTmp, lutTmp);
   lutTmp = _mm_loadu_si128((__m128i*)(lutRowPtr + 32));
   __m256i lut3 = _mm256_set_m128i(lutTmp, lutTmp);
+#if JVET_AJ0237_INTERNAL_12BIT
+  __m256i mmBfac = _mm256_unpacklo_epi16(_mm256_set1_epi16(bfac), _mm256_set1_epi16(1));
+#else
   __m256i mmBfac = _mm256_set1_epi16(bfac);
+#endif
   roundAdd = _mm256_set1_epi16(bifRoundAdd << 3);
   __m256i bitsRound = _mm256_set1_epi16(1 << (cutBitsNum - 2));
   __m256i bitsRound2 = _mm256_set1_epi16((1 << (cutBitsNum - 2)) + (1 << (cutBitsNum - 1)));
@@ -160,6 +185,22 @@ void BilateralFilter::simdFilterDiamond5x5(uint32_t uiWidth, uint32_t uiHeight, 
 
       // apply LUT
 #if JVET_AF0112_BIF_DYNAMIC_SCALING
+#if JVET_AJ0237_INTERNAL_12BIT
+      simdBifApplyLut(left, acc, cutBitsNum, bitsRound, bitsRound2, lut1, bdShift);
+      simdBifApplyLut(right, acc, cutBitsNum, bitsRound, bitsRound2, lut1, bdShift);
+      simdBifApplyLut(up, acc, cutBitsNum, bitsRound, bitsRound2, lut1, bdShift);
+      simdBifApplyLut(down, acc, cutBitsNum, bitsRound, bitsRound2, lut1, bdShift);
+
+      simdBifApplyLut(lu, acc, cutBitsNum, bitsRound, bitsRound2, lut2, bdShift);
+      simdBifApplyLut(ld, acc, cutBitsNum, bitsRound, bitsRound2, lut2, bdShift);
+      simdBifApplyLut(ru, acc, cutBitsNum, bitsRound, bitsRound2, lut2, bdShift);
+      simdBifApplyLut(rd, acc, cutBitsNum, bitsRound, bitsRound2, lut2, bdShift);
+
+      simdBifApplyLut(ll, acc, cutBitsNum, bitsRound, bitsRound2, lut3, bdShift);
+      simdBifApplyLut(rr, acc, cutBitsNum, bitsRound, bitsRound2, lut3, bdShift);
+      simdBifApplyLut(uu, acc, cutBitsNum, bitsRound, bitsRound2, lut3, bdShift);
+      simdBifApplyLut(dd, acc, cutBitsNum, bitsRound, bitsRound2, lut3, bdShift);
+#else
       simdBifApplyLut(left, acc, cutBitsNum, bitsRound, bitsRound2, lut1);
       simdBifApplyLut(right, acc, cutBitsNum, bitsRound, bitsRound2, lut1);
       simdBifApplyLut(up, acc, cutBitsNum, bitsRound, bitsRound2, lut1);
@@ -174,6 +215,7 @@ void BilateralFilter::simdFilterDiamond5x5(uint32_t uiWidth, uint32_t uiHeight, 
       simdBifApplyLut(rr, acc, cutBitsNum, bitsRound, bitsRound2, lut3);
       simdBifApplyLut(uu, acc, cutBitsNum, bitsRound, bitsRound2, lut3);
       simdBifApplyLut(dd, acc, cutBitsNum, bitsRound, bitsRound2, lut3);
+#endif
 #else
       simdBifApplyLut(left, acc, lut, lutShift1);
       simdBifApplyLut(right, acc, lut, lutShift1);
@@ -193,9 +235,21 @@ void BilateralFilter::simdFilterDiamond5x5(uint32_t uiWidth, uint32_t uiHeight, 
 
       // TU scaling
 #if JVET_AF0112_BIF_DYNAMIC_SCALING
+#if JVET_AJ0237_INTERNAL_12BIT
+      __m256i accLow  = _mm256_unpacklo_epi16(acc, roundAdd);
+      __m256i accHigh = _mm256_unpackhi_epi16(acc, roundAdd);
+      __m256i accLowPack = _mm256_madd_epi16(accLow, mmBfac);
+      __m256i accHighPack = _mm256_madd_epi16(accHigh, mmBfac);
+
+      accLow = _mm256_srai_epi32(accLowPack, bifRoundShift + 3);
+      accHigh = _mm256_srai_epi32(accHighPack, bifRoundShift + 3);
+
+      acc = _mm256_packs_epi32(accLow, accHigh);
+#else
       acc = _mm256_mullo_epi16(acc, mmBfac);
       acc = _mm256_adds_epi16(acc, roundAdd);
       acc = _mm256_srai_epi16(acc, bifRoundShift + 3);
+#endif
 #else
       if (bfac == 2)
       {
@@ -293,7 +347,11 @@ int BilateralFilter::simdCalcMAD(int16_t* block, int stride, int width, int heig
 #else // USE_AVX2
 
 #if JVET_AF0112_BIF_DYNAMIC_SCALING
+#if JVET_AJ0237_INTERNAL_12BIT
+inline void simdBifApplyLut(__m128i& val, __m128i& acc, int cutBitsNum, __m128i& bitsRound, __m128i& bitsRound2, __m128i& lut, int bdShift)
+#else
 inline void simdBifApplyLut(__m128i& val, __m128i& acc, int cutBitsNum, __m128i& bitsRound, __m128i& bitsRound2, __m128i& lut)
+#endif
 #else
 inline void simdBifApplyLut(__m128i& val, __m128i& acc, __m128i& lut, int lutShift)
 #endif
@@ -319,21 +377,37 @@ inline void simdBifApplyLut(__m128i& val, __m128i& acc, __m128i& lut, int lutShi
   diffabs = _mm_cvtepi8_epi16(diffabs); /* back to 16-bit */
   diffabs = _mm_srai_epi16(diffabs, lutShift); /* diagonal shift! */
 #endif
+#if JVET_AJ0237_INTERNAL_12BIT
+  diffabs = _mm_slli_epi16(diffabs, bdShift);
+#endif
   diffabs = _mm_sign_epi16(diffabs, val); /* add original sign */
   acc = _mm_add_epi16(diffabs, acc); /* add to acc */
 }
 
+#if JVET_AJ0237_INTERNAL_12BIT
+template<X86_VEXT vext>
+void BilateralFilter::simdFilterDiamond5x5(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bifRoundAdd, int bifRoundShift, bool isRDO, const char* lutRowPtr, bool noClip, int cutBitsNum, int bdShift)
+#else
 template<X86_VEXT vext>
 void BilateralFilter::simdFilterDiamond5x5(uint32_t uiWidth, uint32_t uiHeight, int16_t block[], int16_t blkFilt[], const ClpRng& clpRng, Pel* recPtr, int recStride, int iWidthExtSIMD, int bfac, int bifRoundAdd, int bifRoundShift, bool isRDO, const char* lutRowPtr, bool noClip, int cutBitsNum)
+#endif
 {
   //if( uiWidth < 4 || ( uiWidth < 8 && isRDO ) )
   if( uiWidth < 4 )
   {
+#if JVET_AJ0237_INTERNAL_12BIT
+    return blockBilateralFilterDiamond5x5(uiWidth, uiHeight, block, blkFilt, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, isRDO, lutRowPtr, noClip, cutBitsNum, bdShift);
+#else
     return blockBilateralFilterDiamond5x5(uiWidth, uiHeight, block, blkFilt, clpRng, recPtr, recStride, iWidthExtSIMD, bfac, bifRoundAdd, bifRoundShift, isRDO, lutRowPtr, noClip, cutBitsNum);
+#endif
   }
 
   int pad = 2;
   int padwidth = iWidthExtSIMD;
+
+#if JVET_AJ0237_INTERNAL_12BIT
+  cutBitsNum += bdShift;
+#endif
 
   __m128i center, left, right, up, down, lu, ld, ru, rd, acc, roundAdd, clipmin, clipmax, inputVals;
   __m128i ll, rr, uu, dd;
@@ -346,7 +420,11 @@ void BilateralFilter::simdFilterDiamond5x5(uint32_t uiWidth, uint32_t uiHeight, 
   __m128i lut1 = _mm_loadu_si128((__m128i*)(lutRowPtr));
   __m128i lut2 = _mm_loadu_si128((__m128i*)(lutRowPtr + 16));
   __m128i lut3 = _mm_loadu_si128((__m128i*)(lutRowPtr + 32));
+#if JVET_AJ0237_INTERNAL_12BIT
+  __m128i mmBfac = _mm_unpacklo_epi16(_mm_set1_epi16(bfac), _mm_set1_epi16(1));
+#else
   __m128i mmBfac = _mm_set1_epi16(bfac);
+#endif
   roundAdd = _mm_set1_epi16(bifRoundAdd << 3);
   __m128i bitsRound = _mm_set1_epi16(1 << (cutBitsNum - 2));
   __m128i bitsRound2 = _mm_set1_epi16((1 << (cutBitsNum - 2)) + (1 << (cutBitsNum - 1)));
@@ -399,6 +477,22 @@ void BilateralFilter::simdFilterDiamond5x5(uint32_t uiWidth, uint32_t uiHeight, 
       
       // apply LUT
 #if JVET_AF0112_BIF_DYNAMIC_SCALING
+#if JVET_AJ0237_INTERNAL_12BIT
+      simdBifApplyLut(left, acc, cutBitsNum, bitsRound, bitsRound2, lut1, bdShift);
+      simdBifApplyLut(right, acc, cutBitsNum, bitsRound, bitsRound2, lut1, bdShift);
+      simdBifApplyLut(up, acc, cutBitsNum, bitsRound, bitsRound2, lut1, bdShift);
+      simdBifApplyLut(down, acc, cutBitsNum, bitsRound, bitsRound2, lut1, bdShift);
+
+      simdBifApplyLut(lu, acc, cutBitsNum, bitsRound, bitsRound2, lut2, bdShift);
+      simdBifApplyLut(ld, acc, cutBitsNum, bitsRound, bitsRound2, lut2, bdShift);
+      simdBifApplyLut(ru, acc, cutBitsNum, bitsRound, bitsRound2, lut2, bdShift);
+      simdBifApplyLut(rd, acc, cutBitsNum, bitsRound, bitsRound2, lut2, bdShift);
+
+      simdBifApplyLut(ll, acc, cutBitsNum, bitsRound, bitsRound2, lut3, bdShift);
+      simdBifApplyLut(rr, acc, cutBitsNum, bitsRound, bitsRound2, lut3, bdShift);
+      simdBifApplyLut(uu, acc, cutBitsNum, bitsRound, bitsRound2, lut3, bdShift);
+      simdBifApplyLut(dd, acc, cutBitsNum, bitsRound, bitsRound2, lut3, bdShift);
+#else
       simdBifApplyLut(left, acc, cutBitsNum, bitsRound, bitsRound2, lut1);
       simdBifApplyLut(right, acc, cutBitsNum, bitsRound, bitsRound2, lut1);
       simdBifApplyLut(up, acc, cutBitsNum, bitsRound, bitsRound2, lut1);
@@ -413,6 +507,7 @@ void BilateralFilter::simdFilterDiamond5x5(uint32_t uiWidth, uint32_t uiHeight, 
       simdBifApplyLut(rr, acc, cutBitsNum, bitsRound, bitsRound2, lut3);
       simdBifApplyLut(uu, acc, cutBitsNum, bitsRound, bitsRound2, lut3);
       simdBifApplyLut(dd, acc, cutBitsNum, bitsRound, bitsRound2, lut3);
+#endif
 #else
       simdBifApplyLut(left, acc, lut, lutShift1);
       simdBifApplyLut(right, acc, lut, lutShift1);
@@ -432,9 +527,21 @@ void BilateralFilter::simdFilterDiamond5x5(uint32_t uiWidth, uint32_t uiHeight, 
       
       // TU scaling
 #if JVET_AF0112_BIF_DYNAMIC_SCALING
+#if JVET_AJ0237_INTERNAL_12BIT
+      __m128i accLow  = _mm_unpacklo_epi16(acc, roundAdd);
+      __m128i accHigh = _mm_unpackhi_epi16(acc, roundAdd);
+      __m128i accLowPack = _mm_madd_epi16(accLow, mmBfac);
+      __m128i accHighPack = _mm_madd_epi16(accHigh, mmBfac);
+
+      accLow = _mm_srai_epi32(accLowPack, bifRoundShift + 3);
+      accHigh = _mm_srai_epi32(accHighPack, bifRoundShift + 3);
+
+      acc = _mm_packs_epi32(accLow, accHigh);
+#else
       acc = _mm_mullo_epi16(acc, mmBfac);
       acc = _mm_adds_epi16(acc, roundAdd);
       acc = _mm_srai_epi16(acc, bifRoundShift + 3);
+#endif
 #else
       if (bfac == 2)
       {

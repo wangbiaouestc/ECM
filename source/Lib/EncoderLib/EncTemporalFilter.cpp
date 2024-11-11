@@ -349,6 +349,16 @@ void EncTemporalFilter::subsampleLuma(const PelStorage &input, PelStorage &outpu
   output.extendBorderPel(m_padding, m_padding);
 }
 
+#if JVET_AJ0237_INTERNAL_12BIT
+int64_t EncTemporalFilter::motionErrorLuma(const PelStorage& orig,
+  const PelStorage& buffer,
+  const int x,
+  const int y,
+  int dx,
+  int dy,
+  const int bs,
+  const int64_t besterror) const
+#else
 int EncTemporalFilter::motionErrorLuma(const PelStorage &orig,
   const PelStorage &buffer,
   const int x,
@@ -357,13 +367,18 @@ int EncTemporalFilter::motionErrorLuma(const PelStorage &orig,
   int dy,
   const int bs,
   const int besterror = 8 * 8 * 1024 * 1024) const
+#endif
 {
   const Pel* origOrigin = orig.Y().buf;
   const int  origStride = orig.Y().stride;
   const Pel* buffOrigin = buffer.Y().buf;
   const int  buffStride = buffer.Y().stride;
 
+#if JVET_AJ0237_INTERNAL_12BIT
+  int64_t error = 0;
+#else
   int error = 0;
+#endif
   if (((dx | dy) & 0xF) == 0)
   {
     dx /= m_motionVectorFactor;
@@ -454,6 +469,12 @@ void EncTemporalFilter::motionEstimationLuma(Array2D<MotionVector> &mvs, const P
   const int origWidth  = orig.Y().width;
   const int origHeight = orig.Y().height;
 
+#if JVET_AJ0237_INTERNAL_12BIT
+  const int bitShift = 2 * (16 - m_internalBitDepth[CHANNEL_TYPE_LUMA]);
+  const int denorm = 204800 / (1 << bitShift);
+  const double offset = 20480 / (1 << bitShift);
+#endif
+
 #if JVET_V0056
   for (int blockY = 0; blockY + blockSize <= origHeight; blockY += stepSize)
   {
@@ -489,7 +510,11 @@ void EncTemporalFilter::motionEstimationLuma(Array2D<MotionVector> &mvs, const P
             if ((testx >= 0) && (testx < origWidth / (2 * blockSize)) && (testy >= 0) && (testy < origHeight / (2 * blockSize)))
             {
               MotionVector old = previous->get(testx, testy);
+#if JVET_AJ0237_INTERNAL_12BIT
+              int64_t error = motionErrorLuma(orig, buffer, blockX, blockY, old.x * factor, old.y * factor, blockSize, best.error);
+#else
               int error = motionErrorLuma(orig, buffer, blockX, blockY, old.x * factor, old.y * factor, blockSize, best.error);
+#endif
               if (error < best.error)
               {
                 best.set(old.x * factor, old.y * factor, error);
@@ -498,7 +523,11 @@ void EncTemporalFilter::motionEstimationLuma(Array2D<MotionVector> &mvs, const P
           }
         }
 #if JVET_V0056
+#if JVET_AJ0237_INTERNAL_12BIT
+        int64_t error = motionErrorLuma(orig, buffer, blockX, blockY, 0, 0, blockSize, best.error);
+#else
         int error = motionErrorLuma(orig, buffer, blockX, blockY, 0, 0, blockSize, best.error);
+#endif
         if (error < best.error)
         {
           best.set(0, 0, error);
@@ -510,7 +539,11 @@ void EncTemporalFilter::motionEstimationLuma(Array2D<MotionVector> &mvs, const P
       {
         for (int x2 = prevBest.x / m_motionVectorFactor - range; x2 <= prevBest.x / m_motionVectorFactor + range; x2++)
         {
+#if JVET_AJ0237_INTERNAL_12BIT
+          int64_t error = motionErrorLuma(orig, buffer, blockX, blockY, x2 * m_motionVectorFactor, y2 * m_motionVectorFactor, blockSize, best.error);
+#else
           int error = motionErrorLuma(orig, buffer, blockX, blockY, x2 * m_motionVectorFactor, y2 * m_motionVectorFactor, blockSize, best.error);
+#endif
           if (error < best.error)
           {
             best.set(x2 * m_motionVectorFactor, y2 * m_motionVectorFactor, error);
@@ -525,7 +558,11 @@ void EncTemporalFilter::motionEstimationLuma(Array2D<MotionVector> &mvs, const P
         {
           for (int x2 = prevBest.x - doubleRange; x2 <= prevBest.x + doubleRange; x2 += 4)
           {
+#if JVET_AJ0237_INTERNAL_12BIT
+            int64_t error = motionErrorLuma(orig, buffer, blockX, blockY, x2, y2, blockSize, best.error);
+#else
             int error = motionErrorLuma(orig, buffer, blockX, blockY, x2, y2, blockSize, best.error);
+#endif
             if (error < best.error)
             {
               best.set(x2, y2, error);
@@ -539,7 +576,11 @@ void EncTemporalFilter::motionEstimationLuma(Array2D<MotionVector> &mvs, const P
         {
           for (int x2 = prevBest.x - doubleRange; x2 <= prevBest.x + doubleRange; x2++)
           {
+#if JVET_AJ0237_INTERNAL_12BIT
+            int64_t error = motionErrorLuma(orig, buffer, blockX, blockY, x2, y2, blockSize, best.error);
+#else
             int error = motionErrorLuma(orig, buffer, blockX, blockY, x2, y2, blockSize, best.error);
+#endif
             if (error < best.error)
             {
               best.set(x2, y2, error);
@@ -552,7 +593,11 @@ void EncTemporalFilter::motionEstimationLuma(Array2D<MotionVector> &mvs, const P
       if (blockY > 0)
       {
         MotionVector aboveMV = mvs.get(blockX / stepSize, (blockY - stepSize) / stepSize);
+#if JVET_AJ0237_INTERNAL_12BIT
+        int64_t error = motionErrorLuma(orig, buffer, blockX, blockY, aboveMV.x, aboveMV.y, blockSize, best.error);
+#else
         int error = motionErrorLuma(orig, buffer, blockX, blockY, aboveMV.x, aboveMV.y, blockSize, best.error);
+#endif
         if (error < best.error)
         {
           best.set(aboveMV.x, aboveMV.y, error);
@@ -561,7 +606,11 @@ void EncTemporalFilter::motionEstimationLuma(Array2D<MotionVector> &mvs, const P
       if (blockX > 0)
       {
         MotionVector leftMV = mvs.get((blockX - stepSize) / stepSize, blockY / stepSize);
+#if JVET_AJ0237_INTERNAL_12BIT
+        int64_t error = motionErrorLuma(orig, buffer, blockX, blockY, leftMV.x, leftMV.y, blockSize, best.error);
+#else
         int error = motionErrorLuma(orig, buffer, blockX, blockY, leftMV.x, leftMV.y, blockSize, best.error);
+#endif
         if (error < best.error)
         {
           best.set(leftMV.x, leftMV.y, error);
@@ -589,7 +638,11 @@ void EncTemporalFilter::motionEstimationLuma(Array2D<MotionVector> &mvs, const P
           variance = variance + (pix - avg) * (pix - avg);
         }
       }
+#if JVET_AJ0237_INTERNAL_12BIT
+      best.error = (int)(20 * ((best.error + offset) / (variance + offset)) + (best.error / (blockSize * blockSize)) / denorm);
+#else
       best.error = (int)(20 * ((best.error + 5.0) / (variance + 5.0)) + (best.error / (blockSize * blockSize)) / 50);
+#endif
 #endif
       mvs.get(blockX / stepSize, blockY / stepSize) = best;
     }
@@ -731,6 +784,12 @@ void EncTemporalFilter::bilateralFilter(const PelStorage &orgPic,
     const double weightScaling = overallStrength * (isChroma(compID) ? m_chromaFactor : 0.4);
     const Pel maxSampleValue   = (1 << m_internalBitDepth[toChannelType(compID)]) - 1;
     const double bitDepthDiffWeighting = 1024.0 / (maxSampleValue + 1);
+
+#if JVET_AJ0237_INTERNAL_12BIT
+    const int bitShift = 2 * (16 - m_internalBitDepth[toChannelType(compID)]);
+    const double offset = 20480 / (1 << bitShift);
+#endif
+
 #if JVET_V0056
     const int lumaBlockSize = 8;
     const int csx = getComponentScaleX(compID, m_chromaFormatIDC);
@@ -783,7 +842,11 @@ void EncTemporalFilter::bilateralFilter(const PelStorage &orgPic,
             const int cntV = blockSizeX * blockSizeY;
             const int cntD = 2 * cntV - blockSizeX - blockSizeY;
             srcFrameInfo[i].mvs.get( x / blockSizeX, y / blockSizeY ).noise =
+#if JVET_AJ0237_INTERNAL_12BIT
+              ( int ) round( (15.0 * cntD / cntV * variance + offset) / (diffsum + offset) );
+#else
               ( int ) round( (15.0 * cntD / cntV * variance + 5.0) / (diffsum + 5.0) );
+#endif
           }
         }
         double minError = 9999999;
@@ -795,7 +858,11 @@ void EncTemporalFilter::bilateralFilter(const PelStorage &orgPic,
         for (int i = 0; i < numRefs; i++)
         {
 #if JVET_V0056
+#if JVET_AJ0237_INTERNAL_12BIT
+          const int64_t error = srcFrameInfo[i].mvs.get(x / blockSizeX, y / blockSizeY).error;
+#else
           const int error = srcFrameInfo[i].mvs.get(x / blockSizeX, y / blockSizeY).error;
+#endif
           const int noise = srcFrameInfo[i].mvs.get(x / blockSizeX, y / blockSizeY).noise;
 #endif
           const Pel* pCorrectedPelPtr = srcFrameInfo[i].picBuffer.bufs[c].buf + (y * srcFrameInfo[i].picBuffer.bufs[c].stride + x);

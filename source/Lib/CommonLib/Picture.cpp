@@ -1810,6 +1810,9 @@ void Picture::calcLumaClpParams()
     clipDeltaShift = ADAPTIVE_CLIP_SHIFT_DELTA_VALUE_0;
     cs->slice->setAdaptiveClipQuant(false);
   }
+#if JVET_AJ0237_INTERNAL_12BIT
+  clipDeltaShift += std::max(0, cs->sps->getBitDepth(toChannelType(COMPONENT_Y)) - 10);
+#endif
   int       pelMaxOF  = 0;
   int       pelMinOF  = (1 << cs->sps->getBitDepth(toChannelType(COMPONENT_Y))) - 1;
   const int orgPelMin = pelMin;

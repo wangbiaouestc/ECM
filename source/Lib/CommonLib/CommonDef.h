@@ -1297,6 +1297,10 @@ static const int CCCM_MAX_REF_SAMPLES     = 4 * ( 2 * CCCM_WINDOW_SIZE * ( 2 * M
 #else
 static const int CCCM_MAX_REF_SAMPLES     = ( 2 * CCCM_WINDOW_SIZE * ( 2 * MAX_CU_SIZE + CCCM_WINDOW_SIZE ) );
 #endif
+#if JVET_AJ0237_INTERNAL_12BIT
+static const int CCCM_MATRIX_BITS_HBD     = 32;
+static const int CCCM_DECIM_BITS_HBD      = 22;
+#endif
 #if JVET_AB0174_CCCM_DIV_FREE
 static const int CCCM_MATRIX_BITS         = 22;
 static const int CCCM_DECIM_BITS          = 16;
@@ -1304,7 +1308,9 @@ static const int CCCM_DECIM_BITS          = 16;
 static const int CCCM_MATRIX_BITS         = 28;
 static const int CCCM_DECIM_BITS          = 22;
 #endif
+#if !JVET_AJ0237_INTERNAL_12BIT
 static const int CCCM_DECIM_ROUND         = ( 1 << (CCCM_DECIM_BITS - 1 ) );
+#endif
 #if JVET_AB0143_CCCM_TS
 #if MMLM
 #if JVET_AC0054_GLCCCM
@@ -1409,6 +1415,11 @@ static const int MAX_DELTA_QP   =                                   7;      ///<
 static const int MAX_TESTED_QPs =   ( 1 + 1 + ( MAX_DELTA_QP << 1 ) );      ///< dqp=0 +- max_delta_qp + lossless mode
 
 static const int COM16_C806_TRANS_PREC =                            0;
+
+#if JVET_AJ0237_INTERNAL_12BIT
+#define DECIM_BITS(x)                           ( (x) > 10 ? CCCM_DECIM_BITS_HBD : CCCM_DECIM_BITS )
+#endif
+
 #if IF_12TAP
 #define NTAPS_LUMA(x)                           ( (x) == 0 ? 12 : 8 )  // 12-tap filter for index 0. 8-tap fitler for other indices.
 #else

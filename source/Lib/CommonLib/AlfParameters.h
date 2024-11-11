@@ -584,6 +584,9 @@ struct ScaleAlf
   bool usePrev;
 
   int apsIdx;
+#if JVET_AJ0237_INTERNAL_12BIT
+  int bitDepth;
+#endif
 
   void reset() 
   {
@@ -608,14 +611,20 @@ struct ScaleAlf
   void setMinMax( const Pel lumaMin = 0, const Pel lumaMax = 1024, const bool bCheckClassifier = true ) 
   {
     const int c = classifierIdx;
+#if !JVET_AJ0237_INTERNAL_12BIT
     const int bitDepth = 10;
+#endif
     idxClassMin = (!bCheckClassifier || c == 1) ? ((lumaMin * ALF_NUM_CLASSES_CLASSIFIER[c]) >> bitDepth) : 0 ;
     idxClassMax = (!bCheckClassifier || c == 1) ? ((lumaMax * ALF_NUM_CLASSES_CLASSIFIER[c]) >> bitDepth) : (ALF_NUM_CLASSES_CLASSIFIER[c] - 1) ;
 
     initMinMaxDone = true;
   }
 
-  void init( const int f, const int a, const int c ) 
+#if JVET_AJ0237_INTERNAL_12BIT
+  void init(const int f, const int a, const int c, const int bDepth)
+#else
+  void init( const int f, const int a, const int c )
+#endif
   {
     filterSetIndex  = f;
     alt_num         = a;
@@ -625,7 +634,9 @@ struct ScaleAlf
 
     idxClassMin = 0 ;
     idxClassMax = ALF_NUM_CLASSES_CLASSIFIER[c] - 1 ;
-
+#if JVET_AJ0237_INTERNAL_12BIT
+    bitDepth = bDepth;
+#endif
     initDone = true;
   }
 

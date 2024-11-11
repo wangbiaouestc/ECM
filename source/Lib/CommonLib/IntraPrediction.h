@@ -145,7 +145,11 @@ typedef short TrainDataType;
 
 #if JVET_AA0057_CCCM || JVET_AB0092_GLM_WITH_LUMA || JVET_AC0119_LM_CHROMA_FUSION || JVET_AG0058_EIP || JVET_AG0154_DECODER_DERIVED_CCP_FUSION
 typedef int64_t TCccmCoeff;
+#if JVET_AJ0237_INTERNAL_12BIT
+#define FIXED_MULT(x, y, round, bits) TCccmCoeff((int64_t(x)*(y) + round) >> bits )
+#else
 #define FIXED_MULT(x, y) TCccmCoeff((int64_t(x)*(y) + CCCM_DECIM_ROUND) >> CCCM_DECIM_BITS )
+#endif
 #if !JVET_AB0174_CCCM_DIV_FREE
 #define FIXED_DIV(x, y)  TCccmCoeff((int64_t(x)    << CCCM_DECIM_BITS ) / (y) )
 #endif
@@ -157,6 +161,10 @@ struct CccmModel
     bd = bitdepth;
     midVal = ( 1 << ( bitdepth - 1 ) );
     params.resize( num );
+#if JVET_AJ0237_INTERNAL_12BIT
+    decimBits = DECIM_BITS(bd);
+    decimRound = (1 << (decimBits - 1));
+#endif
   }
 
   ~CccmModel() {}
@@ -164,6 +172,10 @@ struct CccmModel
   std::vector<TCccmCoeff> params;
   int        bd;
   int        midVal;
+#if JVET_AJ0237_INTERNAL_12BIT
+  int        decimRound;
+  int        decimBits;
+#endif
   
   const int getNumParams() const
   {
@@ -176,7 +188,11 @@ struct CccmModel
 
     std::fill( params.begin(), params.end(), 0 );
 
+#if JVET_AJ0237_INTERNAL_12BIT
+    params[numParams - 1] = (TCccmCoeff)1 << decimBits; // Default bias to 1
+#else
     params[numParams - 1] = 1 << CCCM_DECIM_BITS; // Default bias to 1
+#endif
   }
 
   Pel convolve(Pel* vector)
@@ -188,7 +204,11 @@ struct CccmModel
       sum += params[i] * vector[i];
     }
 
+#if JVET_AJ0237_INTERNAL_12BIT
+    return Pel( (sum + decimRound) >> decimBits);
+#else
     return Pel( (sum + CCCM_DECIM_ROUND ) >> CCCM_DECIM_BITS );
+#endif
   }
   
   Pel nonlinear(const Pel val) { return (val * val + midVal) >> bd; }
@@ -236,7 +256,11 @@ private:
   TCccmCoeff C[CCCM_NUM_PARAMS_MAX][CCCM_NUM_PARAMS_MAX + 2];
 
 #if JVET_AC0053_GAUSSIAN_SOLVER
+#if JVET_AJ0237_INTERNAL_12BIT
+  void gaussBacksubstitution       ( TCccmCoeff* x, int numEq, int col, int round, int bits);
+#else
   void gaussBacksubstitution       ( TCccmCoeff* x, int numEq, int col );
+#endif
 #if JVET_AE0059_INTER_CCCM
   void gaussElimination            ( TCccmCoeff A[CCCM_NUM_PARAMS_MAX][CCCM_NUM_PARAMS_MAX], TCccmCoeff* y0, TCccmCoeff* x0, TCccmCoeff* y1, TCccmCoeff* x1, int numEq, int numFilters, int bd, const bool interCccmMode = false);
 #else
@@ -613,7 +637,11 @@ public:
     int b;
     int shift;
   };
+#if JVET_AJ0237_INTERNAL_12BIT
+  int xCalcLMParametersGeneralized(int64_t x, int64_t y, int64_t xx, int64_t xy, int count, int bitDepth, int& a, int& b, int& iShift);
+#else
   int xCalcLMParametersGeneralized(int x, int y, int xx, int xy, int count, int bitDepth, int &a, int &b, int &iShift);
+#endif
   int xLMSampleClassifiedTraining (int count, int mean, int meanC, int lumaSamples[], int chrmSamples[], int bitDepth, MMLMParameters parameters[]);
 #if JVET_AG0136_INTRA_TMP_LIC
   std::array<int, 7>& getMemLicParams(const int licIdc, const int idx) { return m_memLicParams[licIdc][idx]; }

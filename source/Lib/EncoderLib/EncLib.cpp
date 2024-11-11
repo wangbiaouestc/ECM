@@ -101,6 +101,9 @@ void EncLib::create( const int layerId )
   m_iPOCLast = m_compositeRefEnabled ? -2 : -1;
   // create processing unit classes
   m_cGOPEncoder.        create( );
+#if JVET_AJ0237_INTERNAL_12BIT
+  m_cGOPEncoder.m_cBilateralFilter.setInternalBitDepth(m_bitDepth[COMPONENT_Y]);
+#endif
 #if ENABLE_SPLIT_PARALLELISM
 #if ENABLE_SPLIT_PARALLELISM
   m_numCuEncStacks  = m_numSplitThreads == 1 ? 1 : NUM_RESERVERD_SPLIT_JOBS;
@@ -131,6 +134,9 @@ void EncLib::create( const int layerId )
   m_cCuEncoder.         create( this );
 #if JVET_V0094_BILATERAL_FILTER || JVET_X0071_CHROMA_BILATERAL_FILTER
   m_bilateralFilter.    create();
+#if JVET_AJ0237_INTERNAL_12BIT
+  m_bilateralFilter.setInternalBitDepth(m_bitDepth[COMPONENT_Y]);
+#endif
 #endif
 #endif
 #if JVET_J0090_MEMORY_BANDWITH_MEASURE
@@ -219,6 +225,9 @@ void EncLib::create( const int layerId )
     m_cEncSAO.create(m_iSourceWidth, m_iSourceHeight, m_chromaFormatIDC, m_maxCUWidth, m_maxCUHeight, floorLog2(m_maxCUWidth) - m_log2MinCUSize, (uint32_t)std::max(0, m_bitDepth[CHANNEL_TYPE_LUMA] - MAX_SAO_TRUNCATED_BITDEPTH), (uint32_t)std::max(0, m_bitDepth[CHANNEL_TYPE_CHROMA] - MAX_SAO_TRUNCATED_BITDEPTH));
 #endif
     m_cEncSAO.createEncData(m_saoCtuBoundary, numCtuInFrame);
+#if JVET_AJ0237_INTERNAL_12BIT
+    m_cEncSAO.m_bilateralFilter.setInternalBitDepth(m_bitDepth[COMPONENT_Y]);
+#endif
   }
 }
 
