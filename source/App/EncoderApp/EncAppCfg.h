@@ -684,6 +684,9 @@ protected:
   bool      m_scaledMvExtTmvp;
   bool      m_scaledMvExtBiTmvp;
 #endif
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+  bool      m_sbTmvpMvExt;
+#endif
   
   // ADD_NEW_TOOL : (encoder app) add tool enabling flags and associated parameters here
   bool      m_virtualBoundariesEnabledFlag;

@@ -180,10 +180,16 @@ void DecSlice::decompressSlice( Slice* slice, InputBitstream* bitstream, int deb
 #endif
   {
     clipMv = clipMvInSubpic;
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+    clipMv2 = clipMvInSubpic2;
+#endif
   }
   else
   {
     clipMv = clipMvInPic;
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+    clipMv2 = clipMvInPic2;
+#endif
   }
 
 #if JVET_Y0134_TMVP_NAMVP_CAND_REORDERING

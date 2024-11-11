@@ -208,6 +208,15 @@ public:
       ver = ver >= 0 ? (ver + nOffset - 1) >> rightShift : (ver + nOffset) >> rightShift;
     }
   }
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+  void roundRightShift(int shift)
+  {
+    CHECK(shift < 0, "shift < 0 for roundRightShift");
+    const int nOffset = 1 << (shift - 1);
+    hor = hor >= 0 ? (hor + nOffset - 1) >> shift : (hor + nOffset) >> shift;
+    ver = ver >= 0 ? (ver + nOffset - 1) >> shift : (ver + nOffset) >> shift;
+  }
+#endif
 
   void roundToPrecision(const MvPrecision& src, const MvPrecision& dst)
   {
@@ -512,11 +521,18 @@ namespace std
 extern void(*clipMv) ( Mv& rcMv, const struct Position& pos, const struct Size& size, const class SPS& sps, const class PPS& pps );
 void clipMvInPic ( Mv& rcMv, const struct Position& pos, const struct Size& size, const class SPS& sps, const class PPS& pps );
 void clipMvInSubpic ( Mv& rcMv, const struct Position& pos, const struct Size& size, const class SPS& sps, const class PPS& pps );
-
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+extern void(*clipMv2) (Mv& rcMv, const struct Position& pos, const struct Size& size, const class SPS& sps, const class PPS& pps, const int mvShift);
+void clipMvInPic2(Mv& rcMv, const struct Position& pos, const struct Size& size, const class SPS& sps, const class PPS& pps, const int mvShift);
+void clipMvInSubpic2(Mv& rcMv, const struct Position& pos, const struct Size& size, const class SPS& sps, const class PPS& pps, const int mvShift);
+#endif
 bool wrapClipMv( Mv& rcMv, const Position& pos,
                  const struct Size& size,
                  const SPS *sps
                , const PPS* pps
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+               , const int mvShift = MV_FRACTIONAL_BITS_INTERNAL
+#endif
 );
 
 void roundAffineMv( int& mvx, int& mvy, int nShift );

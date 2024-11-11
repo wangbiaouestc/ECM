@@ -628,7 +628,13 @@ protected:
                                );
 #if JVET_AG0135_AFFINE_CIIP
   void xCheckSATDCostAffineMerge
-  (CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu, AffineMergeCtx affineMergeCtx, MergeCtx& mrgCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer, PelUnitBuf  acMergeAffineBuffer[AFFINE_MRG_MAX_NUM_CANDS]
+  (CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+    , AffineMergeCtx& affineMergeCtx
+#else
+    , AffineMergeCtx affineMergeCtx
+#endif 
+    , MergeCtx& mrgCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer, PelUnitBuf  acMergeAffineBuffer[AFFINE_MRG_MAX_NUM_CANDS]
     , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &rdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart);
 #else
   void xCheckSATDCostAffineMerge 
@@ -637,13 +643,25 @@ protected:
 #endif
 #if JVET_AG0276_LIC_FLAG_SIGNALING
   void xCheckSATDCostAffineMergeOppositeLic
-  (CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu, AffineMergeCtx affineMergeCtx, MergeCtx& mrgCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer
+  (CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+    , AffineMergeCtx& affineMergeCtx
+#else
+    , AffineMergeCtx affineMergeCtx
+#endif
+    , MergeCtx& mrgCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer
     , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &rdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart
   );
 #endif
 #if JVET_AD0182_AFFINE_DMVR_PLUS_EXTENSIONS
   void xCheckSATDCostBMAffineMerge
-  (CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu, AffineMergeCtx affineMergeCtxL0, RefPicList reflist, MergeCtx& mrgCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer
+  (CodingStructure *&tempCS, CodingUnit &cu, PredictionUnit &pu
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+    , AffineMergeCtx& affineMergeCtxL0
+#else
+    , AffineMergeCtx affineMergeCtxL0
+#endif
+    , RefPicList reflist, MergeCtx& mrgCtx, PelUnitBuf *acMergeTempBuffer[MMVD_MRG_MAX_RD_NUM], PelUnitBuf *&singleMergeTempBuffer
     , unsigned& uiNumMrgSATDCand, static_vector<ModeInfo, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM>  &rdModeList, static_vector<double, MRG_MAX_NUM_CANDS + MMVD_ADD_NUM> &candCostList, DistParam distParam, const TempCtx &ctxStart
   );
 #endif

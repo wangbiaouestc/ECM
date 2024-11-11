@@ -62,6 +62,10 @@
  */
 class InterpolationFilter
 {
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+public:
+  static const TFilterCoeff m_lumaFilter64[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS * 4][12];
+#endif
 #if IF_12TAP
   static const TFilterCoeff m_lumaFilter4x4[LUMA_INTERPOLATION_FILTER_SUB_SAMPLE_POSITIONS][8];
 #else
@@ -166,7 +170,11 @@ public:
   template<int N, bool isVertical, bool isFirst, bool isLast>
   static void filter(const ClpRng& clpRng, Pel const *src, int srcStride, Pel *dst, int dstStride, int width, int height, TFilterCoeff const *coeff, bool biMCForDMVR);
 
-  void filter4x4( const ClpRng& clpRng, Pel const *src, int srcStride, Pel *dst, int dstStride, int xFrac, int yFrac, bool isLast);
+  void filter4x4( const ClpRng& clpRng, Pel const *src, int srcStride, Pel *dst, int dstStride, int xFrac, int yFrac, bool isLast
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+  , bool useHighPrec = false
+#endif
+  );
 
   template<int N>
   void filterHor(const ClpRng& clpRng, Pel const* src, int srcStride, Pel *dst, int dstStride, int width, int height, bool isLast, TFilterCoeff const *coeff, bool biMCForDMVR);

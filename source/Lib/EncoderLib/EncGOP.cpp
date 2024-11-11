@@ -3619,11 +3619,17 @@ void EncGOP::compressGOP(int iPOCLast, int iNumPicRcvd, PicList &rcListPic, std:
 #endif
         {
           clipMv = clipMvInSubpic;
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+          clipMv2 = clipMvInSubpic2;
+#endif
           m_pcEncLib->getInterSearch()->setClipMvInSubPic(true);
         }
         else
         {
           clipMv = clipMvInPic;
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+          clipMv2 = clipMvInPic2;
+#endif
           m_pcEncLib->getInterSearch()->setClipMvInSubPic(false);
         }
 

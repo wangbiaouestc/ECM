@@ -1114,6 +1114,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setConfigScaledMvExtTmvp                             ( m_scaledMvExtTmvp );
   m_cEncLib.setConfigScaledMvExtBiTmvp                           ( m_scaledMvExtBiTmvp );
 #endif
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+  m_cEncLib.setConfigSbTmvpMvExt                                 ( m_sbTmvpMvExt );
+#endif
 
   // ADD_NEW_TOOL : (encoder app) add setting of tool enabling flags and associated parameters here
   m_cEncLib.setVirtualBoundariesEnabledFlag                      ( m_virtualBoundariesEnabledFlag );

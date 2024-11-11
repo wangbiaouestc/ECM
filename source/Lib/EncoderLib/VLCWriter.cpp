@@ -1603,8 +1603,14 @@ void HLSWriter::codeSPS( const SPS* pcSPS )
   if ( pcSPS->getUseAffine() )
   {
 #if JVET_AI0183_MVP_EXTENSION
+#if JVET_AJ0158_SUBBLOCK_INTER_EXTENSION
+    WRITE_UVLC(AFFINE_MRG_MAX_NUM_CANDS - pcSPS->getMaxNumAffineMergeCand() - (pcSPS->getConfigScaledMvExtTmvp() ? 0 : 2) - (pcSPS->getConfigSbTmvpMvExt() ? 0 : 2), "five_minus_max_num_subblock_merge_cand");
+    WRITE_FLAG( pcSPS->getConfigScaledMvExtTmvp() ? 1 : 0,                                 "sps_scaled_mv_ext_b_configure_flag");
+    WRITE_FLAG( pcSPS->getConfigSbTmvpMvExt() ? 1 : 0,                                     "sps_sbtmvp_mv_ext_configure_flag");
+#else
     WRITE_UVLC(AFFINE_MRG_MAX_NUM_CANDS - pcSPS->getMaxNumAffineMergeCand() - (pcSPS->getConfigScaledMvExtTmvp() ? 0 : 2), "five_minus_max_num_subblock_merge_cand");
     WRITE_FLAG( pcSPS->getConfigScaledMvExtTmvp() ? 1 : 0,                                 "sps_scaled_mv_ext_b_configure_flag");
+#endif
 #else
     WRITE_UVLC(AFFINE_MRG_MAX_NUM_CANDS - pcSPS->getMaxNumAffineMergeCand(), "five_minus_max_num_subblock_merge_cand");
 #endif
