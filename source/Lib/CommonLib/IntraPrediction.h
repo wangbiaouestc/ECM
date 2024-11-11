@@ -223,7 +223,9 @@ struct CccmCovariance
   );
 #endif
 #if JVET_AG0058_EIP
-#if JVET_AB0174_CCCM_DIV_FREE
+#if JVET_AJ0082_MM_EIP
+  void solveEip                    ( const TCccmCoeff* A, const TCccmCoeff* Y, const int sampleNum, const int lumaOffset, CccmModel& model, bool bMm = false);
+#elif JVET_AB0174_CCCM_DIV_FREE
   void solveEip                    ( const TCccmCoeff* A, const TCccmCoeff* Y, const int sampleNum, const int lumaOffset, CccmModel& model );
 #else
   void solveEip                    ( const TCccmCoeff* A, const TCccmCoeff* Y, const int sampleNum, CccmModel& model );
@@ -320,6 +322,15 @@ protected:
   int        m_eipClipMin;
   int        m_eipClipMax;
 #endif
+#if JVET_AJ0082_MM_EIP
+  Pel        m_mmEipInputs[2][CCCM_NUM_PARAMS_MAX][CCCM_REF_SAMPLES_MAX];
+  Pel        m_eipAvg;
+  TCccmCoeff mmEipATABuf[2][NUM_EIP_COMB][((EIP_FILTER_TAP + 1) * EIP_FILTER_TAP) >> 1];
+  TCccmCoeff mmEipATYBuf[2][NUM_EIP_COMB][EIP_FILTER_TAP];
+  Pel        m_mmEipYBuffer[(NUM_EIP_SHAPE * NUM_EIP_BASE_RECOTYPE) << 1][MAX_EIP_SIZE * MAX_EIP_SIZE * 2]; 
+  int        numMmSamplesBuf[2][NUM_EIP_SHAPE * NUM_EIP_BASE_RECOTYPE];
+  int        m_numSigEip;
+#endif 
 #endif
 private:
 #if JVET_AG0136_INTRA_TMP_LIC
@@ -952,6 +963,19 @@ public:
   void reorderEipCands(const PredictionUnit &pu, static_vector<EipModelCandidate, MAX_MERGE_EIP> &candList, const ComponentID compId = COMPONENT_Y);
 #if JVET_AH0086_EIP_BIAS_AND_CLIP
   void setInputsVec(Pel *inputs, PelBuf &reco, int w, int h, int filterShape);
+#endif
+#if JVET_AJ0082_MM_EIP
+  inline Pel getEipInputsAvg(Pel *inputs, int filterShape)
+  {
+    if (filterShape == 0)
+    {
+      return (inputs[0] + inputs[3] + 1) >> 1;
+    }
+    else
+    {
+      return inputs[1];
+    }
+  }
 #endif
 #endif
 #if JVET_Z0056_GPM_SPLIT_MODE_REORDERING && JVET_Y0065_GPM_INTRA

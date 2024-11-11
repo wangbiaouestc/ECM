@@ -717,8 +717,19 @@ static const int MAX_MERGE_EIP =                                   12;
 static const int NUM_EIP_MERGE_SIGNAL =                             6;
 static const int EIP_TPL_SIZE =                                     1;
 static const int NUM_EIP_BASE_RECOTYPE =                            3;
+#if JVET_AJ0082_MM_EIP
+static const int NUM_EIP_MM = 9;
+static const int NUM_EIP_COMB = NUM_EIP_SHAPE * NUM_EIP_BASE_RECOTYPE;
+static const int NUM_DERIVED_EIP                  = (NUM_EIP_SHAPE * 3) + NUM_EIP_MM;
+static const int L2_MM_EIP_REG[6] = { 320, 288, 256, 224, 192, 128 };
+static const int L2_MM_SAMPLE_THR[5] = { 128, 256, 512, 1024, 2048 };
+static const int MAX_EIP_DERIVED_SIZE      = 8;
+static const double EIP_LNFST_MTS_RATE = 1.5;
+static const double ENC_EIP_SAD_CHK_RATE = 1.1;
+#else
 static const int NUM_EIP_COMB = NUM_EIP_SHAPE * NUM_EIP_BASE_RECOTYPE;
 static const int NUM_DERIVED_EIP                  = NUM_EIP_SHAPE * 3;
+#endif  
 #endif
 #if MMLM
 static const int MMLM_CHROMA_IDX = LM_CHROMA_IDX + 1; ///< MDLM_L

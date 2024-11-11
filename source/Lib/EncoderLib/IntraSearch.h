@@ -638,6 +638,9 @@ private:
   static_vector<ModeInfo, NUM_DERIVED_EIP + MAX_MERGE_EIP> m_uiSavedHadModeListEip;
   static_vector<double, NUM_DERIVED_EIP + MAX_MERGE_EIP>   m_dSavedModeCostEip;
   static_vector<double, NUM_DERIVED_EIP + MAX_MERGE_EIP>   m_dSavedHadListEip;
+#if JVET_AJ0082_MM_EIP
+  double m_encBestEipCost;
+#endif
 #endif
 #if JVET_AH0076_OBIC
   Pel* m_dimdPredBuf;
@@ -732,6 +735,9 @@ public:
   bool            m_skipCCCMSATD;
   int             m_isCccmNoSubModeEnabledInRdo[MMLM_T_IDX + 1];
 #endif 
+#if JVET_AJ0082_MM_EIP
+  bool            m_skipEipLfnstMtsPass;
+#endif
 #if JVET_AD0202_CCCM_MDF
   bool            m_skipCCCMwithMdfSATD;
   int             m_isCccmWithMdfEnabledInRdo[5][MMLM_T_IDX + 1];

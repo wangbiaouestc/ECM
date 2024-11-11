@@ -2774,7 +2774,16 @@ void CABACReader::cu_eip_flag(CodingUnit& cu)
       {
         unsigned int symbol = 0;
         static_vector<EIPInfo, NUM_DERIVED_EIP> eipInfoList;
+#if JVET_AJ0082_MM_EIP
+        cu.eipMmFlag = m_BinDecoder.decodeBin(Ctx::EipFlag(2));
+        int eipNum = getAllowedCurEip(cu, COMPONENT_Y, eipInfoList, cu.eipMmFlag);
+        if (eipNum > 1)
+        {
+          xReadTruncBinCode(symbol, eipNum);
+        }
+#else
         xReadTruncBinCode(symbol, getAllowedCurEip(cu, COMPONENT_Y, eipInfoList));
+#endif
         cu.firstPU->intraDir[0] = symbol;
       }
     }

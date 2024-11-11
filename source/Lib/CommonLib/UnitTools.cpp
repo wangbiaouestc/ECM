@@ -33593,9 +33593,15 @@ bool PU::isEIP(const PredictionUnit& pu, const ChannelType& chType)
 
 Position getRecoLinesEIP(const CodingUnit& cu, const ComponentID compId)
 {
+#if JVET_AJ0082_MM_EIP
+  const int numRecoLines = std::min<int>(std::min(cu.blocks[compId].width, cu.blocks[compId].height), MAX_EIP_DERIVED_SIZE);
+  const int left = std::min(cu.blocks[compId].y - EIP_FILTER_SIZE, numRecoLines);
+  const int above = std::min(cu.blocks[compId].x - EIP_FILTER_SIZE, numRecoLines);
+#else
   const int numRecoLines = std::min(cu.blocks[compId].width, cu.blocks[compId].height);
   const int above = std::min(cu.blocks[compId].y - EIP_FILTER_SIZE, numRecoLines);
   const int left = std::min(cu.blocks[compId].x - EIP_FILTER_SIZE, numRecoLines);
+#endif
   CHECK(above < 1 || left < 1, "no reconstruction lines above or left.");
 
   return Position(above, left);
@@ -33623,7 +33629,12 @@ bool getAllowedEip(const CodingUnit& cu, const ComponentID compId)
 
   const int numAboveAvail = cu.blocks[compId].y;
   const int numLeftAvail = cu.blocks[compId].x;
+#if JVET_AJ0082_MM_EIP
+  const int numRecoLines = std::min<int>(std::min(cu.blocks[compId].width, cu.blocks[compId].height), MAX_EIP_DERIVED_SIZE);
+  const int tplSize = numRecoLines + EIP_FILTER_SIZE;
+#else
   const int tplSize = std::min(cu.blocks[compId].height, cu.blocks[compId].width) + EIP_FILTER_SIZE;
+#endif
   if(numAboveAvail < tplSize || numLeftAvail < tplSize)
   {
     return false;
@@ -33657,7 +33668,43 @@ bool getAllowedEipMerge(const CodingUnit& cu, const ComponentID compId)
 
   return false;
 }
-
+#if JVET_AJ0082_MM_EIP
+int getAllowedCurEip(const CodingUnit &cu, const ComponentID compId, static_vector<EIPInfo, NUM_DERIVED_EIP>& eipInfoList, bool bMmEip)
+{ 
+  const int log2Wm2 = floorLog2(cu.blocks[compId].width)  - 2;
+  const int log2Hm2 = floorLog2(cu.blocks[compId].height) - 2;
+  if(!bMmEip)
+  {
+    const int numOfCombEIP[4][4] = 
+    {
+      { 0, 0, 1, 1 },
+      { 0, 2, 2, 2 },
+      { 1, 2, 3, 3 },
+      { 1, 2, 3, 3 },
+    };
+    for (int i = 0; i < numOfCombEIP[log2Wm2][log2Hm2]; i++)
+    {
+      eipInfoList.push_back(g_eipInfoLut[log2Wm2][log2Hm2][i]);
+    }
+  }
+  else
+  {
+    const int numOfCombMmEIP[4][4] = 
+    {
+      { 0, 0, 2, 1 },
+      { 0, 3, 3, 3 },
+      { 2, 3, 5, 5 },
+      { 1, 3, 5, 5 },
+    };
+    for (int i = 0; i < numOfCombMmEIP[log2Wm2][log2Hm2]; i++)
+    {
+      EIPInfo mmInfo = g_mmEipInfoLut[log2Wm2][log2Hm2][i];
+      eipInfoList.push_back(mmInfo);
+    }
+  }
+  return int(eipInfoList.size());
+}
+#else
 int getAllowedCurEip(const CodingUnit &cu, const ComponentID compId, static_vector<EIPInfo, NUM_DERIVED_EIP>& eipInfoList)
 { 
   const int numOfCombEIP[4][4] = 
@@ -33676,7 +33723,7 @@ int getAllowedCurEip(const CodingUnit &cu, const ComponentID compId, static_vect
 
   return int(eipInfoList.size());
 }
-
+#endif
 void CU::saveModelsInHEIP(const CodingUnit &cu)
 {
   if (!cu.Y().valid())

@@ -27473,8 +27473,9 @@ int64_t IntraPrediction::calcAeipGroupSum(const Pel* src1, const Pel* src2, cons
 
   return sum;
 }
-
-#if JVET_AB0174_CCCM_DIV_FREE
+#if JVET_AJ0082_MM_EIP
+void CccmCovariance::solveEip(const TCccmCoeff* A, const TCccmCoeff* Y, const int sampleNum, const int lumaOffset, CccmModel& model, bool bMm)
+#elif JVET_AB0174_CCCM_DIV_FREE
 void CccmCovariance::solveEip(const TCccmCoeff* A, const TCccmCoeff* Y, const int sampleNum, const int lumaOffset, CccmModel& model)
 #else
 void CccmCovariance::solveEip(const TCccmCoeff* A, const TCccmCoeff* Y, const int sampleNum, CccmModel& model)
@@ -27496,8 +27497,42 @@ void CccmCovariance::solveEip(const TCccmCoeff* A, const TCccmCoeff* Y, const in
 
 #if JVET_AI0066_REGULARIZED_EIP
   // Regularization parameter: L2 multiplier * number of parameters
+#if JVET_AJ0082_MM_EIP
+  int regularizationParam;
+  if (bMm)
+  {
+    if (sampleNum <= L2_MM_SAMPLE_THR[0])
+    {
+      regularizationParam = L2_MM_EIP_REG[0] * numParams;
+    }
+    else if (sampleNum <= L2_MM_SAMPLE_THR[1])
+    {
+      regularizationParam = L2_MM_EIP_REG[1] * numParams;
+    }
+    else if (sampleNum <= L2_MM_SAMPLE_THR[2])
+    {
+      regularizationParam = L2_MM_EIP_REG[2] * numParams;
+    }
+    else if (sampleNum <= L2_MM_SAMPLE_THR[3])
+    {
+      regularizationParam = L2_MM_EIP_REG[3] * numParams;
+    }
+    else if (sampleNum <= L2_MM_SAMPLE_THR[4])
+    {
+      regularizationParam = L2_MM_EIP_REG[4] * numParams;
+    }
+    else
+    {
+      regularizationParam = L2_MM_EIP_REG[5] * numParams;
+    }
+  }
+  else
+  {
+    regularizationParam = (sampleNum <= REGULARIZED_EIP_L2_SAMPLE_THRESHOLD) ? REGULARIZED_EIP_L2_SMALL * numParams : REGULARIZED_EIP_L2_LARGE * numParams;
+  }
+#else
   const int regularizationParam = (sampleNum <= REGULARIZED_EIP_L2_SAMPLE_THRESHOLD) ? REGULARIZED_EIP_L2_SMALL * numParams : REGULARIZED_EIP_L2_LARGE * numParams;
-  
+#endif
   for (int coli0 = 0; coli0 < numParams - 1; coli0++) // The last term (bias) is not regularized.
   {
     ATA[coli0][coli0] += regularizationParam;
@@ -27619,11 +27654,15 @@ void IntraPrediction::initEipParams(const PredictionUnit& pu, const ComponentID 
   PelBuf refLeft(m_eipBuffer + refWidth * refSizeY, refWidth, refSizeX, refHeight - refSizeY);
   refLeft.copyFrom(recoLeft);
 
-#if JVET_AH0086_EIP_BIAS_AND_CLIP
+#if JVET_AH0086_EIP_BIAS_AND_CLIP || JVET_AJ0082_MM_EIP
   int min = MAX_INT;
   int max = 0;
   int startY = refPosPicY < 0 ? -refPosPicY : 0;
   const int startX = refPosPicX < 0 ? -refPosPicX : 0;
+#if JVET_AJ0082_MM_EIP
+  double sum = 0;
+  int samplesNum = 0;
+#endif
   for(int y=startY;y<refTopAndTopLeft.height;y++)
   {
     for(int x=startX;x<refTopAndTopLeft.width;x++)
@@ -27631,6 +27670,13 @@ void IntraPrediction::initEipParams(const PredictionUnit& pu, const ComponentID 
       int sample = refTopAndTopLeft.at(x,y);
       min = sample < min ? sample : min;
       max = sample > max ? sample : max;
+#if JVET_AJ0082_MM_EIP
+      if(y >= (refTopAndTopLeft.height >> 1) && x >= (refSizeX >> 1))
+      {
+        sum += sample;
+        samplesNum++;
+      }
+#endif
     }
   }
   startY = (refPosPicY + refSizeY) < 0 ? -(refPosPicY + refSizeY) : 0;
@@ -27641,11 +27687,23 @@ void IntraPrediction::initEipParams(const PredictionUnit& pu, const ComponentID 
       int sample = refLeft.at(x,y);
       min = sample < min ? sample : min;
       max = sample > max ? sample : max;
+#if JVET_AJ0082_MM_EIP
+      if(x >= (refLeft.width >> 1))
+      {
+        sum += sample;
+        samplesNum++;
+      }
+#endif
     }
   }
+#if JVET_AH0086_EIP_BIAS_AND_CLIP
   m_eipClipMin = min;
   m_eipClipMax = max;
   m_eipBias    = 1 << (pu.cu->slice->getSPS()->getBitDepth(chType) - 1);
+#endif
+#if JVET_AJ0082_MM_EIP
+  m_eipAvg = Pel( sum / samplesNum);
+#endif
 #endif
 }
 
@@ -27688,7 +27746,21 @@ void IntraPrediction::getCurEipCands(const PredictionUnit& pu, static_vector<Eip
   const int sizeAtaBuf = ((EIP_FILTER_TAP + 1) * EIP_FILTER_TAP) >> 1;
   const int numInputs = EIP_FILTER_TAP;
   static_vector<EIPInfo, NUM_DERIVED_EIP> eipInfoList;
+#if JVET_AJ0082_MM_EIP
+  if (pu.cs->pcv->isEncoder)
+  {
+    m_numSigEip = getAllowedCurEip(*pu.cu, compId, eipInfoList, false);
+    getAllowedCurEip(*pu.cu, compId, eipInfoList, true);
+  }
+  else
+  {
+    getAllowedCurEip(*pu.cu, compId, eipInfoList, pu.cu->eipMmFlag);
+  }
+  memset(mmEipATABuf, 0, sizeof(TCccmCoeff) * 2 * NUM_EIP_COMB * sizeAtaBuf);
+  memset(mmEipATYBuf, 0, sizeof(TCccmCoeff) * 2 * NUM_EIP_COMB * EIP_FILTER_TAP);
+#else
   getAllowedCurEip(*pu.cu, compId, eipInfoList);
+#endif
   memset(ATABuf[0], 0, sizeof(TCccmCoeff) * NUM_EIP_COMB * sizeAtaBuf);
   memset(ATYBuf[0], 0, sizeof(TCccmCoeff) * NUM_EIP_COMB * EIP_FILTER_TAP);
   for (int i = 0; i < NUM_EIP_SHAPE * NUM_EIP_BASE_RECOTYPE; i++)
@@ -27707,13 +27779,29 @@ void IntraPrediction::getCurEipCands(const PredictionUnit& pu, static_vector<Eip
     eipInfoList.push_back(eipInfoBackup);
   }
   static_vector<int, NUM_EIP_BASE_RECOTYPE> refIdxList;
+#if JVET_AJ0082_MM_EIP
+  bool bMmMode = pu.cs->pcv->isEncoder || pu.cu->eipMmFlag;
+  int thrd = m_eipAvg;
+  for(int i = 0; i < eipInfoList.size(); i++)
+  {
+    EIPInfo mode = eipInfoList[i];
+    EipModelCandidate cand;
+    cand.bMm = pu.cs->pcv->isEncoder ? (i >= m_numSigEip): pu.cu->eipMmFlag;
+#else
   for (auto mode : eipInfoList)
   {
+#endif
     int recoType = mode.recoType, filterShape = mode.filterShape;
     CccmModel model(EIP_FILTER_TAP, bd);
     TCccmCoeff ATA[sizeAtaBuf]{ 0 };
     TCccmCoeff ATY[EIP_FILTER_TAP]{ 0 };
     int totalSamples = 0;
+#if JVET_AJ0082_MM_EIP
+    CccmModel model1(EIP_FILTER_TAP, bd);
+    TCccmCoeff ATA1[sizeAtaBuf]{ 0 };
+    TCccmCoeff ATY1[EIP_FILTER_TAP]{ 0 };
+    int totalSamples1 = 0;
+#endif
     // push needed refIdx for current mode.
     refIdxList.clear();
     if (recoType == EIP_AL || recoType == EIP_AL_A || recoType == EIP_AL_L || recoType == EIP_AL_A_L) 
@@ -27728,6 +27816,228 @@ void IntraPrediction::getCurEipCands(const PredictionUnit& pu, static_vector<Eip
     {
       refIdxList.push_back(EIP_L);
     }
+#if JVET_AJ0082_MM_EIP
+    for (auto refIdx: refIdxList)
+    {
+      const int srcBufIdx = filterShape + refIdx * NUM_EIP_BASE_RECOTYPE;
+      const int mmIdx0    = srcBufIdx << 1;
+      const int mmIdx1    = mmIdx0 + 1;
+
+      // fill src buffer
+      if (!bSrcBufFilled[srcBufIdx])
+      {
+        bSrcBufFilled[srcBufIdx] = true;
+
+        int startX, startY, endX, endY;
+
+        if (refIdx == EIP_AL)
+        {
+          startX = refSizeX - tplSize.x;
+          startY = refSizeY - tplSize.y;
+          endX   = refSizeX;
+          endY   = refSizeY;
+        }
+        else if (refIdx == EIP_A)
+        {
+          startX = refSizeX;
+          startY = refSizeY - tplSize.y;
+          endX   = refWidth;
+          endY   = refSizeY;
+        }
+        else   // EIP_L
+        {
+          startX = refSizeX - tplSize.x;
+          startY = refSizeY;
+          endX   = refSizeX;
+          endY   = refHeight;
+        }
+
+        if (bMmMode)
+        {
+          int numMmSamples[2] = {};
+
+          for (int y = startY; y < endY; y++)
+          {
+            for (int x = startX; x < endX; x++)
+            {
+#if JVET_AH0086_EIP_BIAS_AND_CLIP
+              m_mmEipInputs[0][numInputs - 1][numMmSamples[0]] =  m_mmEipInputs[1][numInputs - 1][numMmSamples[1]] = m_eipBias;
+
+              for (int inputIdx = 0; inputIdx < numInputs - 1; inputIdx++)
+#else
+              for (int inputIdx = 0; inputIdx < numInputs; inputIdx++)
+#endif
+              {
+                m_mmEipInputs[0][inputIdx][numMmSamples[0]] =  m_mmEipInputs[1][inputIdx][numMmSamples[1]] = 
+                    refBuf.at(x + g_eipFilter[filterShape][inputIdx].x, y + g_eipFilter[filterShape][inputIdx].y);
+              }
+
+              m_mmEipYBuffer[mmIdx0][numMmSamples[0]] = m_mmEipYBuffer[mmIdx1][numMmSamples[1]] = refBuf.at(x, y);
+
+              const int ref =  filterShape == 0 ? ((m_mmEipInputs[0][0][numMmSamples[0]] + m_mmEipInputs[0][3][numMmSamples[0]] + 1) >> 1): m_mmEipInputs[0][1][numMmSamples[0]];
+
+              numMmSamples[0] += ref <= thrd ? 1: 0;
+              numMmSamples[1] += ref > thrd ? 1: 0;
+            }
+          }
+
+          for (int part = 0; part < 2; part++)
+          {
+            const int numSamples                      = numMmSamples[part];
+            numMmSamplesBuf[part][srcBufIdx]          = numSamples;
+            const int samplesInBatches                = (numSamples >> log2BatchSize) << log2BatchSize;
+            int       i                               = 0;
+            for (int coli0 = 0; coli0 < numInputs; coli0++)
+            {
+              for (int coli1 = coli0; coli1 < numInputs; coli1++)
+              {
+                for (int offset = 0; offset < samplesInBatches; offset += batchSize)
+                {
+                  mmEipATABuf[part][srcBufIdx][i] +=
+                    m_calcAeipGroupSum(&m_mmEipInputs[part][coli0][offset],
+                                        &m_mmEipInputs[part][coli1][offset], batchSize);
+                }
+                mmEipATABuf[part][srcBufIdx][i] += m_calcAeipGroupSum(
+                  &m_mmEipInputs[part][coli0][samplesInBatches],
+                  &m_mmEipInputs[part][coli1][samplesInBatches], numSamples - samplesInBatches);
+
+                i++;
+              }
+            }
+
+            for (int coli = 0; coli < numInputs; coli++)
+            {
+              for (int offset = 0; offset < samplesInBatches; offset += batchSize)
+              {
+                mmEipATYBuf[part][srcBufIdx][coli] +=
+                  m_calcAeipGroupSum(&m_mmEipInputs[part][coli][offset],
+                                      &m_mmEipYBuffer[mmIdx0 + part][offset], batchSize);
+              }
+              mmEipATYBuf[part][srcBufIdx][coli] += m_calcAeipGroupSum(
+                &m_mmEipInputs[part][coli][samplesInBatches],
+                &m_mmEipYBuffer[mmIdx0 + part][samplesInBatches], numSamples - samplesInBatches);
+            }
+          }
+        }
+        else
+        {
+          int numSamples = 0;
+          for (int y = startY; y < endY; y++)
+          {
+            for (int x = startX; x < endX; x++)
+            {
+#if JVET_AH0086_EIP_BIAS_AND_CLIP
+              m_a[numInputs - 1][numSamples] = m_eipBias;
+            
+              for (int inputIdx = 0; inputIdx < numInputs - 1; inputIdx++)
+#else
+              for (int inputIdx = 0; inputIdx < numInputs; inputIdx++)
+#endif
+              {
+                m_a[inputIdx][numSamples] = refBuf.at(x + g_eipFilter[filterShape][inputIdx].x, y + g_eipFilter[filterShape][inputIdx].y);
+              }
+              numSamples++;
+            }
+          }
+          numSamplesBuf[refIdx] = numSamples;
+
+          if (!bDstBufFilled[refIdx])
+          {
+            bDstBufFilled[refIdx] = true;
+            numSamples            = 0;
+            for (int y = startY; y < endY; y++)
+            {
+              for (int x = startX; x < endX; x++)
+              {
+                m_eipYBuffer[refIdx][numSamples++] = refBuf.at(x, y);
+              }
+            }
+          }
+
+          const int samplesInBatches = (numSamples >> log2BatchSize) << log2BatchSize;
+          int       i                = 0;
+          for (int coli0 = 0; coli0 < numInputs; coli0++)
+          {
+            for (int coli1 = coli0; coli1 < numInputs; coli1++)
+            {
+              for (int offset = 0; offset < samplesInBatches; offset += batchSize)
+              {
+                ATABuf[srcBufIdx][i] += m_calcAeipGroupSum(&m_a[coli0][offset], &m_a[coli1][offset], batchSize);
+              }
+              ATABuf[srcBufIdx][i] += m_calcAeipGroupSum(&m_a[coli0][samplesInBatches], &m_a[coli1][samplesInBatches],
+                                                          numSamples - samplesInBatches);
+              i++;
+            }
+          }
+
+          for (int coli = 0; coli < numInputs; coli++)
+          {
+            for (int offset = 0; offset < samplesInBatches; offset += batchSize)
+            {
+              ATYBuf[srcBufIdx][coli] +=
+                m_calcAeipGroupSum(&m_a[coli][offset], &m_eipYBuffer[refIdx][offset], batchSize);
+            }
+            ATYBuf[srcBufIdx][coli] += m_calcAeipGroupSum(
+              &m_a[coli][samplesInBatches], &m_eipYBuffer[refIdx][samplesInBatches], numSamples - samplesInBatches);
+          }
+        }
+      }
+      if (cand.bMm)
+      {
+        for (int i = 0; i < sizeAtaBuf; i++)
+        {
+          ATA[i] += mmEipATABuf[0][srcBufIdx][i];
+          ATA1[i] += mmEipATABuf[1][srcBufIdx][i];
+        }
+
+        for (int coli = 0; coli < numInputs; coli++)
+        {
+          ATY[coli] += mmEipATYBuf[0][srcBufIdx][coli];
+          ATY1[coli] += mmEipATYBuf[1][srcBufIdx][coli];
+        }
+        totalSamples += numMmSamplesBuf[0][srcBufIdx];
+        totalSamples1 += numMmSamplesBuf[1][srcBufIdx];
+      }
+      else if(pu.cs->pcv->isEncoder)
+      {
+        for (int i = 0; i < sizeAtaBuf; i++)
+        {
+          ATA[i] += (mmEipATABuf[0][srcBufIdx][i] + mmEipATABuf[1][srcBufIdx][i]);
+        }
+
+        for (int coli = 0; coli < numInputs; coli++)
+        {
+          ATY[coli] += (mmEipATYBuf[0][srcBufIdx][coli] + mmEipATYBuf[1][srcBufIdx][coli]);
+        }
+        totalSamples += (numMmSamplesBuf[0][srcBufIdx] + numMmSamplesBuf[1][srcBufIdx]);
+      }
+      else
+      {
+        for (int i = 0; i < sizeAtaBuf; i++)
+        {
+          ATA[i] += ATABuf[srcBufIdx][i];
+        }
+
+        for (int coli = 0; coli < numInputs; coli++)
+        {
+          ATY[coli] += ATYBuf[srcBufIdx][coli];
+        }
+        totalSamples += numSamplesBuf[refIdx];
+      }
+    }
+    m_cccmSolver.solveEip(ATA, ATY, totalSamples, m_cccmLumaOffset, model, cand.bMm);
+    cand.filterShape = filterShape;
+    memcpy(cand.params, model.params.data(), sizeof(cand.params));
+
+    if(cand.bMm)
+    {
+      cand.eipMmThrd = thrd;
+      m_cccmSolver.solveEip(ATA1, ATY1, totalSamples1, m_cccmLumaOffset, model1, true);
+      memcpy(cand.params1, model1.params.data(), sizeof(cand.params1));
+    }
+
+    candList.push_back(cand);
+#else
     for (auto refIdx : refIdxList)
     {
       const int srcBufIdx = filterShape + refIdx * NUM_EIP_BASE_RECOTYPE;
@@ -27836,6 +28146,7 @@ void IntraPrediction::getCurEipCands(const PredictionUnit& pu, static_vector<Eip
     cand.filterShape = filterShape;
     memcpy(cand.params, model.params.data(), sizeof(cand.params));
     candList.push_back(cand);
+#endif
   }
 }
 
@@ -27862,12 +28173,37 @@ void IntraPrediction::eipPred(const PredictionUnit& pu, PelBuf& piPred, const Co
 #else
   const ClpRng clipRng = pu.cu->slice->clpRngs().comp[compId];
 #endif
+#if JVET_AJ0082_MM_EIP
+  if(model.bMm)
+  {
+    CccmModel cand1(EIP_FILTER_TAP, pu.cu->slice->getSPS()->getBitDepth(toChannelType(compId)));
+    memcpy(cand1.params.data(), model.params1, sizeof(model.params1));
+    const int thrd = model.eipMmThrd;
+    for (int scanIdx = 0; scanIdx < num; scanIdx++)
+    {
+      setInputsVec(inputs, predBuf, scan[scanIdx].x, scan[scanIdx].y, model.filterShape);
+
+      if (getEipInputsAvg(inputs, model.filterShape) <= thrd)
+      {
+        predBuf.at(scan[scanIdx].x, scan[scanIdx].y) = ClipPel(cand.convolve(inputs), clipRng);
+      }
+      else
+      {
+        predBuf.at(scan[scanIdx].x, scan[scanIdx].y) = ClipPel(cand1.convolve(inputs), clipRng);
+      }
+    }
+  }
+  else
+  {
+#endif
   for (int scanIdx = 0; scanIdx < num; scanIdx++)
   {
     setInputsVec(inputs, predBuf, scan[scanIdx].x, scan[scanIdx].y, model.filterShape);
     predBuf.at(scan[scanIdx].x, scan[scanIdx].y) = ClipPel(cand.convolve(inputs), clipRng);
   }
-
+#if JVET_AJ0082_MM_EIP
+  }
+#endif
   piPred.copyFrom(predBuf);
 }
 
@@ -28363,14 +28699,29 @@ void IntraPrediction::reorderEipCands(const PredictionUnit& pu, static_vector<Ei
   {
     CccmModel cand(EIP_FILTER_TAP, pu.cu->slice->getSPS()->getBitDepth(toChannelType(compId)));
     memcpy(cand.params.data(), model.params, sizeof(model.params));
-
+#if JVET_AJ0082_MM_EIP
+    CccmModel cand1(EIP_FILTER_TAP, pu.cu->slice->getSPS()->getBitDepth(toChannelType(compId)));
+    Pel thrd = model.eipMmThrd;
+    memcpy(cand1.params.data(), model.params1, sizeof(model.params1));
+#endif
     uiCost = 0;
     for (int h = 0; h < EIP_TPL_SIZE; h++)
     {
       for (int w = 0; w < blockWidth; w++)
       {
         setInputsVec(inputs, recoTop, w, h, model.filterShape);
+#if JVET_AJ0082_MM_EIP
+        if (model.bMm && getEipInputsAvg(inputs, model.filterShape) > thrd)
+        {
+          predTop.at(w, h) = ClipPel(cand1.convolve(inputs), clipRng);
+        }
+        else
+        {
+          predTop.at(w, h) = ClipPel(cand.convolve(inputs), clipRng);
+        }
+#else
         predTop.at(w, h) = ClipPel(cand.convolve(inputs), clipRng);
+#endif
       }
     }
 #if JVET_AJ0096_SATD_REORDER_INTRA
@@ -28385,7 +28736,18 @@ void IntraPrediction::reorderEipCands(const PredictionUnit& pu, static_vector<Ei
       for (int w = 0; w < EIP_TPL_SIZE; w++)
       {
         setInputsVec(inputs, recoLeft, w, h, model.filterShape);
+#if JVET_AJ0082_MM_EIP
+        if (model.bMm && getEipInputsAvg(inputs, model.filterShape) > thrd)
+        {
+          predLeft.at(w, h) = ClipPel(cand1.convolve(inputs), clipRng);
+        }
+        else
+        {
+          predLeft.at(w, h) = ClipPel(cand.convolve(inputs), clipRng);
+        }
+#else
         predLeft.at(w, h) = ClipPel(cand.convolve(inputs), clipRng);
+#endif
       }
     }
 #if JVET_AJ0096_SATD_REORDER_INTRA

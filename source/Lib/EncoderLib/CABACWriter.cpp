@@ -2474,7 +2474,18 @@ void CABACWriter::cu_eip_flag(const CodingUnit& cu)
       {
         CHECK(cu.firstPU->intraDir[0] >= NUM_DERIVED_EIP, "cu.firstPU->intraDir[0] >= NUM_DERIVED_EIP");
         static_vector<EIPInfo, NUM_DERIVED_EIP> eipInfoList;
+#if JVET_AJ0082_MM_EIP
+        m_BinEncoder.encodeBin(cu.eipMmFlag, Ctx::EipFlag(2));
+        int eipNum = getAllowedCurEip(cu, COMPONENT_Y, eipInfoList, cu.eipMmFlag);
+        int eipIdx = cu.firstPU->intraDir[0];
+
+        if (eipNum > 1)
+        {
+          xWriteTruncBinCode(eipIdx, eipNum);
+        }
+#else
         xWriteTruncBinCode(cu.firstPU->intraDir[0], getAllowedCurEip(cu, COMPONENT_Y, eipInfoList));
+#endif
       }
     }
   }
