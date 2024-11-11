@@ -32518,6 +32518,19 @@ int PU::getNSPTMatrixDim( int width, int height )
   return dimension;
 }
 
+#if JVET_AJ0175_NSPT_FOR_NONREG_MODES
+int PU::getNSPTBucket( const TransformUnit &tu )
+{
+  const CodingUnit &cu = *tu.cu;
+  if (cu.timd || cu.dimd || cu.eipFlag || cu.mipFlag || cu.sgpm)
+    return 1;
+  if (cu.tmpFlag || CU::isInter(cu))
+    return 2;
+  // Conventional intra mode
+  return 0;
+}
+#endif
+
 uint32_t PU::getFinalIntraModeForTransform( const TransformUnit &tu, const ComponentID compID )
 {
   const CompArea& area = tu.blocks[ compID ];

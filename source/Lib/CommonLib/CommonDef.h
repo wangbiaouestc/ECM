@@ -838,6 +838,24 @@ static const int NUM_LFNST_NUM_PER_SET =                            4;
 static const int NUM_LFNST_NUM_PER_SET =                            3;
 #endif
 
+#if JVET_AJ0175_NSPT_FOR_NONREG_MODES
+static const int NUM_NSPT_BLOCK_TYPES   =                           3;   ///< 0:Regular 1:Mixed 2:Inter/ITMP
+static const int NUM_NSPT_CLUSTERS_4x4  =                         245;
+static const int NUM_NSPT_CLUSTERS_4x8  =                         245;
+static const int NUM_NSPT_CLUSTERS_8x4  =                         221;
+static const int NUM_NSPT_CLUSTERS_8x8  =                         245;
+static const int NUM_NSPT_CLUSTERS_4x16 =                         213;
+static const int NUM_NSPT_CLUSTERS_16x4 =                         183;
+static const int NUM_NSPT_CLUSTERS_8x16 =                         213;
+static const int NUM_NSPT_CLUSTERS_16x8 =                         194;
+#if JVET_AE0086_LARGE_NSPT
+static const int NUM_NSPT_CLUSTERS_4x32 =                         149;
+static const int NUM_NSPT_CLUSTERS_32x4 =                         113;
+static const int NUM_NSPT_CLUSTERS_8x32 =                         149;
+static const int NUM_NSPT_CLUSTERS_32x8 =                         127;
+#endif
+#endif
+
 static const int LOG2_MAX_NUM_COLUMNS_MINUS1 =                      7;
 static const int LOG2_MAX_NUM_ROWS_MINUS1 =                         7;
 

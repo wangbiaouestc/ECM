@@ -625,7 +625,11 @@ MsgLevel g_verbosity = VERBOSE;
 #if SIGN_PREDICTION
 #if JVET_Y0141_SIGN_PRED_IMPROVE
 #if JVET_W0119_LFNST_EXTENSION || EXTENDED_LFNST
+#if JVET_AJ0175_NSPT_FOR_NONREG_MODES
+int8_t * g_resiBorderTemplateLFNST[NUM_NSPT_BLOCK_TYPES][6][6][210];
+#else
 int8_t * g_resiBorderTemplateLFNST[6][6][210];
+#endif
 #else
 int8_t * g_resiBorderTemplateLFNST[6][6][16];
 #endif
@@ -5150,7 +5154,11 @@ void initROM()
  
 #if JVET_Y0141_SIGN_PRED_IMPROVE
   memset(&g_resiBorderTemplate[0][0][0], 0, sizeof(g_resiBorderTemplate));
+#if JVET_AJ0175_NSPT_FOR_NONREG_MODES
+  memset(&g_resiBorderTemplateLFNST[0][0][0][0], 0, sizeof(g_resiBorderTemplateLFNST));
+#else
   memset(&g_resiBorderTemplateLFNST[0][0][0], 0, sizeof(g_resiBorderTemplateLFNST));
+#endif
 #endif
 #if TU_256
   c = 256;
@@ -5471,11 +5479,22 @@ void destroyROM()
       for (int idx = 0; idx < 16; idx++)
 #endif
       {
+#if JVET_AJ0175_NSPT_FOR_NONREG_MODES
+        for (int t = 0; t < NUM_NSPT_BLOCK_TYPES; t++)
+        {
+          if (g_resiBorderTemplateLFNST[t][log2Width][log2Height][idx])
+          {
+            xFree(g_resiBorderTemplateLFNST[t][log2Width][log2Height][idx]);
+            g_resiBorderTemplateLFNST[t][log2Width][log2Height][idx] = nullptr;
+          }
+        }
+#else
         if (g_resiBorderTemplateLFNST[log2Width][log2Height][idx])
         {
           xFree(g_resiBorderTemplateLFNST[log2Width][log2Height][idx]);
           g_resiBorderTemplateLFNST[log2Width][log2Height][idx] = nullptr;
         }
+#endif
       }
     }
   }

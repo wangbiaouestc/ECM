@@ -1730,10 +1730,14 @@ void TrQuant::xFwdNspt( const TransformUnit &tu, TCoeff* src, TCoeff* dst, const
   int     zeroOutSize = PU::getNSPTMatrixDim( transposeFlag ? height : width, transposeFlag ? width : height );
 
 #if INTRA_TRANS_ENC_OPT
-  m_computeFwdNspt( m_nsptTempInMatrix, m_nsptTempOutMatrix, nsptSetIdx, transposeFlag ? height : width, transposeFlag ? width : height, shift_1st, shift_2nd, zeroOutSize, nsptIdx );
+  m_computeFwdNspt( m_nsptTempInMatrix, m_nsptTempOutMatrix, nsptSetIdx, transposeFlag ? height : width, transposeFlag ? width : height, shift_1st, shift_2nd, zeroOutSize, nsptIdx
 #else
-  computeFwdNspt( m_nsptTempInMatrix, m_nsptTempOutMatrix, nsptSetIdx, transposeFlag ? height : width, transposeFlag ? width : height, shift_1st, shift_2nd, zeroOutSize, nsptIdx );
+  computeFwdNspt( m_nsptTempInMatrix, m_nsptTempOutMatrix, nsptSetIdx, transposeFlag ? height : width, transposeFlag ? width : height, shift_1st, shift_2nd, zeroOutSize, nsptIdx
 #endif
+#if JVET_AJ0175_NSPT_FOR_NONREG_MODES
+    , PU::getNSPTBucket(tu)
+#endif
+  );
 
   int nsptCoeffNum = PU::getNSPTMatrixDim( width, height );
   const ScanElement *scanPtr = scan;
@@ -1777,17 +1781,21 @@ void TrQuant::xInvNspt( const TransformUnit &tu, const TCoeff* src, TCoeff* dst,
 
 #if INTRA_TRANS_ENC_OPT
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
-  m_computeInvNspt( m_nsptTempInMatrix, m_nsptTempOutMatrix, nsptSetIdx, transposeFlag ? height : width, transposeFlag ? width : height, shift_1st, shift_2nd, maxLog2TrDynamicRange, zeroOutSize, nsptIdx );
+  m_computeInvNspt( m_nsptTempInMatrix, m_nsptTempOutMatrix, nsptSetIdx, transposeFlag ? height : width, transposeFlag ? width : height, shift_1st, shift_2nd, maxLog2TrDynamicRange, zeroOutSize, nsptIdx
 #else
-  m_computeInvNspt( m_nsptTempInMatrix, m_nsptTempOutMatrix, nsptSetIdx, transposeFlag ? height : width, transposeFlag ? width : height, shift_1st, shift_2nd, zeroOutSize, nsptIdx );
+  m_computeInvNspt( m_nsptTempInMatrix, m_nsptTempOutMatrix, nsptSetIdx, transposeFlag ? height : width, transposeFlag ? width : height, shift_1st, shift_2nd, zeroOutSize, nsptIdx
 #endif
 #else
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
-  computeInvNspt( m_nsptTempInMatrix, m_nsptTempOutMatrix, nsptSetIdx, transposeFlag ? height : width, transposeFlag ? width : height, shift_1st, shift_2nd, maxLog2TrDynamicRange, zeroOutSize, nsptIdx );
+  computeInvNspt( m_nsptTempInMatrix, m_nsptTempOutMatrix, nsptSetIdx, transposeFlag ? height : width, transposeFlag ? width : height, shift_1st, shift_2nd, maxLog2TrDynamicRange, zeroOutSize, nsptIdx
 #else
-  computeInvNspt( m_nsptTempInMatrix, m_nsptTempOutMatrix, nsptSetIdx, transposeFlag ? height : width, transposeFlag ? width : height, shift_1st, shift_2nd, zeroOutSize, nsptIdx );
+  computeInvNspt( m_nsptTempInMatrix, m_nsptTempOutMatrix, nsptSetIdx, transposeFlag ? height : width, transposeFlag ? width : height, shift_1st, shift_2nd, zeroOutSize, nsptIdx
 #endif
 #endif
+#if JVET_AJ0175_NSPT_FOR_NONREG_MODES
+    , PU::getNSPTBucket(tu)
+#endif
+  );
 
   TCoeff*       nsptOut = m_nsptTempOutMatrix;
 
@@ -1810,12 +1818,130 @@ void TrQuant::xInvNspt( const TransformUnit &tu, const TCoeff* src, TCoeff* dst,
   }
 }
 
-#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
-void TrQuant::computeFwdNspt( TCoeff* src, TCoeff* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx )
-#else
-void TrQuant::computeFwdNspt( int* src, int* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx )
-#endif
+#if JVET_AJ0175_NSPT_FOR_NONREG_MODES
+uint8_t TrQuant::getNsptKernelCluster(const uint32_t mode, const uint32_t width, const uint32_t height, int nsptIdx, int bktIdx)
 {
+  CHECK(bktIdx < 0 || bktIdx >= NUM_NSPT_BLOCK_TYPES, "bktIdx outside range");
+  if (width == 4 && height == 4)
+  {
+    return g_nsptIdx_4x4[ mode ][ bktIdx ][ nsptIdx ];
+  }
+  else if (width == 8 && height == 8)
+  {
+    return g_nsptIdx_8x8[ mode ][ bktIdx ][ nsptIdx ];
+  }
+  else if (width == 4 && height == 8)
+  {
+    return g_nsptIdx_4x8[ mode ][ bktIdx ][ nsptIdx ];
+  }
+  else if (width == 8 && height == 4)
+  {
+    return g_nsptIdx_8x4[ mode ][ bktIdx ][ nsptIdx ];
+  }
+  else if (width == 4 && height == 16)
+  {
+    return g_nsptIdx_4x16[ mode ][ bktIdx ][ nsptIdx ];
+  }
+  else if (width == 16 && height == 4)
+  {
+    return g_nsptIdx_16x4[ mode ][ bktIdx ][ nsptIdx ];
+  }
+  else if (width == 8 && height == 16)
+  {
+    return g_nsptIdx_8x16[ mode ][ bktIdx ][ nsptIdx ];
+  }
+  else if (width == 16 && height == 8)
+  {
+    return g_nsptIdx_16x8[ mode ][ bktIdx ][ nsptIdx ];
+  }
+#if JVET_AE0086_LARGE_NSPT
+  else if (width == 4 && height == 32)
+  {
+    return g_nsptIdx_4x32[ mode ][ bktIdx ][ nsptIdx ];
+  }
+  else if (width == 32 && height == 4)
+  {
+    return g_nsptIdx_32x4[ mode ][ bktIdx ][ nsptIdx ];
+  }
+  else if (width == 8 && height == 32)
+  {
+    return g_nsptIdx_8x32[ mode ][ bktIdx ][ nsptIdx ];
+  }
+  else if (width == 32 && height == 8)
+  {
+    return g_nsptIdx_32x8[ mode ][ bktIdx ][ nsptIdx ];
+  }
+#endif
+  return false;
+}
+
+const int8_t *TrQuant::getNsptMatrix(const uint32_t mode, const uint32_t width, const uint32_t height, int nsptIdx, int bktIdx)
+{
+  uint8_t clusterIdx = TrQuant::getNsptKernelCluster(mode, width, height, nsptIdx, bktIdx);
+  const int8_t *trMat = g_nspt4x4[ clusterIdx ][ 0 ];
+  if (width == 8 && height == 8)
+  {
+    trMat = g_nspt8x8[ clusterIdx ][ 0 ];
+  }
+  else if (width == 4 && height == 8)
+  {
+    trMat = g_nspt4x8[ clusterIdx ][ 0 ];
+  }
+  else if (width == 8 && height == 4)
+  {
+    trMat = g_nspt8x4[ clusterIdx ][ 0 ];
+  }
+  else if (width == 4 && height == 16)
+  {
+    trMat = g_nspt4x16[ clusterIdx ][ 0 ];
+  }
+  else if (width == 16 && height == 4)
+  {
+    trMat = g_nspt16x4[ clusterIdx ][ 0 ];
+  }
+  else if (width == 8 && height == 16)
+  {
+    trMat = g_nspt8x16[ clusterIdx ][ 0 ];
+  }
+  else if (width == 16 && height == 8)
+  {
+    trMat = g_nspt16x8[ clusterIdx ][ 0 ];
+  }
+#if JVET_AE0086_LARGE_NSPT
+  else if (width == 4 && height == 32)
+  {
+    trMat = g_nspt4x32[ clusterIdx ][ 0 ];
+  }
+  else if (width == 32 && height == 4)
+  {
+    trMat = g_nspt32x4[ clusterIdx ][ 0 ];
+  }
+  else if (width == 8 && height == 32)
+  {
+    trMat = g_nspt8x32[ clusterIdx ][ 0 ];
+  }
+  else if (width == 32 && height == 8)
+  {
+    trMat = g_nspt32x8[ clusterIdx ][ 0 ];
+  }
+#endif 
+  return trMat;
+}
+#endif
+
+#if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
+void TrQuant::computeFwdNspt( TCoeff* src, TCoeff* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx
+#else
+void TrQuant::computeFwdNspt( int* src, int* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx
+#endif
+#if JVET_AJ0175_NSPT_FOR_NONREG_MODES
+                             , int bktIdx
+#endif
+)
+{
+#if JVET_AJ0175_NSPT_FOR_NONREG_MODES
+  const int8_t* trMat = getNsptMatrix(mode, width, height, nsptIdx, bktIdx);
+#else
   const int8_t* trMat = g_nspt4x4[ mode ][ nsptIdx ][ 0 ];
   if( width == 8 && height == 8 )
   {
@@ -1863,6 +1989,7 @@ void TrQuant::computeFwdNspt( int* src, int* dst, const uint32_t mode, const uin
     trMat = g_nspt32x8[ mode ][ nsptIdx ][ 0 ];
   }
 #endif
+#endif
 
   int     trSize = width * height;
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
@@ -1899,7 +2026,11 @@ void TrQuant::computeFwdNspt( int* src, int* dst, const uint32_t mode, const uin
 
 #if JVET_R0351_HIGH_BIT_DEPTH_SUPPORT
 void TrQuant::computeInvNspt( TCoeff* src, TCoeff* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd,
-  const int maxLog2TrDynamicRange, int zeroOutSize, int nsptIdx )
+  const int maxLog2TrDynamicRange, int zeroOutSize, int nsptIdx
+#if JVET_AJ0175_NSPT_FOR_NONREG_MODES
+                             , int bktIdx
+#endif
+)
 {
 #else
 void TrQuant::computeInvNspt( int* src, int* dst, const uint32_t mode, const uint32_t width, const uint32_t height, const int shift_1st, const int shift_2nd, int zeroOutSize, int nsptIdx )
@@ -1909,6 +2040,9 @@ void TrQuant::computeInvNspt( int* src, int* dst, const uint32_t mode, const uin
   const TCoeff    outputMinimum = -( 1 << maxLog2TrDynamicRange );
   const TCoeff    outputMaximum = ( 1 << maxLog2TrDynamicRange ) - 1;
 
+#if JVET_AJ0175_NSPT_FOR_NONREG_MODES
+  const int8_t* trMat = getNsptMatrix(mode, width, height, nsptIdx, bktIdx);
+#else
   const int8_t* trMat = g_nspt4x4[ mode ][ nsptIdx ][ 0 ];
   if( width == 8 && height == 8 )
   {
@@ -1955,6 +2089,7 @@ void TrQuant::computeInvNspt( int* src, int* dst, const uint32_t mode, const uin
   {
     trMat = g_nspt32x8[ mode ][ nsptIdx ][ 0 ];
   }
+#endif
 #endif
 
   int trSize = width * height;
@@ -2502,7 +2637,15 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
 
     int log2Width = floorLog2(width);
     int log2Height = floorLog2(height);
+#if JVET_AJ0175_NSPT_FOR_NONREG_MODES
+    bool spsIntraLfnstEnabled = ( ( tu.cu->slice->getSliceType() == I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTISlice() ) ||
+                                ( tu.cu->slice->getSliceType() != I_SLICE && tu.cu->cs->sps->getUseIntraLFNSTPBSlice() ) );
+    bool allowNSPT = CU::isNSPTAllowed(tu, comp, width, height, spsIntraLfnstEnabled && CU::isIntra(*(tu.cu)));
+    int  nsptBucketIdx = allowNSPT ? PU::getNSPTBucket(tu) : 0;
+    g_resiBorderTemplateLFNST[nsptBucketIdx][log2Width - 2][log2Height - 2][lfnstIdx] = templateBuf.buf;
+#else
     g_resiBorderTemplateLFNST[log2Width - 2][log2Height - 2][lfnstIdx] = templateBuf.buf;
+#endif
 
     xFree(memTmpResid);
   };
@@ -2534,10 +2677,19 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
   if (lfnstEnabled)
   {
     actualLfnstIdx = getLfnstIdx(tu, residCompID);
+#if JVET_AJ0175_NSPT_FOR_NONREG_MODES
+    bool allowNSPT = CU::isNSPTAllowed(tu, compID, uiWidth, uiHeight, spsIntraLfnstEnabled && CU::isIntra(*(tu.cu)));
+    int  nsptBucketIdx = allowNSPT ? PU::getNSPTBucket(tu) : 0;
+    if (!g_resiBorderTemplateLFNST[nsptBucketIdx][log2Width - 2][log2Height - 2][actualLfnstIdx])
+    {
+      createTemplateLFNST(residCompID, uiWidth, uiHeight, actualLfnstIdx);
+    }
+#else
     if (!g_resiBorderTemplateLFNST[log2Width - 2][log2Height - 2][actualLfnstIdx])
     {
       createTemplateLFNST(residCompID, uiWidth, uiHeight, actualLfnstIdx);
     }
+#endif
   }
   else
   {
@@ -2579,10 +2731,19 @@ void TrQuant::predCoeffSigns(TransformUnit &tu, const ComponentID compID, const 
     (lfnstEnabled ? AreaBuf<const int8_t>()
                   : AreaBuf<const int8_t>(g_resiBorderTemplate[log2Width - 2][log2Height - 2][actualTrIdx], stride,
                                           length, w * h));
+#if JVET_AJ0175_NSPT_FOR_NONREG_MODES
+  bool allowNSPT = CU::isNSPTAllowed( tu, compID, uiWidth, uiHeight, spsIntraLfnstEnabled && CU::isIntra( *( tu.cu ) ) );
+  int  nsptBucketIdx = allowNSPT ? PU::getNSPTBucket(tu) : 0;
+  AreaBuf<const int8_t> templateLfnstNormalizedBuf =
+    (lfnstEnabled ? AreaBuf<const int8_t>(g_resiBorderTemplateLFNST[nsptBucketIdx][log2Width - 2][log2Height - 2][actualLfnstIdx],
+                                          stride, length, signPredWidth * signPredHeight)
+                  : AreaBuf<const int8_t>());
+#else
   AreaBuf<const int8_t> templateLfnstNormalizedBuf =
     (lfnstEnabled ? AreaBuf<const int8_t>(g_resiBorderTemplateLFNST[log2Width - 2][log2Height - 2][actualLfnstIdx],
                                           stride, length, signPredWidth * signPredHeight)
                   : AreaBuf<const int8_t>());
+#endif
 #else
   AreaBuf<const int8_t> templateNormalizedBuf(g_resiBorderTemplate[log2Width - 2][log2Height - 2][actualTrIdx], stride,
                                               length, SIGN_PRED_FREQ_RANGE * SIGN_PRED_FREQ_RANGE);
