@@ -4144,6 +4144,11 @@ SPS::SPS()
   , m_itmpLicExtension        ( false )
   , m_itmpLicMode             ( false )
 #endif
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+  , m_disableRefFilter        ( false )
+  , m_disablePdpc             ( false )
+  , m_disableIntraFusion      ( false )
+#endif
 #if TM_AMVP || TM_MRG || JVET_Z0084_IBC_TM || MULTI_PASS_DMVR
  , m_DMVDMode                 ( false )
 #endif

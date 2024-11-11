@@ -1306,6 +1306,9 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 #if JVET_AG0136_INTRA_TMP_LIC
   ("ItmpLicExtension",                                m_itmpLicExtension,                               false, "extended Itmp LIC(0:off, 1:on)  [default: off]" )
 #endif
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+  ("IntraToolControlMode",                            m_intraToolControlMode,                               1, "Control of Intra tools related to reference Filtering, PDPC, and intra prediction fusion (0:tool off, 1:tool on, 2:decision by alogithm whether to signal 0 or 1 in SPS)  [default: 1]")
+#endif
   ("WrapAround",                                      m_wrapAround,                                     false, "Enable horizontal wrap-around motion compensation for inter prediction (0:off, 1:on)  [default: off]")
   ("WrapAroundOffset",                                m_wrapAroundOffset,                                  0u, "Offset in luma samples used for computing the horizontal wrap-around position")
 #if JVET_AH0135_TEMPORAL_PARTITIONING
@@ -5748,6 +5751,9 @@ void EncAppCfg::xPrintParameter()
 #if JVET_AG0136_INTRA_TMP_LIC
   msg( VERBOSE, "TmpLicExtension:%d ", m_itmpLicExtension );
   msg( VERBOSE, "TmpLicMode:%d ", m_itmpLicMode );
+#endif
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+  msg(VERBOSE, "IntraToolControlMode:%d ", m_intraToolControlMode);
 #endif
   msg( VERBOSE, "HashME:%d ", m_HashME );
   msg( VERBOSE, "WrapAround:%d ", m_wrapAround);

@@ -219,6 +219,7 @@
 #define JVET_AI0208_PDP_MIP                               1 // JVET_AI0208: Modifications to Matrix-based intra prediction
 #endif
 #define JVET_AI0136_ADAPTIVE_DUAL_TREE                    1 // JVET-AI0136: Adaptive dual tree in inter slices
+#define JVET_AJ0057_HL_INTRA_METHOD_CONTROL               1 // JVET-AJ0057: High-level control of intra prediction methods
 
 //IBC
 #define JVET_Y0058_IBC_LIST_MODIFY                        1 // JVET-Y0058: Modifications of IBC merge/AMVP list construction, ARMC-TM-IBC part is included under JVET_W0090_ARMC_TM

@@ -2139,6 +2139,11 @@ void EncLib::xInitSPS( SPS& sps )
   sps.setItmpLicExtension                   ( m_itmpLicExtension );
   sps.setItmpLicMode                        ( m_itmpLicMode );
 #endif
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+  sps.setDisableRefFilter                   ( false );
+  sps.setDisablePdpc                        ( false );
+  sps.setDisableIntraFusion                 ( false );
+#endif
   sps.setWrapAroundEnabledFlag                      ( m_wrapAround );
 #if JVET_AH0135_TEMPORAL_PARTITIONING
   sps.setEnableMaxMttIncrease               ( m_enableMaxMttIncrease );

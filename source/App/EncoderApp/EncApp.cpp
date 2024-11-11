@@ -1068,7 +1068,9 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setTMIbc(m_tmibc);
   m_cEncLib.setIbcMerge                                          ( m_ibcMerge );
 #endif
-
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+  m_cEncLib.setIntraToolControlMode                              ( m_intraToolControlMode );
+#endif
   m_cEncLib.setUseWrapAround                                     ( m_wrapAround );
   m_cEncLib.setWrapAroundOffset                                  ( m_wrapAroundOffset );
 #if JVET_V0130_INTRA_TMP

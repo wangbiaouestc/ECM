@@ -620,7 +620,9 @@ protected:
   bool      m_itmpLicExtension;
   bool      m_itmpLicMode;
 #endif
-
+#if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
+  int       m_intraToolControlMode;
+#endif
 #if JVET_AD0208_IBC_ADAPT_FOR_CAM_CAPTURED_CONTENTS
   bool      m_rribc;
   bool      m_tmibc;
