@@ -27797,7 +27797,7 @@ void IntraPrediction::getChromaTmrlList(const CPelBuf& recoBufY, const CPelBuf& 
         }
         else
         {
-          assert(0);
+          CHECK(true, "wrong template type!");
         }
       }
 
