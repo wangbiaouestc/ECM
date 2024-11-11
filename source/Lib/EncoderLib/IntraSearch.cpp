@@ -9273,14 +9273,13 @@ void IntraSearch::xSelectAMTForFullRD(TransformUnit &tu
   const int m = sizeIdx > 12 ? 2 : 0;
   const int s = sizeIdx > 12 ? 4 : 2;
   uint16_t uiDirMode = pu.cu->bdpcmMode ? BDPCM_IDX : PU::getFinalIntraMode(pu, CHANNEL_TYPE_LUMA);
-  auto modeIdx = g_modeGroup[uiDirMode];
 
   bool isPDPMode = (sizeIdx >= 0 && m_refAvailable && !pu.cu->ispMode && uiDirMode != BDPCM_IDX
     && pu.cu->cs->sps->getUsePDP()
     && !pu.cu->plIdx && !pu.cu->sgpm
     && !pu.cu->timd && !pu.cu->tmrlFlag && !pu.multiRefIdx
-    && g_pdpFilters[modeIdx][sizeIdx]
-    && !(modeIdx > 1 && (modeIdx % s != m)));
+    && g_pdpFilters[uiDirMode][sizeIdx]
+    && !(uiDirMode > 1 && (uiDirMode % s != m)));
 #endif
   //===== get prediction signal =====
 #if JVET_V0130_INTRA_TMP && JVET_AC0115_INTRA_TMP_DIMD_MTS_LFNST
@@ -9631,14 +9630,13 @@ void IntraSearch::xIntraCodingTUBlock(TransformUnit &tu, const ComponentID &comp
       const int m = sizeIdx > 12 ? 2 : 0;
       const int s = sizeIdx > 12 ? 4 : 2;
       uint16_t uiDirMode = pu.cu->bdpcmMode ? BDPCM_IDX : PU::getFinalIntraMode(pu, CHANNEL_TYPE_LUMA);
-      auto modeIdx = g_modeGroup[uiDirMode];
 
       bool isPDPMode = (sizeIdx >= 0 && m_refAvailable && !pu.cu->ispMode && uiDirMode != BDPCM_IDX
         && pu.cu->cs->sps->getUsePDP()
         && !pu.cu->plIdx && !pu.cu->sgpm
         && !pu.cu->timd && !pu.cu->tmrlFlag && !pu.multiRefIdx
-        && g_pdpFilters[modeIdx][sizeIdx]
-        && !(modeIdx > 1 && (modeIdx % s != m)));
+        && g_pdpFilters[uiDirMode][sizeIdx]
+        && !(uiDirMode > 1 && (uiDirMode % s != m)));
 #endif
       //===== get prediction signal =====
       if(compID != COMPONENT_Y && !tu.cu->bdpcmModeChroma && PU::isLMCMode(uiChFinalMode))
