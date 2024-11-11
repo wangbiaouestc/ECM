@@ -152,6 +152,12 @@ IntraPrediction::IntraPrediction()
 #if MMLM
   m_encPreRDRun = false;
 #endif
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
+  m_isIntraForOBMC = 0;
+  m_refSampleForOBMC = false;
+  memset(m_refSampleForOBMCBuf, -1, sizeof( Pel ) * (MAX_INTRA_SIZE + 3));
+  memset(m_refSampleForOBMCBufFiltered, -1, sizeof( Pel ) * (MAX_INTRA_SIZE + 3));
+#endif
 #if JVET_V0130_INTRA_TMP
   m_pppTarPatch = NULL;
 #endif
@@ -3650,6 +3656,13 @@ void IntraPrediction::initPredIntraParams(const PredictionUnit & pu, const CompA
     }
   }
 
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
+  if (pu.cu->isobmcMC)
+  {
+    m_ipaParam.applyPDPC &= (m_isIntraForOBMC == 0);
+    m_ipaParam.useGradPDPC &= (m_isIntraForOBMC == 0);
+  }
+#endif
   // high level conditions and DC intra prediction
   if(   sps.getSpsRangeExtension().getIntraSmoothingDisabledFlag()
     || !isLuma( chType )
@@ -3691,6 +3704,11 @@ void IntraPrediction::initPredIntraParams(const PredictionUnit & pu, const CompA
       filterFlag = (diff > m_aucIntraFilter[log2Size]);
 #endif
     }
+
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
+    if (pu.cu->isobmcMC)
+      filterFlag = false;
+#endif
 
     // Selelection of either ([1 2 1] / 4 ) refrence filter OR Gaussian 4-tap interpolation filter
     if (filterFlag)
@@ -3853,9 +3871,30 @@ void IntraPrediction::xPredIntraAng( const CPelBuf &pSrc, PelBuf &pDst, const Ch
 
     // Extend the Main reference to the left.
     int sizeSide = bIsModeVer ? height : width;
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
+    if (m_refSampleForOBMC && (m_isIntraForOBMC == 2 && intraPredAngle == -32))
+    {
+      for (int k = 1; k <= width + 2; k++)
+      {
+        int val = m_refSampleForOBMCBufFiltered[k];
+        refMain[k] = (Pel)ClipPel(val, clpRng);
+      }
+    }
+#endif
     // left extend by 1
     for (int k = -(sizeSide + 1); k <= -1; k++)
     {
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
+      if (m_refSampleForOBMC && !(m_isIntraForOBMC == 2 && intraPredAngle == -32))
+      {
+        if ((m_isIntraForOBMC == 1 && bIsModeVer == true) || (m_isIntraForOBMC == 2 && bIsModeVer == false))
+        {
+          int val = m_refSampleForOBMCBufFiltered[abs(k)];
+          refMain[k] = (Pel)ClipPel(val, clpRng);
+        }
+        continue;
+      }
+#endif
       int frac32precision = (-k * absInvAngle + 8) >> 4;
       int intpel = frac32precision >> 5;
       int fracpel = frac32precision & 31;
@@ -5333,6 +5372,12 @@ inline int  isAboveAvailable      ( const CodingUnit &cu, const ChannelType &chT
 inline int  isLeftAvailable       ( const CodingUnit &cu, const ChannelType &chType, const Position &posLT, const uint32_t uiNumUnitsInPU, const uint32_t unitWidth, bool *validFlags );
 inline int  isAboveRightAvailable ( const CodingUnit &cu, const ChannelType &chType, const Position &posRT, const uint32_t uiNumUnitsInPU, const uint32_t unitHeight, bool *validFlags );
 inline int  isBelowLeftAvailable  ( const CodingUnit &cu, const ChannelType &chType, const Position &posLB, const uint32_t uiNumUnitsInPU, const uint32_t unitHeight, bool *validFlags );
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
+inline int  isAboveAvailableOBMC      ( const CodingUnit &cu, const ChannelType &chType, const Position &posLT, const uint32_t uiNumUnitsInPU, const uint32_t unitWidth, bool *validFlags, const int isForOBMC );
+inline int  isLeftAvailableOBMC       ( const CodingUnit &cu, const ChannelType &chType, const Position &posLT, const uint32_t uiNumUnitsInPU, const uint32_t unitWidth, bool *validFlags, const int isForOBMC );
+inline int  isAboveRightAvailableOBMC ( const CodingUnit &cu, const ChannelType &chType, const Position &posRT, const uint32_t uiNumUnitsInPU, const uint32_t unitHeight, bool *validFlags, const int isForOBMC );
+inline int  isBelowLeftAvailableOBMC  ( const CodingUnit &cu, const ChannelType &chType, const Position &posLB, const uint32_t uiNumUnitsInPU, const uint32_t unitHeight, bool *validFlags, const int isForOBMC );
+#endif
 
 #if JVET_AB0155_SGPM
 void IntraPrediction::initIntraPatternChType(const CodingUnit &cu, const CompArea &area, const bool forceRefFilterFlag,
@@ -5376,6 +5421,13 @@ void IntraPrediction::initIntraPatternChType(const CodingUnit &cu, const CompAre
 #if JVET_AC0112_IBC_GPM
   m_ipaParam.fetchRef2nd &= !cu.firstPU->ibcGpmFlag;
 #endif
+#endif
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
+  if (cu.isobmcMC)
+  {
+    applyFusion = false;
+    m_ipaParam.fetchRef2nd = false;
+  }
 #endif
 
   if (!forceRefFilterFlag)
@@ -5430,6 +5482,38 @@ void IntraPrediction::initIntraPatternChType(const CodingUnit &cu, const CompAre
     xFilterReferenceSamples( refBufUnfiltered, refBufFiltered, area, *cs.sps, cu.firstPU->multiRefIdx );
   }
 }
+
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
+void IntraPrediction::initIntraPatternChTypeOBMC(const CodingUnit &cu, const CompArea &area)
+{
+#if !INTRA_RM_SMALL_BLOCK_SIZE_CONSTRAINTS
+  CHECK(area.width == 2, "Width of 2 is not supported");
+#endif
+  const CodingStructure& cs   = *cu.cs;
+
+  m_ipaParam.fetchRef2nd = false;
+
+  initPredIntraParams(*cu.firstPU, area, *cs.sps);
+
+  m_ipaParam.applyFusion = false;
+
+  Pel *refBufUnfiltered = m_refBuffer[area.compID][PRED_BUF_UNFILTERED];
+  Pel *refBufFiltered   = m_refBuffer[area.compID][PRED_BUF_FILTERED];
+
+  setReferenceArrayLengths( area );
+#if JVET_AH0209_PDP
+  m_refAvailable = false;
+#endif
+  // ----- Step 1: unfiltered reference samples -----
+  xFillReferenceSamplesOBMC(cs.picture->getRecoBuf(area), refBufUnfiltered, area, cu);
+
+  // ----- Step 2: filtered reference samples -----
+  if( m_ipaParam.refFilterFlag)
+  {
+    xFilterReferenceSamples( refBufUnfiltered, refBufFiltered, area, *cs.sps, cu.firstPU->multiRefIdx );
+  }
+}
+#endif
 
 void IntraPrediction::initIntraPatternChTypeISP(const CodingUnit& cu, const CompArea& area, PelBuf& recBuf, const bool forceRefFilterFlag)
 {
@@ -5796,7 +5880,11 @@ void IntraPrediction::xFillReferenceSamples2(const CPelBuf &recoBuf, const CompA
 void IntraPrediction::xFillReferenceSamples( const CPelBuf &recoBuf, Pel* refBufUnfiltered, const CompArea &area, const CodingUnit &cu )
 {
 #if JVET_AH0209_PDP
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
+  if (m_isIntraForOBMC == 0 && !cu.firstPU->multiRefIdx && !cu.ispMode && !cu.plIdx)
+#else
   if (!cu.firstPU->multiRefIdx && !cu.ispMode && !cu.plIdx)
+#endif
   {
     xFillReferenceSamples2(recoBuf, area, cu);
   }
@@ -6163,6 +6251,364 @@ void IntraPrediction::xFillReferenceSamples( const CPelBuf &recoBuf, Pel* refBuf
   }
 }
 
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
+void IntraPrediction::xFillReferenceSamplesOBMC( const CPelBuf &recoBuf, Pel* refBufUnfiltered, const CompArea &area, const CodingUnit &cu )
+{
+  m_refAvailable                = false;
+
+  const ChannelType      chType = toChannelType( area.compID );
+  const CodingStructure &cs     = *cu.cs;
+  const SPS             &sps    = *cs.sps;
+  const PreCalcValues   &pcv    = *cs.pcv;
+
+  const int multiRefIdx         = (area.compID == COMPONENT_Y) ? cu.firstPU->multiRefIdx : 0;
+
+  const int  tuWidth            = area.width;
+  const int  tuHeight           = area.height;
+  const int  predSize           = m_topRefLength;
+  const int  predHSize          = m_leftRefLength;
+  const int predStride = predSize + 1 + multiRefIdx;
+  m_refBufferStride[area.compID] = predStride;
+
+  const bool noShift            = pcv.noChroma2x2 && area.width == 4; // don't shift on the lowest level (chroma not-split)
+  const int  unitWidth          = tuWidth  <= 2 && cu.ispMode && isLuma(area.compID) ? tuWidth  : pcv.minCUWidth  >> (noShift ? 0 : getComponentScaleX(area.compID, sps.getChromaFormatIdc()));
+  const int  unitHeight         = tuHeight <= 2 && cu.ispMode && isLuma(area.compID) ? tuHeight : pcv.minCUHeight >> (noShift ? 0 : getComponentScaleY(area.compID, sps.getChromaFormatIdc()));
+
+ #if JVET_Y0116_EXTENDED_MRL_LIST
+  int leftMrlUnitNum  = multiRefIdx / unitHeight;
+  int aboveMrlUnitNum = multiRefIdx / unitWidth;
+#endif
+
+  const int  totalAboveUnits    = (predSize + (unitWidth - 1)) / unitWidth;
+  const int  totalLeftUnits     = (predHSize + (unitHeight - 1)) / unitHeight;
+#if JVET_Y0116_EXTENDED_MRL_LIST
+  const int  totalUnits         = totalAboveUnits + totalLeftUnits + 1 + leftMrlUnitNum + aboveMrlUnitNum; //+1 for top-left
+#else
+  const int  totalUnits         = totalAboveUnits + totalLeftUnits + 1; //+1 for top-left
+#endif
+  const int  numAboveUnits      = std::max<int>( tuWidth / unitWidth, 1 );
+  const int  numLeftUnits       = std::max<int>( tuHeight / unitHeight, 1 );
+  const int  numAboveRightUnits = totalAboveUnits - numAboveUnits;
+  const int  numLeftBelowUnits  = totalLeftUnits - numLeftUnits;
+
+  CHECK( numAboveUnits <= 0 || numLeftUnits <= 0 || numAboveRightUnits <= 0 || numLeftBelowUnits <= 0, "Size not supported" );
+
+  // ----- Step 1: analyze neighborhood -----
+  const Position posLT          = area;
+  const Position posRT          = area.topRight();
+  const Position posLB          = area.bottomLeft();
+
+#if JVET_Y0116_EXTENDED_MRL_LIST
+#if JVET_AC0094_REF_SAMPLES_OPT
+  bool neighborFlags[4 * (MAX_NUM_PART_IDXS_IN_CTU_WIDTH << 2) + MAX_REF_LINE_IDX + 1];
+#else
+  bool  neighborFlags[4 * MAX_NUM_PART_IDXS_IN_CTU_WIDTH + MAX_REF_LINE_IDX + 1];
+#endif
+#else
+  bool  neighborFlags[4 * MAX_NUM_PART_IDXS_IN_CTU_WIDTH + 1];
+#endif
+  int   numIntraNeighbor = 0;
+
+  memset( neighborFlags, 0, totalUnits );
+
+  neighborFlags[totalLeftUnits+leftMrlUnitNum] = isAboveLeftAvailable( cu, chType, posLT.offset(-multiRefIdx, -multiRefIdx) );
+  numIntraNeighbor += neighborFlags[totalLeftUnits+leftMrlUnitNum] ? 1 : 0;
+  numIntraNeighbor += isAboveAvailableOBMC     ( cu, chType, posLT.offset(-aboveMrlUnitNum*unitWidth, -multiRefIdx), aboveMrlUnitNum,      unitWidth,  (neighborFlags + totalLeftUnits + 1 + leftMrlUnitNum), m_isIntraForOBMC );
+  numIntraNeighbor += isLeftAvailableOBMC      ( cu, chType, posLT.offset(-multiRefIdx, -leftMrlUnitNum*unitHeight), leftMrlUnitNum,       unitHeight, (neighborFlags + totalLeftUnits - 1 + leftMrlUnitNum), m_isIntraForOBMC );
+  numIntraNeighbor += isAboveAvailableOBMC     ( cu, chType, posLT.offset(0, -multiRefIdx), numAboveUnits,      unitWidth,  (neighborFlags + totalLeftUnits + 1 + leftMrlUnitNum + aboveMrlUnitNum), m_isIntraForOBMC );
+  numIntraNeighbor += isAboveRightAvailableOBMC( cu, chType, posRT.offset(0, -multiRefIdx), numAboveRightUnits, unitWidth,  (neighborFlags + totalLeftUnits + 1 + leftMrlUnitNum + aboveMrlUnitNum + numAboveUnits), m_isIntraForOBMC );
+  numIntraNeighbor += isLeftAvailableOBMC      ( cu, chType, posLT.offset(-multiRefIdx, 0), numLeftUnits,       unitHeight, (neighborFlags + totalLeftUnits - 1), m_isIntraForOBMC );
+  numIntraNeighbor += isBelowLeftAvailableOBMC ( cu, chType, posLB.offset(-multiRefIdx, 0), numLeftBelowUnits,  unitHeight, (neighborFlags + totalLeftUnits - 1 - numLeftUnits), m_isIntraForOBMC );
+
+  // ----- Step 2: fill reference samples (depending on neighborhood) -----
+
+  const Pel*  srcBuf    = recoBuf.buf;
+  const int   srcStride = recoBuf.stride;
+        Pel*  ptrDst    = refBufUnfiltered;
+  const Pel*  ptrSrc;
+
+  // Fill top-left sample(s) if available
+  ptrSrc = srcBuf - (1 + multiRefIdx) * srcStride - (1 + multiRefIdx);
+  ptrDst = refBufUnfiltered;
+#if JVET_Y0116_EXTENDED_MRL_LIST
+  if (neighborFlags[totalLeftUnits+leftMrlUnitNum])
+#else
+  if (neighborFlags[totalLeftUnits])
+#endif
+  {
+    ptrDst[0] = ptrSrc[0];
+    ptrDst[predStride] = ptrSrc[0];
+#if JVET_Y0116_EXTENDED_MRL_LIST
+    for (int i = 1; i <= multiRefIdx-leftMrlUnitNum*unitHeight; i++)
+#else
+    for (int i = 1; i <= multiRefIdx; i++)
+#endif
+    {
+      ptrDst[i] = ptrSrc[i];
+      ptrDst[i + predStride] = ptrSrc[i * srcStride];
+    }
+  }
+    
+
+  if (m_isIntraForOBMC == 2)
+  {
+  // Fill left & below-left samples if available (downwards)
+#if JVET_Y0116_EXTENDED_MRL_LIST
+  ptrSrc += (1 + multiRefIdx-leftMrlUnitNum*unitHeight) * srcStride;
+  ptrDst += (1 + multiRefIdx-leftMrlUnitNum*unitHeight) + predStride;
+#else
+  ptrSrc += (1 + multiRefIdx) * srcStride;
+  ptrDst += (1 + multiRefIdx) + predStride;
+#endif
+#if JVET_Y0116_EXTENDED_MRL_LIST
+  for (int unitIdx = totalLeftUnits + leftMrlUnitNum - 1; unitIdx > 0; unitIdx--)
+#else
+  for (int unitIdx = totalLeftUnits - 1; unitIdx > 0; unitIdx--)
+#endif
+  {
+    if (neighborFlags[unitIdx])
+    {
+      for (int i = 0; i < unitHeight; i++)
+      {
+        ptrDst[i] = ptrSrc[i * srcStride];
+      }
+    }
+    ptrSrc += unitHeight * srcStride;
+    ptrDst += unitHeight;
+  }
+  // Fill last below-left sample(s)
+  if (neighborFlags[0])
+  {
+    int lastSample = (predHSize % unitHeight == 0) ? unitHeight : predHSize % unitHeight;
+    for (int i = 0; i < lastSample; i++)
+    {
+      ptrDst[i] = ptrSrc[i * srcStride];
+    }
+  }
+  }
+
+  if (m_isIntraForOBMC == 1)
+  {
+  // Fill above & above-right samples if available (left-to-right)
+#if JVET_Y0116_EXTENDED_MRL_LIST
+  ptrSrc = srcBuf - srcStride * (1 + multiRefIdx ) - aboveMrlUnitNum*unitWidth;
+  ptrDst = refBufUnfiltered + 1 + multiRefIdx - aboveMrlUnitNum*unitWidth;
+#else
+  ptrSrc = srcBuf - srcStride * (1 + multiRefIdx);
+  ptrDst = refBufUnfiltered + 1 + multiRefIdx;
+#endif
+#if JVET_Y0116_EXTENDED_MRL_LIST
+  for (int unitIdx = totalLeftUnits + leftMrlUnitNum + 1; unitIdx < totalUnits - 1; unitIdx++)
+#else
+  for (int unitIdx = totalLeftUnits + 1; unitIdx < totalUnits - 1; unitIdx++)
+#endif
+  {
+    if (neighborFlags[unitIdx])
+    {
+      for (int j = 0; j < unitWidth; j++)
+      {
+        ptrDst[j] = ptrSrc[j];
+      }
+    }
+    ptrSrc += unitWidth;
+    ptrDst += unitWidth;
+  }
+  // Fill last above-right sample(s)
+  if (neighborFlags[totalUnits - 1])
+  {
+    int lastSample = (predSize % unitWidth == 0) ? unitWidth : predSize % unitWidth;
+    for (int j = 0; j < lastSample; j++)
+    {
+      ptrDst[j] = ptrSrc[j];
+    }
+  }
+  }
+
+  // pad from first available down to the last below-left
+  ptrDst = refBufUnfiltered;
+  int lastAvailUnit = 0;
+  if (!neighborFlags[0])
+  {
+    int firstAvailUnit = 1;
+    while (firstAvailUnit < totalUnits && !neighborFlags[firstAvailUnit])
+    {
+      firstAvailUnit++;
+    }
+
+    // first available sample
+    int firstAvailRow = -1;
+    int firstAvailCol = 0;
+
+#if JVET_Y0116_EXTENDED_MRL_LIST
+    if (firstAvailUnit < totalLeftUnits + leftMrlUnitNum)
+    {
+      firstAvailRow = (totalLeftUnits + leftMrlUnitNum - firstAvailUnit) * unitHeight + multiRefIdx - leftMrlUnitNum * unitHeight;
+    }
+    else if (firstAvailUnit == totalLeftUnits + leftMrlUnitNum)
+    {
+      firstAvailRow = multiRefIdx - leftMrlUnitNum * unitHeight;
+    }
+    else
+    {
+      firstAvailCol = (firstAvailUnit - totalLeftUnits - leftMrlUnitNum - 1) * unitWidth + 1 + multiRefIdx - aboveMrlUnitNum * unitWidth;
+    }
+#else
+    if (firstAvailUnit < totalLeftUnits)
+    {
+      firstAvailRow = (totalLeftUnits - firstAvailUnit) * unitHeight + multiRefIdx;
+    }
+    else if (firstAvailUnit == totalLeftUnits)
+    {
+      firstAvailRow = multiRefIdx;
+    }
+    else
+    {
+      firstAvailCol = (firstAvailUnit - totalLeftUnits - 1) * unitWidth + 1 + multiRefIdx;
+    }
+#endif
+    const Pel firstAvailSample = ptrDst[firstAvailRow < 0 ? firstAvailCol : firstAvailRow + predStride];
+
+    // last sample below-left (n.a.)
+    int lastRow = predHSize + multiRefIdx;
+
+    if (m_isIntraForOBMC == 1)
+      lastRow = std::min(lastRow, 1);
+    else
+      firstAvailCol = std::min(firstAvailCol, 1);
+
+    // fill left column
+    for (int i = lastRow; i > firstAvailRow; i--)
+    {
+      ptrDst[i + predStride] = firstAvailSample;
+    }
+    // fill top row
+    if (firstAvailCol > 0)
+    {
+      for (int j = 0; j < firstAvailCol; j++)
+      {
+        ptrDst[j] = firstAvailSample;
+      }
+    }
+    lastAvailUnit = firstAvailUnit;
+  }
+
+  // pad all other reference samples.
+  int currUnit = lastAvailUnit + 1;
+
+  if (m_isIntraForOBMC == 1)
+    currUnit = std::max(totalLeftUnits+leftMrlUnitNum+1, currUnit);
+
+  while (currUnit < totalUnits)
+  {
+    if (m_isIntraForOBMC == 2 && (totalLeftUnits+leftMrlUnitNum+1 < currUnit))
+      break;
+
+    if (!neighborFlags[currUnit]) // samples not available
+    {
+      // last available sample
+      int lastAvailRow = -1;
+      int lastAvailCol = 0;
+#if JVET_Y0116_EXTENDED_MRL_LIST
+      if (lastAvailUnit < totalLeftUnits + leftMrlUnitNum)
+      {
+        lastAvailRow = (totalLeftUnits + leftMrlUnitNum - lastAvailUnit - 1) * unitHeight + multiRefIdx - leftMrlUnitNum * unitHeight + 1;
+      }
+      else if (lastAvailUnit == totalLeftUnits + leftMrlUnitNum)
+      {
+        lastAvailCol = multiRefIdx- leftMrlUnitNum * unitHeight;
+      }
+      else
+      {
+        lastAvailCol = (lastAvailUnit - totalLeftUnits - leftMrlUnitNum) * unitWidth + multiRefIdx - aboveMrlUnitNum * unitWidth;
+      }
+#else
+      if (lastAvailUnit < totalLeftUnits)
+      {
+        lastAvailRow = (totalLeftUnits - lastAvailUnit - 1) * unitHeight + multiRefIdx + 1;
+      }
+      else if (lastAvailUnit == totalLeftUnits)
+      {
+        lastAvailCol = multiRefIdx;
+      }
+      else
+      {
+        lastAvailCol = (lastAvailUnit - totalLeftUnits) * unitWidth + multiRefIdx;
+      }
+#endif
+      const Pel lastAvailSample = ptrDst[lastAvailRow < 0 ? lastAvailCol : lastAvailRow + predStride];
+
+      // fill current unit with last available sample
+#if JVET_Y0116_EXTENDED_MRL_LIST
+      if (currUnit < totalLeftUnits + leftMrlUnitNum)
+      {
+        if (m_isIntraForOBMC == 1)
+        {
+        for (int i = lastAvailRow - 1; i >= lastAvailRow - unitHeight; i--)
+        {
+          ptrDst[i + predStride] = lastAvailSample;
+        }
+        }
+      }
+      else if (currUnit == totalLeftUnits + leftMrlUnitNum)
+      {
+        if (m_isIntraForOBMC == 1)
+        {
+        for (int i = 0; i < multiRefIdx - leftMrlUnitNum * unitHeight + 1; i++)
+        {
+          ptrDst[i + predStride] = lastAvailSample;
+        }
+        }
+        if (m_isIntraForOBMC == 2)
+        {
+        for (int j = 0; j < multiRefIdx - aboveMrlUnitNum * unitWidth + 1; j++)
+        {
+          ptrDst[j] = lastAvailSample;
+        }
+        }
+      }
+      else
+      {
+        int numSamplesInUnit = (currUnit == totalUnits - 1) ? ((predSize % unitWidth == 0) ? unitWidth : predSize % unitWidth) : unitWidth;
+        for (int j = lastAvailCol + 1; j <= lastAvailCol + numSamplesInUnit; j++)
+        {
+          ptrDst[j] = lastAvailSample;
+        }
+      }
+#else
+      if (currUnit < totalLeftUnits)
+      {
+        for (int i = lastAvailRow - 1; i >= lastAvailRow - unitHeight; i--)
+        {
+          ptrDst[i + predStride] = lastAvailSample;
+        }
+      }
+      else if (currUnit == totalLeftUnits)
+      {
+        for (int i = 0; i < multiRefIdx + 1; i++)
+        {
+          ptrDst[i + predStride] = lastAvailSample;
+        }
+        for (int j = 0; j < multiRefIdx + 1; j++)
+        {
+          ptrDst[j] = lastAvailSample;
+        }
+      }
+      else
+      {
+        int numSamplesInUnit = (currUnit == totalUnits - 1) ? ((predSize % unitWidth == 0) ? unitWidth : predSize % unitWidth) : unitWidth;
+        for (int j = lastAvailCol + 1; j <= lastAvailCol + numSamplesInUnit; j++)
+        {
+          ptrDst[j] = lastAvailSample;
+        }
+      }
+#endif
+    }
+    lastAvailUnit = currUnit;
+    currUnit++;
+  }
+}
+#endif
+
 #if JVET_AH0136_CHROMA_REORDERING
 void IntraPrediction::xFillReferenceSamplesForCoLuma(const CPelBuf &recoBuf, Pel* refBufUnfiltered, const CompArea &area, const CodingUnit &cu)
 {
@@ -6474,10 +6920,17 @@ void IntraPrediction::xFilterReferenceSamples(const Pel *refBufUnfiltered, Pel *
 
   refBufFiltered[0] = topLeft;
 
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
+  if (!(m_isIntraForOBMC == 2 && m_refSampleForOBMC))
+  {
+#endif
   for (int i = 1; i < predSize; i++)
   {
     refBufFiltered[i] = (refBufUnfiltered[i - 1] + 2 * refBufUnfiltered[i] + refBufUnfiltered[i + 1] + 2) >> 2;
   }
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
+  }
+#endif
   refBufFiltered[predSize] = refBufUnfiltered[predSize];
 
   refBufFiltered += predStride;
@@ -6485,10 +6938,17 @@ void IntraPrediction::xFilterReferenceSamples(const Pel *refBufUnfiltered, Pel *
 
   refBufFiltered[0] = topLeft;
 
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
+  if (!(m_isIntraForOBMC == 1 && m_refSampleForOBMC))
+  {
+#endif
   for (int i = 1; i < predHSize; i++)
   {
     refBufFiltered[i] = (refBufUnfiltered[i - 1] + 2 * refBufUnfiltered[i] + refBufUnfiltered[i + 1] + 2) >> 2;
   }
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
+  }
+#endif
   refBufFiltered[predHSize] = refBufUnfiltered[predHSize];
 }
 
@@ -10071,6 +10531,65 @@ void IntraPrediction::ibcCiipBlending(Pel *pDst, int strideDst, const Pel *pSrc0
 }
 #endif
 
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
+bool IntraPrediction::getGradForOBMC(const PredictionUnit pu, const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu, const bool isAbove, const int blkSize, int* modeBuf)
+{
+  const int templateSize = 1;
+  
+  const CodingStructure  &cs = *cu.cs;
+
+  const Pel *pReco = recoBuf.buf;
+  const uint32_t uiWidth = area.width;
+  const uint32_t uiHeight = area.height;
+  const int iStride = recoBuf.stride;
+  
+  int totalUnits;
+  if (isAbove)
+  {
+    const Position posNeighbor(pu.lumaPos().offset(1, -1));
+
+    PredictionUnit* tmpPu = pu.cs->getPU(posNeighbor, pu.chType);
+    if (tmpPu == nullptr)
+      return false;
+    totalUnits = uiWidth / blkSize;
+  }
+  else
+  {
+    const Position posNeighbor(pu.lumaPos().offset(-1, 1));
+
+    PredictionUnit* tmpPu = pu.cs->getPU(posNeighbor, pu.chType);
+    if (tmpPu == nullptr)
+      return false;
+
+    totalUnits = uiHeight / blkSize;
+  }
+  memset(modeBuf, -1, sizeof(int) * totalUnits);
+
+  const Position posLT = cu.Y().topLeft().offset(-1, -1);
+  const Position posLB = cu.Y().bottomLeft().offset(-1, 1);
+  const Position posRT = cu.Y().topRight().offset(1, -1);
+
+  if (isAbove)
+  {
+    const bool isExistFirst = (cs.getCURestricted(posLT, cu, cu.chType) != nullptr);
+    const bool isExistLast = (cs.getCURestricted(posRT, cu, cu.chType) != nullptr);
+    const Pel *pRecoAbove = pReco - 2 * iStride;
+
+    calcGradForOBMC(pu, pRecoAbove, iStride, totalUnits, templateSize, blkSize, modeBuf, isAbove, isExistFirst, isExistLast);
+  }
+  else
+  {
+    const bool isExistFirst = (cs.getCURestricted(posLT, cu, cu.chType) != nullptr);
+    const bool isExistLast = (cs.getCURestricted(posLB, cu, cu.chType) != nullptr);
+    const Pel *pRecoLeft = pReco - 2;
+
+    calcGradForOBMC(pu, pRecoLeft, iStride, totalUnits, templateSize, blkSize, modeBuf, isAbove, isExistFirst, isExistLast);
+  }
+
+  return true;
+}
+#endif
+
 #if ENABLE_DIMD
 void IntraPrediction::deriveDimdMode(const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu)
 {
@@ -12536,6 +13055,124 @@ int isBelowLeftAvailable(const CodingUnit &cu, const ChannelType &chType, const 
 
   return numIntra;
 }
+
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
+int isAboveAvailableOBMC(const CodingUnit &cu, const ChannelType &chType, const Position &posLT, const uint32_t uiNumUnitsInPU, const uint32_t unitWidth, bool *bValidFlags, const int isForOBMC)
+{
+  if (isForOBMC == 2)
+    return 0;
+  const CodingStructure& cs = *cu.cs;
+
+  bool *    validFlags = bValidFlags;
+  int       numIntra   = 0;
+  const int maxDx      = uiNumUnitsInPU * unitWidth;
+
+  for (int dx = 0; dx < maxDx; dx += unitWidth)
+  {
+    const Position refPos = posLT.offset(dx, -1);
+
+    if (!cs.isDecomp(refPos, chType))
+    {
+      break;
+    }
+
+    const bool valid = (cs.getCURestricted(refPos, cu, chType) != NULL);
+    numIntra += valid ? 1 : 0;
+    *validFlags = valid;
+
+    validFlags++;
+  }
+
+  return numIntra;
+}
+
+int isLeftAvailableOBMC(const CodingUnit &cu, const ChannelType &chType, const Position &posLT, const uint32_t uiNumUnitsInPU, const uint32_t unitHeight, bool *bValidFlags, const int isForOBMC)
+{
+  if (isForOBMC == 1)
+    return 0;
+  const CodingStructure& cs = *cu.cs;
+
+  bool *    validFlags = bValidFlags;
+  int       numIntra   = 0;
+  const int maxDy      = uiNumUnitsInPU * unitHeight;
+
+  for (int dy = 0; dy < maxDy; dy += unitHeight)
+  {
+    const Position refPos = posLT.offset(-1, dy);
+
+    if (!cs.isDecomp(refPos, chType))
+    {
+      break;
+    }
+
+    const bool valid = (cs.getCURestricted(refPos, cu, chType) != NULL);
+    numIntra += valid ? 1 : 0;
+    *validFlags = valid;
+
+    validFlags--;
+  }
+
+  return numIntra;
+}
+
+int isAboveRightAvailableOBMC(const CodingUnit &cu, const ChannelType &chType, const Position &posRT, const uint32_t uiNumUnitsInPU, const uint32_t unitWidth, bool *bValidFlags, const int isForOBMC )
+{
+  if (isForOBMC == 2)
+    return 0;
+  const CodingStructure& cs = *cu.cs;
+
+  bool *    validFlags = bValidFlags;
+  int       numIntra   = 0;
+  const int maxDx      = uiNumUnitsInPU * unitWidth;
+
+  for (int dx = 0; dx < maxDx; dx += unitWidth)
+  {
+    const Position refPos = posRT.offset(unitWidth + dx, -1);
+
+    if (!cs.isDecomp(refPos, chType))
+    {
+      break;
+    }
+
+    const bool valid = (cs.getCURestricted(refPos, cu, chType) != NULL);
+    numIntra += valid ? 1 : 0;
+    *validFlags = valid;
+
+    validFlags++;
+  }
+
+  return numIntra;
+}
+
+int isBelowLeftAvailableOBMC(const CodingUnit &cu, const ChannelType &chType, const Position &posLB, const uint32_t uiNumUnitsInPU, const uint32_t unitHeight, bool *bValidFlags, const int isForOBMC )
+{
+  if (isForOBMC == 1)
+    return 0;
+  const CodingStructure& cs = *cu.cs;
+
+  bool *    validFlags = bValidFlags;
+  int       numIntra   = 0;
+  const int maxDy      = uiNumUnitsInPU * unitHeight;
+
+  for (int dy = 0; dy < maxDy; dy += unitHeight)
+  {
+    const Position refPos = posLB.offset(-1, unitHeight + dy);
+
+    if (!cs.isDecomp(refPos, chType))
+    {
+      break;
+    }
+
+    const bool valid = (cs.getCURestricted(refPos, cu, chType) != NULL);
+    numIntra += valid ? 1 : 0;
+    *validFlags = valid;
+
+    validFlags--;
+  }
+
+  return numIntra;
+}
+#endif
 
 #if JVET_AA0126_GLM
 Pel IntraPrediction::xGlmGetLumaVal(const int s[6], const int c[6], const int glmIdx, const Pel val) const

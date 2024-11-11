@@ -33059,6 +33059,182 @@ int buildHistogram(const Pel *pReco, int iStride, uint32_t uiHeight, uint32_t ui
 }
 #endif
 
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
+void calcGradForOBMC(const PredictionUnit pu, const Pel *pReco, const int iStride, const int totalUnits, const int templateSize, const int blkSize, int *modeBuf, const int isAbove, const bool isExistFirst, const bool isExistLast)
+{
+  int       angTable[17]   = { 0,     2048,  4096,  6144,  8192,  12288, 16384, 20480, 24576,
+                       28672, 32768, 36864, 40960, 47104, 53248, 59392, 65536 };
+  int       offsets[4]     = { HOR_IDX, HOR_IDX, VER_IDX, VER_IDX };
+  int       dirs[4]        = { -1, 1, -1, 1 };
+  int       mapXgrY1[2][2] = { { 1, 0 }, { 0, 1 } };
+  int       mapXgrY0[2][2] = { { 2, 3 }, { 3, 2 } };
+  
+  int toSaveAmp[NUM_LUMA_MODE];
+  const Position startPos = pu.Y().topLeft().offset(isAbove ? 0 : -1, isAbove ? -1 : 0);
+  PredictionUnit* tmpPu = nullptr;
+  MotionInfo mi;
+
+  const int extraPosNum = 2;
+  bool prevSaved = false;
+  int savedPrevAmp[extraPosNum << 1];
+  int savedPrevAng[extraPosNum << 1];
+
+  for (int i = 0; i < (extraPosNum << 1); i++)
+  {
+    savedPrevAmp[i] = -1;
+    savedPrevAng[i] = -1;
+  }
+
+  int i = 0;
+
+  while (i < totalUnits)
+  {
+    const int off = i * blkSize;
+    const Position  posSubBlock(startPos.offset(isAbove ? off : 0, isAbove ? 0 : off));
+    tmpPu = pu.cs->getPU(posSubBlock, pu.chType);
+    mi = tmpPu->getMotionInfo(posSubBlock);
+
+    if (mi.isInter && !mi.isIBCmot)
+    {
+      if (tmpPu->gpmIntraFlag || tmpPu->gpmInterIbcFlag)
+      {
+        i++;
+      }
+      else
+      {
+        int forNext;
+        if (isAbove)
+        {
+          forNext = tmpPu->Y().bottomRight().x - posSubBlock.x;
+          forNext /= blkSize;
+        }
+        else
+        {
+          forNext = tmpPu->Y().bottomRight().y - posSubBlock.y;
+          forNext /= blkSize;
+        }
+        forNext++;
+
+        for (int k = 0; k < forNext; k++)
+        {
+          mi = tmpPu->getMotionInfo(posSubBlock.offset(isAbove ? blkSize * k : 0, isAbove ? 0 : blkSize * k));
+        }
+        i += forNext;
+      }
+      
+      prevSaved = false;
+      continue;
+    }
+
+    memset(toSaveAmp, 0, sizeof(int) * NUM_LUMA_MODE);
+    int bestMode = PLANAR_IDX;
+    
+    for (int j = -extraPosNum; j < blkSize + extraPosNum; j++)
+    {
+      if (!isExistFirst && (i == 0) && (j < 0))
+        continue;
+      if (!isExistLast && ((i + 1) >= totalUnits) && (j >= blkSize - 1))
+        continue;
+      
+      int iAmp = 0, iAngUneven = -1;
+      if (j < extraPosNum && prevSaved)
+      {
+        iAmp = savedPrevAmp[j + extraPosNum];
+        iAngUneven = savedPrevAng[j + extraPosNum];        
+        toSaveAmp[iAngUneven] += iAmp;
+      }
+      else
+      {
+        const Pel *pRec = &(pReco[isAbove ? (i * blkSize + j) : ((i * blkSize + j) * iStride)]);
+
+        int iDy = pRec[0] + pRec[iStride] - pRec[+1] - pRec[iStride + 1];
+        int iDx = - pRec[0] + pRec[iStride] - pRec[+1] + pRec[iStride + 1];
+
+        if (iDy == 0 && iDx == 0)
+        {
+          if (j >= blkSize - extraPosNum)
+          {
+            savedPrevAmp[j - (blkSize - extraPosNum)] = 0;
+            savedPrevAng[j - (blkSize - extraPosNum)] = 0;
+          }
+          continue;
+        }
+
+        iAmp       = (int) (abs(iDx) + abs(iDy));
+        if (iDx != 0 && iDy != 0)
+        {
+          int signx  = iDx < 0 ? 1 : 0;
+          int signy  = iDy < 0 ? 1 : 0;
+          int absx   = iDx < 0 ? -iDx : iDx;
+          int absy   = iDy < 0 ? -iDy : iDy;
+          int gtY    = absx > absy ? 1 : 0;
+          int region = gtY ? mapXgrY1[signy][signx] : mapXgrY0[signy][signx];
+#if JVET_X0149_TIMD_DIMD_LUT
+          int s0   = gtY ? absy : absx;
+          int s1   = gtY ? absx : absy;
+          int x    = floorLog2(s1);
+          int norm = (s1 << 4 >> x) & 15;
+          int v    = g_gradDivTable[norm] | 8;
+          x += (norm != 0);
+          int shift = 13 - x;
+          int ratio;
+          if (shift < 0)
+          {
+            shift   = -shift;
+            int add = (1 << (shift - 1));
+            ratio   = (s0 * v + add) >> shift;
+          }
+          else
+          {
+            ratio = (s0 * v) << shift;
+          }
+#else
+          float fRatio = gtY ? static_cast<float>(absy) / static_cast<float>(absx)
+                              : static_cast<float>(absx) / static_cast<float>(absy);
+          float fRatioScaled = fRatio * (1 << 16);
+          int ratio = static_cast<int>(fRatioScaled);
+#endif
+          int idx = 16;
+          for (int i = 1; i < 17; i++)
+          {
+            if (ratio <= angTable[i])
+            {
+              idx = ratio - angTable[i - 1] < angTable[i] - ratio ? i - 1 : i;
+              break;
+            }
+          }
+
+          iAngUneven = offsets[region] + dirs[region] * idx;
+        }
+        else
+        {
+          iAngUneven = iDx == 0 ? VER_IDX : HOR_IDX;
+        }
+
+        CHECK(iAngUneven < 0, "Wrong mode in DIMD histogram");
+        CHECK(iAngUneven >= NUM_LUMA_MODE, "Wrong mode in DIMD histogram");
+
+        toSaveAmp[iAngUneven] += iAmp;
+      
+        if (j >= blkSize - extraPosNum)
+        {
+          savedPrevAmp[j - (blkSize - extraPosNum)] = iAmp;
+          savedPrevAng[j - (blkSize - extraPosNum)] = iAngUneven;
+        }
+      }
+      if (toSaveAmp[iAngUneven] > toSaveAmp[bestMode])
+      {
+        bestMode = iAngUneven;
+      }
+    }
+
+    prevSaved = true;
+    modeBuf[i] = bestMode;
+    i++;
+  }
+}
+#endif
+
 #if JVET_AG0164_AFFINE_GPM
 int  PU::getAffGPMCtxOffset(const PredictionUnit& pu)
 {

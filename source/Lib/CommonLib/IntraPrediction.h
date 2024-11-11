@@ -258,6 +258,12 @@ public:
 #if MMLM
   bool m_encPreRDRun;
 #endif
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
+  int m_isIntraForOBMC;
+  bool m_refSampleForOBMC;
+  Pel m_refSampleForOBMCBuf[MAX_INTRA_SIZE + 3];
+  Pel m_refSampleForOBMCBufFiltered[MAX_INTRA_SIZE + 3];
+#endif
 
 #if JVET_AC0147_CCCM_NO_SUBSAMPLING
 #if JVET_AD0202_CCCM_MDF
@@ -561,7 +567,9 @@ protected:
 #endif
 
   void xFillReferenceSamples      ( const CPelBuf &recoBuf,      Pel* refBufUnfiltered, const CompArea &area, const CodingUnit &cu );
-
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
+  void xFillReferenceSamplesOBMC( const CPelBuf &recoBuf, Pel* refBufUnfiltered, const CompArea &area, const CodingUnit &cu );
+#endif
 #if JVET_AH0136_CHROMA_REORDERING
   void xFillReferenceSamplesForCoLuma(const CPelBuf &recoBuf, Pel* refBufUnfiltered, const CompArea &area, const CodingUnit &cu);
 #endif
@@ -812,6 +820,11 @@ public:
   );
 #endif
 
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
+  const IntraPredParam* getIpaParam () { return &m_ipaParam; };
+  bool getGradForOBMC(const PredictionUnit pu, const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu, const bool isAbove, const int blkSize, int* modeBuf);
+#endif
+
 #if ENABLE_DIMD
   static void deriveDimdMode      (const CPelBuf &recoBuf, const CompArea &area, CodingUnit &cu);
 #if JVET_Z0050_DIMD_CHROMA_FUSION && ENABLE_DIMD
@@ -1040,6 +1053,9 @@ public:
 #else
   void initIntraPatternChType     (const CodingUnit &cu, const CompArea &area, const bool forceRefFilterFlag = false); // use forceRefFilterFlag to get both filtered and unfiltered buffers
 #endif
+#endif
+#if JVET_AJ0161_OBMC_EXT_WITH_INTRA_PRED
+  void initIntraPatternChTypeOBMC(const CodingUnit &cu, const CompArea &area);
 #endif
   void initIntraPatternChTypeISP  (const CodingUnit& cu, const CompArea& area, PelBuf& piReco, const bool forceRefFilterFlag = false); // use forceRefFilterFlag to get both filtered and unfiltered buffers
 
