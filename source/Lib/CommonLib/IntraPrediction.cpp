@@ -3922,35 +3922,23 @@ void IntraPrediction::xPredIntraAng(
       int frac32precision = (-k * absInvAngle + 8) >> 4;
       int intpel = frac32precision >> 5;
       int fracpel = frac32precision & 31;
+
+      //std::cout << " fracPel: " << fracpel << std::endl;
+      int left = refSide[Clip3(0, sizeSide + 2 + multiRefIdx, intpel)];
+      int right = refSide[Clip3(0, sizeSide + 2 + multiRefIdx, intpel + 1)];
 #if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
       if (pu.cu->cs->sps->getDisableRefFilter())
       {
-        int left = refSide[Clip3(0, sizeSide + 2 + multiRefIdx, intpel)];
-        int right = refSide[Clip3(0, sizeSide + 2 + multiRefIdx, intpel + 1)];
         refMain[k] = (Pel)(fracpel > 15 ? right : left);
       }
       else
       {
-        //std::cout << " fracPel: " << fracpel << std::endl;
         int leftMinus1 = refSide[Clip3(0, sizeSide + 2 + multiRefIdx, intpel - 1)];
-        int left = refSide[Clip3(0, sizeSide + 2 + multiRefIdx, intpel)];
-        int right = refSide[Clip3(0, sizeSide + 2 + multiRefIdx, intpel + 1)];
         int rightPlus1 = refSide[Clip3(0, sizeSide + 2 + multiRefIdx, intpel + 2)];
-
         const TFilterCoeff* f = InterpolationFilter::getWeak4TapFilterTable(fracpel);
         int val = ((int)f[0] * leftMinus1 + (int)f[1] * left + (int)f[2] * right + f[3] * (int)rightPlus1 + 32) >> 6;
         refMain[k] = (Pel)ClipPel(val, clpRng);
       }
-#else
-      //std::cout << " fracPel: " << fracpel << std::endl;
-      int leftMinus1 = refSide[Clip3(0, sizeSide + 2 + multiRefIdx, intpel - 1)];
-      int left        = refSide[Clip3(0, sizeSide + 2 + multiRefIdx, intpel)];
-      int right       = refSide[Clip3(0, sizeSide + 2 + multiRefIdx, intpel + 1)];
-      int rightPlus1 = refSide[Clip3(0, sizeSide + 2 + multiRefIdx, intpel + 2)];
-
-      const TFilterCoeff* f = InterpolationFilter::getWeak4TapFilterTable(fracpel);
-      int val = ((int)f[0] * leftMinus1 + (int)f[1] * left + (int)f[2] * right + f[3] * (int)rightPlus1 + 32) >> 6;
-      refMain[k] = (Pel)ClipPel(val, clpRng);
 #endif
     }
 #else
@@ -4066,37 +4054,23 @@ void IntraPrediction::xPredIntraAng(
         int frac32precision = (-k * absInvAngle + 8) >> 4;
         int intpel          = frac32precision >> 5;
         int fracpel         = frac32precision & 31;
+
+        // std::cout << " fracPel: " << fracpel << std::endl;        
+        int left        = refSide2nd[Clip3(0, sizeSideRange, intpel)];
+        int right       = refSide2nd[Clip3(0, sizeSideRange, intpel + 1)];
 #if JVET_AJ0057_HL_INTRA_METHOD_CONTROL
         if (pu.cu->cs->sps->getDisableRefFilter())
         {
-          int left = refSide2nd[Clip3(0, sizeSideRange, intpel)];
-          int right = refSide2nd[Clip3(0, sizeSideRange, intpel + 1)];
           refMain2nd[k] = (Pel)(fracpel > 15 ? right : left);
         }
         else
         {
-          // std::cout << " fracPel: " << fracpel << std::endl;
           int leftMinus1 = refSide2nd[Clip3(0, sizeSideRange, intpel - 1)];
-          int left = refSide2nd[Clip3(0, sizeSideRange, intpel)];
-          int right = refSide2nd[Clip3(0, sizeSideRange, intpel + 1)];
           int rightPlus1 = refSide2nd[Clip3(0, sizeSideRange, intpel + 2)];
-
           const TFilterCoeff* f = InterpolationFilter::getWeak4TapFilterTable(fracpel);
-          int                 val =
-            ((int)f[0] * leftMinus1 + (int)f[1] * left + (int)f[2] * right + f[3] * (int)rightPlus1 + 32) >> 6;
+          int val = ((int)f[0] * leftMinus1 + (int)f[1] * left + (int)f[2] * right + f[3] * (int)rightPlus1 + 32) >> 6;
           refMain2nd[k] = (Pel)ClipPel(val, clpRng);
         }
-#else
-        // std::cout << " fracPel: " << fracpel << std::endl;
-        int leftMinus1  = refSide2nd[Clip3(0, sizeSideRange, intpel - 1)];
-        int left        = refSide2nd[Clip3(0, sizeSideRange, intpel)];
-        int right       = refSide2nd[Clip3(0, sizeSideRange, intpel + 1)];
-        int rightPlus1  = refSide2nd[Clip3(0, sizeSideRange, intpel + 2)];
-
-        const TFilterCoeff *f = InterpolationFilter::getWeak4TapFilterTable(fracpel);
-        int                 val =
-          ((int) f[0] * leftMinus1 + (int) f[1] * left + (int) f[2] * right + f[3] * (int) rightPlus1 + 32) >> 6;
-        refMain2nd[k] = (Pel) ClipPel(val, clpRng);
 #endif
       }
     }
@@ -5529,24 +5503,16 @@ void IntraPrediction::initIntraPatternChType(const CodingUnit &cu, const CompAre
     m_ipaParam.refFilterFlag = false;
     xCopyReferenceSamples(refBufUnfiltered, refBufFiltered, area, *cs.sps, cu.firstPU->multiRefIdx);
   }
-  else if (m_ipaParam.refFilterFlag || forceRefFilterFlag
-#if JVET_AG0092_ENHANCED_TIMD_FUSION
-    || cu.timd
+  else
 #endif
-    )
-  {
-    xFilterReferenceSamples(refBufUnfiltered, refBufFiltered, area, *cs.sps, cu.firstPU->multiRefIdx);
-  }
-#else
   if( m_ipaParam.refFilterFlag || forceRefFilterFlag 
 #if JVET_AG0092_ENHANCED_TIMD_FUSION 
    || cu.timd
-#endif  
+#endif
   )
   {
     xFilterReferenceSamples( refBufUnfiltered, refBufFiltered, area, *cs.sps, cu.firstPU->multiRefIdx );
   }
-#endif
 }
 
 void IntraPrediction::initIntraPatternChTypeISP(const CodingUnit& cu, const CompArea& area, PelBuf& recBuf, const bool forceRefFilterFlag)
@@ -5666,20 +5632,14 @@ void IntraPrediction::initIntraPatternChTypeISP(const CodingUnit& cu, const Comp
     Pel* refBufFiltered = m_refBuffer[area.compID][PRED_BUF_FILTERED];
     xCopyReferenceSamples(refBufUnfiltered, refBufFiltered, area, *cs.sps, cu.firstPU->multiRefIdx);
   }
-  else if (m_ipaParam.refFilterFlag || forceRefFilterFlag)
-  {
-    Pel* refBufUnfiltered = m_refBuffer[area.compID][PRED_BUF_UNFILTERED];
-    Pel* refBufFiltered = m_refBuffer[area.compID][PRED_BUF_FILTERED];
-    xFilterReferenceSamples(refBufUnfiltered, refBufFiltered, area, *cs.sps, cu.firstPU->multiRefIdx);
-  }
-#else
+  else
+#endif
   if (m_ipaParam.refFilterFlag || forceRefFilterFlag)
   {
     Pel *refBufUnfiltered = m_refBuffer[area.compID][PRED_BUF_UNFILTERED];
     Pel *refBufFiltered   = m_refBuffer[area.compID][PRED_BUF_FILTERED];
     xFilterReferenceSamples(refBufUnfiltered, refBufFiltered, area, *cs.sps, cu.firstPU->multiRefIdx);
   }
-#endif
 }
 
 #if JVET_V0130_INTRA_TMP
